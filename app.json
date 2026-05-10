@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "AI 농구 코치",
+    "slug": "basketball-coach-native",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#120d09"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "농구 자세 분석과 레슨 촬영을 위해 카메라 접근이 필요합니다.",
+          "microphonePermission": "레슨 영상을 녹화하기 위해 마이크 접근이 필요합니다."
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "농구 자세 분석과 레슨 촬영을 위해 카메라 접근이 필요합니다.",
+        "NSMicrophoneUsageDescription": "레슨 영상을 녹화하기 위해 마이크 접근이 필요합니다."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#120d09"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
