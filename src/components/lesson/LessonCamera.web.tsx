@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
 import { colors } from '../../theme/colors';
+import type { DribbleAnalysis, ShootAnalysis } from '../../types/app';
 
 interface LessonCameraProps {
   isLessonActive: boolean;
@@ -9,15 +10,23 @@ interface LessonCameraProps {
   onPoseMessage: (event: WebViewMessageEvent) => void;
 }
 
+type Landmark = { x: number; y: number; visibility?: number };
+
 type PosePayload =
   | { type: 'ready' }
   | { type: 'stream_started' }
   | { type: 'status'; message: string }
   | { type: 'points'; summary: string }
+  | { type: 'dribble_analysis'; analysis: DribbleAnalysis }
+  | { type: 'shoot_analysis'; analysis: ShootAnalysis }
   | { type: 'error'; message: string };
 
 const INDEX = {
   nose: 0,
+  leftEye: 2,
+  rightEye: 5,
+  leftEar: 7,
+  rightEar: 8,
   leftShoulder: 11,
   rightShoulder: 12,
   leftElbow: 13,
@@ -43,6 +52,227 @@ const LABELS = {
   foot: '발',
 } as const;
 
+function visible(point?: Landmark | null) {
+  return Boolean(point && (point.visibility ?? 1) > 0.4);
+}
+
+function midpoint(a: Landmark, b: Landmark): Landmark {
+  return {
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2,
+    visibility: Math.min(a.visibility ?? 1, b.visibility ?? 1),
+  };
+}
+
+function angleAt(a?: Landmark, b?: Landmark, c?: Landmark): number | null {
+  if (!a || !b || !c || !visible(a) || !visible(b) || !visible(c)) {
+    return null;
+  }
+
+  const abx = a.x - b.x;
+  const aby = a.y - b.y;
+  const cbx = c.x - b.x;
+  const cby = c.y - b.y;
+  const dot = abx * cbx + aby * cby;
+  const magAB = Math.hypot(abx, aby);
+  const magCB = Math.hypot(cbx, cby);
+
+  if (magAB === 0 || magCB === 0) {
+    return null;
+  }
+
+  const cosine = Math.min(1, Math.max(-1, dot / (magAB * magCB)));
+  return (Math.acos(cosine) * 180) / Math.PI;
+}
+
+function classifyEyeFocus(landmarks: Landmark[], neck: Landmark | null): DribbleAnalysis['eyeFocus'] {
+  const nose = landmarks[INDEX.nose];
+  const leftEar = landmarks[INDEX.leftEar];
+  const rightEar = landmarks[INDEX.rightEar];
+  const leftEye = landmarks[INDEX.leftEye];
+  const rightEye = landmarks[INDEX.rightEye];
+
+  if (!visible(nose) || !neck) {
+    return 'unknown';
+  }
+
+  const headBase =
+    visible(leftEar) && visible(rightEar)
+      ? midpoint(leftEar, rightEar)
+      : visible(leftEye) && visible(rightEye)
+        ? midpoint(leftEye, rightEye)
+        : null;
+
+  if (!headBase) {
+    return 'unknown';
+  }
+
+  const noseDrop = nose.y - headBase.y;
+  const neckGap = neck.y - nose.y;
+  return noseDrop > 0.055 || neckGap < 0.11 ? 'ball' : 'forward';
+}
+
+function classifyDribbleHeight(
+  landmarks: Landmark[],
+  neck: Landmark | null,
+  hipMid: Landmark | null
+): DribbleAnalysis['dribbleHeight'] {
+  const wrists = [landmarks[INDEX.leftWrist], landmarks[INDEX.rightWrist]].filter(visible);
+
+  if (!neck || !hipMid || wrists.length === 0) {
+    return 'unknown';
+  }
+
+  const dribbleHand = wrists.reduce((lowest, current) => (current.y > lowest.y ? current : lowest));
+  const neckDistance = Math.abs(dribbleHand.y - neck.y);
+  const hipDistance = Math.abs(dribbleHand.y - hipMid.y);
+
+  if (neckDistance + 0.015 < hipDistance) {
+    return 'high';
+  }
+
+  if (hipDistance + 0.015 < neckDistance) {
+    return 'low';
+  }
+
+  return 'balanced';
+}
+
+function classifyTorsoPosture(shoulderMid: Landmark | null, hipMid: Landmark | null): DribbleAnalysis['torsoPosture'] {
+  if (!shoulderMid || !hipMid) {
+    return 'unknown';
+  }
+
+  const torsoHeight = hipMid.y - shoulderMid.y;
+
+  if (torsoHeight > 0.3) {
+    return 'high';
+  }
+
+  if (torsoHeight < 0.2) {
+    return 'low';
+  }
+
+  return 'balanced';
+}
+
+function buildDribbleAnalysis(landmarks: Landmark[]): DribbleAnalysis {
+  const leftShoulder = landmarks[INDEX.leftShoulder];
+  const rightShoulder = landmarks[INDEX.rightShoulder];
+  const leftHip = landmarks[INDEX.leftHip];
+  const rightHip = landmarks[INDEX.rightHip];
+
+  const shoulderMid = visible(leftShoulder) && visible(rightShoulder) ? midpoint(leftShoulder, rightShoulder) : null;
+  const hipMid = visible(leftHip) && visible(rightHip) ? midpoint(leftHip, rightHip) : null;
+  const neck = shoulderMid;
+
+  const eyeFocus = classifyEyeFocus(landmarks, neck);
+  const dribbleHeight = classifyDribbleHeight(landmarks, neck, hipMid);
+  const torsoPosture = classifyTorsoPosture(shoulderMid, hipMid);
+
+  return {
+    eyeFocus,
+    dribbleHeight,
+    torsoPosture,
+    summary: [
+      `시선:${eyeFocus === 'ball' ? '공 쪽' : eyeFocus === 'forward' ? '앞' : '판정 어려움'}`,
+      `드리블:${dribbleHeight === 'high' ? '높음' : dribbleHeight === 'low' ? '낮음' : dribbleHeight === 'balanced' ? '적절' : '판정 어려움'}`,
+      `상체:${torsoPosture === 'high' ? '높음' : torsoPosture === 'low' ? '낮음' : torsoPosture === 'balanced' ? '적절' : '판정 어려움'}`,
+    ].join(' | '),
+  };
+}
+
+function buildShootAnalysis(landmarks: Landmark[], releaseVelocity: number | null): ShootAnalysis {
+  const leftShoulder = landmarks[INDEX.leftShoulder];
+  const rightShoulder = landmarks[INDEX.rightShoulder];
+  const leftElbow = landmarks[INDEX.leftElbow];
+  const rightElbow = landmarks[INDEX.rightElbow];
+  const leftWrist = landmarks[INDEX.leftWrist];
+  const rightWrist = landmarks[INDEX.rightWrist];
+  const leftHip = landmarks[INDEX.leftHip];
+  const rightHip = landmarks[INDEX.rightHip];
+  const leftKnee = landmarks[INDEX.leftKnee];
+  const rightKnee = landmarks[INDEX.rightKnee];
+  const leftAnkle = landmarks[INDEX.leftAnkle];
+  const rightAnkle = landmarks[INDEX.rightAnkle];
+
+  const leftArmAngle = angleAt(leftShoulder, leftElbow, leftWrist);
+  const rightArmAngle = angleAt(rightShoulder, rightElbow, rightWrist);
+  const shootingSide =
+    leftArmAngle !== null && rightArmAngle !== null
+      ? (leftWrist?.y ?? 1) < (rightWrist?.y ?? 1)
+        ? 'left'
+        : 'right'
+      : leftArmAngle !== null
+        ? 'left'
+        : rightArmAngle !== null
+          ? 'right'
+          : null;
+
+  const armAngle = shootingSide === 'left' ? leftArmAngle : shootingSide === 'right' ? rightArmAngle : null;
+  const shootingShoulder = shootingSide === 'left' ? leftShoulder : shootingSide === 'right' ? rightShoulder : undefined;
+  const shootingWrist = shootingSide === 'left' ? leftWrist : shootingSide === 'right' ? rightWrist : undefined;
+
+  let armAngleState: ShootAnalysis['armAngleState'] = 'unknown';
+  if (armAngle !== null) {
+    if (armAngle < 90) {
+      armAngleState = 'narrow';
+    } else if (armAngle > 110) {
+      armAngleState = 'wide';
+    } else {
+      armAngleState = 'balanced';
+    }
+  }
+
+  const legAngles = [angleAt(leftHip, leftKnee, leftAnkle), angleAt(rightHip, rightKnee, rightAnkle)].filter(
+    (value): value is number => value !== null
+  );
+  const legAngle = legAngles.length > 0 ? legAngles.reduce((sum, value) => sum + value, 0) / legAngles.length : null;
+
+  let legAngleState: ShootAnalysis['legAngleState'] = 'unknown';
+  if (legAngle !== null) {
+    if (legAngle < 100) {
+      legAngleState = 'low';
+    } else if (legAngle > 130) {
+      legAngleState = 'high';
+    } else {
+      legAngleState = 'balanced';
+    }
+  }
+
+  const releasePose =
+    armAngle !== null &&
+    armAngle > 120 &&
+    visible(shootingShoulder) &&
+    visible(shootingWrist) &&
+    shootingWrist!.y < shootingShoulder!.y;
+
+  let releaseTiming: ShootAnalysis['releaseTiming'] = 'unknown';
+  if (releasePose && releaseVelocity !== null) {
+    if (releaseVelocity < -0.003) {
+      releaseTiming = 'early';
+    } else if (releaseVelocity > 0.003) {
+      releaseTiming = 'late';
+    } else {
+      releaseTiming = 'balanced';
+    }
+  }
+
+  return {
+    armAngle,
+    legAngle,
+    releaseVelocity,
+    armAngleState,
+    releaseTiming,
+    legAngleState,
+    summary: [
+      `팔:${armAngleState === 'narrow' ? '좁음' : armAngleState === 'wide' ? '넓음' : armAngleState === 'balanced' ? '적절' : '판정 어려움'}`,
+      `타이밍:${releaseTiming === 'early' ? '빠름' : releaseTiming === 'late' ? '늦음' : releaseTiming === 'balanced' ? '적절' : '판정 어려움'}`,
+      `하체:${legAngleState === 'low' ? '너무 낮음' : legAngleState === 'high' ? '높음' : legAngleState === 'balanced' ? '적절' : '판정 어려움'}`,
+    ].join(' | '),
+  };
+}
+
 export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: LessonCameraProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const onPoseMessageRef = useRef(onPoseMessage);
@@ -67,14 +297,15 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
     let animationFrameId = 0;
     let stream: MediaStream | null = null;
     let poseLandmarker: {
-      detectForVideo: (video: HTMLVideoElement, timestampMs: number) => {
-        landmarks?: Array<Array<{ x: number; y: number; visibility?: number }>>;
-      };
+      detectForVideo: (video: HTMLVideoElement, timestampMs: number) => { landmarks?: Landmark[][] };
       close?: () => void;
     } | null = null;
     let lastVideoTime = -1;
-    let lastSummary = '';
+    let lastPointSummary = '';
+    let lastDribbleSummary = '';
+    let lastShootSummary = '';
     let lastSentAt = 0;
+    let previousHipY: number | null = null;
 
     const emit = (payload: PosePayload) => {
       onPoseMessageRef.current({
@@ -112,7 +343,6 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
       inset: '0',
       width: '100%',
       height: '100%',
-      transform: 'scaleX(-1)',
       pointerEvents: 'none',
     } satisfies Partial<CSSStyleDeclaration>);
 
@@ -148,25 +378,17 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
       hud.textContent = text;
     };
 
-    const visible = (point?: { visibility?: number } | null) => Boolean(point && (point.visibility ?? 1) > 0.4);
-
-    const midpoint = (
-      a: { x: number; y: number; visibility?: number },
-      b: { x: number; y: number; visibility?: number }
-    ) => ({
-      x: (a.x + b.x) / 2,
-      y: (a.y + b.y) / 2,
-      visibility: Math.min(a.visibility ?? 1, b.visibility ?? 1),
-    });
-
     const resizeCanvas = () => {
       canvas.width = video.videoWidth || host.clientWidth || 1280;
       canvas.height = video.videoHeight || host.clientHeight || 720;
     };
 
-    const drawPoint = (point: { x: number; y: number }, label: string, color: string) => {
-      const x = point.x * canvas.width;
-      const y = point.y * canvas.height;
+    const projectX = (x: number) => (1 - x) * canvas.width;
+    const projectY = (y: number) => y * canvas.height;
+
+    const drawPoint = (point: Landmark, label: string, color: string) => {
+      const x = projectX(point.x);
+      const y = projectY(point.y);
       context.beginPath();
       context.arc(x, y, 7, 0, Math.PI * 2);
       context.fillStyle = color;
@@ -179,20 +401,20 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
       context.fillText(label, x + 10, y - 10);
     };
 
-    const drawSegment = (a?: { x: number; y: number; visibility?: number }, b?: { x: number; y: number; visibility?: number }, color?: string) => {
+    const drawSegment = (a?: Landmark, b?: Landmark, color?: string) => {
       if (!a || !b || !color || !visible(a) || !visible(b)) {
         return;
       }
 
       context.beginPath();
-      context.moveTo(a.x * canvas.width, a.y * canvas.height);
-      context.lineTo(b.x * canvas.width, b.y * canvas.height);
+      context.moveTo(projectX(a.x), projectY(a.y));
+      context.lineTo(projectX(b.x), projectY(b.y));
       context.strokeStyle = color;
       context.lineWidth = 4;
       context.stroke();
     };
 
-    const renderPose = (landmarks: Array<{ x: number; y: number; visibility?: number }> | null) => {
+    const renderPose = (landmarks: Landmark[] | null) => {
       context.clearRect(0, 0, canvas.width, canvas.height);
 
       if (!landmarks) {
@@ -219,6 +441,7 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
       const leftAnkle = landmarks[INDEX.leftAnkle];
       const rightAnkle = landmarks[INDEX.rightAnkle];
       const neck = visible(leftShoulder) && visible(rightShoulder) ? midpoint(leftShoulder, rightShoulder) : null;
+      const hipMid = visible(leftHip) && visible(rightHip) ? midpoint(leftHip, rightHip) : null;
 
       drawSegment(leftShoulder, rightShoulder, '#ffb347');
       drawSegment(leftShoulder, leftElbow, '#ffb347');
@@ -258,14 +481,32 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
       if (visible(leftKnee) || visible(rightKnee)) detected.push(LABELS.knee);
       if (visible(leftAnkle) || visible(rightAnkle)) detected.push(LABELS.foot);
 
-      const summary = detected.join(', ');
-      setHud(summary ? `인식 중: ${summary}` : '관절을 찾는 중입니다.');
+      const pointSummary = detected.join(', ');
+      setHud(pointSummary ? `인식 중: ${pointSummary}` : '관절을 찾는 중입니다.');
 
+      const releaseVelocity = hipMid && previousHipY !== null ? hipMid.y - previousHipY : null;
+      if (hipMid) {
+        previousHipY = hipMid.y;
+      }
+
+      const dribbleAnalysis = buildDribbleAnalysis(landmarks);
+      const shootAnalysis = buildShootAnalysis(landmarks, releaseVelocity);
       const now = Date.now();
-      if (summary && (summary !== lastSummary || now - lastSentAt > 1200)) {
-        lastSummary = summary;
+
+      if (pointSummary && (pointSummary !== lastPointSummary || now - lastSentAt > 1200)) {
+        lastPointSummary = pointSummary;
         lastSentAt = now;
-        emit({ type: 'points', summary });
+        emit({ type: 'points', summary: pointSummary });
+      }
+
+      if (dribbleAnalysis.summary !== lastDribbleSummary || now - lastSentAt > 1200) {
+        lastDribbleSummary = dribbleAnalysis.summary;
+        emit({ type: 'dribble_analysis', analysis: dribbleAnalysis });
+      }
+
+      if (shootAnalysis.summary !== lastShootSummary || now - lastSentAt > 1200) {
+        lastShootSummary = shootAnalysis.summary;
+        emit({ type: 'shoot_analysis', analysis: shootAnalysis });
       }
     };
 
@@ -313,9 +554,7 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
               fileset: unknown,
               options: Record<string, unknown>
             ) => Promise<{
-              detectForVideo: (video: HTMLVideoElement, timestampMs: number) => {
-                landmarks?: Array<Array<{ x: number; y: number; visibility?: number }>>;
-              };
+              detectForVideo: (video: HTMLVideoElement, timestampMs: number) => { landmarks?: Landmark[][] };
               close?: () => void;
             }>;
           };
@@ -389,7 +628,6 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{isCameraReady ? 'LIVE' : 'LOADING'}</Text>
             </View>
-            <Text style={styles.hint}>웹에서는 inner.html처럼 브라우저 카메라와 MediaPipe를 직접 실행합니다.</Text>
           </View>
         </>
       ) : (
@@ -404,7 +642,7 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
 
 const styles = StyleSheet.create({
   videoWrap: {
-    height: 420,
+    height: 560,
     backgroundColor: colors.cameraBg,
     borderRadius: 22,
     overflow: 'hidden',
@@ -419,7 +657,7 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     padding: 16,
     pointerEvents: 'none',
   },
@@ -435,14 +673,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 1,
-  },
-  hint: {
-    color: colors.text,
-    fontSize: 14,
-    lineHeight: 20,
-    backgroundColor: 'rgba(0,0,0,0.38)',
-    borderRadius: 14,
-    padding: 12,
   },
   placeholder: {
     flex: 1,

@@ -5,10 +5,7 @@ export function buildPoseWebHtml(): string {
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <style>
       html, body {
         margin: 0;
@@ -34,6 +31,9 @@ export function buildPoseWebHtml(): string {
         width: 100%;
         height: 100%;
         object-fit: cover;
+      }
+
+      video {
         transform: scaleX(-1);
       }
 
@@ -43,7 +43,7 @@ export function buildPoseWebHtml(): string {
         right: 12px;
         bottom: 12px;
         z-index: 5;
-        color: white;
+        color: #ffffff;
         background: rgba(0, 0, 0, 0.5);
         border-radius: 14px;
         padding: 10px 12px;
@@ -56,7 +56,7 @@ export function buildPoseWebHtml(): string {
     <div class="wrap">
       <video id="video" autoplay playsinline muted webkit-playsinline></video>
       <canvas id="canvas"></canvas>
-      <div class="hud" id="hud">MediaPipe를 준비하는 중...</div>
+      <div class="hud" id="hud">MediaPipe를 준비하는 중입니다.</div>
     </div>
 
     <script type="module">
@@ -67,6 +67,10 @@ export function buildPoseWebHtml(): string {
 
       const INDEX = {
         nose: 0,
+        leftEye: 2,
+        rightEye: 5,
+        leftEar: 7,
+        rightEar: 8,
         leftShoulder: 11,
         rightShoulder: 12,
         leftElbow: 13,
@@ -94,8 +98,11 @@ export function buildPoseWebHtml(): string {
 
       let poseLandmarker = null;
       let lastVideoTime = -1;
-      let lastSummary = "";
+      let lastPointSummary = "";
+      let lastDribbleSummary = "";
+      let lastShootSummary = "";
       let lastSentAt = 0;
+      let previousHipY = null;
 
       function post(payload) {
         if (window.ReactNativeWebView) {
@@ -114,6 +121,14 @@ export function buildPoseWebHtml(): string {
         canvas.height = height;
       }
 
+      function projectX(x) {
+        return (1 - x) * canvas.width;
+      }
+
+      function projectY(y) {
+        return y * canvas.height;
+      }
+
       function visible(point) {
         return Boolean(point && (point.visibility ?? 1) > 0.4);
       }
@@ -126,9 +141,30 @@ export function buildPoseWebHtml(): string {
         };
       }
 
+      function angleAt(a, b, c) {
+        if (!visible(a) || !visible(b) || !visible(c)) {
+          return null;
+        }
+
+        const abx = a.x - b.x;
+        const aby = a.y - b.y;
+        const cbx = c.x - b.x;
+        const cby = c.y - b.y;
+        const dot = abx * cbx + aby * cby;
+        const magAB = Math.hypot(abx, aby);
+        const magCB = Math.hypot(cbx, cby);
+
+        if (magAB === 0 || magCB === 0) {
+          return null;
+        }
+
+        const cosine = Math.min(1, Math.max(-1, dot / (magAB * magCB)));
+        return Math.acos(cosine) * 180 / Math.PI;
+      }
+
       function drawPoint(point, label, color) {
-        const x = point.x * canvas.width;
-        const y = point.y * canvas.height;
+        const x = projectX(point.x);
+        const y = projectY(point.y);
         ctx.beginPath();
         ctx.arc(x, y, 7, 0, Math.PI * 2);
         ctx.fillStyle = color;
@@ -142,24 +178,206 @@ export function buildPoseWebHtml(): string {
       }
 
       function drawSegment(a, b, color) {
-        if (!visible(a) || !visible(b)) return;
+        if (!visible(a) || !visible(b)) {
+          return;
+        }
+
         ctx.beginPath();
-        ctx.moveTo(a.x * canvas.width, a.y * canvas.height);
-        ctx.lineTo(b.x * canvas.width, b.y * canvas.height);
+        ctx.moveTo(projectX(a.x), projectY(a.y));
+        ctx.lineTo(projectX(b.x), projectY(b.y));
         ctx.strokeStyle = color;
         ctx.lineWidth = 4;
         ctx.stroke();
+      }
+
+      function classifyEyeFocus(landmarks, neck) {
+        const nose = landmarks[INDEX.nose];
+        const leftEar = landmarks[INDEX.leftEar];
+        const rightEar = landmarks[INDEX.rightEar];
+        const leftEye = landmarks[INDEX.leftEye];
+        const rightEye = landmarks[INDEX.rightEye];
+
+        if (!visible(nose) || !neck) {
+          return "unknown";
+        }
+
+        const headBase =
+          visible(leftEar) && visible(rightEar)
+            ? midpoint(leftEar, rightEar)
+            : visible(leftEye) && visible(rightEye)
+              ? midpoint(leftEye, rightEye)
+              : null;
+
+        if (!headBase) {
+          return "unknown";
+        }
+
+        const noseDrop = nose.y - headBase.y;
+        const neckGap = neck.y - nose.y;
+        return noseDrop > 0.055 || neckGap < 0.11 ? "ball" : "forward";
+      }
+
+      function classifyDribbleHeight(landmarks, neck, hipMid) {
+        const wrists = [landmarks[INDEX.leftWrist], landmarks[INDEX.rightWrist]].filter(visible);
+
+        if (!neck || !hipMid || wrists.length === 0) {
+          return "unknown";
+        }
+
+        const dribbleHand = wrists.reduce((lowest, current) => current.y > lowest.y ? current : lowest);
+        const neckDistance = Math.abs(dribbleHand.y - neck.y);
+        const hipDistance = Math.abs(dribbleHand.y - hipMid.y);
+
+        if (neckDistance + 0.015 < hipDistance) {
+          return "high";
+        }
+
+        if (hipDistance + 0.015 < neckDistance) {
+          return "low";
+        }
+
+        return "balanced";
+      }
+
+      function classifyTorsoPosture(shoulderMid, hipMid) {
+        if (!shoulderMid || !hipMid) {
+          return "unknown";
+        }
+
+        const torsoHeight = hipMid.y - shoulderMid.y;
+
+        if (torsoHeight > 0.3) {
+          return "high";
+        }
+
+        if (torsoHeight < 0.2) {
+          return "low";
+        }
+
+        return "balanced";
+      }
+
+      function buildDribbleAnalysis(landmarks) {
+        const leftShoulder = landmarks[INDEX.leftShoulder];
+        const rightShoulder = landmarks[INDEX.rightShoulder];
+        const leftHip = landmarks[INDEX.leftHip];
+        const rightHip = landmarks[INDEX.rightHip];
+        const shoulderMid = visible(leftShoulder) && visible(rightShoulder) ? midpoint(leftShoulder, rightShoulder) : null;
+        const hipMid = visible(leftHip) && visible(rightHip) ? midpoint(leftHip, rightHip) : null;
+        const neck = shoulderMid;
+
+        const eyeFocus = classifyEyeFocus(landmarks, neck);
+        const dribbleHeight = classifyDribbleHeight(landmarks, neck, hipMid);
+        const torsoPosture = classifyTorsoPosture(shoulderMid, hipMid);
+
+        return {
+          eyeFocus,
+          dribbleHeight,
+          torsoPosture,
+          summary: [
+            "시선:" + (eyeFocus === "ball" ? "공 쪽" : eyeFocus === "forward" ? "앞" : "판정 어려움"),
+            "드리블:" + (dribbleHeight === "high" ? "높음" : dribbleHeight === "low" ? "낮음" : dribbleHeight === "balanced" ? "적절" : "판정 어려움"),
+            "상체:" + (torsoPosture === "high" ? "높음" : torsoPosture === "low" ? "낮음" : torsoPosture === "balanced" ? "적절" : "판정 어려움")
+          ].join(" | ")
+        };
+      }
+
+      function buildShootAnalysis(landmarks, releaseVelocity) {
+        const leftShoulder = landmarks[INDEX.leftShoulder];
+        const rightShoulder = landmarks[INDEX.rightShoulder];
+        const leftElbow = landmarks[INDEX.leftElbow];
+        const rightElbow = landmarks[INDEX.rightElbow];
+        const leftWrist = landmarks[INDEX.leftWrist];
+        const rightWrist = landmarks[INDEX.rightWrist];
+        const leftHip = landmarks[INDEX.leftHip];
+        const rightHip = landmarks[INDEX.rightHip];
+        const leftKnee = landmarks[INDEX.leftKnee];
+        const rightKnee = landmarks[INDEX.rightKnee];
+        const leftAnkle = landmarks[INDEX.leftAnkle];
+        const rightAnkle = landmarks[INDEX.rightAnkle];
+
+        const leftArmAngle = angleAt(leftShoulder, leftElbow, leftWrist);
+        const rightArmAngle = angleAt(rightShoulder, rightElbow, rightWrist);
+        const shootingSide =
+          leftArmAngle !== null && rightArmAngle !== null
+            ? (leftWrist?.y ?? 1) < (rightWrist?.y ?? 1) ? "left" : "right"
+            : leftArmAngle !== null
+              ? "left"
+              : rightArmAngle !== null
+                ? "right"
+                : null;
+
+        const armAngle = shootingSide === "left" ? leftArmAngle : shootingSide === "right" ? rightArmAngle : null;
+        const shootingShoulder = shootingSide === "left" ? leftShoulder : shootingSide === "right" ? rightShoulder : null;
+        const shootingWrist = shootingSide === "left" ? leftWrist : shootingSide === "right" ? rightWrist : null;
+
+        let armAngleState = "unknown";
+        if (armAngle !== null) {
+          if (armAngle < 90) {
+            armAngleState = "narrow";
+          } else if (armAngle > 110) {
+            armAngleState = "wide";
+          } else {
+            armAngleState = "balanced";
+          }
+        }
+
+        const legAngles = [angleAt(leftHip, leftKnee, leftAnkle), angleAt(rightHip, rightKnee, rightAnkle)].filter((value) => value !== null);
+        const legAngle = legAngles.length > 0 ? legAngles.reduce((sum, value) => sum + value, 0) / legAngles.length : null;
+
+        let legAngleState = "unknown";
+        if (legAngle !== null) {
+          if (legAngle < 100) {
+            legAngleState = "low";
+          } else if (legAngle > 130) {
+            legAngleState = "high";
+          } else {
+            legAngleState = "balanced";
+          }
+        }
+
+        const releasePose =
+          armAngle !== null &&
+          armAngle > 120 &&
+          visible(shootingShoulder) &&
+          visible(shootingWrist) &&
+          shootingWrist.y < shootingShoulder.y;
+
+        let releaseTiming = "unknown";
+        if (releasePose && releaseVelocity !== null) {
+          if (releaseVelocity < -0.003) {
+            releaseTiming = "early";
+          } else if (releaseVelocity > 0.003) {
+            releaseTiming = "late";
+          } else {
+            releaseTiming = "balanced";
+          }
+        }
+
+        return {
+          armAngle,
+          legAngle,
+          releaseVelocity,
+          armAngleState,
+          releaseTiming,
+          legAngleState,
+          summary: [
+            "팔:" + (armAngleState === "narrow" ? "좁음" : armAngleState === "wide" ? "넓음" : armAngleState === "balanced" ? "적절" : "판정 어려움"),
+            "타이밍:" + (releaseTiming === "early" ? "빠름" : releaseTiming === "late" ? "늦음" : releaseTiming === "balanced" ? "적절" : "판정 어려움"),
+            "하체:" + (legAngleState === "low" ? "너무 낮음" : legAngleState === "high" ? "높음" : legAngleState === "balanced" ? "적절" : "판정 어려움")
+          ].join(" | ")
+        };
       }
 
       function renderPose(landmarks) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         if (!landmarks) {
-          setHud("사람이 화면 안에 잘 보이도록 서 주세요.");
+          setHud("화면 안에 몸이 보이도록 서 주세요.");
           const now = Date.now();
           if (now - lastSentAt > 1000) {
             lastSentAt = now;
-            post({ type: "status", message: "사람을 찾는 중" });
+            post({ type: "status", message: "사람을 찾는 중입니다." });
           }
           return;
         }
@@ -178,6 +396,7 @@ export function buildPoseWebHtml(): string {
         const leftAnkle = landmarks[INDEX.leftAnkle];
         const rightAnkle = landmarks[INDEX.rightAnkle];
         const neck = visible(leftShoulder) && visible(rightShoulder) ? midpoint(leftShoulder, rightShoulder) : null;
+        const hipMid = visible(leftHip) && visible(rightHip) ? midpoint(leftHip, rightHip) : null;
 
         drawSegment(leftShoulder, rightShoulder, "#ffb347");
         drawSegment(leftShoulder, leftElbow, "#ffb347");
@@ -217,77 +436,82 @@ export function buildPoseWebHtml(): string {
         if (visible(leftKnee) || visible(rightKnee)) detected.push(LABELS.knee);
         if (visible(leftAnkle) || visible(rightAnkle)) detected.push(LABELS.foot);
 
-        const summary = detected.join(", ");
-        setHud(summary ? "인식 중: " + summary : "관절 포인트를 찾는 중...");
+        const pointSummary = detected.join(", ");
+        setHud(pointSummary ? "인식 중: " + pointSummary : "관절을 찾는 중입니다.");
 
+        const releaseVelocity = hipMid && previousHipY !== null ? hipMid.y - previousHipY : null;
+        if (hipMid) {
+          previousHipY = hipMid.y;
+        }
+
+        const dribbleAnalysis = buildDribbleAnalysis(landmarks);
+        const shootAnalysis = buildShootAnalysis(landmarks, releaseVelocity);
         const now = Date.now();
-        if (summary && (summary !== lastSummary || now - lastSentAt > 1200)) {
-          lastSummary = summary;
+
+        if (pointSummary && (pointSummary !== lastPointSummary || now - lastSentAt > 1200)) {
+          lastPointSummary = pointSummary;
           lastSentAt = now;
-          post({ type: "points", summary });
+          post({ type: "points", summary: pointSummary });
+        }
+
+        if (dribbleAnalysis.summary !== lastDribbleSummary || now - lastSentAt > 1200) {
+          lastDribbleSummary = dribbleAnalysis.summary;
+          post({ type: "dribble_analysis", analysis: dribbleAnalysis });
+        }
+
+        if (shootAnalysis.summary !== lastShootSummary || now - lastSentAt > 1200) {
+          lastShootSummary = shootAnalysis.summary;
+          post({ type: "shoot_analysis", analysis: shootAnalysis });
         }
       }
 
       async function setupPose() {
-        post({ type: "status", message: "MediaPipe 모델을 불러오는 중" });
-        setHud("MediaPipe 모델을 불러오는 중...");
+        post({ type: "status", message: "MediaPipe 모델을 불러오는 중입니다." });
+        setHud("MediaPipe 모델을 불러오는 중입니다.");
 
-        try {
-          const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest");
-          const { FilesetResolver, PoseLandmarker } = vision;
-          const fileset = await FilesetResolver.forVisionTasks(
-            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-          );
+        const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest");
+        const { FilesetResolver, PoseLandmarker } = vision;
+        const fileset = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+        );
 
-          poseLandmarker = await PoseLandmarker.createFromOptions(fileset, {
-            baseOptions: {
-              modelAssetPath:
-                "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
-            },
-            runningMode: "VIDEO",
-            numPoses: 1,
-            minPoseDetectionConfidence: 0.5,
-            minPosePresenceConfidence: 0.5,
-            minTrackingConfidence: 0.5
-          });
+        poseLandmarker = await PoseLandmarker.createFromOptions(fileset, {
+          baseOptions: {
+            modelAssetPath:
+              "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
+          },
+          runningMode: "VIDEO",
+          numPoses: 1,
+          minPoseDetectionConfidence: 0.5,
+          minPosePresenceConfidence: 0.5,
+          minTrackingConfidence: 0.5
+        });
 
-          post({ type: "ready" });
-          setHud("카메라를 시작하는 중...");
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "MediaPipe 초기화 실패";
-          post({ type: "error", message });
-          setHud(message);
-          throw error;
-        }
+        post({ type: "ready" });
+        setHud("카메라를 시작하는 중입니다.");
       }
 
       async function setupCamera() {
-        try {
-          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new Error("navigator.mediaDevices.getUserMedia 를 사용할 수 없습니다.");
-          }
-
-          const stream = await navigator.mediaDevices.getUserMedia({
-            audio: false,
-            video: {
-              facingMode: "user",
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            }
-          });
-
-          video.srcObject = stream;
-          await video.play();
-          resizeCanvas();
-          window.addEventListener("resize", resizeCanvas);
-          post({ type: "stream_started" });
-          setHud("카메라 시작 완료. 자세를 분석하는 중...");
-          requestAnimationFrame(loop);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "카메라 접근 실패";
-          post({ type: "error", message });
-          setHud(message);
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("navigator.mediaDevices.getUserMedia를 사용할 수 없습니다.");
         }
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: "user",
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        });
+
+        video.srcObject = stream;
+        await video.play();
+        resizeCanvas();
+        window.addEventListener("resize", resizeCanvas);
+        post({ type: "stream_started" });
+        setHud("카메라 시작 완료. 자세를 분석하는 중입니다.");
+        requestAnimationFrame(loop);
       }
 
       function loop() {
@@ -311,8 +535,9 @@ export function buildPoseWebHtml(): string {
           await setupPose();
           await setupCamera();
         } catch (error) {
-          const message = error instanceof Error ? error.message : "분석 시작 실패";
+          const message = error instanceof Error ? error.message : "분석을 시작하지 못했습니다.";
           post({ type: "error", message });
+          setHud(message);
         }
       }
 

@@ -40,3 +40,28 @@ export interface FireworkItem {
   left: `${number}%`;
   top: `${number}%`;
 }
+
+export type EyeFocusState = 'ball' | 'forward' | 'unknown';
+export type DribbleHeightState = 'high' | 'low' | 'balanced' | 'unknown';
+export type TorsoPostureState = 'high' | 'low' | 'balanced' | 'unknown';
+
+export interface DribbleAnalysis {
+  eyeFocus: EyeFocusState;
+  dribbleHeight: DribbleHeightState;
+  torsoPosture: TorsoPostureState;
+  summary: string;
+}
+
+export type ShootArmAngleState = 'narrow' | 'wide' | 'balanced' | 'unknown';
+export type ShootReleaseTimingState = 'early' | 'late' | 'balanced' | 'unknown';
+export type ShootLegAngleState = 'low' | 'high' | 'balanced' | 'unknown';
+
+export interface ShootAnalysis {
+  armAngle: number | null;
+  legAngle: number | null;
+  releaseVelocity: number | null;
+  armAngleState: ShootArmAngleState;
+  releaseTiming: ShootReleaseTimingState;
+  legAngleState: ShootLegAngleState;
+  summary: string;
+}

@@ -1,7 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
-import { Card } from '../components/common/Card';
 import { SmallButton } from '../components/common/Buttons';
+import { Card } from '../components/common/Card';
 import { InfoBox } from '../components/common/InfoBox';
 import { LessonCamera } from '../components/lesson/LessonCamera';
 import { colors } from '../theme/colors';
@@ -58,11 +58,14 @@ export function LessonScreen({
   onRegisterSuccessfulShot,
   onPoseMessage,
 }: LessonScreenProps) {
+  const { width } = useWindowDimensions();
+  const isWideLayout = width >= 1180;
+
   return (
     <View style={styles.contentGap}>
       <Card title="AI 레슨 받기" style={styles.heroCard}>
         <Text style={styles.paragraph}>
-          inner.html처럼 MediaPipe가 카메라 영상 위에서 직접 관절 포인트를 분석하도록 구성했습니다. 레슨 시작 후 진행 상태에 오류가 뜨면 그 메시지를 그대로 확인해 주세요.
+          실시간 카메라와 MediaPipe로 자세를 분석하고, 선택한 모드 기준에 맞춰 피드백이 바로 바뀌도록 구성했습니다.
         </Text>
 
         <View style={styles.modeRow}>
@@ -84,31 +87,39 @@ export function LessonScreen({
           <Text style={styles.statusText}>현재 모드: {lessonMode === 'shoot' ? '슛 분석' : '드리블 분석'}</Text>
         </View>
 
-        <LessonCamera isLessonActive={isLessonActive} isCameraReady={isCameraReady} onPoseMessage={onPoseMessage} />
-
-        <View style={styles.controlsRow}>
-          <SmallButton title="레슨 시작" onPress={onBeginLesson} disabled={isLessonActive} />
-          {lessonMode === 'shoot' ? (
-            <SmallButton title="슛 성공" onPress={onRegisterSuccessfulShot} variant="dark" />
-          ) : null}
-          <SmallButton title="레슨 종료" onPress={onEndLesson} variant="red" disabled={!isLessonActive} />
-        </View>
-
-        <InfoBox label="진행 상태" text={debugText} />
-        <InfoBox label="코칭 피드백" text={feedbackText} />
-
-        {cameraError ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{cameraError}</Text>
+        <View style={[styles.lessonStage, isWideLayout && styles.lessonStageWide]}>
+          <View style={[styles.cameraColumn, isWideLayout && styles.cameraColumnWide]}>
+            <LessonCamera isLessonActive={isLessonActive} isCameraReady={isCameraReady} onPoseMessage={onPoseMessage} />
           </View>
-        ) : null}
+
+          <View style={[styles.feedbackColumn, isWideLayout && styles.feedbackColumnWide]}>
+            <View style={styles.controlsCard}>
+              <View style={[styles.controlsRow, isWideLayout && styles.controlsColumn]}>
+                <SmallButton title="레슨 시작" onPress={onBeginLesson} disabled={isLessonActive} />
+                {lessonMode === 'shoot' ? (
+                  <SmallButton title="슛 성공" onPress={onRegisterSuccessfulShot} variant="dark" />
+                ) : null}
+                <SmallButton title="레슨 끝내기" onPress={onEndLesson} variant="red" disabled={!isLessonActive} />
+              </View>
+            </View>
+
+            <InfoBox label="진행 상태" text={debugText} />
+            <InfoBox label="실시간 피드백" text={feedbackText} />
+
+            {cameraError ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{cameraError}</Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
       </Card>
 
       <Card title="촬영 팁">
         <View style={styles.tipList}>
-          <Text style={styles.tipText}>전신이 화면 안에 들어오면 목, 어깨, 엉덩이, 무릎, 발 인식이 더 안정적입니다.</Text>
-          <Text style={styles.tipText}>양손과 팔꿈치가 잘 보이도록 배경과 겹치지 않는 밝은 장소에서 촬영해 주세요.</Text>
-          <Text style={styles.tipText}>카메라가 켜지지 않으면 진행 상태 박스에 표시된 오류 문구를 그대로 알려주시면 다음 수정이 빨라집니다.</Text>
+          <Text style={styles.tipText}>몸 전체가 화면에 들어오면 어깨, 팔꿈치, 손목, 엉덩이, 무릎, 발을 더 안정적으로 인식합니다.</Text>
+          <Text style={styles.tipText}>밝은 장소에서 촬영하고, 팔과 다리가 배경에 겹치지 않도록 서 주면 분석이 더 정확해집니다.</Text>
+          <Text style={styles.tipText}>넓은 화면에서는 카메라 옆에 진행 상태와 피드백이 같이 보이도록 배치되어 있습니다.</Text>
         </View>
       </Card>
     </View>
@@ -167,11 +178,42 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
   },
+  lessonStage: {
+    gap: 16,
+  },
+  lessonStageWide: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  cameraColumn: {
+    width: '100%',
+  },
+  cameraColumnWide: {
+    flex: 0.62,
+    maxWidth: 760,
+  },
+  feedbackColumn: {
+    width: '100%',
+  },
+  feedbackColumnWide: {
+    flex: 0.38,
+    minWidth: 280,
+    maxWidth: 420,
+  },
+  controlsCard: {
+    backgroundColor: colors.cardOverlay,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+  },
   controlsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    marginBottom: 16,
+  },
+  controlsColumn: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
   },
   tipList: {
     gap: 10,

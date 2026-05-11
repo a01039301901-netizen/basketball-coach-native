@@ -60,7 +60,7 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
 
 const styles = StyleSheet.create({
   videoWrap: {
-    height: 420,
+    height: 560,
     backgroundColor: colors.cameraBg,
     borderRadius: 22,
     overflow: 'hidden',
