@@ -59,72 +59,78 @@ export function LessonScreen({
   onPoseMessage,
 }: LessonScreenProps) {
   const { width } = useWindowDimensions();
-  const isWideLayout = width >= 1180;
+  const isWideLayout = width >= 1080;
 
   return (
     <View style={styles.contentGap}>
       <Card title="AI 레슨 받기" style={styles.heroCard}>
-        <Text style={styles.paragraph}>
-          실시간 카메라와 MediaPipe로 자세를 분석하고, 선택한 모드 기준에 맞춰 피드백이 바로 바뀌도록 구성했습니다.
+        <Text style={styles.leadText}>
+          실시간 자세 분석을 통해 드리블과 슛 폼을 확인하고, 현재 움직임에 맞는 코칭 피드백을 바로 확인할 수 있습니다.
         </Text>
 
-        <View style={styles.modeRow}>
-          <ModeButton
-            title="드리블 분석"
-            active={lessonMode === 'dribble'}
-            disabled={isLessonActive}
-            onPress={() => onSelectMode('dribble')}
-          />
-          <ModeButton
-            title="슛 분석"
-            active={lessonMode === 'shoot'}
-            disabled={isLessonActive}
-            onPress={() => onSelectMode('shoot')}
-          />
-        </View>
-
-        <View style={styles.statusBox}>
-          <Text style={styles.statusText}>현재 모드: {lessonMode === 'shoot' ? '슛 분석' : '드리블 분석'}</Text>
-        </View>
-
-        <View style={[styles.lessonStage, isWideLayout && styles.lessonStageWide]}>
-          <View style={[styles.cameraColumn, isWideLayout && styles.cameraColumnWide]}>
-            <LessonCamera isLessonActive={isLessonActive} isCameraReady={isCameraReady} onPoseMessage={onPoseMessage} />
-          </View>
-
-          <View style={[styles.feedbackColumn, isWideLayout && styles.feedbackColumnWide]}>
-            <View style={styles.controlsCard}>
-              <View style={[styles.controlsRow, isWideLayout && styles.controlsColumn]}>
-                <SmallButton title="레슨 시작" onPress={onBeginLesson} disabled={isLessonActive} />
-                {lessonMode === 'shoot' ? (
-                  <SmallButton title="슛 성공" onPress={onRegisterSuccessfulShot} variant="dark" />
-                ) : null}
-                <SmallButton title="레슨 끝내기" onPress={onEndLesson} variant="red" disabled={!isLessonActive} />
-              </View>
+        <View style={[styles.lessonLayout, isWideLayout && styles.lessonLayoutWide]}>
+          <View style={styles.cameraCard}>
+            <View style={styles.modeButtons}>
+              <ModeButton
+                title="🏀 드리블 분석"
+                active={lessonMode === 'dribble'}
+                disabled={isLessonActive}
+                onPress={() => onSelectMode('dribble')}
+              />
+              <ModeButton
+                title="🎯 슛 분석"
+                active={lessonMode === 'shoot'}
+                disabled={isLessonActive}
+                onPress={() => onSelectMode('shoot')}
+              />
             </View>
 
+            <View style={styles.modeStatus}>
+              <Text style={styles.modeStatusText}>현재 모드: {lessonMode === 'shoot' ? '슛 분석' : '드리블 분석'}</Text>
+            </View>
+
+            <LessonCamera isLessonActive={isLessonActive} isCameraReady={isCameraReady} onPoseMessage={onPoseMessage} />
+
+            <View style={styles.cameraControls}>
+              <SmallButton title="레슨 시작" onPress={onBeginLesson} disabled={isLessonActive} />
+              {lessonMode === 'shoot' ? (
+                <SmallButton title="슛 성공" onPress={onRegisterSuccessfulShot} variant="dark" />
+              ) : null}
+              <SmallButton title="레슨 끝내기" onPress={onEndLesson} variant="red" disabled={!isLessonActive} />
+            </View>
+          </View>
+
+          <View style={styles.sideCard}>
+            <Text style={styles.sideTitle}>실시간 코칭</Text>
             <InfoBox label="진행 상태" text={debugText} />
-            <InfoBox label="실시간 피드백" text={feedbackText} />
+            <InfoBox label="피드백" text={feedbackText} />
 
             {cameraError ? (
               <View style={styles.errorBox}>
                 <Text style={styles.errorText}>{cameraError}</Text>
               </View>
             ) : null}
-          </View>
-        </View>
-      </Card>
 
-      <Card title="촬영 팁">
-        <View style={styles.tipList}>
-          <Text style={styles.tipText}>몸 전체가 화면에 들어오면 어깨, 팔꿈치, 손목, 엉덩이, 무릎, 발을 더 안정적으로 인식합니다.</Text>
-          <Text style={styles.tipText}>밝은 장소에서 촬영하고, 팔과 다리가 배경에 겹치지 않도록 서 주면 분석이 더 정확해집니다.</Text>
-          <Text style={styles.tipText}>넓은 화면에서는 카메라 옆에 진행 상태와 피드백이 같이 보이도록 배치되어 있습니다.</Text>
+            <View style={styles.tipBox}>
+              <Text style={styles.tipTitle}>촬영 팁</Text>
+              <Text style={styles.tipText}>몸 전체가 화면에 들어오면 어깨, 팔꿈치, 손목, 엉덩이, 무릎, 발을 더 안정적으로 인식합니다.</Text>
+              <Text style={styles.tipText}>밝은 장소에서 촬영하고, 팔과 다리가 배경에 겹치지 않도록 서 주면 분석이 더 정확해집니다.</Text>
+              <Text style={styles.tipText}>슛 분석은 어깨부터 발까지, 드리블 분석은 손목과 상체가 특히 잘 보이도록 맞춰 주세요.</Text>
+            </View>
+          </View>
         </View>
       </Card>
     </View>
   );
 }
+
+const sharedPanel = {
+  backgroundColor: 'rgba(255,255,255,0.12)',
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.18)',
+  borderRadius: 24,
+  padding: 24,
+} as const;
 
 const styles = StyleSheet.create({
   contentGap: {
@@ -133,13 +139,34 @@ const styles = StyleSheet.create({
   heroCard: {
     minHeight: 320,
   },
-  paragraph: {
+  leadText: {
     color: colors.textMuted,
     fontSize: 15,
     lineHeight: 23,
-    marginBottom: 18,
+    marginBottom: 20,
   },
-  modeRow: {
+  lessonLayout: {
+    gap: 24,
+  },
+  lessonLayoutWide: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  cameraCard: {
+    ...sharedPanel,
+    flex: 1.2,
+  },
+  sideCard: {
+    ...sharedPanel,
+    flex: 0.8,
+  },
+  sideTitle: {
+    color: colors.textSoft,
+    fontSize: 22,
+    fontWeight: '900',
+    marginBottom: 14,
+  },
+  modeButtons: {
     flexDirection: 'row',
     gap: 12,
     marginBottom: 16,
@@ -149,84 +176,68 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 16,
     paddingHorizontal: 14,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.16)',
     borderWidth: 2,
     borderColor: 'transparent',
     alignItems: 'center',
   },
   modeButtonActive: {
     backgroundColor: colors.secondary,
-    borderColor: '#fff5ec',
+    borderColor: '#ffffff',
   },
   modeButtonDisabled: {
     opacity: 0.5,
   },
   modeButtonText: {
     color: colors.text,
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 17,
+    fontWeight: '900',
   },
-  statusBox: {
-    backgroundColor: 'rgba(0,0,0,0.24)',
-    borderRadius: 14,
+  modeStatus: {
+    marginBottom: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    marginBottom: 16,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
   },
-  statusText: {
+  modeStatusText: {
     color: colors.text,
     fontSize: 15,
     fontWeight: '800',
   },
-  lessonStage: {
-    gap: 16,
-  },
-  lessonStageWide: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  cameraColumn: {
-    width: '100%',
-  },
-  cameraColumnWide: {
-    flex: 0.62,
-    maxWidth: 760,
-  },
-  feedbackColumn: {
-    width: '100%',
-  },
-  feedbackColumnWide: {
-    flex: 0.38,
-    minWidth: 280,
-    maxWidth: 420,
-  },
-  controlsCard: {
-    backgroundColor: colors.cardOverlay,
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-  },
-  controlsRow: {
+  cameraControls: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+    marginTop: 16,
   },
-  controlsColumn: {
-    flexDirection: 'column',
-    alignItems: 'stretch',
+  tipBox: {
+    marginTop: 8,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
-  tipList: {
-    gap: 10,
+  tipTitle: {
+    color: colors.textSoft,
+    fontSize: 18,
+    fontWeight: '900',
+    marginBottom: 10,
   },
   tipText: {
     color: colors.textSoft,
-    fontSize: 15,
+    fontSize: 14,
     lineHeight: 22,
+    marginBottom: 8,
   },
   errorBox: {
     borderRadius: 14,
     backgroundColor: 'rgba(216,58,77,0.22)',
     padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   errorText: {
     color: '#ffe2e7',

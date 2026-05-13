@@ -17,10 +17,12 @@ export function InfoBox({ label, text }: InfoBoxProps) {
 
 const styles = StyleSheet.create({
   box: {
-    backgroundColor: colors.cardOverlay,
+    backgroundColor: 'rgba(0, 0, 0, 0.28)',
     borderRadius: 14,
     padding: 14,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   label: {
     color: colors.textAccent,

@@ -65,6 +65,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.secondary,
     paddingHorizontal: 18,
     paddingVertical: 13,
+    shadowColor: '#ff7a00',
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
   },
   redButton: {
     backgroundColor: colors.danger,
