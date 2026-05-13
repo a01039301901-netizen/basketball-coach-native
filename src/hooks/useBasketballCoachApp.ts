@@ -63,6 +63,8 @@ export function useBasketballCoachApp() {
   const feedbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const latestFeedbackRef = useRef(feedbackText);
   const lessonModeRef = useRef(lessonMode);
+  const pendingStopSaveRef = useRef(false);
+  const recordingFallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
   const selectedSkill = selectedSkillKey ? SKILLS[selectedSkillKey] : null;
@@ -147,6 +149,10 @@ export function useBasketballCoachApp() {
       if (feedbackIntervalRef.current) {
         clearInterval(feedbackIntervalRef.current);
       }
+
+      if (recordingFallbackTimeoutRef.current) {
+        clearTimeout(recordingFallbackTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -181,47 +187,60 @@ export function useBasketballCoachApp() {
     setFeedbackText(nextFeedback);
   }, []);
 
-  function addLessonHomework(mode: LessonMode) {
+  const clearRecordingWait = useCallback(() => {
+    pendingStopSaveRef.current = false;
+    if (recordingFallbackTimeoutRef.current) {
+      clearTimeout(recordingFallbackTimeoutRef.current);
+      recordingFallbackTimeoutRef.current = null;
+    }
+  }, []);
+
+  const addLessonHomework = useCallback((mode: LessonMode) => {
     const nextHomework = buildLessonHomework(mode);
     setHomework((current) => mergeHomework(current, nextHomework));
-  }
+  }, []);
 
-  function saveLessonRecord() {
+  const saveLessonRecord = useCallback((videoUri: string) => {
     const dateKey = formatDateKey(new Date());
     const nextRecord: LessonRecord = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       dateKey,
       mode: lessonModeRef.current,
       feedback: latestFeedbackRef.current,
-      videoUri: '',
+      videoUri,
       createdAt: new Date().toLocaleString(),
     };
 
     setLessonRecords((current) => [...current, nextRecord]);
     setSelectedDateKey(dateKey);
-  }
+  }, []);
 
-  async function finishLessonSession(shouldSaveRecord: boolean) {
-    if (feedbackIntervalRef.current) {
-      clearInterval(feedbackIntervalRef.current);
-      feedbackIntervalRef.current = null;
-    }
+  const finalizeLessonSession = useCallback(
+    async (shouldSaveRecord: boolean, videoUri: string) => {
+      if (feedbackIntervalRef.current) {
+        clearInterval(feedbackIntervalRef.current);
+        feedbackIntervalRef.current = null;
+      }
 
-    if (shouldSaveRecord) {
-      addLessonHomework(lessonModeRef.current);
-      saveLessonRecord();
-    }
+      clearRecordingWait();
 
-    setIsLessonActive(false);
-    setIsCameraReady(false);
-    setCameraError('');
-    setDebugText('카메라와 MediaPipe를 준비하는 중입니다.');
-    setFeedbackAndRemember('레슨이 종료되었습니다. 기록일지에서 저장된 피드백을 확인할 수 있어요.');
-  }
+      if (shouldSaveRecord) {
+        addLessonHomework(lessonModeRef.current);
+        saveLessonRecord(videoUri);
+      }
+
+      setIsLessonActive(false);
+      setIsCameraReady(false);
+      setCameraError('');
+      setDebugText('카메라와 MediaPipe를 준비하는 중입니다.');
+      setFeedbackAndRemember('레슨이 종료되었습니다. 기록일지에서 저장된 영상과 피드백을 확인할 수 있어요.');
+    },
+    [addLessonHomework, clearRecordingWait, saveLessonRecord, setFeedbackAndRemember]
+  );
 
   async function navigateTo(nextScreen: AppScreen) {
     if (screen === 'lesson' && nextScreen !== 'lesson' && isLessonActive) {
-      await finishLessonSession(true);
+      await endLesson();
     }
 
     setScreen(nextScreen);
@@ -266,6 +285,7 @@ export function useBasketballCoachApp() {
       return;
     }
 
+    clearRecordingWait();
     setCameraError('');
     setIsLessonActive(true);
     setIsCameraReady(false);
@@ -274,7 +294,27 @@ export function useBasketballCoachApp() {
   }
 
   async function endLesson() {
-    await finishLessonSession(isLessonActive);
+    if (!isLessonActive) {
+      return;
+    }
+
+    if (feedbackIntervalRef.current) {
+      clearInterval(feedbackIntervalRef.current);
+      feedbackIntervalRef.current = null;
+    }
+
+    pendingStopSaveRef.current = true;
+    setDebugText('레슨 영상을 저장하는 중입니다.');
+    setIsLessonActive(false);
+    setIsCameraReady(false);
+
+    recordingFallbackTimeoutRef.current = setTimeout(() => {
+      if (!pendingStopSaveRef.current) {
+        return;
+      }
+
+      void finalizeLessonSession(true, '');
+    }, 5000);
   }
 
   const applyDribbleAnalysis = useCallback(
@@ -311,6 +351,8 @@ export function useBasketballCoachApp() {
           | { type: 'points'; summary: string }
           | { type: 'dribble_analysis'; analysis: DribbleAnalysis }
           | { type: 'shoot_analysis'; analysis: ShootAnalysis }
+          | { type: 'recording_ready'; videoUri: string }
+          | { type: 'recording_error'; message: string }
           | { type: 'error'; message: string };
 
         if (payload.type === 'ready') {
@@ -348,6 +390,20 @@ export function useBasketballCoachApp() {
           return;
         }
 
+        if (payload.type === 'recording_ready') {
+          void finalizeLessonSession(pendingStopSaveRef.current, payload.videoUri);
+          return;
+        }
+
+        if (payload.type === 'recording_error') {
+          setDebugText(payload.message || '영상 저장에 실패했습니다. 피드백만 저장된 상태로 종료합니다.');
+
+          if (pendingStopSaveRef.current) {
+            void finalizeLessonSession(true, '');
+          }
+          return;
+        }
+
         if (payload.type === 'error') {
           setCameraError(payload.message || 'MediaPipe 또는 카메라 시작 중 문제가 발생했습니다.');
           setDebugText(payload.message || '카메라 시작 실패');
@@ -356,7 +412,7 @@ export function useBasketballCoachApp() {
         setDebugText('카메라 상태 메시지를 처리하는 중입니다.');
       }
     },
-    [applyDribbleAnalysis, applyShootAnalysis]
+    [applyDribbleAnalysis, applyShootAnalysis, finalizeLessonSession]
   );
 
   function openDiaryDate(dateKey: string) {
@@ -406,7 +462,7 @@ export function useBasketballCoachApp() {
   async function deleteLessonRecord(recordId: string) {
     const record = lessonRecords.find((item) => item.id === recordId);
 
-    if (record?.videoUri) {
+    if (record?.videoUri && !record.videoUri.startsWith('data:')) {
       try {
         await FileSystem.deleteAsync(record.videoUri, { idempotent: true });
       } catch {

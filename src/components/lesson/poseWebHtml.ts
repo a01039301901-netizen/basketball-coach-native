@@ -99,6 +99,9 @@ export function buildPoseWebHtml(): string {
       };
 
       let poseLandmarker = null;
+      let recorder = null;
+      let recorderChunks = [];
+      let recorderStopping = false;
       let lastVideoTime = -1;
       let lastPointSummary = "";
       let lastDribbleSummary = "";
@@ -110,6 +113,31 @@ export function buildPoseWebHtml(): string {
         if (window.ReactNativeWebView) {
           window.ReactNativeWebView.postMessage(JSON.stringify(payload));
         }
+      }
+
+      function finalizeRecording() {
+        if (recorderChunks.length === 0) {
+          post({ type: "recording_error", message: "저장할 영상 데이터가 없습니다." });
+          return;
+        }
+
+        const blob = new Blob(recorderChunks, {
+          type: recorder?.mimeType || "video/webm"
+        });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = typeof reader.result === "string" ? reader.result : "";
+          if (!result) {
+            post({ type: "recording_error", message: "영상 인코딩에 실패했습니다." });
+            return;
+          }
+
+          post({ type: "recording_ready", videoUri: result });
+        };
+        reader.onerror = () => {
+          post({ type: "recording_error", message: "영상 파일을 읽는 중 오류가 발생했습니다." });
+        };
+        reader.readAsDataURL(blob);
       }
 
       function setHud(text) {
@@ -689,6 +717,33 @@ export function buildPoseWebHtml(): string {
         await video.play();
         resizeCanvas();
         window.addEventListener("resize", resizeCanvas);
+
+        if (typeof MediaRecorder !== "undefined") {
+          const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+            ? "video/webm;codecs=vp8,opus"
+            : MediaRecorder.isTypeSupported("video/webm")
+              ? "video/webm"
+              : "";
+
+          recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+          recorderChunks = [];
+          recorderStopping = false;
+          recorder.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) {
+              recorderChunks.push(event.data);
+            }
+          };
+          recorder.onstop = () => {
+            if (recorderStopping) {
+              finalizeRecording();
+            }
+          };
+          recorder.onerror = () => {
+            post({ type: "recording_error", message: "레슨 영상 녹화 중 오류가 발생했습니다." });
+          };
+          recorder.start(1000);
+        }
+
         post({ type: "stream_started" });
         setHud("카메라 시작 완료. 자세와 공을 분석하는 중입니다.");
         requestAnimationFrame(loop);
@@ -720,6 +775,16 @@ export function buildPoseWebHtml(): string {
           setHud(message);
         }
       }
+
+      window.addEventListener("beforeunload", () => {
+        if (recorder && recorder.state !== "inactive") {
+          recorderStopping = true;
+          recorder.stop();
+        }
+        if (video.srcObject) {
+          video.srcObject.getTracks().forEach((track) => track.stop());
+        }
+      });
 
       start();
     </script>

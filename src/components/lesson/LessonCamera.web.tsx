@@ -27,6 +27,8 @@ type PosePayload =
   | { type: 'points'; summary: string }
   | { type: 'dribble_analysis'; analysis: DribbleAnalysis }
   | { type: 'shoot_analysis'; analysis: ShootAnalysis }
+  | { type: 'recording_ready'; videoUri: string }
+  | { type: 'recording_error'; message: string }
   | { type: 'error'; message: string };
 
 const INDEX = {
@@ -457,6 +459,9 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
       detectForVideo: (video: HTMLVideoElement, timestampMs: number) => { landmarks?: Landmark[][] };
       close?: () => void;
     } | null = null;
+    let recorder: MediaRecorder | null = null;
+    let recorderChunks: Blob[] = [];
+    let recorderStopping = false;
     let lastVideoTime = -1;
     let lastPointSummary = '';
     let lastDribbleSummary = '';
@@ -470,6 +475,31 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
           data: JSON.stringify(payload),
         },
       } as WebViewMessageEvent);
+    };
+
+    const finalizeRecording = () => {
+      if (recorderChunks.length === 0) {
+        emit({ type: 'recording_error', message: '저장할 영상 데이터가 없습니다.' });
+        return;
+      }
+
+      const blob = new Blob(recorderChunks, {
+        type: recorder?.mimeType || 'video/webm',
+      });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = typeof reader.result === 'string' ? reader.result : '';
+        if (!result) {
+          emit({ type: 'recording_error', message: '영상 인코딩에 실패했습니다.' });
+          return;
+        }
+
+        emit({ type: 'recording_ready', videoUri: result });
+      };
+      reader.onerror = () => {
+        emit({ type: 'recording_error', message: '영상 파일을 읽는 중 오류가 발생했습니다.' });
+      };
+      reader.readAsDataURL(blob);
     };
 
     const wrap = document.createElement('div');
@@ -789,6 +819,33 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
         await video.play();
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
+
+        if (typeof MediaRecorder !== 'undefined') {
+          const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+            ? 'video/webm;codecs=vp8,opus'
+            : MediaRecorder.isTypeSupported('video/webm')
+              ? 'video/webm'
+              : '';
+
+          recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+          recorderChunks = [];
+          recorderStopping = false;
+          recorder.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) {
+              recorderChunks.push(event.data);
+            }
+          };
+          recorder.onstop = () => {
+            if (recorderStopping) {
+              finalizeRecording();
+            }
+          };
+          recorder.onerror = () => {
+            emit({ type: 'recording_error', message: '레슨 영상 녹화 중 오류가 발생했습니다.' });
+          };
+          recorder.start(1000);
+        }
+
         emit({ type: 'stream_started' });
         setHud('카메라 시작 완료. 자세와 공을 분석하는 중입니다.');
         animationFrameId = window.requestAnimationFrame(loop);
@@ -805,6 +862,10 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
       cancelled = true;
       window.cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', resizeCanvas);
+      if (recorder && recorder.state !== 'inactive') {
+        recorderStopping = true;
+        recorder.stop();
+      }
       stream?.getTracks().forEach((track) => track.stop());
       poseLandmarker?.close?.();
       host.innerHTML = '';
