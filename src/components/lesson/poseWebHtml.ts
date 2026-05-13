@@ -35,6 +35,7 @@ export function buildPoseWebHtml(): string {
 
       video {
         transform: scaleX(-1);
+        opacity: 0;
       }
 
       .hud {
@@ -568,6 +569,11 @@ export function buildPoseWebHtml(): string {
 
       function renderPose(landmarks) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        ctx.restore();
         const ball = detectBall();
 
         if (!landmarks) {
@@ -725,7 +731,8 @@ export function buildPoseWebHtml(): string {
               ? "video/webm"
               : "";
 
-          recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+          const composedStream = canvas.captureStream(30);
+          recorder = mimeType ? new MediaRecorder(composedStream, { mimeType }) : new MediaRecorder(composedStream);
           recorderChunks = [];
           recorderStopping = false;
           recorder.ondataavailable = (event) => {

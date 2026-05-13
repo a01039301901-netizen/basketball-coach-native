@@ -522,6 +522,7 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
       objectFit: 'cover',
       transform: 'scaleX(-1)',
       background: colors.cameraBg,
+      opacity: '0',
     } satisfies Partial<CSSStyleDeclaration>);
 
     const canvas = document.createElement('canvas');
@@ -627,6 +628,11 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
 
     const renderPose = (landmarks: Landmark[] | null) => {
       context.clearRect(0, 0, canvas.width, canvas.height);
+      context.save();
+      context.translate(canvas.width, 0);
+      context.scale(-1, 1);
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      context.restore();
       const ball = detectBall(video, processingCanvas, processingContext);
 
       if (!landmarks) {
@@ -827,7 +833,8 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
               ? 'video/webm'
               : '';
 
-          recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+          const composedStream = canvas.captureStream(30);
+          recorder = mimeType ? new MediaRecorder(composedStream, { mimeType }) : new MediaRecorder(composedStream);
           recorderChunks = [];
           recorderStopping = false;
           recorder.ondataavailable = (event) => {

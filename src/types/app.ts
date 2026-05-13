@@ -25,11 +25,17 @@ export interface Skill {
   query: string;
 }
 
+export interface FeedbackMoment {
+  atMs: number;
+  text: string;
+}
+
 export interface LessonRecord {
   id: string;
   dateKey: string;
   mode: LessonMode;
   feedback: string;
+  feedbackTimeline: FeedbackMoment[];
   videoUri: string;
   createdAt: string;
 }

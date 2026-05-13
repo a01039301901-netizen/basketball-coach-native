@@ -10,6 +10,7 @@ import { STORAGE_KEYS } from '../constants/storage';
 import type {
   AppScreen,
   DribbleAnalysis,
+  FeedbackMoment,
   FireworkItem,
   LessonMode,
   LessonRecord,
@@ -42,6 +43,71 @@ function parseStoredJson<T>(value: string | null, fallback: T): T {
   return value ? (JSON.parse(value) as T) : fallback;
 }
 
+function parseTimelineTimestamp(value: string) {
+  const match = value.match(/^\[(\d{2}):(\d{2})\]\s*(.*)$/);
+
+  if (!match) {
+    return null;
+  }
+
+  const minutes = Number(match[1]);
+  const seconds = Number(match[2]);
+  const text = match[3]?.trim() ?? '';
+
+  return {
+    atMs: (minutes * 60 + seconds) * 1000,
+    text,
+  };
+}
+
+function normalizeFeedbackTimeline(
+  timeline: FeedbackMoment[] | string[] | undefined,
+  fallbackFeedback: string
+): FeedbackMoment[] {
+  if (!Array.isArray(timeline) || timeline.length === 0) {
+    return fallbackFeedback ? [{ atMs: 0, text: fallbackFeedback }] : [];
+  }
+
+  const normalized = timeline
+    .map((entry, index) => {
+      if (typeof entry === 'string') {
+        const parsed = parseTimelineTimestamp(entry);
+
+        if (parsed) {
+          return parsed;
+        }
+
+        return {
+          atMs: index * 1000,
+          text: entry.trim(),
+        };
+      }
+
+      if (!entry || typeof entry.text !== 'string') {
+        return null;
+      }
+
+      return {
+        atMs: typeof entry.atMs === 'number' && Number.isFinite(entry.atMs) ? Math.max(0, entry.atMs) : index * 1000,
+        text: entry.text.trim(),
+      };
+    })
+    .filter((entry): entry is FeedbackMoment => Boolean(entry && entry.text));
+
+  if (normalized.length > 0) {
+    return normalized;
+  }
+
+  return fallbackFeedback ? [{ atMs: 0, text: fallbackFeedback }] : [];
+}
+
+function normalizeLessonRecord(record: LessonRecord | (Omit<LessonRecord, 'feedbackTimeline'> & { feedbackTimeline?: FeedbackMoment[] | string[] })) {
+  return {
+    ...record,
+    feedbackTimeline: normalizeFeedbackTimeline(record.feedbackTimeline, record.feedback),
+  };
+}
+
 export function useBasketballCoachApp() {
   const [screen, setScreen] = useState<AppScreen>('home');
   const [lessonMode, setLessonMode] = useState<LessonMode>('dribble');
@@ -63,6 +129,8 @@ export function useBasketballCoachApp() {
   const feedbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const latestFeedbackRef = useRef(feedbackText);
   const lessonModeRef = useRef(lessonMode);
+  const lessonStartedAtRef = useRef<number | null>(null);
+  const feedbackTimelineRef = useRef<FeedbackMoment[]>([]);
   const pendingStopSaveRef = useRef(false);
   const recordingFallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -103,7 +171,9 @@ export function useBasketballCoachApp() {
         const stored = Object.fromEntries(entries);
         const parsedAttendance = parseStoredJson<Record<string, string>>(stored[STORAGE_KEYS.attendance], {});
         const parsedHomework = parseStoredJson<string[]>(stored[STORAGE_KEYS.homework], []);
-        const parsedLessonRecords = parseStoredJson<LessonRecord[]>(stored[STORAGE_KEYS.lessonRecords], []);
+        const parsedLessonRecords = parseStoredJson<
+          Array<LessonRecord | (Omit<LessonRecord, 'feedbackTimeline'> & { feedbackTimeline?: FeedbackMoment[] | string[] })>
+        >(stored[STORAGE_KEYS.lessonRecords], []).map((record) => normalizeLessonRecord(record));
         const parsedShotSuccess = parseStoredJson<Record<string, number>>(stored[STORAGE_KEYS.shotSuccess], {});
 
         const todayKey = formatDateKey(new Date());
@@ -182,10 +252,30 @@ export function useBasketballCoachApp() {
     return () => clearTimeout(timer);
   }, [cameraError, isCameraReady, isLessonActive]);
 
+  const appendFeedbackTimeline = useCallback((text: string) => {
+    if (!isLessonActive || !text) {
+      return;
+    }
+
+    const trimmed = text.trim();
+    const previous = feedbackTimelineRef.current[feedbackTimelineRef.current.length - 1];
+    if (previous?.text === trimmed) {
+      return;
+    }
+
+    const startedAt = lessonStartedAtRef.current;
+    const atMs = startedAt ? Math.max(0, Date.now() - startedAt) : 0;
+    feedbackTimelineRef.current.push({
+      atMs,
+      text: trimmed,
+    });
+  }, [isLessonActive]);
+
   const setFeedbackAndRemember = useCallback((nextFeedback: string) => {
     latestFeedbackRef.current = nextFeedback;
     setFeedbackText(nextFeedback);
-  }, []);
+    appendFeedbackTimeline(nextFeedback);
+  }, [appendFeedbackTimeline]);
 
   const clearRecordingWait = useCallback(() => {
     pendingStopSaveRef.current = false;
@@ -207,12 +297,13 @@ export function useBasketballCoachApp() {
       dateKey,
       mode: lessonModeRef.current,
       feedback: latestFeedbackRef.current,
+      feedbackTimeline: [...feedbackTimelineRef.current],
       videoUri,
       createdAt: new Date().toLocaleString(),
     };
 
-    setLessonRecords((current) => [...current, nextRecord]);
-    setSelectedDateKey(dateKey);
+      setLessonRecords((current) => [...current, nextRecord]);
+      setSelectedDateKey(dateKey);
   }, []);
 
   const finalizeLessonSession = useCallback(
@@ -229,6 +320,8 @@ export function useBasketballCoachApp() {
         saveLessonRecord(videoUri);
       }
 
+      lessonStartedAtRef.current = null;
+      feedbackTimelineRef.current = [];
       setIsLessonActive(false);
       setIsCameraReady(false);
       setCameraError('');
@@ -287,6 +380,8 @@ export function useBasketballCoachApp() {
 
     clearRecordingWait();
     setCameraError('');
+    lessonStartedAtRef.current = Date.now();
+    feedbackTimelineRef.current = [];
     setIsLessonActive(true);
     setIsCameraReady(false);
     setDebugText('MediaPipe 분석 화면을 시작하는 중입니다.');
