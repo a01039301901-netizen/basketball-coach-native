@@ -52,6 +52,7 @@ export type DribbleHeightState = 'high' | 'low' | 'balanced' | 'unknown';
 export type TorsoPostureState = 'high' | 'low' | 'balanced' | 'unknown';
 
 export interface DribbleAnalysis {
+  dribbleStarted: boolean;
   eyeFocus: EyeFocusState;
   dribbleHeight: DribbleHeightState;
   torsoPosture: TorsoPostureState;

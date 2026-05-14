@@ -59,7 +59,6 @@ export function HomeScreen({ homeworkToShow, onOpenLesson, onOpenDiary, onOpenSk
       <View style={[styles.panel, styles.homeworkCard, isWide && styles.homeworkCardWide]}>
         <View style={styles.sideAccent} />
         <Text style={styles.panelTitle}>오늘의 연습 숙제</Text>
-        <Text style={styles.panelDescription}>`inner.html`처럼 오늘 바로 확인해야 할 숙제를 오른쪽 카드에 모아두었습니다.</Text>
 
         <View style={styles.homeworkList}>
           {homeworkToShow.map((item) => (

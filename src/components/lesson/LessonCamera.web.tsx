@@ -74,6 +74,10 @@ function midpoint(a: Landmark, b: Landmark): Landmark {
   };
 }
 
+function distanceBetween(a: Landmark, b: Landmark) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
 function angleAt(a?: Landmark, b?: Landmark, c?: Landmark): number | null {
   if (!a || !b || !c || !visible(a) || !visible(b) || !visible(c)) {
     return null;
@@ -295,6 +299,26 @@ function classifyDribbleHeight(
   return 'balanced';
 }
 
+function didDribbleStart(landmarks: Landmark[], ball: BallDetection | null) {
+  if (!ball) {
+    return false;
+  }
+
+  const ballPoint: Landmark = { x: ball.x, y: ball.y, visibility: 1 };
+  const lowerBodyPoints = [
+    landmarks[INDEX.leftKnee],
+    landmarks[INDEX.rightKnee],
+    landmarks[INDEX.leftAnkle],
+    landmarks[INDEX.rightAnkle],
+  ].filter(visible);
+
+  if (lowerBodyPoints.length === 0) {
+    return false;
+  }
+
+  return lowerBodyPoints.some((point) => distanceBetween(point, ballPoint) <= 0.12);
+}
+
 function classifyTorsoPosture(shoulderMid: Landmark | null, hipMid: Landmark | null): DribbleAnalysis['torsoPosture'] {
   if (!shoulderMid || !hipMid) {
     return 'unknown';
@@ -322,16 +346,19 @@ function buildDribbleAnalysis(landmarks: Landmark[], ball: BallDetection | null)
   const shoulderMid = visible(leftShoulder) && visible(rightShoulder) ? midpoint(leftShoulder, rightShoulder) : null;
   const hipMid = visible(leftHip) && visible(rightHip) ? midpoint(leftHip, rightHip) : null;
   const neck = shoulderMid;
+  const dribbleStarted = didDribbleStart(landmarks, ball);
 
   const eyeFocus = classifyEyeFocus(landmarks, neck);
-  const dribbleHeight = classifyDribbleHeight(landmarks, neck, hipMid);
+  const dribbleHeight = dribbleStarted ? classifyDribbleHeight(landmarks, neck, hipMid) : 'unknown';
   const torsoPosture = classifyTorsoPosture(shoulderMid, hipMid);
 
   return {
+    dribbleStarted,
     eyeFocus,
     dribbleHeight,
     torsoPosture,
     summary: [
+      `드리블:${dribbleStarted ? '시작됨' : '대기 중'}`,
       `시선:${eyeFocus === 'ball' ? '공 쪽' : eyeFocus === 'forward' ? '앞' : '판정 어려움'}`,
       `드리블:${dribbleHeight === 'high' ? '높음' : dribbleHeight === 'low' ? '낮음' : dribbleHeight === 'balanced' ? '적절' : '판정 어려움'}`,
       `상체:${torsoPosture === 'high' ? '높음' : torsoPosture === 'low' ? '낮음' : torsoPosture === 'balanced' ? '적절' : '판정 어려움'}`,
