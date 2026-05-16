@@ -22,6 +22,11 @@ import { formatDateKey } from '../utils/date';
 import { buildDribbleFeedbackText, buildShootFeedbackText } from '../utils/feedback';
 import { buildLessonHomework, getHomeworkToShow, mergeHomework } from '../utils/homework';
 
+const FEEDBACK_UPDATE_INTERVAL_MS = 3000;
+const DRIBBLE_STANCE_HOLD_MS = 3000;
+
+type DribbleLessonPhase = 'stance_setup' | 'countdown' | 'await_dribble' | 'active';
+
 const DEFAULT_DRIBBLE_FEEDBACK =
   '드리블 피드백\n1. 시선, 드리블 높이, 상체 높이를 분석하는 중입니다.\n2. 몸 전체와 드리블 손이 화면 안에 보이도록 맞춰 주세요.\n3. 분석이 안정되면 자세 기준에 맞춰 피드백이 바로 바뀝니다.';
 
@@ -108,6 +113,45 @@ function normalizeLessonRecord(record: LessonRecord | (Omit<LessonRecord, 'feedb
   };
 }
 
+function isDribbleStanceReady(analysis: DribbleAnalysis) {
+  return analysis.eyeFocus === 'forward' && analysis.torsoPosture === 'balanced';
+}
+
+function buildDribbleStanceFeedback(analysis: DribbleAnalysis) {
+  const eyeLine =
+    analysis.eyeFocus === 'forward'
+      ? '시선이 좋아요. 지금처럼 공이 아니라 앞을 바라봐 주세요.'
+      : '먼저 공이 아니라 앞을 보도록 시선을 맞춰 주세요.';
+
+  const torsoLine =
+    analysis.torsoPosture === 'balanced'
+      ? '상체 높이가 안정적이에요. 지금 자세를 유지해 주세요.'
+      : analysis.torsoPosture === 'high'
+        ? '드리블 전에 무릎을 굽히고 상체를 조금 더 낮춰 주세요.'
+        : analysis.torsoPosture === 'low'
+          ? '상체가 너무 많이 숙여졌어요. 상체를 조금 더 세워 균형을 맞춰 주세요.'
+          : '어깨와 엉덩이가 함께 보이도록 자세를 다시 맞춰 주세요.';
+
+  return `드리블 준비 자세\n1. ${eyeLine}\n2. 시선과 상체 자세가 모두 맞으면 3초 뒤 드리블을 시작합니다.\n3. ${torsoLine}`;
+}
+
+function isShootStanceReady(analysis: ShootAnalysis) {
+  return analysis.armAngleState === 'balanced';
+}
+
+function buildShootStanceFeedback(analysis: ShootAnalysis) {
+  const armLine =
+    analysis.armAngleState === 'balanced'
+      ? '슛을 시작하기 좋은 팔 각도예요. 지금 자세를 유지해 주세요.'
+      : analysis.armAngleState === 'narrow'
+        ? '슛 전에 팔 각도가 너무 좁아요. 어깨와 팔을 조금 더 벌려 주세요.'
+        : analysis.armAngleState === 'wide'
+          ? '슛 전에 팔 각도가 너무 넓어요. 팔을 조금 더 모아서 준비해 주세요.'
+          : '어깨, 팔꿈치, 손목이 잘 보이도록 자세를 다시 맞춰 주세요.';
+
+  return `슛 준비 자세\n1. ${armLine}\n2. 팔 각도가 기준에 맞으면 3초 뒤 슛을 시작합니다.\n3. 준비 자세가 흐트러지면 다시 자세부터 맞출게요.`;
+}
+
 export function useBasketballCoachApp() {
   const [screen, setScreen] = useState<AppScreen>('home');
   const [lessonMode, setLessonMode] = useState<LessonMode>('dribble');
@@ -127,9 +171,12 @@ export function useBasketballCoachApp() {
   const [showFireworks, setShowFireworks] = useState(false);
 
   const feedbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pendingFeedbackRef = useRef<string | null>(null);
   const latestFeedbackRef = useRef(feedbackText);
   const lessonModeRef = useRef(lessonMode);
   const lessonStartedAtRef = useRef<number | null>(null);
+  const dribbleLessonPhaseRef = useRef<DribbleLessonPhase>('stance_setup');
+  const stanceCountdownStartedAtRef = useRef<number | null>(null);
   const feedbackTimelineRef = useRef<FeedbackMoment[]>([]);
   const pendingStopSaveRef = useRef(false);
   const recordingFallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -277,6 +324,23 @@ export function useBasketballCoachApp() {
     appendFeedbackTimeline(nextFeedback);
   }, [appendFeedbackTimeline]);
 
+  const flushPendingFeedback = useCallback(() => {
+    const pendingFeedback = pendingFeedbackRef.current?.trim();
+
+    if (!pendingFeedback || pendingFeedback === latestFeedbackRef.current.trim()) {
+      pendingFeedbackRef.current = null;
+      return;
+    }
+
+    setFeedbackAndRemember(pendingFeedback);
+    pendingFeedbackRef.current = null;
+  }, [setFeedbackAndRemember]);
+
+  const setImmediateLessonFeedback = useCallback((nextFeedback: string) => {
+    pendingFeedbackRef.current = null;
+    setFeedbackAndRemember(nextFeedback);
+  }, [setFeedbackAndRemember]);
+
   const clearRecordingWait = useCallback(() => {
     pendingStopSaveRef.current = false;
     if (recordingFallbackTimeoutRef.current) {
@@ -321,7 +385,10 @@ export function useBasketballCoachApp() {
       }
 
       lessonStartedAtRef.current = null;
+      dribbleLessonPhaseRef.current = 'stance_setup';
+      stanceCountdownStartedAtRef.current = null;
       feedbackTimelineRef.current = [];
+      pendingFeedbackRef.current = null;
       setIsLessonActive(false);
       setIsCameraReady(false);
       setCameraError('');
@@ -348,7 +415,27 @@ export function useBasketballCoachApp() {
 
   function changeLessonMode(mode: LessonMode) {
     setLessonMode(mode);
-    setFeedbackAndRemember(mode === 'shoot' ? DEFAULT_SHOOT_FEEDBACK : DEFAULT_DRIBBLE_FEEDBACK);
+    dribbleLessonPhaseRef.current = 'stance_setup';
+    stanceCountdownStartedAtRef.current = null;
+    setImmediateLessonFeedback(
+      mode === 'shoot'
+        ? buildShootStanceFeedback({
+            armAngle: null,
+            legAngle: null,
+            releaseVelocity: null,
+            armAngleState: 'unknown',
+            releaseTiming: 'unknown',
+            legAngleState: 'unknown',
+            summary: '',
+          })
+        : buildDribbleStanceFeedback({
+            dribbleStarted: false,
+            eyeFocus: 'unknown',
+            dribbleHeight: 'unknown',
+            torsoPosture: 'unknown',
+            summary: '',
+          })
+    );
     setDebugText(mode === 'shoot' ? '슛 분석 모드를 준비하는 중입니다.' : '드리블 분석 모드를 준비하는 중입니다.');
   }
 
@@ -358,7 +445,31 @@ export function useBasketballCoachApp() {
       feedbackIntervalRef.current = null;
     }
 
-    setFeedbackAndRemember(mode === 'shoot' ? DEFAULT_SHOOT_FEEDBACK : DEFAULT_DRIBBLE_FEEDBACK);
+    pendingFeedbackRef.current = null;
+    dribbleLessonPhaseRef.current = 'stance_setup';
+    stanceCountdownStartedAtRef.current = null;
+    if (mode === 'dribble') {
+      setImmediateLessonFeedback(buildDribbleStanceFeedback({
+        dribbleStarted: false,
+        eyeFocus: 'unknown',
+        dribbleHeight: 'unknown',
+        torsoPosture: 'unknown',
+        summary: '',
+      }));
+    } else {
+      setImmediateLessonFeedback(buildShootStanceFeedback({
+        armAngle: null,
+        legAngle: null,
+        releaseVelocity: null,
+        armAngleState: 'unknown',
+        releaseTiming: 'unknown',
+        legAngleState: 'unknown',
+        summary: '',
+      }));
+    }
+    feedbackIntervalRef.current = setInterval(() => {
+      flushPendingFeedback();
+    }, FEEDBACK_UPDATE_INTERVAL_MS);
   }
 
   async function ensurePermissions() {
@@ -381,6 +492,8 @@ export function useBasketballCoachApp() {
     clearRecordingWait();
     setCameraError('');
     lessonStartedAtRef.current = Date.now();
+    dribbleLessonPhaseRef.current = 'stance_setup';
+    stanceCountdownStartedAtRef.current = null;
     feedbackTimelineRef.current = [];
     setIsLessonActive(true);
     setIsCameraReady(false);
@@ -418,10 +531,57 @@ export function useBasketballCoachApp() {
         return;
       }
 
-      setFeedbackAndRemember(buildDribbleFeedbackText(analysis));
+      const phase = dribbleLessonPhaseRef.current;
+      const stanceReady = isDribbleStanceReady(analysis);
+
+      if (analysis.dribbleStarted) {
+        dribbleLessonPhaseRef.current = 'active';
+        stanceCountdownStartedAtRef.current = null;
+        pendingFeedbackRef.current = buildDribbleFeedbackText(analysis);
+        setDebugText(`?몄떇?? ${analysis.summary}`);
+        return;
+      }
+
+      if (!stanceReady) {
+        dribbleLessonPhaseRef.current = 'stance_setup';
+        stanceCountdownStartedAtRef.current = null;
+        pendingFeedbackRef.current = buildDribbleStanceFeedback(analysis);
+        setDebugText('드리블 전에 준비 자세를 맞추는 중입니다.');
+        return;
+      }
+
+      if (phase === 'stance_setup') {
+        dribbleLessonPhaseRef.current = 'countdown';
+        stanceCountdownStartedAtRef.current = Date.now();
+        setImmediateLessonFeedback('좋아요. 지금 준비 자세가 맞았습니다. 3초 동안 그대로 유지해 주세요.');
+        setDebugText('드리블 준비 자세 확인: 3초 유지 중');
+        return;
+      }
+
+      if (phase === 'countdown') {
+        const countdownStartedAt = stanceCountdownStartedAtRef.current ?? Date.now();
+        const elapsed = Date.now() - countdownStartedAt;
+
+        if (elapsed >= DRIBBLE_STANCE_HOLD_MS) {
+          dribbleLessonPhaseRef.current = 'await_dribble';
+          stanceCountdownStartedAtRef.current = null;
+          setImmediateLessonFeedback('좋아요. 이제 드리블을 시작하세요. 공이 내려오기 시작하면 본격적으로 피드백할게요.');
+          setDebugText('드리블 시작 안내');
+          return;
+        }
+
+        const remainingSeconds = Math.max(1, Math.ceil((DRIBBLE_STANCE_HOLD_MS - elapsed) / 1000));
+        pendingFeedbackRef.current = `드리블 준비 자세를 잘 잡았어요.\n1. 시선은 계속 앞을 보세요.\n2. 상체 자세를 ${remainingSeconds}초만 더 유지하면 드리블을 시작합니다.\n3. 자세가 흐트러지면 다시 준비 자세부터 맞출게요.`;
+        setDebugText(`드리블 준비 자세 유지 중: ${remainingSeconds}초 남음`);
+        return;
+      }
+
+      pendingFeedbackRef.current = '이제 드리블을 시작하세요. 공이 무릎이나 발 쪽까지 내려오면 드리블 분석을 이어갈게요.';
+      setDebugText('드리블 시작 대기 중');
+      return;
       setDebugText(`인식됨: ${analysis.summary}`);
     },
-    [setFeedbackAndRemember]
+    []
   );
 
   const applyShootAnalysis = useCallback(
@@ -430,10 +590,70 @@ export function useBasketballCoachApp() {
         return;
       }
 
-      setFeedbackAndRemember(buildShootFeedbackText(analysis));
+      pendingFeedbackRef.current = buildShootFeedbackText(analysis);
       setDebugText(`인식됨: ${analysis.summary}`);
     },
-    [setFeedbackAndRemember]
+    []
+  );
+
+  const applyShootAnalysisWithStance = useCallback(
+    (analysis: ShootAnalysis) => {
+      if (lessonModeRef.current !== 'shoot') {
+        return;
+      }
+
+      const phase = dribbleLessonPhaseRef.current;
+      const stanceReady = isShootStanceReady(analysis);
+      const releaseStarted =
+        analysis.releaseTiming !== 'unknown' ||
+        (analysis.releaseVelocity !== null && Math.abs(analysis.releaseVelocity) > 0.003);
+
+      if (releaseStarted) {
+        dribbleLessonPhaseRef.current = 'active';
+        stanceCountdownStartedAtRef.current = null;
+        pendingFeedbackRef.current = buildShootFeedbackText(analysis);
+        setDebugText(`?몄떇?? ${analysis.summary}`);
+        return;
+      }
+
+      if (!stanceReady) {
+        dribbleLessonPhaseRef.current = 'stance_setup';
+        stanceCountdownStartedAtRef.current = null;
+        pendingFeedbackRef.current = buildShootStanceFeedback(analysis);
+        setDebugText('슛 전에 준비 자세를 맞추는 중입니다.');
+        return;
+      }
+
+      if (phase === 'stance_setup') {
+        dribbleLessonPhaseRef.current = 'countdown';
+        stanceCountdownStartedAtRef.current = Date.now();
+        setImmediateLessonFeedback('좋아요. 지금 슛 준비 자세가 맞았습니다. 3초 동안 그대로 유지해 주세요.');
+        setDebugText('슛 준비 자세 확인: 3초 유지 중');
+        return;
+      }
+
+      if (phase === 'countdown') {
+        const countdownStartedAt = stanceCountdownStartedAtRef.current ?? Date.now();
+        const elapsed = Date.now() - countdownStartedAt;
+
+        if (elapsed >= DRIBBLE_STANCE_HOLD_MS) {
+          dribbleLessonPhaseRef.current = 'await_dribble';
+          stanceCountdownStartedAtRef.current = null;
+          setImmediateLessonFeedback('좋아요. 이제 슛을 시작하세요. 릴리스가 시작되면 본격적으로 피드백할게요.');
+          setDebugText('슛 시작 안내');
+          return;
+        }
+
+        const remainingSeconds = Math.max(1, Math.ceil((DRIBBLE_STANCE_HOLD_MS - elapsed) / 1000));
+        pendingFeedbackRef.current = `슛 준비 자세를 잘 잡았어요.\n1. 팔 각도를 지금처럼 유지해 주세요.\n2. ${remainingSeconds}초만 더 유지하면 슛을 시작합니다.\n3. 자세가 흐트러지면 다시 준비 자세부터 맞출게요.`;
+        setDebugText(`슛 준비 자세 유지 중: ${remainingSeconds}초 남음`);
+        return;
+      }
+
+      pendingFeedbackRef.current = '이제 슛을 시작하세요. 공을 던지기 시작하면 슛 피드백을 이어갈게요.';
+      setDebugText('슛 시작 대기 중');
+    },
+    [setImmediateLessonFeedback]
   );
 
   const handlePoseMessage = useCallback(
@@ -481,7 +701,7 @@ export function useBasketballCoachApp() {
 
         if (payload.type === 'shoot_analysis') {
           setIsCameraReady(true);
-          applyShootAnalysis(payload.analysis);
+          applyShootAnalysisWithStance(payload.analysis);
           return;
         }
 
@@ -507,7 +727,7 @@ export function useBasketballCoachApp() {
         setDebugText('카메라 상태 메시지를 처리하는 중입니다.');
       }
     },
-    [applyDribbleAnalysis, applyShootAnalysis, finalizeLessonSession]
+    [applyDribbleAnalysis, applyShootAnalysisWithStance, finalizeLessonSession]
   );
 
   function openDiaryDate(dateKey: string) {
