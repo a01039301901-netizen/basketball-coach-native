@@ -1,15 +1,17 @@
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { colors } from '../../theme/colors';
+import type { LessonMode } from '../../types/app';
 import { buildPoseBootstrapScript, POSE_WEB_BOOTSTRAP_URL } from './poseWebHtml';
 
 interface LessonCameraProps {
+  lessonMode: LessonMode;
   isLessonActive: boolean;
   isCameraReady: boolean;
   onPoseMessage: (event: WebViewMessageEvent) => void;
 }
 
-export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: LessonCameraProps) {
+export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, onPoseMessage }: LessonCameraProps) {
   return (
     <View style={styles.videoWrap}>
       {isLessonActive ? (
@@ -19,7 +21,7 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
             source={{ uri: POSE_WEB_BOOTSTRAP_URL }}
             style={styles.webview}
             onMessage={onPoseMessage}
-            injectedJavaScriptBeforeContentLoaded={buildPoseBootstrapScript()}
+            injectedJavaScriptBeforeContentLoaded={buildPoseBootstrapScript(lessonMode)}
             javaScriptEnabled
             domStorageEnabled
             allowsInlineMediaPlayback

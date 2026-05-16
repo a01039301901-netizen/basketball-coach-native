@@ -89,7 +89,13 @@ export function LessonScreen({
               <Text style={styles.modeStatusText}>현재 모드: {lessonMode === 'shoot' ? '슛 분석' : '드리블 분석'}</Text>
             </View>
 
-            <LessonCamera isLessonActive={isLessonActive} isCameraReady={isCameraReady} onPoseMessage={onPoseMessage} />
+            <LessonCamera
+              lessonMode={lessonMode}
+              isLessonActive={isLessonActive}
+              isCameraReady={isCameraReady}
+              onPoseMessage={onPoseMessage}
+            />
+
 
             <View style={styles.cameraControls}>
               <SmallButton title="레슨 시작" onPress={onBeginLesson} disabled={isLessonActive} />

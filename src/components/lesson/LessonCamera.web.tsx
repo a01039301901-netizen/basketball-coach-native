@@ -2,9 +2,10 @@ import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
 import { colors } from '../../theme/colors';
-import type { DribbleAnalysis, ShootAnalysis } from '../../types/app';
+import type { DribbleAnalysis, LessonMode, ShootAnalysis } from '../../types/app';
 
 interface LessonCameraProps {
+  lessonMode: LessonMode;
   isLessonActive: boolean;
   isCameraReady: boolean;
   onPoseMessage: (event: WebViewMessageEvent) => void;
@@ -19,6 +20,36 @@ interface BallDetection {
   pixelCount: number;
   color: 'orange' | 'red';
 }
+
+type JointKey =
+  | 'head'
+  | 'neck'
+  | 'leftShoulder'
+  | 'rightShoulder'
+  | 'leftElbow'
+  | 'rightElbow'
+  | 'leftWrist'
+  | 'rightWrist'
+  | 'leftHip'
+  | 'rightHip'
+  | 'leftKnee'
+  | 'rightKnee'
+  | 'leftAnkle'
+  | 'rightAnkle';
+
+type SegmentJointKey =
+  | 'leftShoulder'
+  | 'rightShoulder'
+  | 'leftElbow'
+  | 'rightElbow'
+  | 'leftWrist'
+  | 'rightWrist'
+  | 'leftHip'
+  | 'rightHip'
+  | 'leftKnee'
+  | 'rightKnee'
+  | 'leftAnkle'
+  | 'rightAnkle';
 
 type PosePayload =
   | { type: 'ready' }
@@ -319,6 +350,25 @@ function didDribbleStart(landmarks: Landmark[], ball: BallDetection | null) {
   return lowerBodyPoints.some((point) => distanceBetween(point, ballPoint) <= 0.12);
 }
 
+function getShootingSide(landmarks: Landmark[]) {
+  const leftArmAngle = angleAt(landmarks[INDEX.leftShoulder], landmarks[INDEX.leftElbow], landmarks[INDEX.leftWrist]);
+  const rightArmAngle = angleAt(landmarks[INDEX.rightShoulder], landmarks[INDEX.rightElbow], landmarks[INDEX.rightWrist]);
+
+  if (leftArmAngle !== null && rightArmAngle !== null) {
+    return (landmarks[INDEX.leftWrist]?.y ?? 1) < (landmarks[INDEX.rightWrist]?.y ?? 1) ? 'left' : 'right';
+  }
+
+  if (leftArmAngle !== null) {
+    return 'left';
+  }
+
+  if (rightArmAngle !== null) {
+    return 'right';
+  }
+
+  return null;
+}
+
 function classifyTorsoPosture(shoulderMid: Landmark | null, hipMid: Landmark | null): DribbleAnalysis['torsoPosture'] {
   if (!shoulderMid || !hipMid) {
     return 'unknown';
@@ -459,7 +509,67 @@ function buildShootAnalysis(landmarks: Landmark[], releaseVelocity: number | nul
   };
 }
 
-export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: LessonCameraProps) {
+function getProblemJointKeys(
+  lessonMode: LessonMode,
+  landmarks: Landmark[],
+  dribbleAnalysis: DribbleAnalysis,
+  shootAnalysis: ShootAnalysis
+) {
+  const problemJoints = new Set<JointKey>();
+
+  if (lessonMode === 'dribble') {
+    if (dribbleAnalysis.eyeFocus === 'ball') {
+      problemJoints.add('head');
+      problemJoints.add('neck');
+    }
+
+    if (dribbleAnalysis.dribbleStarted && dribbleAnalysis.dribbleHeight !== 'balanced' && dribbleAnalysis.dribbleHeight !== 'unknown') {
+      problemJoints.add('leftWrist');
+      problemJoints.add('rightWrist');
+    }
+
+    if (dribbleAnalysis.torsoPosture !== 'balanced' && dribbleAnalysis.torsoPosture !== 'unknown') {
+      problemJoints.add('leftShoulder');
+      problemJoints.add('rightShoulder');
+      problemJoints.add('leftHip');
+      problemJoints.add('rightHip');
+    }
+  } else {
+    const shootingSide = getShootingSide(landmarks);
+    const shoulderKey = shootingSide === 'left' ? 'leftShoulder' : 'rightShoulder';
+    const elbowKey = shootingSide === 'left' ? 'leftElbow' : 'rightElbow';
+    const wristKey = shootingSide === 'left' ? 'leftWrist' : 'rightWrist';
+
+    if (shootingSide && shootAnalysis.armAngleState !== 'balanced' && shootAnalysis.armAngleState !== 'unknown') {
+      problemJoints.add(shoulderKey);
+      problemJoints.add(elbowKey);
+      problemJoints.add(wristKey);
+    }
+
+    if (shootingSide && shootAnalysis.releaseTiming !== 'balanced' && shootAnalysis.releaseTiming !== 'unknown') {
+      problemJoints.add(wristKey);
+      problemJoints.add('leftHip');
+      problemJoints.add('rightHip');
+    }
+
+    if (shootAnalysis.legAngleState !== 'balanced' && shootAnalysis.legAngleState !== 'unknown') {
+      problemJoints.add('leftHip');
+      problemJoints.add('rightHip');
+      problemJoints.add('leftKnee');
+      problemJoints.add('rightKnee');
+      problemJoints.add('leftAnkle');
+      problemJoints.add('rightAnkle');
+    }
+  }
+
+  return problemJoints;
+}
+
+function shouldHighlightSegment(problemJointKeys: Set<JointKey>, a: SegmentJointKey, b: SegmentJointKey) {
+  return problemJointKeys.has(a) || problemJointKeys.has(b);
+}
+
+export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, onPoseMessage }: LessonCameraProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const onPoseMessageRef = useRef(onPoseMessage);
 
@@ -692,37 +802,6 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
       const neck = visible(leftShoulder) && visible(rightShoulder) ? midpoint(leftShoulder, rightShoulder) : null;
       const hipMid = visible(leftHip) && visible(rightHip) ? midpoint(leftHip, rightHip) : null;
 
-      drawSegment(leftShoulder, rightShoulder, '#ffb347');
-      drawSegment(leftShoulder, leftElbow, '#ffb347');
-      drawSegment(rightShoulder, rightElbow, '#ffb347');
-      drawSegment(leftElbow, leftWrist, '#ffd166');
-      drawSegment(rightElbow, rightWrist, '#ffd166');
-      drawSegment(leftShoulder, leftHip, '#7bd389');
-      drawSegment(rightShoulder, rightHip, '#7bd389');
-      drawSegment(leftHip, rightHip, '#7bd389');
-      drawSegment(leftHip, leftKnee, '#7bd389');
-      drawSegment(rightHip, rightKnee, '#7bd389');
-      drawSegment(leftKnee, leftAnkle, '#80ed99');
-      drawSegment(rightKnee, rightAnkle, '#80ed99');
-
-      if (visible(head)) drawPoint(head, LABELS.head, '#ff6b6b');
-      if (neck && visible(neck)) drawPoint(neck, LABELS.neck, '#f7b267');
-      if (visible(leftShoulder)) drawPoint(leftShoulder, `왼쪽 ${LABELS.shoulder}`, '#ffd166');
-      if (visible(rightShoulder)) drawPoint(rightShoulder, `오른쪽 ${LABELS.shoulder}`, '#ffd166');
-      if (visible(leftElbow)) drawPoint(leftElbow, `왼쪽 ${LABELS.elbow}`, '#ffb703');
-      if (visible(rightElbow)) drawPoint(rightElbow, `오른쪽 ${LABELS.elbow}`, '#ffb703');
-      if (visible(leftWrist)) drawPoint(leftWrist, `왼쪽 ${LABELS.hand}`, '#fb8500');
-      if (visible(rightWrist)) drawPoint(rightWrist, `오른쪽 ${LABELS.hand}`, '#fb8500');
-      if (visible(leftHip)) drawPoint(leftHip, `왼쪽 ${LABELS.hip}`, '#06d6a0');
-      if (visible(rightHip)) drawPoint(rightHip, `오른쪽 ${LABELS.hip}`, '#06d6a0');
-      if (visible(leftKnee)) drawPoint(leftKnee, `왼쪽 ${LABELS.knee}`, '#118ab2');
-      if (visible(rightKnee)) drawPoint(rightKnee, `오른쪽 ${LABELS.knee}`, '#118ab2');
-      if (visible(leftAnkle)) drawPoint(leftAnkle, `왼쪽 ${LABELS.foot}`, '#4cc9f0');
-      if (visible(rightAnkle)) drawPoint(rightAnkle, `오른쪽 ${LABELS.foot}`, '#4cc9f0');
-      if (ball) {
-        drawBall(ball);
-      }
-
       const detected: string[] = [];
       if (visible(head)) detected.push(LABELS.head);
       if (neck && visible(neck)) detected.push(LABELS.neck);
@@ -736,9 +815,6 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
         detected.push(ball.color === 'orange' ? '주황 공' : '빨간 공');
       }
 
-      const pointSummary = detected.join(', ');
-      setHud(pointSummary ? `인식 중: ${pointSummary}` : '관절과 공을 찾는 중입니다.');
-
       const releaseVelocity = hipMid && previousHipY !== null ? hipMid.y - previousHipY : null;
       if (hipMid) {
         previousHipY = hipMid.y;
@@ -746,6 +822,46 @@ export function LessonCamera({ isLessonActive, isCameraReady, onPoseMessage }: L
 
       const dribbleAnalysis = buildDribbleAnalysis(landmarks, ball);
       const shootAnalysis = buildShootAnalysis(landmarks, releaseVelocity, ball);
+      const problemJointKeys = getProblemJointKeys(lessonMode, landmarks, dribbleAnalysis, shootAnalysis);
+      const highlightColor = '#ff4d5a';
+      const pickColor = (jointKey: JointKey, baseColor: string) => (problemJointKeys.has(jointKey) ? highlightColor : baseColor);
+      const pickSegmentColor = (a: SegmentJointKey, b: SegmentJointKey, baseColor: string) =>
+        shouldHighlightSegment(problemJointKeys, a, b) ? highlightColor : baseColor;
+      drawSegment(leftShoulder, rightShoulder, pickSegmentColor('leftShoulder', 'rightShoulder', '#ffb347'));
+      drawSegment(leftShoulder, leftElbow, pickSegmentColor('leftShoulder', 'leftElbow', '#ffb347'));
+      drawSegment(rightShoulder, rightElbow, pickSegmentColor('rightShoulder', 'rightElbow', '#ffb347'));
+      drawSegment(leftElbow, leftWrist, pickSegmentColor('leftElbow', 'leftWrist', '#ffd166'));
+      drawSegment(rightElbow, rightWrist, pickSegmentColor('rightElbow', 'rightWrist', '#ffd166'));
+      drawSegment(leftShoulder, leftHip, pickSegmentColor('leftShoulder', 'leftHip', '#7bd389'));
+      drawSegment(rightShoulder, rightHip, pickSegmentColor('rightShoulder', 'rightHip', '#7bd389'));
+      drawSegment(leftHip, rightHip, pickSegmentColor('leftHip', 'rightHip', '#7bd389'));
+      drawSegment(leftHip, leftKnee, pickSegmentColor('leftHip', 'leftKnee', '#7bd389'));
+      drawSegment(rightHip, rightKnee, pickSegmentColor('rightHip', 'rightKnee', '#7bd389'));
+      drawSegment(leftKnee, leftAnkle, pickSegmentColor('leftKnee', 'leftAnkle', '#80ed99'));
+      drawSegment(rightKnee, rightAnkle, pickSegmentColor('rightKnee', 'rightAnkle', '#80ed99'));
+      if (visible(head)) drawPoint(head, LABELS.head, pickColor('head', '#ff6b6b'));
+      if (neck && visible(neck)) drawPoint(neck, LABELS.neck, pickColor('neck', '#f7b267'));
+      if (visible(leftShoulder)) drawPoint(leftShoulder, `왼쪽 ${LABELS.shoulder}`, pickColor('leftShoulder', '#ffd166'));
+      if (visible(rightShoulder)) drawPoint(rightShoulder, `오른쪽 ${LABELS.shoulder}`, pickColor('rightShoulder', '#ffd166'));
+      if (visible(leftElbow)) drawPoint(leftElbow, `왼쪽 ${LABELS.elbow}`, pickColor('leftElbow', '#ffb703'));
+      if (visible(rightElbow)) drawPoint(rightElbow, `오른쪽 ${LABELS.elbow}`, pickColor('rightElbow', '#ffb703'));
+      if (visible(leftWrist)) drawPoint(leftWrist, `왼쪽 ${LABELS.hand}`, pickColor('leftWrist', '#fb8500'));
+      if (visible(rightWrist)) drawPoint(rightWrist, `오른쪽 ${LABELS.hand}`, pickColor('rightWrist', '#fb8500'));
+      if (visible(leftHip)) drawPoint(leftHip, `왼쪽 ${LABELS.hip}`, pickColor('leftHip', '#06d6a0'));
+      if (visible(rightHip)) drawPoint(rightHip, `오른쪽 ${LABELS.hip}`, pickColor('rightHip', '#06d6a0'));
+      if (visible(leftKnee)) drawPoint(leftKnee, `왼쪽 ${LABELS.knee}`, pickColor('leftKnee', '#118ab2'));
+      if (visible(rightKnee)) drawPoint(rightKnee, `오른쪽 ${LABELS.knee}`, pickColor('rightKnee', '#118ab2'));
+      if (visible(leftAnkle)) drawPoint(leftAnkle, `왼쪽 ${LABELS.foot}`, pickColor('leftAnkle', '#4cc9f0'));
+      if (visible(rightAnkle)) drawPoint(rightAnkle, `오른쪽 ${LABELS.foot}`, pickColor('rightAnkle', '#4cc9f0'));
+      if (ball) {
+        drawBall(ball);
+      }
+      const pointSummary = detected.join(', ');
+      const issueSummary =
+        problemJointKeys.size > 0
+          ? '문제가 의심되는 관절을 빨간색으로 표시하고 있어요.'
+          : '현재는 크게 문제로 보이는 관절이 없어요.';
+      setHud(pointSummary ? `인식 중: ${pointSummary}\n${issueSummary}` : '관절과 공을 찾는 중입니다.');
       const now = Date.now();
 
       if (pointSummary && (pointSummary !== lastPointSummary || now - lastSentAt > 1200)) {

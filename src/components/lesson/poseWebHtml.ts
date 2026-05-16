@@ -1,6 +1,6 @@
 export const POSE_WEB_BOOTSTRAP_URL = 'https://example.com/';
 
-export function buildPoseWebHtml(): string {
+export function buildPoseWebHtml(lessonMode: 'dribble' | 'shoot' = 'dribble'): string {
   return `<!DOCTYPE html>
 <html lang="ko">
   <head>
@@ -61,6 +61,7 @@ export function buildPoseWebHtml(): string {
     </div>
 
     <script type="module">
+      const lessonMode = ${JSON.stringify(lessonMode)};
       const video = document.getElementById("video");
       const canvas = document.getElementById("canvas");
       const hud = document.getElementById("hud");
@@ -460,6 +461,25 @@ export function buildPoseWebHtml(): string {
         return lowerBodyPoints.some((point) => distanceBetween(point, ballPoint) <= 0.12);
       }
 
+      function getShootingSide(landmarks) {
+        const leftArmAngle = angleAt(landmarks[INDEX.leftShoulder], landmarks[INDEX.leftElbow], landmarks[INDEX.leftWrist]);
+        const rightArmAngle = angleAt(landmarks[INDEX.rightShoulder], landmarks[INDEX.rightElbow], landmarks[INDEX.rightWrist]);
+
+        if (leftArmAngle !== null && rightArmAngle !== null) {
+          return (landmarks[INDEX.leftWrist]?.y ?? 1) < (landmarks[INDEX.rightWrist]?.y ?? 1) ? "left" : "right";
+        }
+
+        if (leftArmAngle !== null) {
+          return "left";
+        }
+
+        if (rightArmAngle !== null) {
+          return "right";
+        }
+
+        return null;
+      }
+
       function classifyTorsoPosture(shoulderMid, hipMid) {
         if (!shoulderMid || !hipMid) {
           return "unknown";
@@ -594,6 +614,61 @@ export function buildPoseWebHtml(): string {
         };
       }
 
+      function getProblemJointKeys(landmarks, dribbleAnalysis, shootAnalysis) {
+        const problemJoints = new Set();
+
+        if (lessonMode === "dribble") {
+          if (dribbleAnalysis.eyeFocus === "ball") {
+            problemJoints.add("head");
+            problemJoints.add("neck");
+          }
+
+          if (dribbleAnalysis.dribbleStarted && dribbleAnalysis.dribbleHeight !== "balanced" && dribbleAnalysis.dribbleHeight !== "unknown") {
+            problemJoints.add("leftWrist");
+            problemJoints.add("rightWrist");
+          }
+
+          if (dribbleAnalysis.torsoPosture !== "balanced" && dribbleAnalysis.torsoPosture !== "unknown") {
+            problemJoints.add("leftShoulder");
+            problemJoints.add("rightShoulder");
+            problemJoints.add("leftHip");
+            problemJoints.add("rightHip");
+          }
+        } else {
+          const shootingSide = getShootingSide(landmarks);
+          const shoulderKey = shootingSide === "left" ? "leftShoulder" : "rightShoulder";
+          const elbowKey = shootingSide === "left" ? "leftElbow" : "rightElbow";
+          const wristKey = shootingSide === "left" ? "leftWrist" : "rightWrist";
+
+          if (shootingSide && shootAnalysis.armAngleState !== "balanced" && shootAnalysis.armAngleState !== "unknown") {
+            problemJoints.add(shoulderKey);
+            problemJoints.add(elbowKey);
+            problemJoints.add(wristKey);
+          }
+
+          if (shootingSide && shootAnalysis.releaseTiming !== "balanced" && shootAnalysis.releaseTiming !== "unknown") {
+            problemJoints.add(wristKey);
+            problemJoints.add("leftHip");
+            problemJoints.add("rightHip");
+          }
+
+          if (shootAnalysis.legAngleState !== "balanced" && shootAnalysis.legAngleState !== "unknown") {
+            problemJoints.add("leftHip");
+            problemJoints.add("rightHip");
+            problemJoints.add("leftKnee");
+            problemJoints.add("rightKnee");
+            problemJoints.add("leftAnkle");
+            problemJoints.add("rightAnkle");
+          }
+        }
+
+        return problemJoints;
+      }
+
+      function shouldHighlightSegment(problemJointKeys, a, b) {
+        return problemJointKeys.has(a) || problemJointKeys.has(b);
+      }
+
       function renderPose(landmarks) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.save();
@@ -632,19 +707,6 @@ export function buildPoseWebHtml(): string {
         const rightAnkle = landmarks[INDEX.rightAnkle];
         const neck = visible(leftShoulder) && visible(rightShoulder) ? midpoint(leftShoulder, rightShoulder) : null;
         const hipMid = visible(leftHip) && visible(rightHip) ? midpoint(leftHip, rightHip) : null;
-
-        drawSegment(leftShoulder, rightShoulder, "#ffb347");
-        drawSegment(leftShoulder, leftElbow, "#ffb347");
-        drawSegment(rightShoulder, rightElbow, "#ffb347");
-        drawSegment(leftElbow, leftWrist, "#ffd166");
-        drawSegment(rightElbow, rightWrist, "#ffd166");
-        drawSegment(leftShoulder, leftHip, "#7bd389");
-        drawSegment(rightShoulder, rightHip, "#7bd389");
-        drawSegment(leftHip, rightHip, "#7bd389");
-        drawSegment(leftHip, leftKnee, "#7bd389");
-        drawSegment(rightHip, rightKnee, "#7bd389");
-        drawSegment(leftKnee, leftAnkle, "#80ed99");
-        drawSegment(rightKnee, rightAnkle, "#80ed99");
 
         if (visible(head)) drawPoint(head, LABELS.head, "#ff6b6b");
         if (neck && visible(neck)) drawPoint(neck, LABELS.neck, "#f7b267");
@@ -826,8 +888,8 @@ export function buildPoseWebHtml(): string {
 </html>`;
 }
 
-export function buildPoseBootstrapScript(): string {
-  const html = JSON.stringify(buildPoseWebHtml());
+export function buildPoseBootstrapScript(lessonMode: 'dribble' | 'shoot' = 'dribble'): string {
+  const html = JSON.stringify(buildPoseWebHtml(lessonMode));
 
   return `
     document.open();

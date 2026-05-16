@@ -1,7 +1,9 @@
 import { Platform } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
+import type { LessonMode } from '../../types/app';
 
 interface LessonCameraProps {
+  lessonMode: LessonMode;
   isLessonActive: boolean;
   isCameraReady: boolean;
   onPoseMessage: (event: WebViewMessageEvent) => void;
