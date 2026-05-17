@@ -22,6 +22,12 @@ interface BallDetection {
   color: 'orange' | 'red';
 }
 
+interface HandDetection {
+  handedness: 'left' | 'right';
+  wrist: Landmark;
+  handCenter: Landmark;
+}
+
 type JointKey =
   | 'head'
   | 'neck'
@@ -63,6 +69,26 @@ type PosePayload =
   | { type: 'recording_error'; message: string }
   | { type: 'error'; message: string };
 
+type PoseResults = {
+  image?: CanvasImageSource;
+  poseLandmarks?: Landmark[];
+};
+
+type ClassicPose = {
+  setOptions: (options: Record<string, unknown>) => void;
+  onResults: (callback: (results: PoseResults) => void) => void;
+  send: (input: { image: HTMLVideoElement }) => Promise<void>;
+  close?: () => void;
+};
+
+type PoseGlobal = new (options: { locateFile: (file: string) => string }) => ClassicPose;
+
+declare global {
+  interface Window {
+    Pose?: PoseGlobal;
+  }
+}
+
 const INDEX = {
   nose: 0,
   leftEye: 2,
@@ -75,6 +101,12 @@ const INDEX = {
   rightElbow: 14,
   leftWrist: 15,
   rightWrist: 16,
+  leftPinky: 17,
+  rightPinky: 18,
+  leftIndex: 19,
+  rightIndex: 20,
+  leftThumb: 21,
+  rightThumb: 22,
   leftHip: 23,
   rightHip: 24,
   leftKnee: 25,
@@ -88,14 +120,30 @@ const LABELS = {
   neck: '목',
   shoulder: '어깨',
   elbow: '팔꿈치',
+  wrist: '손목',
   hand: '손',
   hip: '엉덩이',
   knee: '무릎',
   foot: '발',
 } as const;
 
+const BODY_SEGMENTS: Array<[SegmentJointKey, SegmentJointKey, string]> = [
+  ['leftShoulder', 'rightShoulder', '#ffb347'],
+  ['leftShoulder', 'leftElbow', '#ffb347'],
+  ['rightShoulder', 'rightElbow', '#ffb347'],
+  ['leftElbow', 'leftWrist', '#ffd166'],
+  ['rightElbow', 'rightWrist', '#ffd166'],
+  ['leftShoulder', 'leftHip', '#7bd389'],
+  ['rightShoulder', 'rightHip', '#7bd389'],
+  ['leftHip', 'rightHip', '#7bd389'],
+  ['leftHip', 'leftKnee', '#7bd389'],
+  ['rightHip', 'rightKnee', '#7bd389'],
+  ['leftKnee', 'leftAnkle', '#80ed99'],
+  ['rightKnee', 'rightAnkle', '#80ed99'],
+];
+
 function visible(point?: Landmark | null) {
-  return Boolean(point && (point.visibility ?? 1) > 0.4);
+  return Boolean(point && (point.visibility ?? 1) > 0.45);
 }
 
 function midpoint(a: Landmark, b: Landmark): Landmark {
@@ -108,6 +156,52 @@ function midpoint(a: Landmark, b: Landmark): Landmark {
 
 function distanceBetween(a: Landmark, b: Landmark) {
   return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function averagePoints(points: Landmark[]): Landmark | null {
+  if (points.length === 0) {
+    return null;
+  }
+
+  const total = points.reduce(
+    (acc, point) => ({
+      x: acc.x + point.x,
+      y: acc.y + point.y,
+    }),
+    { x: 0, y: 0 }
+  );
+
+  return {
+    x: total.x / points.length,
+    y: total.y / points.length,
+    visibility: 1,
+  };
+}
+
+function getPoseHandDetections(landmarks: Landmark[]): HandDetection[] {
+  const leftWrist = landmarks[INDEX.leftWrist];
+  const rightWrist = landmarks[INDEX.rightWrist];
+  const leftHand = averagePoints(
+    [INDEX.leftPinky, INDEX.leftIndex, INDEX.leftThumb]
+      .map((index) => landmarks[index])
+      .filter((point): point is Landmark => visible(point))
+  );
+  const rightHand = averagePoints(
+    [INDEX.rightPinky, INDEX.rightIndex, INDEX.rightThumb]
+      .map((index) => landmarks[index])
+      .filter((point): point is Landmark => visible(point))
+  );
+
+  const hands: HandDetection[] = [];
+  if (visible(leftWrist) && leftHand) {
+    hands.push({ handedness: 'left', wrist: leftWrist, handCenter: leftHand });
+  }
+
+  if (visible(rightWrist) && rightHand) {
+    hands.push({ handedness: 'right', wrist: rightWrist, handCenter: rightHand });
+  }
+
+  return hands;
 }
 
 function angleAt(a?: Landmark, b?: Landmark, c?: Landmark): number | null {
@@ -155,10 +249,11 @@ function rgbToHsv(r: number, g: number, b: number) {
     hue += 360;
   }
 
-  const saturation = max === 0 ? 0 : delta / max;
-  const value = max;
-
-  return { h: hue, s: saturation, v: value };
+  return {
+    h: hue,
+    s: max === 0 ? 0 : delta / max,
+    v: max,
+  };
 }
 
 function classifyBallPixel(r: number, g: number, b: number): BallDetection['color'] | null {
@@ -233,7 +328,6 @@ function detectBall(
       maxY = Math.max(maxY, y);
 
       const neighbors = [current - 1, current + 1, current - width, current + width];
-
       for (const neighbor of neighbors) {
         if (neighbor < 0 || neighbor >= colorMap.length || visited[neighbor] || colorMap[neighbor] !== colorValue) {
           continue;
@@ -261,11 +355,10 @@ function detectBall(
       continue;
     }
 
-    const radius = Math.max(blobWidth, blobHeight) / Math.max(width, height) / 2;
     const candidate: BallDetection = {
       x: sumX / count / width,
       y: sumY / count / height,
-      radius,
+      radius: Math.max(blobWidth, blobHeight) / Math.max(width, height) / 2,
       pixelCount: count,
       color: colorValue === 1 ? 'orange' : 'red',
     };
@@ -311,7 +404,6 @@ function classifyDribbleHeight(
   hipMid: Landmark | null
 ): DribbleAnalysis['dribbleHeight'] {
   const wrists = [landmarks[INDEX.leftWrist], landmarks[INDEX.rightWrist]].filter(visible);
-
   if (!neck || !hipMid || wrists.length === 0) {
     return 'unknown';
   }
@@ -376,15 +468,12 @@ function classifyTorsoPosture(shoulderMid: Landmark | null, hipMid: Landmark | n
   }
 
   const torsoHeight = hipMid.y - shoulderMid.y;
-
   if (torsoHeight > 0.3) {
     return 'high';
   }
-
   if (torsoHeight < 0.2) {
     return 'low';
   }
-
   return 'balanced';
 }
 
@@ -399,21 +488,17 @@ function buildDribbleAnalysis(landmarks: Landmark[], ball: BallDetection | null)
   const neck = shoulderMid;
   const dribbleStarted = didDribbleStart(landmarks, ball);
 
-  const eyeFocus = classifyEyeFocus(landmarks, neck);
-  const dribbleHeight = dribbleStarted ? classifyDribbleHeight(landmarks, neck, hipMid) : 'unknown';
-  const torsoPosture = classifyTorsoPosture(shoulderMid, hipMid);
-
   return {
     dribbleStarted,
-    eyeFocus,
-    dribbleHeight,
-    torsoPosture,
+    eyeFocus: classifyEyeFocus(landmarks, neck),
+    dribbleHeight: dribbleStarted ? classifyDribbleHeight(landmarks, neck, hipMid) : 'unknown',
+    torsoPosture: classifyTorsoPosture(shoulderMid, hipMid),
     summary: [
-      `드리블:${dribbleStarted ? '시작됨' : '대기 중'}`,
-      `시선:${eyeFocus === 'ball' ? '공 쪽' : eyeFocus === 'forward' ? '앞' : '판정 어려움'}`,
-      `드리블:${dribbleHeight === 'high' ? '높음' : dribbleHeight === 'low' ? '낮음' : dribbleHeight === 'balanced' ? '적절' : '판정 어려움'}`,
-      `상체:${torsoPosture === 'high' ? '높음' : torsoPosture === 'low' ? '낮음' : torsoPosture === 'balanced' ? '적절' : '판정 어려움'}`,
-      `공:${ball ? `${ball.color === 'orange' ? '주황' : '빨강'} 감지` : '탐색 중'}`,
+      `드리블:${dribbleStarted ? '시작' : '대기'}`,
+      `시선:${classifyEyeFocus(landmarks, neck)}`,
+      `높이:${dribbleStarted ? classifyDribbleHeight(landmarks, neck, hipMid) : 'unknown'}`,
+      `상체:${classifyTorsoPosture(shoulderMid, hipMid)}`,
+      `공:${ball ? ball.color : 'none'}`,
     ].join(' | '),
   };
 }
@@ -434,30 +519,14 @@ function buildShootAnalysis(landmarks: Landmark[], releaseVelocity: number | nul
 
   const leftArmAngle = angleAt(leftShoulder, leftElbow, leftWrist);
   const rightArmAngle = angleAt(rightShoulder, rightElbow, rightWrist);
-  const shootingSide =
-    leftArmAngle !== null && rightArmAngle !== null
-      ? (leftWrist?.y ?? 1) < (rightWrist?.y ?? 1)
-        ? 'left'
-        : 'right'
-      : leftArmAngle !== null
-        ? 'left'
-        : rightArmAngle !== null
-          ? 'right'
-          : null;
-
+  const shootingSide = getShootingSide(landmarks);
   const armAngle = shootingSide === 'left' ? leftArmAngle : shootingSide === 'right' ? rightArmAngle : null;
   const shootingShoulder = shootingSide === 'left' ? leftShoulder : shootingSide === 'right' ? rightShoulder : undefined;
   const shootingWrist = shootingSide === 'left' ? leftWrist : shootingSide === 'right' ? rightWrist : undefined;
 
   let armAngleState: ShootAnalysis['armAngleState'] = 'unknown';
   if (armAngle !== null) {
-    if (armAngle < 90) {
-      armAngleState = 'narrow';
-    } else if (armAngle > 110) {
-      armAngleState = 'wide';
-    } else {
-      armAngleState = 'balanced';
-    }
+    armAngleState = armAngle < 90 ? 'narrow' : armAngle > 110 ? 'wide' : 'balanced';
   }
 
   const legAngles = [angleAt(leftHip, leftKnee, leftAnkle), angleAt(rightHip, rightKnee, rightAnkle)].filter(
@@ -467,13 +536,7 @@ function buildShootAnalysis(landmarks: Landmark[], releaseVelocity: number | nul
 
   let legAngleState: ShootAnalysis['legAngleState'] = 'unknown';
   if (legAngle !== null) {
-    if (legAngle < 100) {
-      legAngleState = 'low';
-    } else if (legAngle > 130) {
-      legAngleState = 'high';
-    } else {
-      legAngleState = 'balanced';
-    }
+    legAngleState = legAngle < 100 ? 'low' : legAngle > 130 ? 'high' : 'balanced';
   }
 
   const releasePose =
@@ -481,17 +544,11 @@ function buildShootAnalysis(landmarks: Landmark[], releaseVelocity: number | nul
     armAngle > 120 &&
     visible(shootingShoulder) &&
     visible(shootingWrist) &&
-    shootingWrist!.y < shootingShoulder!.y;
+    Boolean(shootingWrist && shootingShoulder && shootingWrist.y < shootingShoulder.y);
 
   let releaseTiming: ShootAnalysis['releaseTiming'] = 'unknown';
   if (releasePose && releaseVelocity !== null) {
-    if (releaseVelocity < -0.003) {
-      releaseTiming = 'early';
-    } else if (releaseVelocity > 0.003) {
-      releaseTiming = 'late';
-    } else {
-      releaseTiming = 'balanced';
-    }
+    releaseTiming = releaseVelocity < -0.003 ? 'early' : releaseVelocity > 0.003 ? 'late' : 'balanced';
   }
 
   return {
@@ -502,10 +559,10 @@ function buildShootAnalysis(landmarks: Landmark[], releaseVelocity: number | nul
     releaseTiming,
     legAngleState,
     summary: [
-      `팔:${armAngleState === 'narrow' ? '좁음' : armAngleState === 'wide' ? '넓음' : armAngleState === 'balanced' ? '적절' : '판정 어려움'}`,
-      `타이밍:${releaseTiming === 'early' ? '빠름' : releaseTiming === 'late' ? '늦음' : releaseTiming === 'balanced' ? '적절' : '판정 어려움'}`,
-      `하체:${legAngleState === 'low' ? '너무 낮음' : legAngleState === 'high' ? '높음' : legAngleState === 'balanced' ? '적절' : '판정 어려움'}`,
-      `공:${ball ? `${ball.color === 'orange' ? '주황' : '빨강'} 감지` : '탐색 중'}`,
+      `팔:${armAngleState}`,
+      `타이밍:${releaseTiming}`,
+      `하체:${legAngleState}`,
+      `공:${ball ? ball.color : 'none'}`,
     ].join(' | '),
   };
 }
@@ -570,6 +627,33 @@ function shouldHighlightSegment(problemJointKeys: Set<JointKey>, a: SegmentJoint
   return problemJointKeys.has(a) || problemJointKeys.has(b);
 }
 
+function loadScript(src: string) {
+  return new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector(`script[data-codex-src="${src}"]`) as HTMLScriptElement | null;
+    if (existing?.dataset.loaded === 'true') {
+      resolve();
+      return;
+    }
+
+    if (existing) {
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.dataset.codexSrc = src;
+    script.onload = () => {
+      script.dataset.loaded = 'true';
+      resolve();
+    };
+    script.onerror = () => reject(new Error(`Failed to load ${src}`));
+    document.head.appendChild(script);
+  });
+}
+
 export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countdownValue, onPoseMessage }: LessonCameraProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const onPoseMessageRef = useRef(onPoseMessage);
@@ -585,33 +669,27 @@ export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countd
     }
 
     host.innerHTML = '';
-
     if (!isLessonActive) {
       return undefined;
     }
 
     let cancelled = false;
-    let animationFrameId = 0;
+    let rafId = 0;
     let stream: MediaStream | null = null;
-    let poseLandmarker: {
-      detectForVideo: (video: HTMLVideoElement, timestampMs: number) => { landmarks?: Landmark[][] };
-      close?: () => void;
-    } | null = null;
+    let pose: ClassicPose | null = null;
     let recorder: MediaRecorder | null = null;
     let recorderChunks: Blob[] = [];
     let recorderStopping = false;
-    let lastVideoTime = -1;
+    let inFlight = false;
     let lastPointSummary = '';
     let lastDribbleSummary = '';
     let lastShootSummary = '';
-    let lastSentAt = 0;
+    let lastStatusAt = 0;
     let previousHipY: number | null = null;
 
     const emit = (payload: PosePayload) => {
       onPoseMessageRef.current({
-        nativeEvent: {
-          data: JSON.stringify(payload),
-        },
+        nativeEvent: { data: JSON.stringify(payload) },
       } as WebViewMessageEvent);
     };
 
@@ -621,9 +699,7 @@ export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countd
         return;
       }
 
-      const blob = new Blob(recorderChunks, {
-        type: recorder?.mimeType || 'video/webm',
-      });
+      const blob = new Blob(recorderChunks, { type: recorder?.mimeType || 'video/webm' });
       const reader = new FileReader();
       reader.onloadend = () => {
         const result = typeof reader.result === 'string' ? reader.result : '';
@@ -631,12 +707,9 @@ export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countd
           emit({ type: 'recording_error', message: '영상 인코딩에 실패했습니다.' });
           return;
         }
-
         emit({ type: 'recording_ready', videoUri: result });
       };
-      reader.onerror = () => {
-        emit({ type: 'recording_error', message: '영상 파일을 읽는 중 오류가 발생했습니다.' });
-      };
+      reader.onerror = () => emit({ type: 'recording_error', message: '영상 파일을 읽는 중 오류가 발생했습니다.' });
       reader.readAsDataURL(blob);
     };
 
@@ -659,8 +732,7 @@ export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countd
       height: '100%',
       objectFit: 'cover',
       transform: 'scaleX(-1)',
-      background: colors.cameraBg,
-      opacity: '0',
+      display: 'none',
     } satisfies Partial<CSSStyleDeclaration>);
 
     const canvas = document.createElement('canvas');
@@ -676,7 +748,7 @@ export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countd
     const processingContext = processingCanvas.getContext('2d', { willReadFrequently: true });
 
     const hud = document.createElement('div');
-    hud.textContent = 'MediaPipe와 공 인식을 준비하는 중입니다.';
+    hud.textContent = 'MediaPipe Pose를 준비하는 중입니다.';
     Object.assign(hud.style, {
       position: 'absolute',
       left: '12px',
@@ -754,14 +826,6 @@ export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countd
       context.strokeStyle = stroke;
       context.lineWidth = 4;
       context.stroke();
-
-      context.fillStyle = 'rgba(0,0,0,0.55)';
-      context.fillRect(centerX - 44, centerY - Math.max(radius, 16) - 32, 88, 22);
-      context.fillStyle = '#ffffff';
-      context.font = 'bold 13px Arial';
-      context.textAlign = 'center';
-      context.fillText(ball.color === 'orange' ? '주황 공' : '빨간 공', centerX, centerY - Math.max(radius, 16) - 16);
-      context.textAlign = 'left';
     };
 
     const renderPose = (landmarks: Landmark[] | null) => {
@@ -771,22 +835,23 @@ export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countd
       context.scale(-1, 1);
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       context.restore();
-      const ball = detectBall(video, processingCanvas, processingContext);
 
+      const ball = detectBall(video, processingCanvas, processingContext);
       if (!landmarks) {
         if (ball) {
           drawBall(ball);
         }
-
-        setHud(ball ? `공 인식됨: ${ball.color === 'orange' ? '주황 공' : '빨간 공'}` : '화면 안에 몸과 공이 보이도록 맞춰 주세요.');
         const now = Date.now();
-        if (now - lastSentAt > 1200) {
-          lastSentAt = now;
-          emit({ type: 'status', message: ball ? '공은 감지되지만 사람을 찾는 중입니다.' : '사람과 공을 찾는 중입니다.' });
+        if (now - lastStatusAt > 1200) {
+          lastStatusAt = now;
+          emit({ type: 'status', message: ball ? '공은 보이지만 자세를 찾는 중입니다.' : '자세와 공을 찾는 중입니다.' });
         }
+        setHud(ball ? `공 인식 중: ${ball.color}` : '화면 안에 몸 전체와 공이 보이도록 맞춰 주세요.');
         return;
       }
 
+      const leftHand = getPoseHandDetections(landmarks).find((hand) => hand.handedness === 'left');
+      const rightHand = getPoseHandDetections(landmarks).find((hand) => hand.handedness === 'right');
       const head = landmarks[INDEX.nose];
       const leftShoulder = landmarks[INDEX.leftShoulder];
       const rightShoulder = landmarks[INDEX.rightShoulder];
@@ -803,19 +868,6 @@ export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countd
       const neck = visible(leftShoulder) && visible(rightShoulder) ? midpoint(leftShoulder, rightShoulder) : null;
       const hipMid = visible(leftHip) && visible(rightHip) ? midpoint(leftHip, rightHip) : null;
 
-      const detected: string[] = [];
-      if (visible(head)) detected.push(LABELS.head);
-      if (neck && visible(neck)) detected.push(LABELS.neck);
-      if (visible(leftShoulder) || visible(rightShoulder)) detected.push(LABELS.shoulder);
-      if (visible(leftElbow) || visible(rightElbow)) detected.push(LABELS.elbow);
-      if (visible(leftWrist) || visible(rightWrist)) detected.push(LABELS.hand);
-      if (visible(leftHip) || visible(rightHip)) detected.push(LABELS.hip);
-      if (visible(leftKnee) || visible(rightKnee)) detected.push(LABELS.knee);
-      if (visible(leftAnkle) || visible(rightAnkle)) detected.push(LABELS.foot);
-      if (ball) {
-        detected.push(ball.color === 'orange' ? '주황 공' : '빨간 공');
-      }
-
       const releaseVelocity = hipMid && previousHipY !== null ? hipMid.y - previousHipY : null;
       if (hipMid) {
         previousHipY = hipMid.y;
@@ -828,125 +880,140 @@ export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countd
       const pickColor = (jointKey: JointKey, baseColor: string) => (problemJointKeys.has(jointKey) ? highlightColor : baseColor);
       const pickSegmentColor = (a: SegmentJointKey, b: SegmentJointKey, baseColor: string) =>
         shouldHighlightSegment(problemJointKeys, a, b) ? highlightColor : baseColor;
-      drawSegment(leftShoulder, rightShoulder, pickSegmentColor('leftShoulder', 'rightShoulder', '#ffb347'));
-      drawSegment(leftShoulder, leftElbow, pickSegmentColor('leftShoulder', 'leftElbow', '#ffb347'));
-      drawSegment(rightShoulder, rightElbow, pickSegmentColor('rightShoulder', 'rightElbow', '#ffb347'));
-      drawSegment(leftElbow, leftWrist, pickSegmentColor('leftElbow', 'leftWrist', '#ffd166'));
-      drawSegment(rightElbow, rightWrist, pickSegmentColor('rightElbow', 'rightWrist', '#ffd166'));
-      drawSegment(leftShoulder, leftHip, pickSegmentColor('leftShoulder', 'leftHip', '#7bd389'));
-      drawSegment(rightShoulder, rightHip, pickSegmentColor('rightShoulder', 'rightHip', '#7bd389'));
-      drawSegment(leftHip, rightHip, pickSegmentColor('leftHip', 'rightHip', '#7bd389'));
-      drawSegment(leftHip, leftKnee, pickSegmentColor('leftHip', 'leftKnee', '#7bd389'));
-      drawSegment(rightHip, rightKnee, pickSegmentColor('rightHip', 'rightKnee', '#7bd389'));
-      drawSegment(leftKnee, leftAnkle, pickSegmentColor('leftKnee', 'leftAnkle', '#80ed99'));
-      drawSegment(rightKnee, rightAnkle, pickSegmentColor('rightKnee', 'rightAnkle', '#80ed99'));
+
+      const byKey: Record<SegmentJointKey, Landmark | undefined> = {
+        leftShoulder,
+        rightShoulder,
+        leftElbow,
+        rightElbow,
+        leftWrist,
+        rightWrist,
+        leftHip,
+        rightHip,
+        leftKnee,
+        rightKnee,
+        leftAnkle,
+        rightAnkle,
+      };
+
+      for (const [from, to, color] of BODY_SEGMENTS) {
+        drawSegment(byKey[from], byKey[to], pickSegmentColor(from, to, color));
+      }
+
+      if (leftHand) {
+        drawSegment(leftHand.wrist, leftHand.handCenter, pickColor('leftWrist', '#ff8fab'));
+      }
+      if (rightHand) {
+        drawSegment(rightHand.wrist, rightHand.handCenter, pickColor('rightWrist', '#ff8fab'));
+      }
+
       if (visible(head)) drawPoint(head, LABELS.head, pickColor('head', '#ff6b6b'));
       if (neck && visible(neck)) drawPoint(neck, LABELS.neck, pickColor('neck', '#f7b267'));
       if (visible(leftShoulder)) drawPoint(leftShoulder, `왼쪽 ${LABELS.shoulder}`, pickColor('leftShoulder', '#ffd166'));
       if (visible(rightShoulder)) drawPoint(rightShoulder, `오른쪽 ${LABELS.shoulder}`, pickColor('rightShoulder', '#ffd166'));
       if (visible(leftElbow)) drawPoint(leftElbow, `왼쪽 ${LABELS.elbow}`, pickColor('leftElbow', '#ffb703'));
       if (visible(rightElbow)) drawPoint(rightElbow, `오른쪽 ${LABELS.elbow}`, pickColor('rightElbow', '#ffb703'));
-      if (visible(leftWrist)) drawPoint(leftWrist, `왼쪽 ${LABELS.hand}`, pickColor('leftWrist', '#fb8500'));
-      if (visible(rightWrist)) drawPoint(rightWrist, `오른쪽 ${LABELS.hand}`, pickColor('rightWrist', '#fb8500'));
+      if (visible(leftWrist)) drawPoint(leftWrist, `왼쪽 ${LABELS.wrist}`, pickColor('leftWrist', '#fb8500'));
+      if (visible(rightWrist)) drawPoint(rightWrist, `오른쪽 ${LABELS.wrist}`, pickColor('rightWrist', '#fb8500'));
+      if (leftHand) drawPoint(leftHand.handCenter, `왼쪽 ${LABELS.hand}`, '#ff8fab');
+      if (rightHand) drawPoint(rightHand.handCenter, `오른쪽 ${LABELS.hand}`, '#ff8fab');
       if (visible(leftHip)) drawPoint(leftHip, `왼쪽 ${LABELS.hip}`, pickColor('leftHip', '#06d6a0'));
       if (visible(rightHip)) drawPoint(rightHip, `오른쪽 ${LABELS.hip}`, pickColor('rightHip', '#06d6a0'));
       if (visible(leftKnee)) drawPoint(leftKnee, `왼쪽 ${LABELS.knee}`, pickColor('leftKnee', '#118ab2'));
       if (visible(rightKnee)) drawPoint(rightKnee, `오른쪽 ${LABELS.knee}`, pickColor('rightKnee', '#118ab2'));
       if (visible(leftAnkle)) drawPoint(leftAnkle, `왼쪽 ${LABELS.foot}`, pickColor('leftAnkle', '#4cc9f0'));
       if (visible(rightAnkle)) drawPoint(rightAnkle, `오른쪽 ${LABELS.foot}`, pickColor('rightAnkle', '#4cc9f0'));
-      if (ball) {
-        drawBall(ball);
-      }
+      if (ball) drawBall(ball);
+
+      const detected: string[] = [];
+      if (visible(head)) detected.push(LABELS.head);
+      if (neck && visible(neck)) detected.push(LABELS.neck);
+      if (visible(leftShoulder) || visible(rightShoulder)) detected.push(LABELS.shoulder);
+      if (visible(leftElbow) || visible(rightElbow)) detected.push(LABELS.elbow);
+      if (visible(leftWrist) || visible(rightWrist)) detected.push(LABELS.wrist);
+      if (leftHand || rightHand) detected.push(LABELS.hand);
+      if (visible(leftHip) || visible(rightHip)) detected.push(LABELS.hip);
+      if (visible(leftKnee) || visible(rightKnee)) detected.push(LABELS.knee);
+      if (visible(leftAnkle) || visible(rightAnkle)) detected.push(LABELS.foot);
+      if (ball) detected.push(ball.color === 'orange' ? '주황 공' : '빨간 공');
+
       const pointSummary = detected.join(', ');
       const issueSummary =
-        problemJointKeys.size > 0
-          ? '문제가 의심되는 관절을 빨간색으로 표시하고 있어요.'
-          : '현재는 크게 문제로 보이는 관절이 없어요.';
+        problemJointKeys.size > 0 ? '문제가 의심되는 관절을 빨간색으로 표시 중입니다.' : '현재는 큰 자세 문제 없이 관절을 인식 중입니다.';
       setHud(pointSummary ? `인식 중: ${pointSummary}\n${issueSummary}` : '관절과 공을 찾는 중입니다.');
-      const now = Date.now();
 
-      if (pointSummary && (pointSummary !== lastPointSummary || now - lastSentAt > 1200)) {
+      const now = Date.now();
+      if (pointSummary && (pointSummary !== lastPointSummary || now - lastStatusAt > 1200)) {
         lastPointSummary = pointSummary;
-        lastSentAt = now;
+        lastStatusAt = now;
         emit({ type: 'points', summary: pointSummary });
       }
 
-      if (dribbleAnalysis.summary !== lastDribbleSummary || now - lastSentAt > 1200) {
+      if (dribbleAnalysis.summary !== lastDribbleSummary || now - lastStatusAt > 1200) {
         lastDribbleSummary = dribbleAnalysis.summary;
         emit({ type: 'dribble_analysis', analysis: dribbleAnalysis });
       }
 
-      if (shootAnalysis.summary !== lastShootSummary || now - lastSentAt > 1200) {
+      if (shootAnalysis.summary !== lastShootSummary || now - lastStatusAt > 1200) {
         lastShootSummary = shootAnalysis.summary;
         emit({ type: 'shoot_analysis', analysis: shootAnalysis });
       }
     };
 
-    const loop = () => {
+    const loop = async () => {
       if (cancelled) {
         return;
       }
 
-      if (!poseLandmarker || video.readyState < 2) {
-        animationFrameId = window.requestAnimationFrame(loop);
-        return;
+      if (pose && video.readyState >= 2 && !inFlight) {
+        inFlight = true;
+        try {
+          await pose.send({ image: video });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'MediaPipe Pose 처리에 실패했습니다.';
+          emit({ type: 'error', message });
+          setHud(message);
+        } finally {
+          inFlight = false;
+        }
       }
 
-      if (video.currentTime !== lastVideoTime) {
-        lastVideoTime = video.currentTime;
-        const result = poseLandmarker.detectForVideo(video, performance.now());
-        const landmarks = result.landmarks && result.landmarks.length > 0 ? result.landmarks[0] : null;
-        renderPose(landmarks);
-      }
-
-      animationFrameId = window.requestAnimationFrame(loop);
+      rafId = window.requestAnimationFrame(() => {
+        void loop();
+      });
     };
 
     const start = async () => {
       try {
         if (!window.isSecureContext) {
-          throw new Error('브라우저가 보안 컨텍스트가 아니라 카메라를 열 수 없습니다. localhost 또는 https에서 실행해 주세요.');
+          throw new Error('브라우저 보안 컨텍스트가 아니라 카메라를 사용할 수 없습니다. localhost 또는 https에서 실행해 주세요.');
         }
 
         if (!navigator.mediaDevices?.getUserMedia) {
           throw new Error('이 브라우저에서는 getUserMedia를 사용할 수 없습니다.');
         }
 
-        emit({ type: 'status', message: 'MediaPipe와 공 인식 모델을 준비하는 중입니다.' });
-        setHud('MediaPipe와 공 인식 모델을 준비하는 중입니다.');
+        emit({ type: 'status', message: 'classic MediaPipe Pose를 준비하는 중입니다.' });
+        setHud('classic MediaPipe Pose를 준비하는 중입니다.');
 
-        const loadVisionModule = new Function(
-          'return import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest");'
-        ) as () => Promise<{
-          FilesetResolver: {
-            forVisionTasks: (wasmRoot: string) => Promise<unknown>;
-          };
-          PoseLandmarker: {
-            createFromOptions: (
-              fileset: unknown,
-              options: Record<string, unknown>
-            ) => Promise<{
-              detectForVideo: (video: HTMLVideoElement, timestampMs: number) => { landmarks?: Landmark[][] };
-              close?: () => void;
-            }>;
-          };
-        }>;
+        await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js');
+        const PoseCtor = window.Pose;
+        if (!PoseCtor) {
+          throw new Error('MediaPipe Pose 스크립트를 불러오지 못했습니다.');
+        }
 
-        const { FilesetResolver, PoseLandmarker } = await loadVisionModule();
-        const fileset = await FilesetResolver.forVisionTasks(
-          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
-        );
-
-        poseLandmarker = await PoseLandmarker.createFromOptions(fileset, {
-          baseOptions: {
-            modelAssetPath:
-              'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
-          },
-          runningMode: 'VIDEO',
-          numPoses: 1,
-          minPoseDetectionConfidence: 0.5,
-          minPosePresenceConfidence: 0.5,
-          minTrackingConfidence: 0.5,
+        pose = new PoseCtor({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
+        });
+        pose.setOptions({
+          modelComplexity: 0,
+          smoothLandmarks: true,
+          enableSegmentation: false,
+          minDetectionConfidence: 0.55,
+          minTrackingConfidence: 0.55,
+        });
+        pose.onResults((results) => {
+          renderPose(results.poseLandmarks ?? null);
         });
 
         emit({ type: 'ready' });
@@ -955,8 +1022,9 @@ export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countd
           audio: false,
           video: {
             facingMode: 'user',
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { ideal: 960 },
+            height: { ideal: 540 },
+            frameRate: { ideal: 24, max: 30 },
           },
         });
 
@@ -991,15 +1059,13 @@ export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countd
               finalizeRecording();
             }
           };
-          recorder.onerror = () => {
-            emit({ type: 'recording_error', message: '레슨 영상 녹화 중 오류가 발생했습니다.' });
-          };
+          recorder.onerror = () => emit({ type: 'recording_error', message: '레슨 영상 녹화 중 오류가 발생했습니다.' });
           recorder.start(1000);
         }
 
         emit({ type: 'stream_started' });
-        setHud('카메라 시작 완료. 자세와 공을 분석하는 중입니다.');
-        animationFrameId = window.requestAnimationFrame(loop);
+        setHud('카메라 시작 완료. classic MediaPipe Pose로 분석 중입니다.');
+        void loop();
       } catch (error) {
         const message = error instanceof Error ? error.message : '웹 카메라를 시작하지 못했습니다.';
         emit({ type: 'error', message });
@@ -1011,17 +1077,17 @@ export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countd
 
     return () => {
       cancelled = true;
-      window.cancelAnimationFrame(animationFrameId);
+      window.cancelAnimationFrame(rafId);
       window.removeEventListener('resize', resizeCanvas);
       if (recorder && recorder.state !== 'inactive') {
         recorderStopping = true;
         recorder.stop();
       }
       stream?.getTracks().forEach((track) => track.stop());
-      poseLandmarker?.close?.();
+      pose?.close?.();
       host.innerHTML = '';
     };
-  }, [isLessonActive]);
+  }, [isLessonActive, lessonMode]);
 
   return (
     <View style={styles.videoWrap}>
@@ -1045,7 +1111,7 @@ export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countd
       ) : (
         <View style={styles.placeholder}>
           <Text style={styles.placeholderTitle}>카메라 대기 중</Text>
-          <Text style={styles.placeholderText}>레슨 시작을 누르면 자세와 공 인식이 함께 시작됩니다.</Text>
+          <Text style={styles.placeholderText}>레슨 시작을 누르면 classic MediaPipe Pose 분석이 바로 시작됩니다.</Text>
         </View>
       )}
     </View>
