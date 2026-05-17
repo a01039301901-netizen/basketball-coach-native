@@ -22,7 +22,7 @@ import { formatDateKey } from '../utils/date';
 import { buildDribbleFeedbackText, buildShootFeedbackText } from '../utils/feedback';
 import { buildLessonHomework, getHomeworkToShow, mergeHomework } from '../utils/homework';
 
-const FEEDBACK_UPDATE_INTERVAL_MS = 3000;
+const FEEDBACK_UPDATE_INTERVAL_MS = 1500;
 const DRIBBLE_STANCE_HOLD_MS = 3000;
 
 type DribbleLessonPhase = 'stance_setup' | 'countdown' | 'await_dribble' | 'active';
@@ -167,6 +167,8 @@ export function useBasketballCoachApp() {
   const [isLessonActive, setIsLessonActive] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState('');
+  const [cameraSessionKey, setCameraSessionKey] = useState(0);
+  const [countdownValue, setCountdownValue] = useState<number | null>(null);
   const [fireworks, setFireworks] = useState<FireworkItem[]>([]);
   const [showFireworks, setShowFireworks] = useState(false);
 
@@ -287,6 +289,30 @@ export function useBasketballCoachApp() {
   }, [showFireworks]);
 
   useEffect(() => {
+    const countdownStartedAt = stanceCountdownStartedAtRef.current;
+
+    if (!isLessonActive || !countdownStartedAt) {
+      setCountdownValue(null);
+      return undefined;
+    }
+
+    const updateCountdown = () => {
+      const remaining = DRIBBLE_STANCE_HOLD_MS - (Date.now() - countdownStartedAt);
+      if (remaining <= 0) {
+        setCountdownValue(null);
+        return;
+      }
+
+      setCountdownValue(Math.max(1, Math.ceil(remaining / 1000)));
+    };
+
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 100);
+
+    return () => clearInterval(timer);
+  }, [debugText, isLessonActive]);
+
+  useEffect(() => {
     if (!isLessonActive || isCameraReady || cameraError) {
       return undefined;
     }
@@ -311,7 +337,11 @@ export function useBasketballCoachApp() {
     }
 
     const startedAt = lessonStartedAtRef.current;
-    const atMs = startedAt ? Math.max(0, Date.now() - startedAt) : 0;
+    if (startedAt === null) {
+      return;
+    }
+
+    const atMs = Math.max(0, Date.now() - startedAt);
     feedbackTimelineRef.current.push({
       atMs,
       text: trimmed,
@@ -389,6 +419,7 @@ export function useBasketballCoachApp() {
       stanceCountdownStartedAtRef.current = null;
       feedbackTimelineRef.current = [];
       pendingFeedbackRef.current = null;
+      setCountdownValue(null);
       setIsLessonActive(false);
       setIsCameraReady(false);
       setCameraError('');
@@ -417,6 +448,7 @@ export function useBasketballCoachApp() {
     setLessonMode(mode);
     dribbleLessonPhaseRef.current = 'stance_setup';
     stanceCountdownStartedAtRef.current = null;
+    setCountdownValue(null);
     setImmediateLessonFeedback(
       mode === 'shoot'
         ? buildShootStanceFeedback({
@@ -448,6 +480,7 @@ export function useBasketballCoachApp() {
     pendingFeedbackRef.current = null;
     dribbleLessonPhaseRef.current = 'stance_setup';
     stanceCountdownStartedAtRef.current = null;
+    setCountdownValue(null);
     if (mode === 'dribble') {
       setImmediateLessonFeedback(buildDribbleStanceFeedback({
         dribbleStarted: false,
@@ -490,11 +523,13 @@ export function useBasketballCoachApp() {
     }
 
     clearRecordingWait();
+    setCameraSessionKey((current) => current + 1);
     setCameraError('');
-    lessonStartedAtRef.current = Date.now();
+    lessonStartedAtRef.current = null;
     dribbleLessonPhaseRef.current = 'stance_setup';
     stanceCountdownStartedAtRef.current = null;
     feedbackTimelineRef.current = [];
+    setCountdownValue(null);
     setIsLessonActive(true);
     setIsCameraReady(false);
     setDebugText('MediaPipe 분석 화면을 시작하는 중입니다.');
@@ -513,6 +548,7 @@ export function useBasketballCoachApp() {
 
     pendingStopSaveRef.current = true;
     setDebugText('레슨 영상을 저장하는 중입니다.');
+    setCountdownValue(null);
     setIsLessonActive(false);
     setIsCameraReady(false);
 
@@ -534,9 +570,18 @@ export function useBasketballCoachApp() {
       const phase = dribbleLessonPhaseRef.current;
       const stanceReady = isDribbleStanceReady(analysis);
 
+      if (phase === 'active') {
+        stanceCountdownStartedAtRef.current = null;
+        setCountdownValue(null);
+        pendingFeedbackRef.current = buildDribbleFeedbackText(analysis);
+        setDebugText(`드리블 전체 분석 중: ${analysis.summary}`);
+        return;
+      }
+
       if (analysis.dribbleStarted) {
         dribbleLessonPhaseRef.current = 'active';
         stanceCountdownStartedAtRef.current = null;
+        setCountdownValue(null);
         pendingFeedbackRef.current = buildDribbleFeedbackText(analysis);
         setDebugText(`?몄떇?? ${analysis.summary}`);
         return;
@@ -545,6 +590,7 @@ export function useBasketballCoachApp() {
       if (!stanceReady) {
         dribbleLessonPhaseRef.current = 'stance_setup';
         stanceCountdownStartedAtRef.current = null;
+        setCountdownValue(null);
         pendingFeedbackRef.current = buildDribbleStanceFeedback(analysis);
         setDebugText('드리블 전에 준비 자세를 맞추는 중입니다.');
         return;
@@ -563,8 +609,12 @@ export function useBasketballCoachApp() {
         const elapsed = Date.now() - countdownStartedAt;
 
         if (elapsed >= DRIBBLE_STANCE_HOLD_MS) {
-          dribbleLessonPhaseRef.current = 'await_dribble';
+          dribbleLessonPhaseRef.current = 'active';
           stanceCountdownStartedAtRef.current = null;
+          setCountdownValue(null);
+          setImmediateLessonFeedback(buildDribbleFeedbackText(analysis));
+          setDebugText('드리블 1, 2, 3 기준 분석 시작');
+          return;
           setImmediateLessonFeedback('좋아요. 이제 드리블을 시작하세요. 공이 내려오기 시작하면 본격적으로 피드백할게요.');
           setDebugText('드리블 시작 안내');
           return;
@@ -608,9 +658,18 @@ export function useBasketballCoachApp() {
         analysis.releaseTiming !== 'unknown' ||
         (analysis.releaseVelocity !== null && Math.abs(analysis.releaseVelocity) > 0.003);
 
+      if (phase === 'active') {
+        stanceCountdownStartedAtRef.current = null;
+        setCountdownValue(null);
+        pendingFeedbackRef.current = buildShootFeedbackText(analysis);
+        setDebugText(`슛 전체 분석 중: ${analysis.summary}`);
+        return;
+      }
+
       if (releaseStarted) {
         dribbleLessonPhaseRef.current = 'active';
         stanceCountdownStartedAtRef.current = null;
+        setCountdownValue(null);
         pendingFeedbackRef.current = buildShootFeedbackText(analysis);
         setDebugText(`?몄떇?? ${analysis.summary}`);
         return;
@@ -619,6 +678,7 @@ export function useBasketballCoachApp() {
       if (!stanceReady) {
         dribbleLessonPhaseRef.current = 'stance_setup';
         stanceCountdownStartedAtRef.current = null;
+        setCountdownValue(null);
         pendingFeedbackRef.current = buildShootStanceFeedback(analysis);
         setDebugText('슛 전에 준비 자세를 맞추는 중입니다.');
         return;
@@ -637,8 +697,9 @@ export function useBasketballCoachApp() {
         const elapsed = Date.now() - countdownStartedAt;
 
         if (elapsed >= DRIBBLE_STANCE_HOLD_MS) {
-          dribbleLessonPhaseRef.current = 'await_dribble';
+          dribbleLessonPhaseRef.current = 'active';
           stanceCountdownStartedAtRef.current = null;
+          setCountdownValue(null);
           setImmediateLessonFeedback('좋아요. 이제 슛을 시작하세요. 릴리스가 시작되면 본격적으로 피드백할게요.');
           setDebugText('슛 시작 안내');
           return;
@@ -676,6 +737,14 @@ export function useBasketballCoachApp() {
         }
 
         if (payload.type === 'stream_started') {
+          lessonStartedAtRef.current = Date.now();
+          feedbackTimelineRef.current = [];
+          if (latestFeedbackRef.current.trim()) {
+            feedbackTimelineRef.current.push({
+              atMs: 0,
+              text: latestFeedbackRef.current.trim(),
+            });
+          }
           setIsCameraReady(true);
           setCameraError('');
           setDebugText('카메라 시작 완료, 자세를 인식하는 중입니다.');
@@ -802,6 +871,8 @@ export function useBasketballCoachApp() {
     feedbackText,
     isLessonActive,
     isCameraReady,
+    cameraSessionKey,
+    countdownValue,
     cameraError,
     fireworks,
     showFireworks,

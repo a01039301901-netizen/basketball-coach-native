@@ -8,6 +8,7 @@ interface LessonCameraProps {
   lessonMode: LessonMode;
   isLessonActive: boolean;
   isCameraReady: boolean;
+  countdownValue: number | null;
   onPoseMessage: (event: WebViewMessageEvent) => void;
 }
 
@@ -569,7 +570,7 @@ function shouldHighlightSegment(problemJointKeys: Set<JointKey>, a: SegmentJoint
   return problemJointKeys.has(a) || problemJointKeys.has(b);
 }
 
-export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, onPoseMessage }: LessonCameraProps) {
+export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countdownValue, onPoseMessage }: LessonCameraProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const onPoseMessageRef = useRef(onPoseMessage);
 
@@ -1031,6 +1032,14 @@ export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, onPose
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{isCameraReady ? 'LIVE' : 'LOADING'}</Text>
             </View>
+            {countdownValue !== null ? (
+              <View style={styles.countdownWrap}>
+                <View style={styles.countdownBubble}>
+                  <Text style={styles.countdownNumber}>{countdownValue}</Text>
+                  <Text style={styles.countdownLabel}>START</Text>
+                </View>
+              </View>
+            ) : null}
           </View>
         </>
       ) : (
@@ -1076,6 +1085,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 1,
+  },
+  countdownWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  countdownBubble: {
+    width: 150,
+    height: 150,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0,0,0,0.48)',
+    borderWidth: 4,
+    borderColor: 'rgba(255,255,255,0.78)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countdownNumber: {
+    color: '#fff6ed',
+    fontSize: 64,
+    fontWeight: '900',
+    lineHeight: 72,
+  },
+  countdownLabel: {
+    color: '#ffd8a8',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginTop: 2,
   },
   placeholder: {
     flex: 1,

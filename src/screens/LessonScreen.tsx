@@ -11,6 +11,8 @@ interface LessonScreenProps {
   lessonMode: LessonMode;
   isLessonActive: boolean;
   isCameraReady: boolean;
+  cameraSessionKey: number;
+  countdownValue: number | null;
   debugText: string;
   feedbackText: string;
   cameraError: string;
@@ -49,6 +51,8 @@ export function LessonScreen({
   lessonMode,
   isLessonActive,
   isCameraReady,
+  cameraSessionKey,
+  countdownValue,
   debugText,
   feedbackText,
   cameraError,
@@ -90,9 +94,11 @@ export function LessonScreen({
             </View>
 
             <LessonCamera
+              key={cameraSessionKey}
               lessonMode={lessonMode}
               isLessonActive={isLessonActive}
               isCameraReady={isCameraReady}
+              countdownValue={countdownValue}
               onPoseMessage={onPoseMessage}
             />
 

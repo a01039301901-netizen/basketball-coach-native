@@ -35,6 +35,8 @@ export default function App() {
               lessonMode={app.lessonMode}
               isLessonActive={app.isLessonActive}
               isCameraReady={app.isCameraReady}
+              cameraSessionKey={app.cameraSessionKey}
+              countdownValue={app.countdownValue}
               debugText={app.debugText}
               feedbackText={app.feedbackText}
               cameraError={app.cameraError}

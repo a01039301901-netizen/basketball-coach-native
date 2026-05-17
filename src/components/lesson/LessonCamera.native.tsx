@@ -8,10 +8,11 @@ interface LessonCameraProps {
   lessonMode: LessonMode;
   isLessonActive: boolean;
   isCameraReady: boolean;
+  countdownValue: number | null;
   onPoseMessage: (event: WebViewMessageEvent) => void;
 }
 
-export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, onPoseMessage }: LessonCameraProps) {
+export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countdownValue, onPoseMessage }: LessonCameraProps) {
   return (
     <View style={styles.videoWrap}>
       {isLessonActive ? (
@@ -45,6 +46,14 @@ export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, onPose
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{isCameraReady ? 'LIVE' : 'LOADING'}</Text>
             </View>
+            {countdownValue !== null ? (
+              <View style={styles.countdownWrap}>
+                <View style={styles.countdownBubble}>
+                  <Text style={styles.countdownNumber}>{countdownValue}</Text>
+                  <Text style={styles.countdownLabel}>START</Text>
+                </View>
+              </View>
+            ) : null}
             <Text style={styles.hint}>
               모바일에서는 WebView 안에서 inner.html 방식으로 MediaPipe를 실행합니다.
             </Text>
@@ -108,6 +117,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 1,
+  },
+  countdownWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countdownBubble: {
+    width: 150,
+    height: 150,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0,0,0,0.48)',
+    borderWidth: 4,
+    borderColor: 'rgba(255,255,255,0.78)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countdownNumber: {
+    color: '#fff6ed',
+    fontSize: 64,
+    fontWeight: '900',
+    lineHeight: 72,
+  },
+  countdownLabel: {
+    color: '#ffd8a8',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginTop: 2,
   },
   hint: {
     color: colors.text,

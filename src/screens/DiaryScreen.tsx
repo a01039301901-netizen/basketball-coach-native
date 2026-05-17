@@ -1,5 +1,5 @@
 import { type AVPlaybackStatus, ResizeMode, Video } from 'expo-av';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
@@ -53,6 +53,8 @@ export function DiaryScreen({
   onDeleteRecord,
 }: DiaryScreenProps) {
   const [playbackFeedback, setPlaybackFeedback] = useState<Record<string, string>>({});
+  const videoRefs = useRef<Record<string, Video | null>>({});
+  const playbackPollersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
 
   useEffect(() => {
     setPlaybackFeedback((current) => {
@@ -74,12 +76,17 @@ export function DiaryScreen({
     });
   }, [selectedDateRecords]);
 
-  function handlePlaybackStatus(record: LessonRecord, status: AVPlaybackStatus) {
-    if (!status.isLoaded) {
-      return;
-    }
+  useEffect(() => {
+    const pollers = playbackPollersRef.current;
 
-    const positionMillis = typeof status.positionMillis === 'number' ? status.positionMillis : 0;
+    return () => {
+      for (const poller of Object.values(pollers)) {
+        clearInterval(poller);
+      }
+    };
+  }, []);
+
+  const syncFeedbackFromPosition = useCallback((record: LessonRecord, positionMillis: number) => {
     const nextFeedback = getSyncedFeedback(record.feedbackTimeline, record.feedback, positionMillis);
 
     setPlaybackFeedback((current) => {
@@ -92,6 +99,63 @@ export function DiaryScreen({
         [record.id]: nextFeedback,
       };
     });
+  }, []);
+
+  const stopPlaybackPolling = useCallback((recordId: string) => {
+    const poller = playbackPollersRef.current[recordId];
+
+    if (!poller) {
+      return;
+    }
+
+    clearInterval(poller);
+    delete playbackPollersRef.current[recordId];
+  }, []);
+
+  const startPlaybackPolling = useCallback((record: LessonRecord) => {
+    if (playbackPollersRef.current[record.id]) {
+      return;
+    }
+
+    playbackPollersRef.current[record.id] = setInterval(() => {
+      const video = videoRefs.current[record.id];
+
+      if (!video) {
+        return;
+      }
+
+      void video.getStatusAsync().then((status) => {
+        if (!status.isLoaded) {
+          return;
+        }
+
+        const positionMillis = typeof status.positionMillis === 'number' ? status.positionMillis : 0;
+        syncFeedbackFromPosition(record, positionMillis);
+
+        if (!status.isPlaying) {
+          stopPlaybackPolling(record.id);
+        }
+      });
+    }, 200);
+  }, [stopPlaybackPolling, syncFeedbackFromPosition]);
+
+  function handlePlaybackStatus(record: LessonRecord, status: AVPlaybackStatus) {
+    if (!status.isLoaded) {
+      return;
+    }
+
+    const positionMillis = typeof status.positionMillis === 'number' ? status.positionMillis : 0;
+    syncFeedbackFromPosition(record, positionMillis);
+
+    if (status.isPlaying) {
+      startPlaybackPolling(record);
+    } else {
+      stopPlaybackPolling(record.id);
+    }
+
+    if (status.didJustFinish) {
+      syncFeedbackFromPosition(record, 0);
+    }
   }
 
   return (
@@ -171,10 +235,14 @@ export function DiaryScreen({
 
               {record.videoUri ? (
                 <Video
+                  ref={(instance) => {
+                    videoRefs.current[record.id] = instance;
+                  }}
                   source={{ uri: record.videoUri }}
                   useNativeControls
                   shouldPlay={false}
                   isLooping={false}
+                  progressUpdateIntervalMillis={200}
                   resizeMode={ResizeMode.COVER}
                   style={styles.recordVideo}
                   onPlaybackStatusUpdate={(status) => handlePlaybackStatus(record, status)}

@@ -6,6 +6,7 @@ interface LessonCameraProps {
   lessonMode: LessonMode;
   isLessonActive: boolean;
   isCameraReady: boolean;
+  countdownValue: number | null;
   onPoseMessage: (event: WebViewMessageEvent) => void;
 }
 
