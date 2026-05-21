@@ -52,17 +52,28 @@ export type DribbleHeightState = 'high' | 'low' | 'balanced' | 'unknown';
 export type TorsoPostureState = 'high' | 'low' | 'balanced' | 'unknown';
 export type DribbleStanceState = 'ready' | 'too_upright' | 'too_low' | 'unknown';
 export type BounceHeightState = 'too_high' | 'too_low' | 'balanced' | 'unknown';
+export type BodyFacingState = 'front' | 'side' | 'unknown';
+export type FrontBallLaneState = 'between_legs' | 'outside_legs' | 'unknown';
+export type HandBalanceState = 'balanced' | 'unbalanced' | 'unknown';
+export type FootSpacingState = 'narrow' | 'wide' | 'balanced' | 'unknown';
 
 export interface DribbleAnalysis {
   dribbleStarted: boolean;
+  bodyFacing: BodyFacingState;
   eyeFocus: EyeFocusState;
   dribbleHeight: DribbleHeightState;
   torsoPosture: TorsoPostureState;
   torsoLeanAngle: number | null;
   stanceState: DribbleStanceState;
+  frontStanceAngle: number | null;
   bounceHighState: BounceHeightState;
   bounceLowState: BounceHeightState;
   dribbleCount: number;
+  leftHandDribbleCount: number;
+  rightHandDribbleCount: number;
+  handBalanceState: HandBalanceState;
+  frontBallLaneState: FrontBallLaneState;
+  footSpacingState: FootSpacingState;
   highestBounceY: number | null;
   lowestBounceY: number | null;
   summary: string;

@@ -30,6 +30,9 @@ interface HandDetection {
 
 interface DribbleTracker {
   dribbleCount: number;
+  lastHand: 'left' | 'right' | null;
+  leftHandDribbleCount: number;
+  rightHandDribbleCount: number;
   cycleActive: boolean;
   wasNearFoot: boolean;
   highestBallY: number | null;
@@ -163,6 +166,9 @@ const BODY_SEGMENTS: Array<[SegmentJointKey, SegmentJointKey, string]> = [
 function createDribbleTracker(): DribbleTracker {
   return {
     dribbleCount: 0,
+    lastHand: null,
+    leftHandDribbleCount: 0,
+    rightHandDribbleCount: 0,
     cycleActive: false,
     wasNearFoot: false,
     highestBallY: null,
@@ -488,7 +494,9 @@ function updateDribbleTracker(
   shoulderMid: Landmark | null,
   hipMid: Landmark | null,
   kneePoints: Landmark[],
-  anklePoints: Landmark[]
+  anklePoints: Landmark[],
+  leftHand: HandDetection | undefined,
+  rightHand: HandDetection | undefined
 ) {
   if (!ball || !shoulderMid || !hipMid) {
     tracker.cycleActive = false;
@@ -507,6 +515,11 @@ function updateDribbleTracker(
     tracker.wasNearFoot = true;
     tracker.highestBallY = ball.y;
     tracker.lowestBallY = ball.y;
+
+    const ballPoint: Landmark = { x: ball.x, y: ball.y, visibility: 1 };
+    const leftDistance = leftHand ? distanceBetween(leftHand.handCenter, ballPoint) : Number.POSITIVE_INFINITY;
+    const rightDistance = rightHand ? distanceBetween(rightHand.handCenter, ballPoint) : Number.POSITIVE_INFINITY;
+    tracker.lastHand = leftDistance <= rightDistance ? 'left' : 'right';
   }
 
   if (tracker.cycleActive) {
@@ -515,12 +528,18 @@ function updateDribbleTracker(
 
     if (tracker.wasNearFoot && ball.y < hipMid.y - 0.03) {
       tracker.dribbleCount += 1;
+      if (tracker.lastHand === 'left') {
+        tracker.leftHandDribbleCount += 1;
+      } else if (tracker.lastHand === 'right') {
+        tracker.rightHandDribbleCount += 1;
+      }
       tracker.cycleActive = false;
       tracker.wasNearFoot = false;
       tracker.bounceHighState =
         tracker.highestBallY !== null && tracker.highestBallY < shoulderMid.y ? 'too_high' : 'balanced';
       tracker.bounceLowState =
         tracker.lowestBallY !== null && tracker.lowestBallY < hipMid.y ? 'too_low' : 'balanced';
+      tracker.lastHand = null;
     }
   }
 
@@ -630,6 +649,84 @@ function classifyBodyFacing(landmarks: Landmark[]) {
   return '판단 중';
 }
 
+function normalizeBodyFacing(value: string): DribbleAnalysis['bodyFacing'] {
+  if (value === '앞') {
+    return 'front';
+  }
+
+  if (value === '옆') {
+    return 'side';
+  }
+
+  return 'unknown';
+}
+
+function classifyFrontStanceAngle(angle: number | null): DribbleAnalysis['stanceState'] {
+  if (angle === null) {
+    return 'unknown';
+  }
+
+  if (angle < 40) {
+    return 'too_upright';
+  }
+
+  if (angle > 60) {
+    return 'too_low';
+  }
+
+  return 'ready';
+}
+
+function getFrontStanceAngle(leftKnee?: Landmark, hipMid?: Landmark | null, rightKnee?: Landmark) {
+  return angleAt(leftKnee, hipMid ?? undefined, rightKnee);
+}
+
+function classifyFrontBallLane(
+  ball: BallDetection | null,
+  leftLegX: number | null,
+  rightLegX: number | null
+): DribbleAnalysis['frontBallLaneState'] {
+  if (!ball || leftLegX === null || rightLegX === null) {
+    return 'unknown';
+  }
+
+  const minX = Math.min(leftLegX, rightLegX);
+  const maxX = Math.max(leftLegX, rightLegX);
+  return ball.x >= minX && ball.x <= maxX ? 'between_legs' : 'outside_legs';
+}
+
+function classifyFootSpacing(
+  leftAnkle?: Landmark,
+  rightAnkle?: Landmark,
+  leftShoulder?: Landmark,
+  rightShoulder?: Landmark
+): DribbleAnalysis['footSpacingState'] {
+  if (!visible(leftAnkle) || !visible(rightAnkle) || !visible(leftShoulder) || !visible(rightShoulder)) {
+    return 'unknown';
+  }
+
+  const footWidth = Math.abs((leftAnkle as Landmark).x - (rightAnkle as Landmark).x);
+  const shoulderWidth = Math.abs((leftShoulder as Landmark).x - (rightShoulder as Landmark).x);
+
+  if (footWidth < shoulderWidth) {
+    return 'narrow';
+  }
+
+  if (footWidth >= shoulderWidth * 2) {
+    return 'wide';
+  }
+
+  return 'balanced';
+}
+
+function classifyHandBalance(leftCount: number, rightCount: number): DribbleAnalysis['handBalanceState'] {
+  if (leftCount === 0 && rightCount === 0) {
+    return 'unknown';
+  }
+
+  return leftCount === rightCount ? 'balanced' : 'unbalanced';
+}
+
 function buildDribbleAnalysis(landmarks: Landmark[], ball: BallDetection | null, tracker: DribbleTracker): DribbleAnalysis {
   const leftShoulder = landmarks[INDEX.leftShoulder];
   const rightShoulder = landmarks[INDEX.rightShoulder];
@@ -639,20 +736,37 @@ function buildDribbleAnalysis(landmarks: Landmark[], ball: BallDetection | null,
   const rightKnee = landmarks[INDEX.rightKnee];
   const leftAnkle = landmarks[INDEX.leftAnkle];
   const rightAnkle = landmarks[INDEX.rightAnkle];
+  const nose = landmarks[INDEX.nose];
+  const hands = getPoseHandDetections(landmarks);
+  const leftHand = hands.find((hand) => hand.handedness === 'left');
+  const rightHand = hands.find((hand) => hand.handedness === 'right');
 
   const shoulderMid = visible(leftShoulder) && visible(rightShoulder) ? midpoint(leftShoulder, rightShoulder) : null;
   const hipMid = visible(leftHip) && visible(rightHip) ? midpoint(leftHip, rightHip) : null;
   const neck = shoulderMid;
+  const bodyFacing =
+    visible(leftShoulder) && visible(rightShoulder) && visible(nose)
+      ? Math.abs(leftShoulder.x - rightShoulder.x) < 0.08 || Math.abs(nose.x - (leftShoulder.x + rightShoulder.x) / 2) > 0.055
+        ? 'side'
+        : Math.abs(leftShoulder.x - rightShoulder.x) > 0.12
+          ? 'front'
+          : 'unknown'
+      : 'unknown';
   const torsoLeanAngle = getTorsoLeanAngle(shoulderMid, hipMid);
-  const stanceState = classifyDribbleStance(torsoLeanAngle);
+  const frontStanceAngle = getFrontStanceAngle(leftKnee, hipMid, rightKnee);
+  const stanceState = bodyFacing === 'front' ? classifyFrontStanceAngle(frontStanceAngle) : classifyDribbleStance(torsoLeanAngle);
   const kneePoints = [leftKnee, rightKnee].filter(visible);
   const anklePoints = [leftAnkle, rightAnkle].filter(visible);
-  const nextTracker = updateDribbleTracker(tracker, ball, shoulderMid, hipMid, kneePoints, anklePoints);
+  const nextTracker = updateDribbleTracker(tracker, ball, shoulderMid, hipMid, kneePoints, anklePoints, leftHand, rightHand);
   const dribbleStarted = nextTracker.dribbleCount > 0 || nextTracker.cycleActive;
   const eyeFocus = classifyEyeFocus(landmarks, neck);
+  const frontBallLaneState = classifyFrontBallLane(ball, visible(leftAnkle) ? leftAnkle.x : null, visible(rightAnkle) ? rightAnkle.x : null);
+  const footSpacingState = classifyFootSpacing(leftAnkle, rightAnkle, leftShoulder, rightShoulder);
+  const handBalanceState = classifyHandBalance(nextTracker.leftHandDribbleCount, nextTracker.rightHandDribbleCount);
 
   return {
     dribbleStarted,
+    bodyFacing,
     eyeFocus,
     dribbleHeight:
       nextTracker.bounceHighState === 'too_high'
@@ -672,9 +786,15 @@ function buildDribbleAnalysis(landmarks: Landmark[], ball: BallDetection | null,
             : 'unknown',
     torsoLeanAngle,
     stanceState,
+    frontStanceAngle,
     bounceHighState: nextTracker.bounceHighState,
     bounceLowState: nextTracker.bounceLowState,
     dribbleCount: nextTracker.dribbleCount,
+    leftHandDribbleCount: nextTracker.leftHandDribbleCount,
+    rightHandDribbleCount: nextTracker.rightHandDribbleCount,
+    handBalanceState,
+    frontBallLaneState,
+    footSpacingState,
     highestBounceY: nextTracker.highestBallY,
     lowestBounceY: nextTracker.lowestBallY,
     summary: [
@@ -790,12 +910,39 @@ function getProblemJointKeys(
   const problemJoints = new Set<JointKey>();
 
   if (lessonMode === 'dribble') {
-    if (dribbleAnalysis.eyeFocus === 'ball') {
+    if (dribbleAnalysis.bodyFacing === 'front') {
+      if (dribbleAnalysis.frontBallLaneState === 'between_legs') {
+        problemJoints.add('leftKnee');
+        problemJoints.add('rightKnee');
+        problemJoints.add('leftAnkle');
+        problemJoints.add('rightAnkle');
+      }
+
+      if (dribbleAnalysis.handBalanceState === 'unbalanced') {
+        problemJoints.add('leftWrist');
+        problemJoints.add('rightWrist');
+      }
+
+      if (dribbleAnalysis.footSpacingState === 'narrow' || dribbleAnalysis.footSpacingState === 'wide') {
+        problemJoints.add('leftAnkle');
+        problemJoints.add('rightAnkle');
+        problemJoints.add('leftShoulder');
+        problemJoints.add('rightShoulder');
+      }
+
+      if (dribbleAnalysis.stanceState !== 'ready' && dribbleAnalysis.stanceState !== 'unknown') {
+        problemJoints.add('leftKnee');
+        problemJoints.add('rightKnee');
+        problemJoints.add('leftHip');
+        problemJoints.add('rightHip');
+      }
+    } else if (dribbleAnalysis.eyeFocus === 'ball') {
       problemJoints.add('head');
       problemJoints.add('neck');
     }
 
     if (
+      dribbleAnalysis.bodyFacing !== 'front' &&
       dribbleAnalysis.dribbleStarted &&
       (dribbleAnalysis.bounceHighState === 'too_high' || dribbleAnalysis.bounceLowState === 'too_low')
     ) {
@@ -803,7 +950,11 @@ function getProblemJointKeys(
       problemJoints.add('rightWrist');
     }
 
-    if (dribbleAnalysis.stanceState !== 'ready' && dribbleAnalysis.stanceState !== 'unknown') {
+    if (
+      dribbleAnalysis.bodyFacing !== 'front' &&
+      dribbleAnalysis.stanceState !== 'ready' &&
+      dribbleAnalysis.stanceState !== 'unknown'
+    ) {
       problemJoints.add('leftShoulder');
       problemJoints.add('rightShoulder');
       problemJoints.add('leftHip');

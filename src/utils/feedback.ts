@@ -6,6 +6,38 @@ export function buildFeedbackText(mode: LessonMode, lines: [string, string, stri
 }
 
 export function buildDribbleFeedbackText(analysis: DribbleAnalysis): string {
+  if (analysis.bodyFacing === 'front') {
+    const stanceLine =
+      analysis.stanceState === 'ready'
+        ? `무릎-엉덩이-무릎 각도 ${analysis.frontStanceAngle ? analysis.frontStanceAngle.toFixed(1) : '--'}도로 자세를 잘 낮췄습니다.`
+        : `무릎-엉덩이-무릎 각도가 ${analysis.frontStanceAngle ? analysis.frontStanceAngle.toFixed(1) : '--'}도예요. 40~60도가 되도록 자세를 다시 맞춰 주세요.`;
+
+    const laneLine =
+      analysis.frontBallLaneState === 'between_legs'
+        ? '공이 다리 사이로 들어오고 있어요. 공을 옆쪽에서 드리블해 주세요.'
+        : analysis.frontBallLaneState === 'outside_legs'
+          ? '공 위치는 좋습니다. 다리 사이가 아니라 옆쪽에서 드리블하고 있어요.'
+          : '공 위치를 확인하는 중입니다. 공과 다리가 화면에 잘 보이게 움직여 주세요.';
+
+    const balanceLine =
+      analysis.handBalanceState === 'unbalanced'
+        ? `왼손 ${analysis.leftHandDribbleCount}번, 오른손 ${analysis.rightHandDribbleCount}번으로 편차가 있어요. 양손 숙련도가 불균형할 수 있습니다.`
+        : analysis.handBalanceState === 'balanced'
+          ? `왼손 ${analysis.leftHandDribbleCount}번, 오른손 ${analysis.rightHandDribbleCount}번으로 균형이 좋습니다.`
+          : '양손 드리블 횟수를 쌓는 중입니다.';
+
+    const footLine =
+      analysis.footSpacingState === 'narrow'
+        ? '발 간격이 어깨보다 좁아요. 조금 더 벌려 주세요.'
+        : analysis.footSpacingState === 'wide'
+          ? '발 간격이 어깨 너비의 두 배 이상이에요. 조금만 좁혀 주세요.'
+          : analysis.footSpacingState === 'balanced'
+            ? '발 간격은 안정적입니다.'
+            : '발 간격을 확인하는 중입니다.';
+
+    return `드리블 피드백\n1. ${stanceLine}\n2. ${laneLine}\n3. ${balanceLine} ${footLine}`;
+  }
+
   const stanceLine =
     analysis.stanceState === 'too_upright'
       ? `상체 기울기가 ${analysis.torsoLeanAngle ? analysis.torsoLeanAngle.toFixed(1) : '--'}도라서 조금 더 숙여 주세요.`

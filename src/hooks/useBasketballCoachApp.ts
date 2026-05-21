@@ -114,6 +114,10 @@ function normalizeLessonRecord(record: LessonRecord | (Omit<LessonRecord, 'feedb
 }
 
 function isDribbleStanceReady(analysis: DribbleAnalysis) {
+  if (analysis.bodyFacing === 'front') {
+    return analysis.stanceState === 'ready';
+  }
+
   return (
     analysis.stanceState === 'ready' ||
     ((!analysis.stanceState || analysis.stanceState === 'unknown') &&
@@ -155,6 +159,19 @@ function buildDribbleStanceFeedbackV2(analysis: DribbleAnalysis) {
           : '어깨와 엉덩이가 잘 보이도록 서서 상체 기울기를 다시 잡아 주세요.';
 
   return `드리블 준비 자세\n1. 엉덩이에서 어깨까지의 상체 기울기를 15~45도로 맞춰 주세요.\n2. 이 자세를 3초 동안 유지하면 드리블을 시작하라고 알려드릴게요.\n3. ${torsoLine}`;
+}
+
+function buildDribbleStanceFeedbackV3(analysis: DribbleAnalysis) {
+  if (analysis.bodyFacing === 'front') {
+    const stanceLine =
+      analysis.stanceState === 'ready'
+        ? `무릎-엉덩이-무릎 각도 ${analysis.frontStanceAngle ? analysis.frontStanceAngle.toFixed(1) : '--'}도로 자세를 잘 낮췄습니다.`
+        : `무릎-엉덩이-무릎 각도가 ${analysis.frontStanceAngle ? analysis.frontStanceAngle.toFixed(1) : '--'}도예요. 40~60도가 되도록 자세를 다시 맞춰 주세요.`;
+
+    return `정면 드리블 준비 자세\n1. 자세를 낮춰 왼쪽 무릎, 엉덩이, 오른쪽 무릎 사이 각도를 40~60도로 맞춰 주세요.\n2. 이 자세를 3초 동안 유지하면 드리블을 시작하라고 알려드릴게요.\n3. ${stanceLine}`;
+  }
+
+  return buildDribbleStanceFeedbackV2(analysis);
 }
 
 function buildShootStanceFeedback(analysis: ShootAnalysis) {
@@ -481,16 +498,23 @@ export function useBasketballCoachApp() {
             legAngleState: 'unknown',
             summary: '',
           })
-        : buildDribbleStanceFeedbackV2({
+        : buildDribbleStanceFeedbackV3({
             dribbleStarted: false,
+            bodyFacing: 'unknown',
             eyeFocus: 'unknown',
             dribbleHeight: 'unknown',
             torsoPosture: 'unknown',
             torsoLeanAngle: null,
             stanceState: 'unknown',
+            frontStanceAngle: null,
             bounceHighState: 'unknown',
             bounceLowState: 'unknown',
             dribbleCount: 0,
+            leftHandDribbleCount: 0,
+            rightHandDribbleCount: 0,
+            handBalanceState: 'unknown',
+            frontBallLaneState: 'unknown',
+            footSpacingState: 'unknown',
             highestBounceY: null,
             lowestBounceY: null,
             summary: '',
@@ -510,16 +534,23 @@ export function useBasketballCoachApp() {
     stanceCountdownStartedAtRef.current = null;
     setCountdownValue(null);
     if (mode === 'dribble') {
-      setImmediateLessonFeedback(buildDribbleStanceFeedbackV2({
+      setImmediateLessonFeedback(buildDribbleStanceFeedbackV3({
         dribbleStarted: false,
+        bodyFacing: 'unknown',
         eyeFocus: 'unknown',
         dribbleHeight: 'unknown',
         torsoPosture: 'unknown',
         torsoLeanAngle: null,
         stanceState: 'unknown',
+        frontStanceAngle: null,
         bounceHighState: 'unknown',
         bounceLowState: 'unknown',
         dribbleCount: 0,
+        leftHandDribbleCount: 0,
+        rightHandDribbleCount: 0,
+        handBalanceState: 'unknown',
+        frontBallLaneState: 'unknown',
+        footSpacingState: 'unknown',
         highestBounceY: null,
         lowestBounceY: null,
         summary: '',
@@ -629,7 +660,7 @@ export function useBasketballCoachApp() {
         dribbleLessonPhaseRef.current = 'stance_setup';
         stanceCountdownStartedAtRef.current = null;
         setCountdownValue(null);
-        pendingFeedbackRef.current = buildDribbleStanceFeedbackV2(analysis);
+        pendingFeedbackRef.current = buildDribbleStanceFeedbackV3(analysis);
         setDebugText('드리블 전에 준비 자세를 맞추는 중입니다.');
         return;
       }
