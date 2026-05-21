@@ -114,7 +114,12 @@ function normalizeLessonRecord(record: LessonRecord | (Omit<LessonRecord, 'feedb
 }
 
 function isDribbleStanceReady(analysis: DribbleAnalysis) {
-  return analysis.eyeFocus === 'forward' && analysis.torsoPosture === 'balanced';
+  return (
+    analysis.stanceState === 'ready' ||
+    ((!analysis.stanceState || analysis.stanceState === 'unknown') &&
+      analysis.eyeFocus === 'forward' &&
+      analysis.torsoPosture === 'balanced')
+  );
 }
 
 function buildDribbleStanceFeedback(analysis: DribbleAnalysis) {
@@ -137,6 +142,19 @@ function buildDribbleStanceFeedback(analysis: DribbleAnalysis) {
 
 function isShootStanceReady(analysis: ShootAnalysis) {
   return analysis.armAngleState === 'balanced';
+}
+
+function buildDribbleStanceFeedbackV2(analysis: DribbleAnalysis) {
+  const torsoLine =
+    analysis.stanceState === 'ready'
+      ? `상체 기울기 ${analysis.torsoLeanAngle ? analysis.torsoLeanAngle.toFixed(1) : '--'}도로 준비 자세가 좋습니다.`
+      : analysis.stanceState === 'too_upright'
+        ? `상체 기울기가 ${analysis.torsoLeanAngle ? analysis.torsoLeanAngle.toFixed(1) : '--'}도예요. 15~45도가 되도록 조금 더 숙여 주세요.`
+        : analysis.stanceState === 'too_low'
+          ? `상체 기울기가 ${analysis.torsoLeanAngle ? analysis.torsoLeanAngle.toFixed(1) : '--'}도예요. 너무 많이 숙였으니 조금 세워 주세요.`
+          : '어깨와 엉덩이가 잘 보이도록 서서 상체 기울기를 다시 잡아 주세요.';
+
+  return `드리블 준비 자세\n1. 엉덩이에서 어깨까지의 상체 기울기를 15~45도로 맞춰 주세요.\n2. 이 자세를 3초 동안 유지하면 드리블을 시작하라고 알려드릴게요.\n3. ${torsoLine}`;
 }
 
 function buildShootStanceFeedback(analysis: ShootAnalysis) {
@@ -455,16 +473,26 @@ export function useBasketballCoachApp() {
             armAngle: null,
             legAngle: null,
             releaseVelocity: null,
+            lowestLegAngle: null,
+            headPeakY: null,
+            releaseDetected: false,
             armAngleState: 'unknown',
             releaseTiming: 'unknown',
             legAngleState: 'unknown',
             summary: '',
           })
-        : buildDribbleStanceFeedback({
+        : buildDribbleStanceFeedbackV2({
             dribbleStarted: false,
             eyeFocus: 'unknown',
             dribbleHeight: 'unknown',
             torsoPosture: 'unknown',
+            torsoLeanAngle: null,
+            stanceState: 'unknown',
+            bounceHighState: 'unknown',
+            bounceLowState: 'unknown',
+            dribbleCount: 0,
+            highestBounceY: null,
+            lowestBounceY: null,
             summary: '',
           })
     );
@@ -482,11 +510,18 @@ export function useBasketballCoachApp() {
     stanceCountdownStartedAtRef.current = null;
     setCountdownValue(null);
     if (mode === 'dribble') {
-      setImmediateLessonFeedback(buildDribbleStanceFeedback({
+      setImmediateLessonFeedback(buildDribbleStanceFeedbackV2({
         dribbleStarted: false,
         eyeFocus: 'unknown',
         dribbleHeight: 'unknown',
         torsoPosture: 'unknown',
+        torsoLeanAngle: null,
+        stanceState: 'unknown',
+        bounceHighState: 'unknown',
+        bounceLowState: 'unknown',
+        dribbleCount: 0,
+        highestBounceY: null,
+        lowestBounceY: null,
         summary: '',
       }));
     } else {
@@ -494,6 +529,9 @@ export function useBasketballCoachApp() {
         armAngle: null,
         legAngle: null,
         releaseVelocity: null,
+        lowestLegAngle: null,
+        headPeakY: null,
+        releaseDetected: false,
         armAngleState: 'unknown',
         releaseTiming: 'unknown',
         legAngleState: 'unknown',
@@ -578,7 +616,7 @@ export function useBasketballCoachApp() {
         return;
       }
 
-      if (analysis.dribbleStarted) {
+      if (phase === 'await_dribble' && analysis.dribbleStarted) {
         dribbleLessonPhaseRef.current = 'active';
         stanceCountdownStartedAtRef.current = null;
         setCountdownValue(null);
@@ -591,7 +629,7 @@ export function useBasketballCoachApp() {
         dribbleLessonPhaseRef.current = 'stance_setup';
         stanceCountdownStartedAtRef.current = null;
         setCountdownValue(null);
-        pendingFeedbackRef.current = buildDribbleStanceFeedback(analysis);
+        pendingFeedbackRef.current = buildDribbleStanceFeedbackV2(analysis);
         setDebugText('드리블 전에 준비 자세를 맞추는 중입니다.');
         return;
       }
@@ -599,7 +637,7 @@ export function useBasketballCoachApp() {
       if (phase === 'stance_setup') {
         dribbleLessonPhaseRef.current = 'countdown';
         stanceCountdownStartedAtRef.current = Date.now();
-        setImmediateLessonFeedback('좋아요. 지금 준비 자세가 맞았습니다. 3초 동안 그대로 유지해 주세요.');
+        setImmediateLessonFeedback('좋아요. 상체 기울기가 기준에 맞습니다. 3초 동안 그대로 유지해 주세요.');
         setDebugText('드리블 준비 자세 확인: 3초 유지 중');
         return;
       }
@@ -612,7 +650,7 @@ export function useBasketballCoachApp() {
           dribbleLessonPhaseRef.current = 'active';
           stanceCountdownStartedAtRef.current = null;
           setCountdownValue(null);
-          setImmediateLessonFeedback(buildDribbleFeedbackText(analysis));
+          setImmediateLessonFeedback('좋아요. 이제 드리블을 시작해 주세요. 상체 기울기, 시선, 공 간격을 함께 분석할게요.');
           setDebugText('드리블 1, 2, 3 기준 분석 시작');
           return;
           setImmediateLessonFeedback('좋아요. 이제 드리블을 시작하세요. 공이 내려오기 시작하면 본격적으로 피드백할게요.');
@@ -621,7 +659,7 @@ export function useBasketballCoachApp() {
         }
 
         const remainingSeconds = Math.max(1, Math.ceil((DRIBBLE_STANCE_HOLD_MS - elapsed) / 1000));
-        pendingFeedbackRef.current = `드리블 준비 자세를 잘 잡았어요.\n1. 시선은 계속 앞을 보세요.\n2. 상체 자세를 ${remainingSeconds}초만 더 유지하면 드리블을 시작합니다.\n3. 자세가 흐트러지면 다시 준비 자세부터 맞출게요.`;
+        pendingFeedbackRef.current = `드리블 준비 자세 유지 중입니다.\n1. 상체 기울기를 지금처럼 15~45도로 유지해 주세요.\n2. ${remainingSeconds}초만 더 유지하면 드리블을 시작할 수 있어요.\n3. 자세가 무너지면 다시 준비 자세부터 확인할게요.`;
         setDebugText(`드리블 준비 자세 유지 중: ${remainingSeconds}초 남음`);
         return;
       }
@@ -666,7 +704,7 @@ export function useBasketballCoachApp() {
         return;
       }
 
-      if (releaseStarted) {
+      if (phase === 'await_dribble' && releaseStarted) {
         dribbleLessonPhaseRef.current = 'active';
         stanceCountdownStartedAtRef.current = null;
         setCountdownValue(null);

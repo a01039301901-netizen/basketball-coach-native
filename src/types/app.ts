@@ -50,12 +50,21 @@ export interface FireworkItem {
 export type EyeFocusState = 'ball' | 'forward' | 'unknown';
 export type DribbleHeightState = 'high' | 'low' | 'balanced' | 'unknown';
 export type TorsoPostureState = 'high' | 'low' | 'balanced' | 'unknown';
+export type DribbleStanceState = 'ready' | 'too_upright' | 'too_low' | 'unknown';
+export type BounceHeightState = 'too_high' | 'too_low' | 'balanced' | 'unknown';
 
 export interface DribbleAnalysis {
   dribbleStarted: boolean;
   eyeFocus: EyeFocusState;
   dribbleHeight: DribbleHeightState;
   torsoPosture: TorsoPostureState;
+  torsoLeanAngle: number | null;
+  stanceState: DribbleStanceState;
+  bounceHighState: BounceHeightState;
+  bounceLowState: BounceHeightState;
+  dribbleCount: number;
+  highestBounceY: number | null;
+  lowestBounceY: number | null;
   summary: string;
 }
 
@@ -67,6 +76,9 @@ export interface ShootAnalysis {
   armAngle: number | null;
   legAngle: number | null;
   releaseVelocity: number | null;
+  lowestLegAngle: number | null;
+  headPeakY: number | null;
+  releaseDetected: boolean;
   armAngleState: ShootArmAngleState;
   releaseTiming: ShootReleaseTimingState;
   legAngleState: ShootLegAngleState;
