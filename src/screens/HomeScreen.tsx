@@ -6,6 +6,7 @@ interface HomeScreenProps {
   onOpenLesson: () => void;
   onOpenDiary: () => void;
   onOpenSkill: () => void;
+  onOpenSettings: () => void;
 }
 
 interface HomeMenuButtonProps {
@@ -26,7 +27,7 @@ function HomeMenuButton({ title, subtitle, onPress }: HomeMenuButtonProps) {
   );
 }
 
-export function HomeScreen({ homeworkToShow, onOpenLesson, onOpenDiary, onOpenSkill }: HomeScreenProps) {
+export function HomeScreen({ homeworkToShow, onOpenLesson, onOpenDiary, onOpenSkill, onOpenSettings }: HomeScreenProps) {
   const { width } = useWindowDimensions();
   const isWide = width >= 860;
 
@@ -37,6 +38,9 @@ export function HomeScreen({ homeworkToShow, onOpenLesson, onOpenDiary, onOpenSk
         <Text style={styles.panelTitle}>기능 선택</Text>
         <Text style={styles.panelDescription}>원하는 기능을 선택해서 농구 연습을 시작해보세요.</Text>
 
+        <Pressable onPress={onOpenSettings} style={({ pressed }) => [styles.settingsButton, pressed && styles.pressed]}>
+          <Text style={styles.settingsButtonText}>설정</Text>
+        </Pressable>
         <View style={styles.menuButtons}>
           <HomeMenuButton
             title="AI에게 레슨 받기"
@@ -137,6 +141,22 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 15,
     lineHeight: 23,
+  },
+  settingsButton: {
+    alignSelf: 'flex-end',
+    marginTop: 14,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    backgroundColor: 'rgba(0,0,0,0.28)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  settingsButtonText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.4,
   },
   menuButtons: {
     gap: 18,

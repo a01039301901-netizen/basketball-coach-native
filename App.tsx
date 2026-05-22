@@ -6,6 +6,7 @@ import { useBasketballCoachApp } from './src/hooks/useBasketballCoachApp';
 import { DiaryScreen } from './src/screens/DiaryScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { LessonScreen } from './src/screens/LessonScreen';
+import { SettingsScreen } from './src/screens/SettingsScreen';
 import { SkillScreen } from './src/screens/SkillScreen';
 import { colors } from './src/theme/colors';
 
@@ -27,12 +28,15 @@ export default function App() {
               onOpenLesson={() => void app.navigateTo('lesson')}
               onOpenDiary={() => void app.navigateTo('diary')}
               onOpenSkill={() => void app.navigateTo('skill')}
+              onOpenSettings={() => void app.navigateTo('settings')}
             />
           )}
 
           {app.screen === 'lesson' && (
             <LessonScreen
               lessonMode={app.lessonMode}
+              selectedBallBrand={app.selectedBallBrand}
+              selectedBallColors={app.selectedBallColors}
               isLessonActive={app.isLessonActive}
               isCameraReady={app.isCameraReady}
               cameraSessionKey={app.cameraSessionKey}
@@ -66,6 +70,15 @@ export default function App() {
               onChangeMonth={app.changeMonth}
               onOpenDate={app.openDiaryDate}
               onDeleteRecord={(recordId) => void app.deleteLessonRecord(recordId)}
+            />
+          )}
+
+          {app.screen === 'settings' && (
+            <SettingsScreen
+              selectedBallBrand={app.selectedBallBrand}
+              selectedBallColors={app.selectedBallColors}
+              onSelectBallBrand={app.selectBallBrand}
+              onToggleBallColor={app.toggleBallColor}
             />
           )}
         </ScrollView>

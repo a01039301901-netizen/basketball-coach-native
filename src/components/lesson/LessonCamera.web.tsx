@@ -2,10 +2,12 @@ import { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
 import { colors } from '../../theme/colors';
-import type { DribbleAnalysis, LessonMode, ShootAnalysis } from '../../types/app';
+import type { BallBrandOption, BallColorOption, DribbleAnalysis, LessonMode, ShootAnalysis } from '../../types/app';
 
 interface LessonCameraProps {
   lessonMode: LessonMode;
+  selectedBallBrand: BallBrandOption;
+  selectedBallColors: BallColorOption[];
   isLessonActive: boolean;
   isCameraReady: boolean;
   countdownValue: number | null;
@@ -20,6 +22,15 @@ interface BallDetection {
   radius: number;
   pixelCount: number;
   color: 'orange' | 'red';
+}
+
+interface BallDetectionProfile {
+  mergeColors: boolean;
+  dilationRadius: number;
+  minPixels: number;
+  minFillRatio: number;
+  minCircleCoverage: number;
+  maxCircleCoverage: number;
 }
 
 interface HandDetection {
@@ -302,20 +313,81 @@ function rgbToHsv(r: number, g: number, b: number) {
   };
 }
 
-function classifyBallPixel(r: number, g: number, b: number): BallDetection['color'] | null {
+function getBallDetectionProfile(brand: BallBrandOption): BallDetectionProfile {
+  if (brand === 'molten') {
+    return {
+      mergeColors: true,
+      dilationRadius: 1,
+      minPixels: 24,
+      minFillRatio: 0.28,
+      minCircleCoverage: 0.18,
+      maxCircleCoverage: 1.38,
+    };
+  }
+
+  if (brand === 'wilson') {
+    return {
+      mergeColors: true,
+      dilationRadius: 1,
+      minPixels: 28,
+      minFillRatio: 0.3,
+      minCircleCoverage: 0.2,
+      maxCircleCoverage: 1.34,
+    };
+  }
+
+  return {
+    mergeColors: true,
+    dilationRadius: 1,
+    minPixels: 26,
+    minFillRatio: 0.3,
+    minCircleCoverage: 0.2,
+    maxCircleCoverage: 1.34,
+  };
+}
+
+function classifyBallPixel(r: number, g: number, b: number, selectedBallColors: BallColorOption[]): BallDetection['color'] | null {
   const { h, s, v } = rgbToHsv(r, g, b);
 
-  const isOrange = h >= 10 && h <= 42 && s >= 0.45 && v >= 0.25 && r > g && g > b * 0.8;
+  const allowOrange = selectedBallColors.includes('orange');
+  const allowBrown = selectedBallColors.includes('brown');
+  const allowYellow = selectedBallColors.includes('yellow');
+  const allowWhite = selectedBallColors.includes('white');
+  const allowBlack = selectedBallColors.includes('black');
+  const allowGray = selectedBallColors.includes('gray');
+  const allowRed = selectedBallColors.includes('red');
+
+  const isOrange = allowOrange && h >= 10 && h <= 42 && s >= 0.45 && v >= 0.25 && r > g && g > b * 0.8;
   if (isOrange) {
     return 'orange';
   }
 
-  const isBrown = h >= 12 && h <= 34 && s >= 0.3 && v >= 0.18 && v <= 0.75 && r > g * 1.05 && g > b * 1.05;
+  const isBrown = allowBrown && h >= 12 && h <= 34 && s >= 0.3 && v >= 0.18 && v <= 0.75 && r > g * 1.05 && g > b * 1.05;
   if (isBrown) {
     return 'orange';
   }
 
-  const isRed = (h <= 12 || h >= 345) && s >= 0.45 && v >= 0.22 && r > g * 1.1 && r > b * 1.1;
+  const isYellow = allowYellow && h >= 40 && h <= 65 && s >= 0.35 && v >= 0.35;
+  if (isYellow) {
+    return 'orange';
+  }
+
+  const isWhite = allowWhite && s <= 0.18 && v >= 0.72;
+  if (isWhite) {
+    return 'orange';
+  }
+
+  const isBlack = allowBlack && v <= 0.18;
+  if (isBlack) {
+    return 'orange';
+  }
+
+  const isGray = allowGray && s <= 0.2 && v > 0.18 && v < 0.72;
+  if (isGray) {
+    return 'orange';
+  }
+
+  const isRed = allowRed && (h <= 12 || h >= 345) && s >= 0.45 && v >= 0.22 && r > g * 1.1 && r > b * 1.1;
   if (isRed) {
     return 'red';
   }
@@ -326,8 +398,11 @@ function classifyBallPixel(r: number, g: number, b: number): BallDetection['colo
 function detectBall(
   video: HTMLVideoElement,
   processingCanvas: HTMLCanvasElement,
-  processingContext: CanvasRenderingContext2D
+  processingContext: CanvasRenderingContext2D,
+  selectedBallBrand: BallBrandOption,
+  selectedBallColors: BallColorOption[]
 ): BallDetection | null {
+  const profile = getBallDetectionProfile(selectedBallBrand);
   const width = 192;
   const height = 144;
   processingCanvas.width = width;
@@ -337,17 +412,43 @@ function detectBall(
   const { data } = processingContext.getImageData(0, 0, width, height);
   const visited = new Uint8Array(width * height);
   const colorMap = new Uint8Array(width * height);
+  const mergedMap = new Uint8Array(width * height);
 
   for (let index = 0; index < width * height; index += 1) {
     const offset = index * 4;
-    const color = classifyBallPixel(data[offset], data[offset + 1], data[offset + 2]);
+    const color = classifyBallPixel(data[offset], data[offset + 1], data[offset + 2], selectedBallColors);
     colorMap[index] = color === 'orange' ? 1 : color === 'red' ? 2 : 0;
+  }
+
+  if (profile.mergeColors) {
+    for (let index = 0; index < colorMap.length; index += 1) {
+      if (colorMap[index] === 0) {
+        continue;
+      }
+
+      const x = index % width;
+      const y = Math.floor(index / width);
+
+      for (let offsetY = -profile.dilationRadius; offsetY <= profile.dilationRadius; offsetY += 1) {
+        for (let offsetX = -profile.dilationRadius; offsetX <= profile.dilationRadius; offsetX += 1) {
+          const nextX = x + offsetX;
+          const nextY = y + offsetY;
+          if (nextX < 0 || nextX >= width || nextY < 0 || nextY >= height) {
+            continue;
+          }
+
+          mergedMap[nextY * width + nextX] = 1;
+        }
+      }
+    }
   }
 
   let best: BallDetection | null = null;
 
-  for (let index = 0; index < colorMap.length; index += 1) {
-    if (visited[index] || colorMap[index] === 0) {
+  const sourceMap = profile.mergeColors ? mergedMap : colorMap;
+
+  for (let index = 0; index < sourceMap.length; index += 1) {
+    if (visited[index] || sourceMap[index] === 0) {
       continue;
     }
 
@@ -355,6 +456,7 @@ function detectBall(
     visited[index] = 1;
     const colorValue = colorMap[index];
     let head = 0;
+    let mergedCount = 0;
     let count = 0;
     let sumX = 0;
     let sumY = 0;
@@ -362,6 +464,8 @@ function detectBall(
     let minY = height;
     let maxX = 0;
     let maxY = 0;
+    let orangeCount = 0;
+    let redCount = 0;
 
     while (head < queue.length) {
       const current = queue[head];
@@ -370,7 +474,7 @@ function detectBall(
       const x = current % width;
       const y = Math.floor(current / width);
 
-      count += 1;
+      mergedCount += 1;
       sumX += x;
       sumY += y;
       minX = Math.min(minX, x);
@@ -378,9 +482,38 @@ function detectBall(
       maxX = Math.max(maxX, x);
       maxY = Math.max(maxY, y);
 
-      const neighbors = [current - 1, current + 1, current - width, current + width];
+      const currentColorValue = colorMap[current];
+      if (currentColorValue !== 0) {
+        count += 1;
+        if (currentColorValue === 1) {
+          orangeCount += 1;
+        } else {
+          redCount += 1;
+        }
+      }
+
+      const neighbors = profile.mergeColors
+        ? [
+            current - 1,
+            current + 1,
+            current - width,
+            current + width,
+            current - width - 1,
+            current - width + 1,
+            current + width - 1,
+            current + width + 1,
+          ]
+        : [current - 1, current + 1, current - width, current + width];
       for (const neighbor of neighbors) {
-        if (neighbor < 0 || neighbor >= colorMap.length || visited[neighbor] || colorMap[neighbor] !== colorValue) {
+        if (neighbor < 0 || neighbor >= sourceMap.length || visited[neighbor]) {
+          continue;
+        }
+
+        if (profile.mergeColors) {
+          if (sourceMap[neighbor] === 0) {
+            continue;
+          }
+        } else if (colorMap[neighbor] !== colorValue) {
           continue;
         }
 
@@ -395,7 +528,7 @@ function detectBall(
       }
     }
 
-    if (count < 90) {
+    if (count < profile.minPixels) {
       continue;
     }
 
@@ -406,12 +539,25 @@ function detectBall(
       continue;
     }
 
+    const boundingArea = blobWidth * blobHeight;
+    const fillRatio = (profile.mergeColors ? mergedCount : count) / boundingArea;
+    if (fillRatio < profile.minFillRatio) {
+      continue;
+    }
+
+    const radiusPx = Math.max(blobWidth, blobHeight) / 2;
+    const estimatedCircleArea = Math.PI * radiusPx * radiusPx;
+    const circleCoverage = (profile.mergeColors ? mergedCount : count) / estimatedCircleArea;
+    if (circleCoverage < profile.minCircleCoverage || circleCoverage > profile.maxCircleCoverage) {
+      continue;
+    }
+
     const candidate: BallDetection = {
-      x: sumX / count / width,
-      y: sumY / count / height,
+      x: sumX / mergedCount / width,
+      y: sumY / mergedCount / height,
       radius: Math.max(blobWidth, blobHeight) / Math.max(width, height) / 2,
       pixelCount: count,
-      color: colorValue === 1 ? 'orange' : 'red',
+      color: redCount > orangeCount ? 'red' : colorValue === 2 ? 'red' : 'orange',
     };
 
     if (!best || candidate.pixelCount > best.pixelCount) {
@@ -1022,7 +1168,15 @@ function loadScript(src: string) {
   });
 }
 
-export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countdownValue, onPoseMessage }: LessonCameraProps) {
+export function LessonCamera({
+  lessonMode,
+  selectedBallBrand,
+  selectedBallColors,
+  isLessonActive,
+  isCameraReady,
+  countdownValue,
+  onPoseMessage,
+}: LessonCameraProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const onPoseMessageRef = useRef(onPoseMessage);
 
@@ -1226,7 +1380,7 @@ export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countd
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       context.restore();
 
-      const ball = detectBall(video, processingCanvas, processingContext);
+      const ball = detectBall(video, processingCanvas, processingContext, selectedBallBrand, selectedBallColors);
       if (!landmarks) {
         facingBadge.textContent = '방향: 판단 중';
         if (ball) {
@@ -1486,7 +1640,7 @@ export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countd
       pose?.close?.();
       host.innerHTML = '';
     };
-  }, [isLessonActive, lessonMode]);
+  }, [isLessonActive, lessonMode, selectedBallBrand, selectedBallColors]);
 
   return (
     <View style={styles.videoWrap}>

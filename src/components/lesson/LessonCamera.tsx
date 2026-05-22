@@ -1,9 +1,11 @@
 import { Platform } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
-import type { LessonMode } from '../../types/app';
+import type { BallBrandOption, BallColorOption, LessonMode } from '../../types/app';
 
 interface LessonCameraProps {
   lessonMode: LessonMode;
+  selectedBallBrand: BallBrandOption;
+  selectedBallColors: BallColorOption[];
   isLessonActive: boolean;
   isCameraReady: boolean;
   countdownValue: number | null;

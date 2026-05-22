@@ -1,6 +1,10 @@
 export const POSE_WEB_BOOTSTRAP_URL = 'https://example.com/';
 
-export function buildPoseWebHtml(lessonMode: 'dribble' | 'shoot' = 'dribble'): string {
+export function buildPoseWebHtml(
+  lessonMode: 'dribble' | 'shoot' = 'dribble',
+  selectedBallBrand: 'wilson' | 'spalding' | 'molten' = 'wilson',
+  selectedBallColors: string[] = ['orange']
+): string {
   return `<!DOCTYPE html>
 <html lang="ko">
   <head>
@@ -62,6 +66,8 @@ export function buildPoseWebHtml(lessonMode: 'dribble' | 'shoot' = 'dribble'): s
 
     <script type="module">
       const lessonMode = ${JSON.stringify(lessonMode)};
+      const selectedBallBrand = ${JSON.stringify(selectedBallBrand)};
+      const selectedBallColors = ${JSON.stringify(selectedBallColors)};
       const video = document.getElementById("video");
       const canvas = document.getElementById("canvas");
       const hud = document.getElementById("hud");
@@ -231,12 +237,45 @@ export function buildPoseWebHtml(lessonMode: 'dribble' | 'shoot' = 'dribble'): s
       function classifyBallPixel(r, g, b) {
         const { h, s, v } = rgbToHsv(r, g, b);
 
-        const isOrange = h >= 10 && h <= 42 && s >= 0.45 && v >= 0.25 && r > g && g > b * 0.8;
+        const allowOrange = selectedBallColors.includes("orange");
+        const allowBrown = selectedBallColors.includes("brown");
+        const allowYellow = selectedBallColors.includes("yellow");
+        const allowWhite = selectedBallColors.includes("white");
+        const allowBlack = selectedBallColors.includes("black");
+        const allowGray = selectedBallColors.includes("gray");
+        const allowRed = selectedBallColors.includes("red");
+
+        const isOrange = allowOrange && h >= 10 && h <= 42 && s >= 0.45 && v >= 0.25 && r > g && g > b * 0.8;
         if (isOrange) {
           return 1;
         }
 
-        const isRed = (h <= 12 || h >= 345) && s >= 0.45 && v >= 0.22 && r > g * 1.1 && r > b * 1.1;
+        const isBrown = allowBrown && h >= 12 && h <= 34 && s >= 0.3 && v >= 0.18 && v <= 0.75 && r > g * 1.05 && g > b * 1.05;
+        if (isBrown) {
+          return 1;
+        }
+
+        const isYellow = allowYellow && h >= 40 && h <= 65 && s >= 0.35 && v >= 0.35;
+        if (isYellow) {
+          return 1;
+        }
+
+        const isWhite = allowWhite && s <= 0.18 && v >= 0.72;
+        if (isWhite) {
+          return 1;
+        }
+
+        const isBlack = allowBlack && v <= 0.18;
+        if (isBlack) {
+          return 1;
+        }
+
+        const isGray = allowGray && s <= 0.2 && v > 0.18 && v < 0.72;
+        if (isGray) {
+          return 1;
+        }
+
+        const isRed = allowRed && (h <= 12 || h >= 345) && s >= 0.45 && v >= 0.22 && r > g * 1.1 && r > b * 1.1;
         if (isRed) {
           return 2;
         }
@@ -244,11 +283,45 @@ export function buildPoseWebHtml(lessonMode: 'dribble' | 'shoot' = 'dribble'): s
         return 0;
       }
 
+      function getBallDetectionProfile() {
+        if (selectedBallBrand === "molten") {
+          return {
+            mergeColors: true,
+            dilationRadius: 1,
+            minPixels: 24,
+            minFillRatio: 0.28,
+            minCircleCoverage: 0.18,
+            maxCircleCoverage: 1.38
+          };
+        }
+
+        if (selectedBallBrand === "wilson") {
+          return {
+            mergeColors: true,
+            dilationRadius: 1,
+            minPixels: 28,
+            minFillRatio: 0.3,
+            minCircleCoverage: 0.2,
+            maxCircleCoverage: 1.34
+          };
+        }
+
+        return {
+          mergeColors: true,
+          dilationRadius: 1,
+          minPixels: 26,
+          minFillRatio: 0.3,
+          minCircleCoverage: 0.2,
+          maxCircleCoverage: 1.34
+        };
+      }
+
       function detectBall() {
         if (!processingContext) {
           return null;
         }
 
+        const profile = getBallDetectionProfile();
         const width = 192;
         const height = 144;
         processingCanvas.width = width;
@@ -258,16 +331,41 @@ export function buildPoseWebHtml(lessonMode: 'dribble' | 'shoot' = 'dribble'): s
         const { data } = processingContext.getImageData(0, 0, width, height);
         const visited = new Uint8Array(width * height);
         const colorMap = new Uint8Array(width * height);
+        const mergedMap = new Uint8Array(width * height);
 
         for (let index = 0; index < width * height; index += 1) {
           const offset = index * 4;
           colorMap[index] = classifyBallPixel(data[offset], data[offset + 1], data[offset + 2]);
         }
 
-        let best = null;
+        if (profile.mergeColors) {
+          for (let index = 0; index < colorMap.length; index += 1) {
+            if (colorMap[index] === 0) {
+              continue;
+            }
 
-        for (let index = 0; index < colorMap.length; index += 1) {
-          if (visited[index] || colorMap[index] === 0) {
+            const x = index % width;
+            const y = Math.floor(index / width);
+
+            for (let offsetY = -profile.dilationRadius; offsetY <= profile.dilationRadius; offsetY += 1) {
+              for (let offsetX = -profile.dilationRadius; offsetX <= profile.dilationRadius; offsetX += 1) {
+                const nextX = x + offsetX;
+                const nextY = y + offsetY;
+                if (nextX < 0 || nextX >= width || nextY < 0 || nextY >= height) {
+                  continue;
+                }
+
+                mergedMap[nextY * width + nextX] = 1;
+              }
+            }
+          }
+        }
+
+        let best = null;
+        const sourceMap = profile.mergeColors ? mergedMap : colorMap;
+
+        for (let index = 0; index < sourceMap.length; index += 1) {
+          if (visited[index] || sourceMap[index] === 0) {
             continue;
           }
 
@@ -275,6 +373,7 @@ export function buildPoseWebHtml(lessonMode: 'dribble' | 'shoot' = 'dribble'): s
           visited[index] = 1;
           const colorValue = colorMap[index];
           let head = 0;
+          let mergedCount = 0;
           let count = 0;
           let sumX = 0;
           let sumY = 0;
@@ -282,6 +381,8 @@ export function buildPoseWebHtml(lessonMode: 'dribble' | 'shoot' = 'dribble'): s
           let minY = height;
           let maxX = 0;
           let maxY = 0;
+          let orangeCount = 0;
+          let redCount = 0;
 
           while (head < queue.length) {
             const current = queue[head];
@@ -290,7 +391,7 @@ export function buildPoseWebHtml(lessonMode: 'dribble' | 'shoot' = 'dribble'): s
             const x = current % width;
             const y = Math.floor(current / width);
 
-            count += 1;
+            mergedCount += 1;
             sumX += x;
             sumY += y;
             minX = Math.min(minX, x);
@@ -298,10 +399,30 @@ export function buildPoseWebHtml(lessonMode: 'dribble' | 'shoot' = 'dribble'): s
             maxX = Math.max(maxX, x);
             maxY = Math.max(maxY, y);
 
-            const neighbors = [current - 1, current + 1, current - width, current + width];
+            const currentColorValue = colorMap[current];
+            if (currentColorValue !== 0) {
+              count += 1;
+              if (currentColorValue === 1) {
+                orangeCount += 1;
+              } else {
+                redCount += 1;
+              }
+            }
+
+            const neighbors = profile.mergeColors
+              ? [current - 1, current + 1, current - width, current + width, current - width - 1, current - width + 1, current + width - 1, current + width + 1]
+              : [current - 1, current + 1, current - width, current + width];
 
             for (const neighbor of neighbors) {
-              if (neighbor < 0 || neighbor >= colorMap.length || visited[neighbor] || colorMap[neighbor] !== colorValue) {
+              if (neighbor < 0 || neighbor >= sourceMap.length || visited[neighbor]) {
+                continue;
+              }
+
+              if (profile.mergeColors) {
+                if (sourceMap[neighbor] === 0) {
+                  continue;
+                }
+              } else if (colorMap[neighbor] !== colorValue) {
                 continue;
               }
 
@@ -316,7 +437,7 @@ export function buildPoseWebHtml(lessonMode: 'dribble' | 'shoot' = 'dribble'): s
             }
           }
 
-          if (count < 90) {
+          if (count < profile.minPixels) {
             continue;
           }
 
@@ -327,12 +448,25 @@ export function buildPoseWebHtml(lessonMode: 'dribble' | 'shoot' = 'dribble'): s
             continue;
           }
 
+          const boundingArea = blobWidth * blobHeight;
+          const fillRatio = (profile.mergeColors ? mergedCount : count) / boundingArea;
+          if (fillRatio < profile.minFillRatio) {
+            continue;
+          }
+
+          const radiusPx = Math.max(blobWidth, blobHeight) / 2;
+          const estimatedCircleArea = Math.PI * radiusPx * radiusPx;
+          const circleCoverage = (profile.mergeColors ? mergedCount : count) / estimatedCircleArea;
+          if (circleCoverage < profile.minCircleCoverage || circleCoverage > profile.maxCircleCoverage) {
+            continue;
+          }
+
           const candidate = {
-            x: sumX / count / width,
-            y: sumY / count / height,
+            x: sumX / mergedCount / width,
+            y: sumY / mergedCount / height,
             radius: Math.max(blobWidth, blobHeight) / Math.max(width, height) / 2,
             pixelCount: count,
-            color: colorValue === 1 ? "orange" : "red"
+            color: redCount > orangeCount ? "red" : colorValue === 2 ? "red" : "orange"
           };
 
           if (!best || candidate.pixelCount > best.pixelCount) {
@@ -888,8 +1022,12 @@ export function buildPoseWebHtml(lessonMode: 'dribble' | 'shoot' = 'dribble'): s
 </html>`;
 }
 
-export function buildPoseBootstrapScript(lessonMode: 'dribble' | 'shoot' = 'dribble'): string {
-  const html = JSON.stringify(buildPoseWebHtml(lessonMode));
+export function buildPoseBootstrapScript(
+  lessonMode: 'dribble' | 'shoot' = 'dribble',
+  selectedBallBrand: 'wilson' | 'spalding' | 'molten' = 'wilson',
+  selectedBallColors: string[] = ['orange']
+): string {
+  const html = JSON.stringify(buildPoseWebHtml(lessonMode, selectedBallBrand, selectedBallColors));
 
   return `
     document.open();

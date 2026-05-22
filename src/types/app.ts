@@ -1,4 +1,4 @@
-export type AppScreen = 'home' | 'lesson' | 'skill' | 'diary';
+export type AppScreen = 'home' | 'lesson' | 'skill' | 'diary' | 'settings';
 
 export type LessonMode = 'dribble' | 'shoot';
 
@@ -17,6 +17,8 @@ export type CalendarCell =
     };
 
 export type SkillKey = 'shoot' | 'crossover' | 'layup' | 'stepback' | 'spin' | 'defense';
+export type BallColorOption = 'orange' | 'brown' | 'yellow' | 'white' | 'black' | 'gray' | 'red';
+export type BallBrandOption = 'wilson' | 'spalding' | 'molten';
 
 export interface Skill {
   title: string;

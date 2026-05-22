@@ -1,18 +1,28 @@
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { colors } from '../../theme/colors';
-import type { LessonMode } from '../../types/app';
+import type { BallBrandOption, BallColorOption, LessonMode } from '../../types/app';
 import { buildPoseBootstrapScript, POSE_WEB_BOOTSTRAP_URL } from './poseWebHtml';
 
 interface LessonCameraProps {
   lessonMode: LessonMode;
+  selectedBallBrand: BallBrandOption;
+  selectedBallColors: BallColorOption[];
   isLessonActive: boolean;
   isCameraReady: boolean;
   countdownValue: number | null;
   onPoseMessage: (event: WebViewMessageEvent) => void;
 }
 
-export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countdownValue, onPoseMessage }: LessonCameraProps) {
+export function LessonCamera({
+  lessonMode,
+  selectedBallBrand,
+  selectedBallColors,
+  isLessonActive,
+  isCameraReady,
+  countdownValue,
+  onPoseMessage,
+}: LessonCameraProps) {
   return (
     <View style={styles.videoWrap}>
       {isLessonActive ? (
@@ -22,7 +32,7 @@ export function LessonCamera({ lessonMode, isLessonActive, isCameraReady, countd
             source={{ uri: POSE_WEB_BOOTSTRAP_URL }}
             style={styles.webview}
             onMessage={onPoseMessage}
-            injectedJavaScriptBeforeContentLoaded={buildPoseBootstrapScript(lessonMode)}
+            injectedJavaScriptBeforeContentLoaded={buildPoseBootstrapScript(lessonMode, selectedBallBrand, selectedBallColors)}
             javaScriptEnabled
             domStorageEnabled
             allowsInlineMediaPlayback

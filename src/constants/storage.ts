@@ -3,4 +3,6 @@ export const STORAGE_KEYS = {
   homework: 'basketballHomework',
   lessonRecords: 'basketballLessonRecords',
   shotSuccess: 'shotSuccessRecords',
+  ballColors: 'basketballBallColors',
+  ballBrand: 'basketballBallBrand',
 } as const;

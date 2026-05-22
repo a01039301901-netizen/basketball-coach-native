@@ -5,10 +5,12 @@ import { Card } from '../components/common/Card';
 import { InfoBox } from '../components/common/InfoBox';
 import { LessonCamera } from '../components/lesson/LessonCamera';
 import { colors } from '../theme/colors';
-import type { LessonMode } from '../types/app';
+import type { BallBrandOption, BallColorOption, LessonMode } from '../types/app';
 
 interface LessonScreenProps {
   lessonMode: LessonMode;
+  selectedBallBrand: BallBrandOption;
+  selectedBallColors: BallColorOption[];
   isLessonActive: boolean;
   isCameraReady: boolean;
   cameraSessionKey: number;
@@ -49,6 +51,8 @@ function ModeButton({ title, active, disabled, onPress }: ModeButtonProps) {
 
 export function LessonScreen({
   lessonMode,
+  selectedBallBrand,
+  selectedBallColors,
   isLessonActive,
   isCameraReady,
   cameraSessionKey,
@@ -96,6 +100,8 @@ export function LessonScreen({
             <LessonCamera
               key={cameraSessionKey}
               lessonMode={lessonMode}
+              selectedBallBrand={selectedBallBrand}
+              selectedBallColors={selectedBallColors}
               isLessonActive={isLessonActive}
               isCameraReady={isCameraReady}
               countdownValue={countdownValue}
