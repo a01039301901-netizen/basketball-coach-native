@@ -6,9 +6,12 @@ interface LessonCameraProps {
   lessonMode: LessonMode;
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
+  isCameraActive: boolean;
   isLessonActive: boolean;
   isCameraReady: boolean;
   countdownValue: number | null;
+  recordingStartToken: number;
+  recordingStopToken: number;
   onPoseMessage: (event: WebViewMessageEvent) => void;
 }
 

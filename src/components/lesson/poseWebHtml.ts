@@ -1,4 +1,4 @@
-export const POSE_WEB_BOOTSTRAP_URL = 'https://example.com/';
+﻿export const POSE_WEB_BOOTSTRAP_URL = 'https://example.com/';
 
 export function buildPoseWebHtml(
   lessonMode: 'dribble' | 'shoot' = 'dribble',
@@ -61,7 +61,7 @@ export function buildPoseWebHtml(
     <div class="wrap">
       <video id="video" autoplay playsinline muted webkit-playsinline></video>
       <canvas id="canvas"></canvas>
-      <div class="hud" id="hud">MediaPipe와 공 인식을 준비하는 중입니다.</div>
+      <div class="hud" id="hud">MediaPipe? 怨??몄떇??以鍮꾪븯??以묒엯?덈떎.</div>
     </div>
 
     <script type="module">
@@ -96,18 +96,19 @@ export function buildPoseWebHtml(
       };
 
       const LABELS = {
-        head: "머리",
-        neck: "목",
-        shoulder: "어깨",
-        elbow: "팔꿈치",
-        hand: "손",
-        hip: "엉덩이",
-        knee: "무릎",
-        foot: "발"
+        head: "癒몃━",
+        neck: "紐?,
+        shoulder: "?닿묠",
+        elbow: "?붽퓞移?,
+        hand: "??,
+        hip: "?됰뜦??,
+        knee: "臾대쫷",
+        foot: "諛?
       };
 
       let poseLandmarker = null;
       let recorder = null;
+      let composedStream = null;
       let recorderChunks = [];
       let recorderStopping = false;
       let lastVideoTime = -1;
@@ -116,16 +117,37 @@ export function buildPoseWebHtml(
       let lastShootSummary = "";
       let lastSentAt = 0;
       let previousHipY = null;
+      let dribbleCount = 0;
+      let leftHandDribbleCount = 0;
+      let rightHandDribbleCount = 0;
+      let wasBallNearFoot = false;
+      let highestBounceY = null;
+      let lowestBounceY = null;
+      let lastBounceHand = "unknown";
 
       function post(payload) {
         if (window.ReactNativeWebView) {
           window.ReactNativeWebView.postMessage(JSON.stringify(payload));
         }
+
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage(payload, "*");
+        }
+      }
+
+      function resetDribbleTracking() {
+        dribbleCount = 0;
+        leftHandDribbleCount = 0;
+        rightHandDribbleCount = 0;
+        wasBallNearFoot = false;
+        highestBounceY = null;
+        lowestBounceY = null;
+        lastBounceHand = "unknown";
       }
 
       function finalizeRecording() {
         if (recorderChunks.length === 0) {
-          post({ type: "recording_error", message: "저장할 영상 데이터가 없습니다." });
+          post({ type: "recording_error", message: "??ν븷 ?곸긽 ?곗씠?곌? ?놁뒿?덈떎." });
           return;
         }
 
@@ -136,17 +158,80 @@ export function buildPoseWebHtml(
         reader.onloadend = () => {
           const result = typeof reader.result === "string" ? reader.result : "";
           if (!result) {
-            post({ type: "recording_error", message: "영상 인코딩에 실패했습니다." });
+            post({ type: "recording_error", message: "?곸긽 ?몄퐫?⑹뿉 ?ㅽ뙣?덉뒿?덈떎." });
             return;
           }
 
           post({ type: "recording_ready", videoUri: result });
         };
         reader.onerror = () => {
-          post({ type: "recording_error", message: "영상 파일을 읽는 중 오류가 발생했습니다." });
+          post({ type: "recording_error", message: "?곸긽 ?뚯씪???쎈뒗 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎." });
         };
         reader.readAsDataURL(blob);
       }
+
+      function startRecorder() {
+        if (!composedStream || typeof MediaRecorder === "undefined") {
+          return;
+        }
+
+        const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+          ? "video/webm;codecs=vp8,opus"
+          : MediaRecorder.isTypeSupported("video/webm")
+            ? "video/webm"
+            : "";
+
+        recorder = mimeType ? new MediaRecorder(composedStream, { mimeType }) : new MediaRecorder(composedStream);
+        recorderChunks = [];
+        recorderStopping = false;
+        recorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            recorderChunks.push(event.data);
+          }
+        };
+        recorder.onstop = () => {
+          if (recorderStopping) {
+            finalizeRecording();
+          }
+        };
+        recorder.onerror = () => {
+          post({ type: "recording_error", message: "??됰뮣 ?怨멸맒 ?諭곸넅 餓???살첒揶쎛 獄쏆뮇源??됰뮸??덈뼄." });
+        };
+        resetDribbleTracking();
+        recorder.start(1000);
+        post({ type: "recording_started" });
+      }
+
+      function restartRecordingFromCue() {
+        if (!composedStream || typeof MediaRecorder === "undefined") {
+          return;
+        }
+
+        if (recorder && recorder.state !== "inactive") {
+          recorder.onstop = () => {
+            recorderChunks = [];
+            recorderStopping = false;
+            startRecorder();
+          };
+          recorderStopping = false;
+          recorder.stop();
+          return;
+        }
+
+        startRecorder();
+      }
+
+      function stopRecordingForReview() {
+        if (!recorder || recorder.state === "inactive") {
+          return;
+        }
+
+        recorderStopping = true;
+        recorder.stop();
+      }
+
+      window.__codexRestartRecordingFromCue = restartRecordingFromCue;
+      window.__codexStopRecordingForReview = stopRecordingForReview;
 
       function setHud(text) {
         hud.textContent = text;
@@ -522,7 +607,7 @@ export function buildPoseWebHtml(
         ctx.fillStyle = "#ffffff";
         ctx.font = "bold 13px Arial";
         ctx.textAlign = "center";
-        ctx.fillText(ball.color === "orange" ? "주황 공" : "빨간 공", centerX, centerY - Math.max(radius, 16) - 16);
+        ctx.fillText(ball.color === "orange" ? "二쇳솴 怨? : "鍮④컙 怨?, centerX, centerY - Math.max(radius, 16) - 16);
         ctx.textAlign = "left";
       }
 
@@ -614,21 +699,211 @@ export function buildPoseWebHtml(
         return null;
       }
 
-      function classifyTorsoPosture(shoulderMid, hipMid) {
-        if (!shoulderMid || !hipMid) {
+      function classifyBodyFacing(landmarks) {
+        const leftShoulder = landmarks[INDEX.leftShoulder];
+        const rightShoulder = landmarks[INDEX.rightShoulder];
+        const nose = landmarks[INDEX.nose];
+
+        if (!visible(leftShoulder) || !visible(rightShoulder) || !visible(nose)) {
           return "unknown";
         }
 
-        const torsoHeight = hipMid.y - shoulderMid.y;
-        if (torsoHeight > 0.3) {
+        const shoulderMid = midpoint(leftShoulder, rightShoulder);
+        const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
+        const noseOffset = Math.abs(nose.x - shoulderMid.x);
+
+        if (shoulderWidth >= 0.16 && noseOffset <= shoulderWidth * 0.32) {
+          return "front";
+        }
+
+        if (shoulderWidth <= 0.14 || noseOffset > shoulderWidth * 0.32) {
+          return "side";
+        }
+
+        return "unknown";
+      }
+
+      function getTorsoLeanAngle(shoulderMid, hipMid) {
+        if (!shoulderMid || !hipMid) {
+          return null;
+        }
+
+        const dx = Math.abs(shoulderMid.x - hipMid.x);
+        const dy = Math.abs(shoulderMid.y - hipMid.y);
+        return Math.atan2(dx, dy + 0.0001) * 180 / Math.PI;
+      }
+
+      function classifyTorsoPosture(shoulderMid, hipMid, torsoLeanAngle) {
+        if (!shoulderMid || !hipMid || torsoLeanAngle === null) {
+          return "unknown";
+        }
+
+        if (torsoLeanAngle < 15) {
           return "high";
         }
 
-        if (torsoHeight < 0.2) {
+        if (torsoLeanAngle > 45) {
           return "low";
         }
 
         return "balanced";
+      }
+
+      function classifyStanceState(bodyFacing, torsoLeanAngle, frontStanceAngle) {
+        if (bodyFacing === "front") {
+          if (frontStanceAngle === null) {
+            return "unknown";
+          }
+
+          if (frontStanceAngle < 40) {
+            return "too_low";
+          }
+
+          if (frontStanceAngle > 60) {
+            return "too_upright";
+          }
+
+          return "ready";
+        }
+
+        if (torsoLeanAngle === null) {
+          return "unknown";
+        }
+
+        if (torsoLeanAngle < 15) {
+          return "too_upright";
+        }
+
+        if (torsoLeanAngle > 45) {
+          return "too_low";
+        }
+
+        return "ready";
+      }
+
+      function classifyFrontStanceAngle(landmarks, hipMid) {
+        const leftKnee = landmarks[INDEX.leftKnee];
+        const rightKnee = landmarks[INDEX.rightKnee];
+
+        if (!hipMid || !visible(leftKnee) || !visible(rightKnee)) {
+          return null;
+        }
+
+        return angleAt(leftKnee, hipMid, rightKnee);
+      }
+
+      function classifyFrontBallLaneState(landmarks, ball) {
+        const leftAnkle = landmarks[INDEX.leftAnkle];
+        const rightAnkle = landmarks[INDEX.rightAnkle];
+
+        if (!ball || !visible(leftAnkle) || !visible(rightAnkle)) {
+          return "unknown";
+        }
+
+        const minX = Math.min(leftAnkle.x, rightAnkle.x);
+        const maxX = Math.max(leftAnkle.x, rightAnkle.x);
+        return ball.x >= minX && ball.x <= maxX ? "between_legs" : "outside_legs";
+      }
+
+      function classifyFootSpacingState(landmarks) {
+        const leftAnkle = landmarks[INDEX.leftAnkle];
+        const rightAnkle = landmarks[INDEX.rightAnkle];
+        const leftShoulder = landmarks[INDEX.leftShoulder];
+        const rightShoulder = landmarks[INDEX.rightShoulder];
+
+        if (!visible(leftAnkle) || !visible(rightAnkle) || !visible(leftShoulder) || !visible(rightShoulder)) {
+          return "unknown";
+        }
+
+        const footWidth = Math.abs(leftAnkle.x - rightAnkle.x);
+        const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
+
+        if (footWidth < shoulderWidth) {
+          return "narrow";
+        }
+
+        if (footWidth > shoulderWidth * 2) {
+          return "wide";
+        }
+
+        return "balanced";
+      }
+
+      function detectControllingHand(landmarks, ball) {
+        const leftWrist = landmarks[INDEX.leftWrist];
+        const rightWrist = landmarks[INDEX.rightWrist];
+
+        if (!ball) {
+          return "unknown";
+        }
+
+        if (visible(leftWrist) && visible(rightWrist)) {
+          const leftDistance = Math.abs(leftWrist.x - ball.x) + Math.abs(leftWrist.y - ball.y);
+          const rightDistance = Math.abs(rightWrist.x - ball.x) + Math.abs(rightWrist.y - ball.y);
+          return leftDistance <= rightDistance ? "left" : "right";
+        }
+
+        if (visible(leftWrist)) {
+          return "left";
+        }
+
+        if (visible(rightWrist)) {
+          return "right";
+        }
+
+        return "unknown";
+      }
+
+      function updateDribbleBounceTracking(landmarks, ball) {
+        const leftAnkle = landmarks[INDEX.leftAnkle];
+        const rightAnkle = landmarks[INDEX.rightAnkle];
+
+        if (!ball || !visible(leftAnkle) || !visible(rightAnkle)) {
+          wasBallNearFoot = false;
+          return;
+        }
+
+        const footY = (leftAnkle.y + rightAnkle.y) / 2;
+        const nearFoot = ball.y >= footY - 0.07;
+
+        if (highestBounceY === null || ball.y < highestBounceY) {
+          highestBounceY = ball.y;
+        }
+
+        if (lowestBounceY === null || ball.y > lowestBounceY) {
+          lowestBounceY = ball.y;
+        }
+
+        if (nearFoot && !wasBallNearFoot) {
+          dribbleCount += 1;
+          lastBounceHand = detectControllingHand(landmarks, ball);
+
+          if (lastBounceHand === "left") {
+            leftHandDribbleCount += 1;
+          } else if (lastBounceHand === "right") {
+            rightHandDribbleCount += 1;
+          }
+
+          highestBounceY = ball.y;
+          lowestBounceY = ball.y;
+        }
+
+        wasBallNearFoot = nearFoot;
+      }
+
+      function classifyBounceStates(shoulderMid, hipMid) {
+        let bounceHighState = "unknown";
+        let bounceLowState = "unknown";
+
+        if (shoulderMid && highestBounceY !== null) {
+          bounceHighState = highestBounceY < shoulderMid.y - 0.015 ? "too_high" : "balanced";
+        }
+
+        if (hipMid && lowestBounceY !== null) {
+          bounceLowState = lowestBounceY < hipMid.y - 0.015 ? "too_low" : "balanced";
+        }
+
+        return { bounceHighState, bounceLowState };
       }
 
       function buildDribbleAnalysis(landmarks, ball) {
@@ -639,23 +914,54 @@ export function buildPoseWebHtml(
         const shoulderMid = visible(leftShoulder) && visible(rightShoulder) ? midpoint(leftShoulder, rightShoulder) : null;
         const hipMid = visible(leftHip) && visible(rightHip) ? midpoint(leftHip, rightHip) : null;
         const neck = shoulderMid;
+        const bodyFacing = classifyBodyFacing(landmarks);
+        const frontStanceAngle = classifyFrontStanceAngle(landmarks, hipMid);
+        const torsoLeanAngle = getTorsoLeanAngle(shoulderMid, hipMid);
+        const stanceState = classifyStanceState(bodyFacing, torsoLeanAngle, frontStanceAngle);
         const dribbleStarted = didDribbleStart(landmarks, ball);
+
+        if (dribbleStarted) {
+          updateDribbleBounceTracking(landmarks, ball);
+        }
 
         const eyeFocus = classifyEyeFocus(landmarks, neck);
         const dribbleHeight = dribbleStarted ? classifyDribbleHeight(landmarks, neck, hipMid) : "unknown";
-        const torsoPosture = classifyTorsoPosture(shoulderMid, hipMid);
+        const torsoPosture = classifyTorsoPosture(shoulderMid, hipMid, torsoLeanAngle);
+        const frontBallLaneState = bodyFacing === "front" ? classifyFrontBallLaneState(landmarks, ball) : "unknown";
+        const footSpacingState = bodyFacing === "front" ? classifyFootSpacingState(landmarks) : "unknown";
+        const handBalanceState = dribbleCount >= 2 && Math.abs(leftHandDribbleCount - rightHandDribbleCount) >= 2
+          ? "unbalanced"
+          : dribbleCount > 0
+            ? "balanced"
+            : "unknown";
+        const bounceStates = classifyBounceStates(shoulderMid, hipMid);
 
         return {
           dribbleStarted,
+          bodyFacing,
           eyeFocus,
           dribbleHeight,
           torsoPosture,
+          torsoLeanAngle,
+          stanceState,
+          frontStanceAngle,
+          bounceHighState: bounceStates.bounceHighState,
+          bounceLowState: bounceStates.bounceLowState,
+          dribbleCount,
+          leftHandDribbleCount,
+          rightHandDribbleCount,
+          handBalanceState,
+          frontBallLaneState,
+          footSpacingState,
+          highestBounceY,
+          lowestBounceY,
           summary: [
-            "드리블:" + (dribbleStarted ? "시작됨" : "대기 중"),
-            "시선:" + (eyeFocus === "ball" ? "공 쪽" : eyeFocus === "forward" ? "앞" : "판정 어려움"),
-            "드리블:" + (dribbleHeight === "high" ? "높음" : dribbleHeight === "low" ? "낮음" : dribbleHeight === "balanced" ? "적절" : "판정 어려움"),
-            "상체:" + (torsoPosture === "high" ? "높음" : torsoPosture === "low" ? "낮음" : torsoPosture === "balanced" ? "적절" : "판정 어려움"),
-            "공:" + (ball ? (ball.color === "orange" ? "주황 감지" : "빨강 감지") : "탐색 중")
+            "??:" + bodyFacing,
+            "???:" + (dribbleStarted ? "??" : "??"),
+            "??:" + dribbleCount,
+            "??:" + eyeFocus,
+            "??:" + stanceState,
+            "?:" + (ball ? ball.color : "unknown")
           ].join(" | ")
         };
       }
@@ -740,10 +1046,10 @@ export function buildPoseWebHtml(
           releaseTiming,
           legAngleState,
           summary: [
-            "팔:" + (armAngleState === "narrow" ? "좁음" : armAngleState === "wide" ? "넓음" : armAngleState === "balanced" ? "적절" : "판정 어려움"),
-            "타이밍:" + (releaseTiming === "early" ? "빠름" : releaseTiming === "late" ? "늦음" : releaseTiming === "balanced" ? "적절" : "판정 어려움"),
-            "하체:" + (legAngleState === "low" ? "너무 낮음" : legAngleState === "high" ? "높음" : legAngleState === "balanced" ? "적절" : "판정 어려움"),
-            "공:" + (ball ? (ball.color === "orange" ? "주황 감지" : "빨강 감지") : "탐색 중")
+            "??" + (armAngleState === "narrow" ? "醫곸쓬" : armAngleState === "wide" ? "?볦쓬" : armAngleState === "balanced" ? "?곸젅" : "?먯젙 ?대젮?"),
+            "??대컢:" + (releaseTiming === "early" ? "鍮좊쫫" : releaseTiming === "late" ? "??쓬" : releaseTiming === "balanced" ? "?곸젅" : "?먯젙 ?대젮?"),
+            "?섏껜:" + (legAngleState === "low" ? "?덈Т ??쓬" : legAngleState === "high" ? "?믪쓬" : legAngleState === "balanced" ? "?곸젅" : "?먯젙 ?대젮?"),
+            "怨?" + (ball ? (ball.color === "orange" ? "二쇳솴 媛먯?" : "鍮④컯 媛먯?") : "?먯깋 以?)
           ].join(" | ")
         };
       }
@@ -817,11 +1123,11 @@ export function buildPoseWebHtml(
             drawBall(ball);
           }
 
-          setHud(ball ? "공 인식됨: " + (ball.color === "orange" ? "주황 공" : "빨간 공") : "화면 안에 몸과 공이 보이도록 맞춰 주세요.");
+          setHud(ball ? "怨??몄떇?? " + (ball.color === "orange" ? "二쇳솴 怨? : "鍮④컙 怨?) : "?붾㈃ ?덉뿉 紐멸낵 怨듭씠 蹂댁씠?꾨줉 留욎떠 二쇱꽭??");
           const now = Date.now();
           if (now - lastSentAt > 1000) {
             lastSentAt = now;
-            post({ type: "status", message: ball ? "공은 감지되지만 사람을 찾는 중입니다." : "사람과 공을 찾는 중입니다." });
+            post({ type: "status", message: ball ? "怨듭? 媛먯??섏?留??щ엺??李얜뒗 以묒엯?덈떎." : "?щ엺怨?怨듭쓣 李얜뒗 以묒엯?덈떎." });
           }
           return;
         }
@@ -844,18 +1150,18 @@ export function buildPoseWebHtml(
 
         if (visible(head)) drawPoint(head, LABELS.head, "#ff6b6b");
         if (neck && visible(neck)) drawPoint(neck, LABELS.neck, "#f7b267");
-        if (visible(leftShoulder)) drawPoint(leftShoulder, "왼쪽 " + LABELS.shoulder, "#ffd166");
-        if (visible(rightShoulder)) drawPoint(rightShoulder, "오른쪽 " + LABELS.shoulder, "#ffd166");
-        if (visible(leftElbow)) drawPoint(leftElbow, "왼쪽 " + LABELS.elbow, "#ffb703");
-        if (visible(rightElbow)) drawPoint(rightElbow, "오른쪽 " + LABELS.elbow, "#ffb703");
-        if (visible(leftWrist)) drawPoint(leftWrist, "왼쪽 " + LABELS.hand, "#fb8500");
-        if (visible(rightWrist)) drawPoint(rightWrist, "오른쪽 " + LABELS.hand, "#fb8500");
-        if (visible(leftHip)) drawPoint(leftHip, "왼쪽 " + LABELS.hip, "#06d6a0");
-        if (visible(rightHip)) drawPoint(rightHip, "오른쪽 " + LABELS.hip, "#06d6a0");
-        if (visible(leftKnee)) drawPoint(leftKnee, "왼쪽 " + LABELS.knee, "#118ab2");
-        if (visible(rightKnee)) drawPoint(rightKnee, "오른쪽 " + LABELS.knee, "#118ab2");
-        if (visible(leftAnkle)) drawPoint(leftAnkle, "왼쪽 " + LABELS.foot, "#4cc9f0");
-        if (visible(rightAnkle)) drawPoint(rightAnkle, "오른쪽 " + LABELS.foot, "#4cc9f0");
+        if (visible(leftShoulder)) drawPoint(leftShoulder, "?쇱そ " + LABELS.shoulder, "#ffd166");
+        if (visible(rightShoulder)) drawPoint(rightShoulder, "?ㅻⅨ履?" + LABELS.shoulder, "#ffd166");
+        if (visible(leftElbow)) drawPoint(leftElbow, "?쇱そ " + LABELS.elbow, "#ffb703");
+        if (visible(rightElbow)) drawPoint(rightElbow, "?ㅻⅨ履?" + LABELS.elbow, "#ffb703");
+        if (visible(leftWrist)) drawPoint(leftWrist, "?쇱そ " + LABELS.hand, "#fb8500");
+        if (visible(rightWrist)) drawPoint(rightWrist, "?ㅻⅨ履?" + LABELS.hand, "#fb8500");
+        if (visible(leftHip)) drawPoint(leftHip, "?쇱そ " + LABELS.hip, "#06d6a0");
+        if (visible(rightHip)) drawPoint(rightHip, "?ㅻⅨ履?" + LABELS.hip, "#06d6a0");
+        if (visible(leftKnee)) drawPoint(leftKnee, "?쇱そ " + LABELS.knee, "#118ab2");
+        if (visible(rightKnee)) drawPoint(rightKnee, "?ㅻⅨ履?" + LABELS.knee, "#118ab2");
+        if (visible(leftAnkle)) drawPoint(leftAnkle, "?쇱そ " + LABELS.foot, "#4cc9f0");
+        if (visible(rightAnkle)) drawPoint(rightAnkle, "?ㅻⅨ履?" + LABELS.foot, "#4cc9f0");
         if (ball) {
           drawBall(ball);
         }
@@ -870,11 +1176,11 @@ export function buildPoseWebHtml(
         if (visible(leftKnee) || visible(rightKnee)) detected.push(LABELS.knee);
         if (visible(leftAnkle) || visible(rightAnkle)) detected.push(LABELS.foot);
         if (ball) {
-          detected.push(ball.color === "orange" ? "주황 공" : "빨간 공");
+          detected.push(ball.color === "orange" ? "二쇳솴 怨? : "鍮④컙 怨?);
         }
 
         const pointSummary = detected.join(", ");
-        setHud(pointSummary ? "인식 중: " + pointSummary : "관절과 공을 찾는 중입니다.");
+        setHud(pointSummary ? "?몄떇 以? " + pointSummary : "愿?덇낵 怨듭쓣 李얜뒗 以묒엯?덈떎.");
 
         const releaseVelocity = hipMid && previousHipY !== null ? hipMid.y - previousHipY : null;
         if (hipMid) {
@@ -903,8 +1209,8 @@ export function buildPoseWebHtml(
       }
 
       async function setupPose() {
-        post({ type: "status", message: "MediaPipe와 공 인식 모델을 준비하는 중입니다." });
-        setHud("MediaPipe와 공 인식 모델을 준비하는 중입니다.");
+        post({ type: "status", message: "MediaPipe? 怨??몄떇 紐⑤뜽??以鍮꾪븯??以묒엯?덈떎." });
+        setHud("MediaPipe? 怨??몄떇 紐⑤뜽??以鍮꾪븯??以묒엯?덈떎.");
 
         const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest");
         const { FilesetResolver, PoseLandmarker } = vision;
@@ -925,12 +1231,12 @@ export function buildPoseWebHtml(
         });
 
         post({ type: "ready" });
-        setHud("카메라를 시작하는 중입니다.");
+        setHud("移대찓?쇰? ?쒖옉?섎뒗 以묒엯?덈떎.");
       }
 
       async function setupCamera() {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error("navigator.mediaDevices.getUserMedia를 사용할 수 없습니다.");
+          throw new Error("navigator.mediaDevices.getUserMedia瑜??ъ슜?????놁뒿?덈떎.");
         }
 
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -948,34 +1254,11 @@ export function buildPoseWebHtml(
         window.addEventListener("resize", resizeCanvas);
 
         if (typeof MediaRecorder !== "undefined") {
-          const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
-            ? "video/webm;codecs=vp8,opus"
-            : MediaRecorder.isTypeSupported("video/webm")
-              ? "video/webm"
-              : "";
-
-          const composedStream = canvas.captureStream(30);
-          recorder = mimeType ? new MediaRecorder(composedStream, { mimeType }) : new MediaRecorder(composedStream);
-          recorderChunks = [];
-          recorderStopping = false;
-          recorder.ondataavailable = (event) => {
-            if (event.data && event.data.size > 0) {
-              recorderChunks.push(event.data);
-            }
-          };
-          recorder.onstop = () => {
-            if (recorderStopping) {
-              finalizeRecording();
-            }
-          };
-          recorder.onerror = () => {
-            post({ type: "recording_error", message: "레슨 영상 녹화 중 오류가 발생했습니다." });
-          };
-          recorder.start(1000);
+          composedStream = canvas.captureStream(30);
         }
 
         post({ type: "stream_started" });
-        setHud("카메라 시작 완료. 자세와 공을 분석하는 중입니다.");
+        setHud("移대찓???쒖옉 ?꾨즺. ?먯꽭? 怨듭쓣 遺꾩꽍?섎뒗 以묒엯?덈떎.");
         requestAnimationFrame(loop);
       }
 
@@ -1000,7 +1283,7 @@ export function buildPoseWebHtml(
           await setupPose();
           await setupCamera();
         } catch (error) {
-          const message = error instanceof Error ? error.message : "분석을 시작하지 못했습니다.";
+          const message = error instanceof Error ? error.message : "遺꾩꽍???쒖옉?섏? 紐삵뻽?듬땲??";
           post({ type: "error", message });
           setHud(message);
         }
@@ -1036,3 +1319,4 @@ export function buildPoseBootstrapScript(
     true;
   `;
 }
+

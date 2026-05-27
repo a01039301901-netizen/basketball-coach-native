@@ -1,6 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+﻿import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Linking from 'expo-linking';
+import { Audio } from 'expo-av';
 import { useCameraPermissions } from 'expo-camera';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
@@ -17,6 +18,7 @@ import type {
   FireworkItem,
   LessonMode,
   LessonRecord,
+  LessonReviewClip,
   ShootAnalysis,
   SkillKey,
 } from '../types/app';
@@ -31,13 +33,13 @@ const DRIBBLE_STANCE_HOLD_MS = 3000;
 type DribbleLessonPhase = 'stance_setup' | 'countdown' | 'await_dribble' | 'active';
 
 const DEFAULT_DRIBBLE_FEEDBACK =
-  '드리블 피드백\n1. 시선, 드리블 높이, 상체 높이를 분석하는 중입니다.\n2. 몸 전체와 드리블 손이 화면 안에 보이도록 맞춰 주세요.\n3. 분석이 안정되면 자세 기준에 맞춰 피드백이 바로 바뀝니다.';
+  '?쒕━釉??쇰뱶諛?n1. ?쒖꽑, ?쒕━釉??믪씠, ?곸껜 ?믪씠瑜?遺꾩꽍?섎뒗 以묒엯?덈떎.\n2. 紐??꾩껜? ?쒕━釉??먯씠 ?붾㈃ ?덉뿉 蹂댁씠?꾨줉 留욎떠 二쇱꽭??\n3. 遺꾩꽍???덉젙?섎㈃ ?먯꽭 湲곗???留욎떠 ?쇰뱶諛깆씠 諛붾줈 諛붾앸땲??';
 
 const DEFAULT_SHOOT_FEEDBACK =
-  '슛 피드백\n1. 팔 각도, 슛 시점, 하체 각도를 분석하는 중입니다.\n2. 어깨부터 발까지 몸 전체가 화면 안에 잘 보이도록 맞춰 주세요.\n3. 분석이 안정되면 슛 기준에 맞춰 피드백이 바로 바뀝니다.';
+  '???쇰뱶諛?n1. ??媛곷룄, ???쒖젏, ?섏껜 媛곷룄瑜?遺꾩꽍?섎뒗 以묒엯?덈떎.\n2. ?닿묠遺??諛쒓퉴吏 紐??꾩껜媛 ?붾㈃ ?덉뿉 ??蹂댁씠?꾨줉 留욎떠 二쇱꽭??\n3. 遺꾩꽍???덉젙?섎㈃ ??湲곗???留욎떠 ?쇰뱶諛깆씠 諛붾줈 諛붾앸땲??';
 
 function createFireworks(): FireworkItem[] {
-  const emojis = ['🏀', '✨', '🔥', '👏', '🎯'];
+  const emojis = ['🏀', '✨', '🔥', '🎉', '🙌'];
 
   return Array.from({ length: 10 }, (_, index) => ({
     id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
@@ -116,6 +118,97 @@ function normalizeLessonRecord(record: LessonRecord | (Omit<LessonRecord, 'feedb
   };
 }
 
+
+function isPositiveFeedback(text: string) {
+  const positiveKeywords = ['????', '???', '???', '??? ?', '???', '??? ???'];
+  return positiveKeywords.some((keyword) => text.includes(keyword));
+}
+
+function scoreFeedbackText(text: string) {
+  let score = 0;
+  const strongKeywords = ['?? ?', '???', '???', '??', '? ', '??', '??', '??', '??', '??', '??', '?? ??', '??'];
+  const mediumKeywords = ['??', '??', '??', '??', '? ??', '???'];
+
+  if (strongKeywords.some((keyword) => text.includes(keyword))) {
+    score += 3;
+  }
+
+  if (mediumKeywords.some((keyword) => text.includes(keyword))) {
+    score += 1;
+  }
+
+  if (isPositiveFeedback(text)) {
+    score -= 2;
+  }
+
+  return score;
+}
+
+function buildReviewClipFromTimeline(
+  timeline: FeedbackMoment[],
+  fallbackFeedback: string,
+  videoUri: string
+): LessonReviewClip {
+  const buckets = new Map<string, { text: string; score: number; count: number; firstAtMs: number }>();
+
+  for (const item of timeline) {
+    const text = item.text.trim();
+    if (!text) {
+      continue;
+    }
+
+    const weight = Math.max(0, scoreFeedbackText(text));
+    const bucket = buckets.get(text);
+
+    if (bucket) {
+      bucket.count += 1;
+      bucket.score += Math.max(1, weight);
+      continue;
+    }
+
+    buckets.set(text, {
+      text,
+      score: Math.max(1, weight),
+      count: 1,
+      firstAtMs: item.atMs,
+    });
+  }
+
+  const candidates = [...buckets.values()]
+    .filter((item) => !isPositiveFeedback(item.text))
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+
+      if (right.count !== left.count) {
+        return right.count - left.count;
+      }
+
+      return left.firstAtMs - right.firstAtMs;
+    });
+
+  const fallbackEntry = timeline[timeline.length - 1] ?? { atMs: 0, text: fallbackFeedback };
+  const selected = candidates[0] ?? {
+    text: fallbackEntry.text || fallbackFeedback,
+    score: 1,
+    count: 1,
+    firstAtMs: fallbackEntry.atMs,
+  };
+
+  const totalDuration = timeline[timeline.length - 1]?.atMs ?? 0;
+  const maxStartAt = Math.max(0, totalDuration - 3000);
+  const startAtMs = Math.max(0, Math.min(selected.firstAtMs, maxStartAt));
+
+  return {
+    videoUri,
+    feedback: selected.text || fallbackFeedback,
+    startAtMs,
+    durationMs: 3000,
+    title: '?? ???? 3?',
+  };
+}
+
 function isDribbleStanceReady(analysis: DribbleAnalysis) {
   if (analysis.bodyFacing === 'front') {
     return analysis.stanceState === 'ready';
@@ -132,19 +225,19 @@ function isDribbleStanceReady(analysis: DribbleAnalysis) {
 function buildDribbleStanceFeedback(analysis: DribbleAnalysis) {
   const eyeLine =
     analysis.eyeFocus === 'forward'
-      ? '시선이 좋아요. 지금처럼 공이 아니라 앞을 바라봐 주세요.'
-      : '먼저 공이 아니라 앞을 보도록 시선을 맞춰 주세요.';
+      ? '?쒖꽑??醫뗭븘?? 吏湲덉쿂??怨듭씠 ?꾨땲???욎쓣 諛붾씪遊?二쇱꽭??'
+      : '癒쇱? 怨듭씠 ?꾨땲???욎쓣 蹂대룄濡??쒖꽑??留욎떠 二쇱꽭??';
 
   const torsoLine =
     analysis.torsoPosture === 'balanced'
-      ? '상체 높이가 안정적이에요. 지금 자세를 유지해 주세요.'
+      ? '?곸껜 ?믪씠媛 ?덉젙?곸씠?먯슂. 吏湲??먯꽭瑜??좎???二쇱꽭??'
       : analysis.torsoPosture === 'high'
-        ? '드리블 전에 무릎을 굽히고 상체를 조금 더 낮춰 주세요.'
+        ? '?쒕━釉??꾩뿉 臾대쫷??援쏀엳怨??곸껜瑜?議곌툑 ????떠 二쇱꽭??'
         : analysis.torsoPosture === 'low'
-          ? '상체가 너무 많이 숙여졌어요. 상체를 조금 더 세워 균형을 맞춰 주세요.'
-          : '어깨와 엉덩이가 함께 보이도록 자세를 다시 맞춰 주세요.';
+          ? '?곸껜媛 ?덈Т 留롮씠 ?숈뿬議뚯뼱?? ?곸껜瑜?議곌툑 ???몄썙 洹좏삎??留욎떠 二쇱꽭??'
+          : '?닿묠? ?됰뜦?닿? ?④퍡 蹂댁씠?꾨줉 ?먯꽭瑜??ㅼ떆 留욎떠 二쇱꽭??';
 
-  return `드리블 준비 자세\n1. ${eyeLine}\n2. 시선과 상체 자세가 모두 맞으면 3초 뒤 드리블을 시작합니다.\n3. ${torsoLine}`;
+  return `?쒕━釉?以鍮??먯꽭\n1. ${eyeLine}\n2. ?쒖꽑怨??곸껜 ?먯꽭媛 紐⑤몢 留욎쑝硫?3珥????쒕━釉붿쓣 ?쒖옉?⑸땲??\n3. ${torsoLine}`;
 }
 
 function isShootStanceReady(analysis: ShootAnalysis) {
@@ -154,24 +247,24 @@ function isShootStanceReady(analysis: ShootAnalysis) {
 function buildDribbleStanceFeedbackV2(analysis: DribbleAnalysis) {
   const torsoLine =
     analysis.stanceState === 'ready'
-      ? `상체 기울기 ${analysis.torsoLeanAngle ? analysis.torsoLeanAngle.toFixed(1) : '--'}도로 준비 자세가 좋습니다.`
+      ? `?곸껜 湲곗슱湲?${analysis.torsoLeanAngle ? analysis.torsoLeanAngle.toFixed(1) : '--'}?꾨줈 以鍮??먯꽭媛 醫뗭뒿?덈떎.`
       : analysis.stanceState === 'too_upright'
-        ? `상체 기울기가 ${analysis.torsoLeanAngle ? analysis.torsoLeanAngle.toFixed(1) : '--'}도예요. 15~45도가 되도록 조금 더 숙여 주세요.`
+        ? `?곸껜 湲곗슱湲곌? ${analysis.torsoLeanAngle ? analysis.torsoLeanAngle.toFixed(1) : '--'}?꾩삁?? 15~45?꾧? ?섎룄濡?議곌툑 ???숈뿬 二쇱꽭??`
         : analysis.stanceState === 'too_low'
-          ? `상체 기울기가 ${analysis.torsoLeanAngle ? analysis.torsoLeanAngle.toFixed(1) : '--'}도예요. 너무 많이 숙였으니 조금 세워 주세요.`
-          : '어깨와 엉덩이가 잘 보이도록 서서 상체 기울기를 다시 잡아 주세요.';
+          ? `?곸껜 湲곗슱湲곌? ${analysis.torsoLeanAngle ? analysis.torsoLeanAngle.toFixed(1) : '--'}?꾩삁?? ?덈Т 留롮씠 ?숈??쇰땲 議곌툑 ?몄썙 二쇱꽭??`
+          : '?닿묠? ?됰뜦?닿? ??蹂댁씠?꾨줉 ?쒖꽌 ?곸껜 湲곗슱湲곕? ?ㅼ떆 ?≪븘 二쇱꽭??';
 
-  return `드리블 준비 자세\n1. 엉덩이에서 어깨까지의 상체 기울기를 15~45도로 맞춰 주세요.\n2. 이 자세를 3초 동안 유지하면 드리블을 시작하라고 알려드릴게요.\n3. ${torsoLine}`;
+  return `?쒕━釉?以鍮??먯꽭\n1. ?됰뜦?댁뿉???닿묠源뚯????곸껜 湲곗슱湲곕? 15~45?꾨줈 留욎떠 二쇱꽭??\n2. ???먯꽭瑜?3珥??숈븞 ?좎??섎㈃ ?쒕━釉붿쓣 ?쒖옉?섎씪怨??뚮젮?쒕┫寃뚯슂.\n3. ${torsoLine}`;
 }
 
 function buildDribbleStanceFeedbackV3(analysis: DribbleAnalysis) {
   if (analysis.bodyFacing === 'front') {
     const stanceLine =
       analysis.stanceState === 'ready'
-        ? `무릎-엉덩이-무릎 각도 ${analysis.frontStanceAngle ? analysis.frontStanceAngle.toFixed(1) : '--'}도로 자세를 잘 낮췄습니다.`
-        : `무릎-엉덩이-무릎 각도가 ${analysis.frontStanceAngle ? analysis.frontStanceAngle.toFixed(1) : '--'}도예요. 40~60도가 되도록 자세를 다시 맞춰 주세요.`;
+        ? `臾대쫷-?됰뜦??臾대쫷 媛곷룄 ${analysis.frontStanceAngle ? analysis.frontStanceAngle.toFixed(1) : '--'}?꾨줈 ?먯꽭瑜?????톬?듬땲??`
+        : `臾대쫷-?됰뜦??臾대쫷 媛곷룄媛 ${analysis.frontStanceAngle ? analysis.frontStanceAngle.toFixed(1) : '--'}?꾩삁?? 40~60?꾧? ?섎룄濡??먯꽭瑜??ㅼ떆 留욎떠 二쇱꽭??`;
 
-    return `정면 드리블 준비 자세\n1. 자세를 낮춰 왼쪽 무릎, 엉덩이, 오른쪽 무릎 사이 각도를 40~60도로 맞춰 주세요.\n2. 이 자세를 3초 동안 유지하면 드리블을 시작하라고 알려드릴게요.\n3. ${stanceLine}`;
+    return `?뺣㈃ ?쒕━釉?以鍮??먯꽭\n1. ?먯꽭瑜???떠 ?쇱そ 臾대쫷, ?됰뜦?? ?ㅻⅨ履?臾대쫷 ?ъ씠 媛곷룄瑜?40~60?꾨줈 留욎떠 二쇱꽭??\n2. ???먯꽭瑜?3珥??숈븞 ?좎??섎㈃ ?쒕━釉붿쓣 ?쒖옉?섎씪怨??뚮젮?쒕┫寃뚯슂.\n3. ${stanceLine}`;
   }
 
   return buildDribbleStanceFeedbackV2(analysis);
@@ -180,14 +273,14 @@ function buildDribbleStanceFeedbackV3(analysis: DribbleAnalysis) {
 function buildShootStanceFeedback(analysis: ShootAnalysis) {
   const armLine =
     analysis.armAngleState === 'balanced'
-      ? '슛을 시작하기 좋은 팔 각도예요. 지금 자세를 유지해 주세요.'
+      ? '?쏆쓣 ?쒖옉?섍린 醫뗭? ??媛곷룄?덉슂. 吏湲??먯꽭瑜??좎???二쇱꽭??'
       : analysis.armAngleState === 'narrow'
-        ? '슛 전에 팔 각도가 너무 좁아요. 어깨와 팔을 조금 더 벌려 주세요.'
+        ? '???꾩뿉 ??媛곷룄媛 ?덈Т 醫곸븘?? ?닿묠? ?붿쓣 議곌툑 ??踰뚮젮 二쇱꽭??'
         : analysis.armAngleState === 'wide'
-          ? '슛 전에 팔 각도가 너무 넓어요. 팔을 조금 더 모아서 준비해 주세요.'
-          : '어깨, 팔꿈치, 손목이 잘 보이도록 자세를 다시 맞춰 주세요.';
+          ? '???꾩뿉 ??媛곷룄媛 ?덈Т ?볦뼱?? ?붿쓣 議곌툑 ??紐⑥븘??以鍮꾪빐 二쇱꽭??'
+          : '?닿묠, ?붽퓞移? ?먮ぉ????蹂댁씠?꾨줉 ?먯꽭瑜??ㅼ떆 留욎떠 二쇱꽭??';
 
-  return `슛 준비 자세\n1. ${armLine}\n2. 팔 각도가 기준에 맞으면 3초 뒤 슛을 시작합니다.\n3. 준비 자세가 흐트러지면 다시 자세부터 맞출게요.`;
+  return `??以鍮??먯꽭\n1. ${armLine}\n2. ??媛곷룄媛 湲곗???留욎쑝硫?3珥????쏆쓣 ?쒖옉?⑸땲??\n3. 以鍮??먯꽭媛 ?먰듃?ъ?硫??ㅼ떆 ?먯꽭遺??留욎텧寃뚯슂.`;
 }
 
 export function useBasketballCoachApp() {
@@ -202,13 +295,17 @@ export function useBasketballCoachApp() {
   const [selectedSkillKey, setSelectedSkillKey] = useState<SkillKey | ''>('');
   const [selectedBallBrand, setSelectedBallBrand] = useState<BallBrandOption>(DEFAULT_BALL_BRAND);
   const [selectedBallColors, setSelectedBallColors] = useState<BallColorOption[]>(DEFAULT_BALL_COLORS);
-  const [debugText, setDebugText] = useState('카메라와 MediaPipe를 준비하는 중입니다.');
+  const [debugText, setDebugText] = useState('移대찓?쇱? MediaPipe瑜?以鍮꾪븯??以묒엯?덈떎.');
   const [feedbackText, setFeedbackText] = useState(DEFAULT_DRIBBLE_FEEDBACK);
+  const [lessonReview, setLessonReview] = useState<LessonReviewClip | null>(null);
   const [isLessonActive, setIsLessonActive] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [cameraSessionKey, setCameraSessionKey] = useState(0);
   const [countdownValue, setCountdownValue] = useState<number | null>(null);
+  const [recordingStartToken, setRecordingStartToken] = useState(0);
+  const [recordingStopToken, setRecordingStopToken] = useState(0);
   const [fireworks, setFireworks] = useState<FireworkItem[]>([]);
   const [showFireworks, setShowFireworks] = useState(false);
 
@@ -219,11 +316,15 @@ export function useBasketballCoachApp() {
   const lessonStartedAtRef = useRef<number | null>(null);
   const dribbleLessonPhaseRef = useRef<DribbleLessonPhase>('stance_setup');
   const shootLessonStartedRef = useRef(false);
+  const dribbleTargetCountRef = useRef<number | null>(null);
+  const dribbleAutoEndingRef = useRef(false);
   const stanceCountdownStartedAtRef = useRef<number | null>(null);
   const feedbackTimelineRef = useRef<FeedbackMoment[]>([]);
   const pendingStopSaveRef = useRef(false);
   const recordingFallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shootAutoEndTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingReviewStopRef = useRef(false);
+  const startCueSoundRef = useRef<Audio.Sound | null>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
   const selectedSkill = selectedSkillKey ? SKILLS[selectedSkillKey] : null;
@@ -286,7 +387,7 @@ export function useBasketballCoachApp() {
 
         await AsyncStorage.setItem(STORAGE_KEYS.attendance, JSON.stringify(parsedAttendance));
       } catch {
-        Alert.alert('불러오기 실패', '저장한 데이터를 읽는 중 문제가 발생했습니다.');
+        Alert.alert('遺덈윭?ㅺ린 ?ㅽ뙣', '??ν븳 ?곗씠?곕? ?쎈뒗 以?臾몄젣媛 諛쒖깮?덉뒿?덈떎.');
       }
     }
 
@@ -334,6 +435,9 @@ export function useBasketballCoachApp() {
       if (shootAutoEndTimeoutRef.current) {
         clearTimeout(shootAutoEndTimeoutRef.current);
       }
+
+      void stopStartCue();
+      void unloadStartCue();
     };
   }, []);
 
@@ -380,8 +484,8 @@ export function useBasketballCoachApp() {
     }
 
     const timer = setTimeout(() => {
-      setDebugText('카메라 시작 응답을 기다리는 중입니다.');
-      setCameraError('카메라 시작이 지연되고 있습니다. 잠시 후에도 화면이 비어 있으면 진행 상태 문구와 함께 알려 주세요.');
+      setDebugText('移대찓???쒖옉 ?묐떟??湲곕떎由щ뒗 以묒엯?덈떎.');
+      setCameraError('移대찓???쒖옉??吏?곕릺怨??덉뒿?덈떎. ?좎떆 ?꾩뿉???붾㈃??鍮꾩뼱 ?덉쑝硫?吏꾪뻾 ?곹깭 臾멸뎄? ?④퍡 ?뚮젮 二쇱꽭??');
     }, 8000);
 
     return () => clearTimeout(timer);
@@ -448,12 +552,67 @@ export function useBasketballCoachApp() {
     }
   }, []);
 
+  const ensureStartCueSound = useCallback(async () => {
+    if (startCueSoundRef.current) {
+      return startCueSoundRef.current;
+    }
+
+    await Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      shouldDuckAndroid: true,
+    });
+
+    const { sound } = await Audio.Sound.createAsync(require('../../assets/sounds/whistle-start.wav'));
+    startCueSoundRef.current = sound;
+    return sound;
+  }, []);
+
+  const stopStartCue = useCallback(async () => {
+    const sound = startCueSoundRef.current;
+    if (!sound) {
+      return;
+    }
+
+    try {
+      await sound.stopAsync();
+      await sound.setPositionAsync(0);
+    } catch {
+      // Ignore transient sound stop failures.
+    }
+  }, []);
+
+  const unloadStartCue = useCallback(async () => {
+    const sound = startCueSoundRef.current;
+    startCueSoundRef.current = null;
+
+    if (!sound) {
+      return;
+    }
+
+    try {
+      await sound.unloadAsync();
+    } catch {
+      // Ignore unload failures during cleanup.
+    }
+  }, []);
+
+  const playStartCue = useCallback(() => {
+    void (async () => {
+      try {
+        const sound = await ensureStartCueSound();
+        await sound.replayAsync();
+      } catch {
+        // Keep the lesson flow running even if the cue sound fails.
+      }
+    })();
+  }, [ensureStartCueSound]);
+
   const addLessonHomework = useCallback((mode: LessonMode) => {
     const nextHomework = buildLessonHomework(mode);
     setHomework((current) => mergeHomework(current, nextHomework));
   }, []);
 
-  const saveLessonRecord = useCallback((videoUri: string) => {
+  const saveLessonRecord = useCallback((videoUri: string, reviewClip?: LessonReviewClip | null) => {
     const dateKey = formatDateKey(new Date());
     const nextRecord: LessonRecord = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -463,6 +622,9 @@ export function useBasketballCoachApp() {
       feedbackTimeline: [...feedbackTimelineRef.current],
       videoUri,
       createdAt: new Date().toLocaleString(),
+      reviewFeedback: reviewClip?.feedback,
+      reviewStartAtMs: reviewClip?.startAtMs,
+      reviewDurationMs: reviewClip?.durationMs,
     };
 
       setLessonRecords((current) => [...current, nextRecord]);
@@ -478,6 +640,9 @@ export function useBasketballCoachApp() {
 
       clearRecordingWait();
       clearShootAutoEnd();
+      pendingReviewStopRef.current = false;
+      void stopStartCue();
+      void unloadStartCue();
 
       if (shouldSaveRecord) {
         addLessonHomework(lessonModeRef.current);
@@ -487,21 +652,25 @@ export function useBasketballCoachApp() {
       lessonStartedAtRef.current = null;
       dribbleLessonPhaseRef.current = 'stance_setup';
       shootLessonStartedRef.current = false;
+      dribbleTargetCountRef.current = null;
+      dribbleAutoEndingRef.current = false;
       stanceCountdownStartedAtRef.current = null;
       feedbackTimelineRef.current = [];
       pendingFeedbackRef.current = null;
       setCountdownValue(null);
+      setRecordingStartToken(0);
+      setRecordingStopToken(0);
       setIsLessonActive(false);
+      setIsCameraActive(false);
       setIsCameraReady(false);
       setCameraError('');
-      setDebugText('카메라와 MediaPipe를 준비하는 중입니다.');
-      setFeedbackAndRemember('레슨이 종료되었습니다. 기록일지에서 저장된 영상과 피드백을 확인할 수 있어요.');
+      setDebugText('移대찓?쇱? MediaPipe瑜?以鍮꾪븯??以묒엯?덈떎.');
     },
     [addLessonHomework, clearRecordingWait, clearShootAutoEnd, saveLessonRecord]
   );
 
   async function navigateTo(nextScreen: AppScreen) {
-    if (screen === 'lesson' && nextScreen !== 'lesson' && isLessonActive) {
+    if (screen === 'lesson' && nextScreen !== 'lesson' && (isLessonActive || isCameraActive)) {
       await endLesson();
     }
 
@@ -536,9 +705,15 @@ export function useBasketballCoachApp() {
     setLessonMode(mode);
     dribbleLessonPhaseRef.current = 'stance_setup';
     shootLessonStartedRef.current = false;
+    dribbleTargetCountRef.current = null;
+    dribbleAutoEndingRef.current = false;
+    pendingReviewStopRef.current = false;
     clearShootAutoEnd();
     stanceCountdownStartedAtRef.current = null;
     setCountdownValue(null);
+    setRecordingStartToken(0);
+    setRecordingStopToken(0);
+    setLessonReview(null);
     setImmediateLessonFeedback(
       mode === 'shoot'
         ? buildShootStanceFeedback({
@@ -575,7 +750,7 @@ export function useBasketballCoachApp() {
             summary: '',
           })
     );
-    setDebugText(mode === 'shoot' ? '슛 분석 모드를 준비하는 중입니다.' : '드리블 분석 모드를 준비하는 중입니다.');
+    setDebugText(mode === 'shoot' ? '??遺꾩꽍 紐⑤뱶瑜?以鍮꾪븯??以묒엯?덈떎.' : '?쒕━釉?遺꾩꽍 紐⑤뱶瑜?以鍮꾪븯??以묒엯?덈떎.');
   }
 
   function startFeedbackLoop(mode: LessonMode) {
@@ -587,9 +762,14 @@ export function useBasketballCoachApp() {
     pendingFeedbackRef.current = null;
     dribbleLessonPhaseRef.current = 'stance_setup';
     shootLessonStartedRef.current = false;
+    dribbleTargetCountRef.current = null;
+    dribbleAutoEndingRef.current = false;
+    pendingReviewStopRef.current = false;
     clearShootAutoEnd();
     stanceCountdownStartedAtRef.current = null;
     setCountdownValue(null);
+    setRecordingStopToken(0);
+    setLessonReview(null);
     if (mode === 'dribble') {
       setImmediateLessonFeedback(buildDribbleStanceFeedbackV3({
         dribbleStarted: false,
@@ -635,14 +815,14 @@ export function useBasketballCoachApp() {
     const cameraGranted = cameraPermission?.granted === true || (await requestCameraPermission()).granted;
 
     if (!cameraGranted) {
-      Alert.alert('권한 필요', '레슨 촬영과 자세 분석을 위해 카메라 권한이 필요합니다.');
+      Alert.alert('沅뚰븳 ?꾩슂', '?덉뒯 珥ъ쁺怨??먯꽭 遺꾩꽍???꾪빐 移대찓??沅뚰븳???꾩슂?⑸땲??');
       return false;
     }
 
     return true;
   }
 
-  async function beginLesson() {
+  async function beginLesson(dribbleTargetCount?: number) {
     const granted = await ensurePermissions();
     if (!granted) {
       return;
@@ -655,12 +835,23 @@ export function useBasketballCoachApp() {
     lessonStartedAtRef.current = null;
     dribbleLessonPhaseRef.current = 'stance_setup';
     shootLessonStartedRef.current = false;
+    dribbleTargetCountRef.current =
+      lessonModeRef.current === 'dribble' && typeof dribbleTargetCount === 'number' && dribbleTargetCount > 0
+        ? dribbleTargetCount
+        : null;
+    dribbleAutoEndingRef.current = false;
+    pendingReviewStopRef.current = false;
     stanceCountdownStartedAtRef.current = null;
     feedbackTimelineRef.current = [];
     setCountdownValue(null);
+    setRecordingStartToken(0);
+    setRecordingStopToken(0);
+    setLessonReview(null);
     setIsLessonActive(true);
+    setIsCameraActive(true);
     setIsCameraReady(false);
-    setDebugText('MediaPipe 분석 화면을 시작하는 중입니다.');
+    setDebugText('MediaPipe 遺꾩꽍 ?붾㈃???쒖옉?섎뒗 以묒엯?덈떎.');
+    void ensureStartCueSound();
     startFeedbackLoop(lessonModeRef.current);
   }
 
@@ -676,7 +867,7 @@ export function useBasketballCoachApp() {
 
     pendingStopSaveRef.current = true;
     clearShootAutoEnd();
-    setDebugText('레슨 영상을 저장하는 중입니다.');
+    setDebugText('?덉뒯 ?곸긽????ν븯??以묒엯?덈떎.');
     setCountdownValue(null);
     setIsLessonActive(false);
     setIsCameraReady(false);
@@ -701,6 +892,60 @@ export function useBasketballCoachApp() {
     }, 5000);
   }, [clearShootAutoEnd, isLessonActive]);
 
+
+  const finishDribbleRecordingForReview = useCallback(() => {
+    if (feedbackIntervalRef.current) {
+      clearInterval(feedbackIntervalRef.current);
+      feedbackIntervalRef.current = null;
+    }
+
+    pendingStopSaveRef.current = false;
+    pendingReviewStopRef.current = true;
+    clearShootAutoEnd();
+    pendingFeedbackRef.current = null;
+    setCountdownValue(null);
+    setIsLessonActive(false);
+    setRecordingStopToken(Date.now());
+    setDebugText('?? ??? ??? ?? ??? ????? ?? ??? ???? ????.');
+  }, [clearShootAutoEnd]);
+
+  const completeDribbleReview = useCallback(
+    (videoUri: string) => {
+      clearRecordingWait();
+      pendingReviewStopRef.current = false;
+
+      const reviewClip = buildReviewClipFromTimeline(
+        [...feedbackTimelineRef.current],
+        latestFeedbackRef.current,
+        videoUri
+      );
+
+      addLessonHomework(lessonModeRef.current);
+      saveLessonRecord(videoUri, reviewClip);
+
+      lessonStartedAtRef.current = null;
+      dribbleLessonPhaseRef.current = 'stance_setup';
+      shootLessonStartedRef.current = false;
+      dribbleTargetCountRef.current = null;
+      dribbleAutoEndingRef.current = false;
+      stanceCountdownStartedAtRef.current = null;
+      feedbackTimelineRef.current = [];
+      pendingFeedbackRef.current = null;
+      setCountdownValue(null);
+      setRecordingStartToken(0);
+      setRecordingStopToken(0);
+      latestFeedbackRef.current = reviewClip.feedback;
+      setFeedbackText(reviewClip.feedback);
+      setLessonReview(reviewClip);
+      setIsLessonActive(false);
+      setIsCameraActive(true);
+      setIsCameraReady(true);
+      setCameraError('');
+      setDebugText('??? ????. ?? ??? ?? ??? 3? ??? ?? ?? ???? ??? ???.');
+    },
+    [addLessonHomework, clearRecordingWait, saveLessonRecord]
+  );
+
   const applyDribbleAnalysis = useCallback(
     (analysis: DribbleAnalysis) => {
       if (lessonModeRef.current !== 'dribble') {
@@ -713,8 +958,17 @@ export function useBasketballCoachApp() {
       if (phase === 'active') {
         stanceCountdownStartedAtRef.current = null;
         setCountdownValue(null);
-        pendingFeedbackRef.current = buildDribbleFeedbackText(analysis);
-        setDebugText(`드리블 전체 분석 중: ${analysis.summary}`);
+        const nextFeedback = buildDribbleFeedbackText(analysis);
+        pendingFeedbackRef.current = nextFeedback;
+        const targetCount = dribbleTargetCountRef.current;
+        if (targetCount && analysis.dribbleCount >= targetCount && !dribbleAutoEndingRef.current) {
+          dribbleAutoEndingRef.current = true;
+          setImmediateLessonFeedback(nextFeedback);
+          setDebugText(`?? ??? ${targetCount}?? ??? ??? ?????.`);
+          finishDribbleRecordingForReview();
+          return;
+        }
+        setDebugText(`???????? ??? ?? ${analysis.summary}`);
         return;
       }
 
@@ -723,7 +977,7 @@ export function useBasketballCoachApp() {
         stanceCountdownStartedAtRef.current = null;
         setCountdownValue(null);
         pendingFeedbackRef.current = buildDribbleFeedbackText(analysis);
-        setDebugText(`?몄떇?? ${analysis.summary}`);
+        setDebugText(`?紐꾨뻼?? ${analysis.summary}`);
         return;
       }
 
@@ -732,14 +986,14 @@ export function useBasketballCoachApp() {
         stanceCountdownStartedAtRef.current = null;
         setCountdownValue(null);
         pendingFeedbackRef.current = buildDribbleStanceFeedbackV3(analysis);
-        setDebugText('드리블 전에 준비 자세를 맞추는 중입니다.');
+        setDebugText('?쒕━釉??꾩뿉 以鍮??먯꽭瑜?留욎텛??以묒엯?덈떎.');
         return;
       }
 
       if (phase === 'stance_setup') {
         dribbleLessonPhaseRef.current = 'countdown';
         stanceCountdownStartedAtRef.current = Date.now();
-        setImmediateLessonFeedback('좋아요. 상체 기울기가 기준에 맞습니다. 3초 동안 그대로 유지해 주세요.');
+        setImmediateLessonFeedback('醫뗭븘?? ?곸껜 湲곗슱湲곌? 湲곗???留욎뒿?덈떎. 3珥??숈븞 洹몃?濡??좎???二쇱꽭??');
         setDebugText('드리블 준비 자세 확인: 3초 유지 중');
         return;
       }
@@ -752,26 +1006,28 @@ export function useBasketballCoachApp() {
           dribbleLessonPhaseRef.current = 'active';
           stanceCountdownStartedAtRef.current = null;
           setCountdownValue(null);
-          setImmediateLessonFeedback('좋아요. 이제 드리블을 시작해 주세요. 상체 기울기, 시선, 공 간격을 함께 분석할게요.');
-          setDebugText('드리블 1, 2, 3 기준 분석 시작');
-          return;
-          setImmediateLessonFeedback('좋아요. 이제 드리블을 시작하세요. 공이 내려오기 시작하면 본격적으로 피드백할게요.');
-          setDebugText('드리블 시작 안내');
+          playStartCue();
+          setRecordingStartToken(Date.now());
+          setImmediateLessonFeedback('???. ?? ???? ??? ???. ?? ???? ??, ??, ? ??? ?? ?????.');
+          setDebugText('??? 1, 2, 3 ?? ?? ??');
           return;
         }
 
         const remainingSeconds = Math.max(1, Math.ceil((DRIBBLE_STANCE_HOLD_MS - elapsed) / 1000));
-        pendingFeedbackRef.current = `드리블 준비 자세 유지 중입니다.\n1. 상체 기울기를 지금처럼 15~45도로 유지해 주세요.\n2. ${remainingSeconds}초만 더 유지하면 드리블을 시작할 수 있어요.\n3. 자세가 무너지면 다시 준비 자세부터 확인할게요.`;
-        setDebugText(`드리블 준비 자세 유지 중: ${remainingSeconds}초 남음`);
+        pendingFeedbackRef.current = `???????????? ??? ??????.
+1. ??? ?????? ???????15~45??? ??????????
+2. ${remainingSeconds}??? ???????? ?????? ????????????
+3. ????? ?????????? ???????????????????`;
+        setDebugText(`???????????? ??? ?? ${remainingSeconds}?????`);
         return;
       }
 
-      pendingFeedbackRef.current = '이제 드리블을 시작하세요. 공이 무릎이나 발 쪽까지 내려오면 드리블 분석을 이어갈게요.';
+      pendingFeedbackRef.current = '?댁젣 ?쒕━釉붿쓣 ?쒖옉?섏꽭?? 怨듭씠 臾대쫷?대굹 諛?履쎄퉴吏 ?대젮?ㅻ㈃ ?쒕━釉?遺꾩꽍???댁뼱媛덇쾶??';
       setDebugText('드리블 시작 대기 중');
       return;
-      setDebugText(`인식됨: ${analysis.summary}`);
+      setDebugText(`?몄떇?? ${analysis.summary}`);
     },
-    []
+    [finishDribbleRecordingForReview, playStartCue, setImmediateLessonFeedback]
   );
 
   const applyShootAnalysis = useCallback(
@@ -781,7 +1037,7 @@ export function useBasketballCoachApp() {
       }
 
       pendingFeedbackRef.current = buildShootFeedbackText(analysis);
-      setDebugText(`인식됨: ${analysis.summary}`);
+      setDebugText(`?몄떇?? ${analysis.summary}`);
     },
     []
   );
@@ -852,6 +1108,8 @@ export function useBasketballCoachApp() {
           dribbleLessonPhaseRef.current = 'active';
           stanceCountdownStartedAtRef.current = null;
           setCountdownValue(null);
+          playStartCue();
+          setRecordingStartToken(Date.now());
           scheduleShootAutoEnd();
           setImmediateLessonFeedback('? ?? ??? ?????. ?? ?? ?? ??? ?????.');
           setDebugText('? ? ?? ??');
@@ -871,7 +1129,7 @@ export function useBasketballCoachApp() {
       pendingFeedbackRef.current = buildShootFeedbackText(analysis);
       setDebugText(`? ?? ?? ? ${analysis.summary}`);
     },
-    [scheduleShootAutoEnd, setImmediateLessonFeedback]
+    [playStartCue, scheduleShootAutoEnd, setImmediateLessonFeedback]
   );
 
   const handlePoseMessage = useCallback(
@@ -880,6 +1138,7 @@ export function useBasketballCoachApp() {
         const payload = JSON.parse(event.nativeEvent.data) as
           | { type: 'ready' }
           | { type: 'stream_started' }
+          | { type: 'recording_started' }
           | { type: 'status'; message: string }
           | { type: 'points'; summary: string }
           | { type: 'dribble_analysis'; analysis: DribbleAnalysis }
@@ -889,11 +1148,18 @@ export function useBasketballCoachApp() {
           | { type: 'error'; message: string };
 
         if (payload.type === 'ready') {
-          setDebugText('MediaPipe 모델 준비 완료');
+          setDebugText('MediaPipe 紐⑤뜽 以鍮??꾨즺');
           return;
         }
 
         if (payload.type === 'stream_started') {
+          setIsCameraReady(true);
+          setCameraError('');
+          setDebugText('??? ?? ??, ??? ???? ????.');
+          return;
+        }
+
+        if (payload.type === 'recording_started') {
           lessonStartedAtRef.current = Date.now();
           feedbackTimelineRef.current = [];
           if (latestFeedbackRef.current.trim()) {
@@ -902,9 +1168,7 @@ export function useBasketballCoachApp() {
               text: latestFeedbackRef.current.trim(),
             });
           }
-          setIsCameraReady(true);
-          setCameraError('');
-          setDebugText('카메라 시작 완료, 자세를 인식하는 중입니다.');
+          setDebugText('?? ?? ???? ??? ???? ????.');
           return;
         }
 
@@ -915,7 +1179,7 @@ export function useBasketballCoachApp() {
 
         if (payload.type === 'points') {
           setIsCameraReady(true);
-          setDebugText(`인식됨: ${payload.summary}`);
+          setDebugText(`?몄떇?? ${payload.summary}`);
           return;
         }
 
@@ -937,7 +1201,15 @@ export function useBasketballCoachApp() {
         }
 
         if (payload.type === 'recording_error') {
-          setDebugText(payload.message || '영상 저장에 실패했습니다. 피드백만 저장된 상태로 종료합니다.');
+          setDebugText(payload.message || '?곸긽 ??μ뿉 ?ㅽ뙣?덉뒿?덈떎. ?쇰뱶諛깅쭔 ??λ맂 ?곹깭濡?醫낅즺?⑸땲??');
+
+          if (pendingReviewStopRef.current) {
+            pendingReviewStopRef.current = false;
+            setRecordingStopToken(0);
+            setIsLessonActive(false);
+            setIsCameraActive(true);
+            return;
+          }
 
           if (pendingStopSaveRef.current) {
             void finalizeLessonSession(true, '');
@@ -946,14 +1218,14 @@ export function useBasketballCoachApp() {
         }
 
         if (payload.type === 'error') {
-          setCameraError(payload.message || 'MediaPipe 또는 카메라 시작 중 문제가 발생했습니다.');
-          setDebugText(payload.message || '카메라 시작 실패');
+          setCameraError(payload.message || 'MediaPipe ?먮뒗 移대찓???쒖옉 以?臾몄젣媛 諛쒖깮?덉뒿?덈떎.');
+          setDebugText(payload.message || '移대찓???쒖옉 ?ㅽ뙣');
         }
       } catch {
-        setDebugText('카메라 상태 메시지를 처리하는 중입니다.');
+        setDebugText('移대찓???곹깭 硫붿떆吏瑜?泥섎━?섎뒗 以묒엯?덈떎.');
       }
     },
-    [applyDribbleAnalysis, applyShootAnalysisWithStance, finalizeLessonSession]
+    [applyDribbleAnalysis, applyShootAnalysisWithStance, completeDribbleReview, finalizeLessonSession, isLessonActive]
   );
 
   function openDiaryDate(dateKey: string) {
@@ -966,7 +1238,7 @@ export function useBasketballCoachApp() {
 
   function registerSuccessfulShot() {
     if (lessonMode !== 'shoot') {
-      Alert.alert('슛 분석 모드 전용', '슛 성공 기록은 슛 분석 모드에서만 사용할 수 있습니다.');
+      Alert.alert('??遺꾩꽍 紐⑤뱶 ?꾩슜', '???깃났 湲곕줉? ??遺꾩꽍 紐⑤뱶?먯꽌留??ъ슜?????덉뒿?덈떎.');
       return;
     }
 
@@ -978,7 +1250,7 @@ export function useBasketballCoachApp() {
       [todayKey]: nextCount,
     }));
 
-    const nextText = `오늘 슛 성공 ${nextCount}개를 기록했습니다.`;
+    const nextText = `?ㅻ뒛 ???깃났 ${nextCount}媛쒕? 湲곕줉?덉뒿?덈떎.`;
     setFeedbackAndRemember(nextText);
     setFireworks(createFireworks());
     setShowFireworks(true);
@@ -993,7 +1265,7 @@ export function useBasketballCoachApp() {
     const supported = await Linking.canOpenURL(url);
 
     if (!supported) {
-      Alert.alert('열기 실패', '기기에서 영상을 열 수 없습니다.');
+      Alert.alert('?닿린 ?ㅽ뙣', '湲곌린?먯꽌 ?곸긽???????놁뒿?덈떎.');
       return;
     }
 
@@ -1028,10 +1300,14 @@ export function useBasketballCoachApp() {
     selectedBallColors,
     debugText,
     feedbackText,
+    lessonReview,
+    isCameraActive,
     isLessonActive,
     isCameraReady,
     cameraSessionKey,
     countdownValue,
+    recordingStartToken,
+    recordingStopToken,
     cameraError,
     fireworks,
     showFireworks,
@@ -1050,3 +1326,6 @@ export function useBasketballCoachApp() {
     deleteLessonRecord,
   };
 }
+
+
+

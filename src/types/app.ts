@@ -40,6 +40,17 @@ export interface LessonRecord {
   feedbackTimeline: FeedbackMoment[];
   videoUri: string;
   createdAt: string;
+  reviewFeedback?: string;
+  reviewStartAtMs?: number;
+  reviewDurationMs?: number;
+}
+
+export interface LessonReviewClip {
+  videoUri: string;
+  feedback: string;
+  startAtMs: number;
+  durationMs: number;
+  title: string;
 }
 
 export interface FireworkItem {

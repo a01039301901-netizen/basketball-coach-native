@@ -1,4 +1,5 @@
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { colors } from '../../theme/colors';
 import type { BallBrandOption, BallColorOption, LessonMode } from '../../types/app';
@@ -8,9 +9,12 @@ interface LessonCameraProps {
   lessonMode: LessonMode;
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
+  isCameraActive: boolean;
   isLessonActive: boolean;
   isCameraReady: boolean;
   countdownValue: number | null;
+  recordingStartToken: number;
+  recordingStopToken: number;
   onPoseMessage: (event: WebViewMessageEvent) => void;
 }
 
@@ -18,16 +22,42 @@ export function LessonCamera({
   lessonMode,
   selectedBallBrand,
   selectedBallColors,
+  isCameraActive,
   isLessonActive,
   isCameraReady,
   countdownValue,
+  recordingStartToken,
+  recordingStopToken,
   onPoseMessage,
 }: LessonCameraProps) {
+  const webViewRef = useRef<WebView>(null);
+
+  useEffect(() => {
+    if (!isCameraActive || recordingStartToken <= 0) {
+      return;
+    }
+
+    webViewRef.current?.injectJavaScript(
+      "window.__codexRestartRecordingFromCue && window.__codexRestartRecordingFromCue(); true;"
+    );
+  }, [isCameraActive, recordingStartToken]);
+
+  useEffect(() => {
+    if (!isCameraActive || recordingStopToken <= 0) {
+      return;
+    }
+
+    webViewRef.current?.injectJavaScript(
+      "window.__codexStopRecordingForReview && window.__codexStopRecordingForReview(); true;"
+    );
+  }, [isCameraActive, recordingStopToken]);
+
   return (
     <View style={styles.videoWrap}>
-      {isLessonActive ? (
+      {isCameraActive ? (
         <>
           <WebView
+            ref={webViewRef}
             originWhitelist={['https://*']}
             source={{ uri: POSE_WEB_BOOTSTRAP_URL }}
             style={styles.webview}
