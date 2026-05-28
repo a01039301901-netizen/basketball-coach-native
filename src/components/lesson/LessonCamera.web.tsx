@@ -13,6 +13,8 @@ interface LessonCameraProps {
   isLessonActive: boolean;
   isCameraReady: boolean;
   countdownValue: number | null;
+  dribbleResetToken: number;
+  shootResetToken: number;
   recordingStartToken: number;
   recordingStopToken: number;
   onPoseMessage: (event: WebViewMessageEvent) => void;
@@ -26,6 +28,8 @@ export function LessonCamera({
   isLessonActive,
   isCameraReady,
   countdownValue,
+  dribbleResetToken,
+  shootResetToken,
   recordingStartToken,
   recordingStopToken,
   onPoseMessage,
@@ -67,6 +71,30 @@ export function LessonCamera({
 
     iframeWindow?.__codexRestartRecordingFromCue?.();
   }, [isCameraActive, recordingStartToken]);
+
+  useEffect(() => {
+    if (!isCameraActive || dribbleResetToken <= 0) {
+      return;
+    }
+
+    const iframeWindow = iframeRef.current?.contentWindow as
+      | (Window & { __codexResetDribbleTracking?: () => void })
+      | undefined;
+
+    iframeWindow?.__codexResetDribbleTracking?.();
+  }, [dribbleResetToken, isCameraActive]);
+
+  useEffect(() => {
+    if (!isCameraActive || shootResetToken <= 0) {
+      return;
+    }
+
+    const iframeWindow = iframeRef.current?.contentWindow as
+      | (Window & { __codexResetShootTracking?: () => void })
+      | undefined;
+
+    iframeWindow?.__codexResetShootTracking?.();
+  }, [isCameraActive, shootResetToken]);
 
   useEffect(() => {
     if (!isCameraActive || recordingStopToken <= 0) {

@@ -10,6 +10,8 @@ interface LessonCameraProps {
   isLessonActive: boolean;
   isCameraReady: boolean;
   countdownValue: number | null;
+  dribbleResetToken: number;
+  shootResetToken: number;
   recordingStartToken: number;
   recordingStopToken: number;
   onPoseMessage: (event: WebViewMessageEvent) => void;

@@ -39,14 +39,17 @@ export default function App() {
               selectedBallColors={app.selectedBallColors}
               isCameraActive={app.isCameraActive}
               isLessonActive={app.isLessonActive}
-              isCameraReady={app.isCameraReady}
-              cameraSessionKey={app.cameraSessionKey}
-              countdownValue={app.countdownValue}
-              recordingStartToken={app.recordingStartToken}
-              recordingStopToken={app.recordingStopToken}
+                isCameraReady={app.isCameraReady}
+                cameraSessionKey={app.cameraSessionKey}
+                countdownValue={app.countdownValue}
+                dribbleResetToken={app.dribbleResetToken}
+                shootResetToken={app.shootResetToken}
+                recordingStartToken={app.recordingStartToken}
+                recordingStopToken={app.recordingStopToken}
               debugText={app.debugText}
               feedbackText={app.feedbackText}
               lessonReview={app.lessonReview}
+              currentDribbleCount={app.currentDribbleCount}
               cameraError={app.cameraError}
               onSelectMode={app.changeLessonMode}
               onBeginLesson={(dribbleTargetCount) => void app.beginLesson(dribbleTargetCount)}

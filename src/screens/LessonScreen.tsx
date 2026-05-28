@@ -18,11 +18,14 @@ interface LessonScreenProps {
   isCameraReady: boolean;
   cameraSessionKey: number;
   countdownValue: number | null;
+  dribbleResetToken: number;
+  shootResetToken: number;
   recordingStartToken: number;
   recordingStopToken: number;
   debugText: string;
   feedbackText: string;
   lessonReview: LessonReviewClip | null;
+  currentDribbleCount: number;
   cameraError: string;
   onSelectMode: (mode: LessonMode) => void;
   onBeginLesson: (dribbleTargetCount?: number) => void;
@@ -117,11 +120,14 @@ export function LessonScreen({
   isCameraReady,
   cameraSessionKey,
   countdownValue,
+  dribbleResetToken,
+  shootResetToken,
   recordingStartToken,
   recordingStopToken,
   debugText,
   feedbackText,
   lessonReview,
+  currentDribbleCount,
   cameraError,
   onSelectMode,
   onBeginLesson,
@@ -242,6 +248,8 @@ export function LessonScreen({
               isLessonActive={isLessonActive}
               isCameraReady={isCameraReady}
               countdownValue={countdownValue}
+              dribbleResetToken={dribbleResetToken}
+              shootResetToken={shootResetToken}
               recordingStartToken={recordingStartToken}
               recordingStopToken={recordingStopToken}
               onPoseMessage={onPoseMessage}
@@ -264,6 +272,7 @@ export function LessonScreen({
           <View style={styles.sideCard}>
             <Text style={styles.sideTitle}>실시간 코칭</Text>
             <InfoBox label="진행 상태" text={debugText} />
+            {lessonMode === 'dribble' ? <InfoBox label="드리블 횟수" text={`${currentDribbleCount}회`} /> : null}
             <InfoBox label="실시간 피드백" text={feedbackText} />
             {lessonReview ? <ReviewClipPlayer clip={lessonReview} /> : null}
 
