@@ -6,6 +6,7 @@ import { useBasketballCoachApp } from './src/hooks/useBasketballCoachApp';
 import { DiaryScreen } from './src/screens/DiaryScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { LessonScreen } from './src/screens/LessonScreen';
+import { RulesGuideScreen } from './src/screens/RulesGuideScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { SkillScreen } from './src/screens/SkillScreen';
 import { colors } from './src/theme/colors';
@@ -28,6 +29,7 @@ export default function App() {
               onOpenLesson={() => void app.navigateTo('lesson')}
               onOpenDiary={() => void app.navigateTo('diary')}
               onOpenSkill={() => void app.navigateTo('skill')}
+              onOpenRules={() => void app.navigateTo('rules')}
               onOpenSettings={() => void app.navigateTo('settings')}
             />
           )}
@@ -74,6 +76,7 @@ export default function App() {
               selectedDateKey={app.selectedDateKey}
               selectedDateRecords={app.selectedDateRecords}
               selectedDateShotCount={app.selectedDateShotCount}
+              shotGraphData={app.shotGraphData}
               onChangeMonth={app.changeMonth}
               onOpenDate={app.openDiaryDate}
               onDeleteRecord={(recordId) => void app.deleteLessonRecord(recordId)}
@@ -88,6 +91,8 @@ export default function App() {
               onToggleBallColor={app.toggleBallColor}
             />
           )}
+
+          {app.screen === 'rules' && <RulesGuideScreen />}
         </ScrollView>
       </View>
     </SafeAreaView>

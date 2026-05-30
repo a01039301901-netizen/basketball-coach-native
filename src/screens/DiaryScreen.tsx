@@ -1,11 +1,11 @@
 import { type AVPlaybackStatus, ResizeMode, Video } from 'expo-av';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
 import { DAY_NAMES } from '../constants/content';
 import { colors } from '../theme/colors';
-import type { CalendarCell, FeedbackMoment, LessonRecord } from '../types/app';
+import type { CalendarCell, FeedbackMoment, LessonRecord, ShotGraphDatum } from '../types/app';
 import { formatMonthTitle } from '../utils/date';
 
 interface DiaryScreenProps {
@@ -14,6 +14,7 @@ interface DiaryScreenProps {
   selectedDateKey: string;
   selectedDateRecords: LessonRecord[];
   selectedDateShotCount: number;
+  shotGraphData: ShotGraphDatum[];
   onChangeMonth: (delta: number) => void;
   onOpenDate: (dateKey: string) => void;
   onDeleteRecord: (recordId: string) => void;
@@ -48,13 +49,19 @@ export function DiaryScreen({
   selectedDateKey,
   selectedDateRecords,
   selectedDateShotCount,
+  shotGraphData,
   onChangeMonth,
   onOpenDate,
   onDeleteRecord,
 }: DiaryScreenProps) {
   const [playbackFeedback, setPlaybackFeedback] = useState<Record<string, string>>({});
+  const [showShotGraph, setShowShotGraph] = useState(false);
   const videoRefs = useRef<Record<string, Video | null>>({});
   const playbackPollersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  const graphMaxValue = useMemo(
+    () => Math.max(1, ...shotGraphData.map((item) => Math.max(item.attempts, item.successes))),
+    [shotGraphData]
+  );
 
   useEffect(() => {
     setPlaybackFeedback((current) => {
@@ -112,32 +119,35 @@ export function DiaryScreen({
     delete playbackPollersRef.current[recordId];
   }, []);
 
-  const startPlaybackPolling = useCallback((record: LessonRecord) => {
-    if (playbackPollersRef.current[record.id]) {
-      return;
-    }
-
-    playbackPollersRef.current[record.id] = setInterval(() => {
-      const video = videoRefs.current[record.id];
-
-      if (!video) {
+  const startPlaybackPolling = useCallback(
+    (record: LessonRecord) => {
+      if (playbackPollersRef.current[record.id]) {
         return;
       }
 
-      void video.getStatusAsync().then((status) => {
-        if (!status.isLoaded) {
+      playbackPollersRef.current[record.id] = setInterval(() => {
+        const video = videoRefs.current[record.id];
+
+        if (!video) {
           return;
         }
 
-        const positionMillis = typeof status.positionMillis === 'number' ? status.positionMillis : 0;
-        syncFeedbackFromPosition(record, positionMillis);
+        void video.getStatusAsync().then((status) => {
+          if (!status.isLoaded) {
+            return;
+          }
 
-        if (!status.isPlaying) {
-          stopPlaybackPolling(record.id);
-        }
-      });
-    }, 200);
-  }, [stopPlaybackPolling, syncFeedbackFromPosition]);
+          const positionMillis = typeof status.positionMillis === 'number' ? status.positionMillis : 0;
+          syncFeedbackFromPosition(record, positionMillis);
+
+          if (!status.isPlaying) {
+            stopPlaybackPolling(record.id);
+          }
+        });
+      }, 200);
+    },
+    [stopPlaybackPolling, syncFeedbackFromPosition]
+  );
 
   function handlePlaybackStatus(record: LessonRecord, status: AVPlaybackStatus) {
     if (!status.isLoaded) {
@@ -212,6 +222,66 @@ export function DiaryScreen({
         <Text style={styles.recordsTitle}>
           {selectedDateKey ? `${selectedDateKey} 레슨 기록` : '날짜를 선택하면 레슨 기록을 볼 수 있습니다.'}
         </Text>
+
+        <View style={styles.graphButtonRow}>
+          <SmallButton
+            title={showShotGraph ? '슛 성공도 그래프 닫기' : '슛 성공도 그래프'}
+            onPress={() => setShowShotGraph((current) => !current)}
+            variant="dark"
+          />
+        </View>
+
+        {showShotGraph ? (
+          <View style={styles.graphCard}>
+            <Text style={styles.graphTitle}>날짜별 슛 성공도 비교</Text>
+            <Text style={styles.graphDescription}>
+              가로축은 날짜, 세로축은 슛 개수입니다. 주황 막대는 슛 시도 수, 초록 막대는 슛 성공 수입니다.
+            </Text>
+
+            {shotGraphData.length === 0 ? (
+              <Text style={styles.graphEmpty}>아직 저장된 슛 레슨 기록이 없습니다.</Text>
+            ) : (
+              <>
+                <View style={styles.graphLegend}>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.dot, styles.dotAttempt]} />
+                    <Text style={styles.legendText}>슛 시도</Text>
+                  </View>
+                  <View style={styles.legendItem}>
+                    <View style={[styles.dot, styles.dotSuccess]} />
+                    <Text style={styles.legendText}>슛 성공</Text>
+                  </View>
+                </View>
+
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.graphScroll}
+                >
+                  {shotGraphData.map((item) => {
+                    const attemptHeight = item.attempts > 0 ? Math.max(10, (item.attempts / graphMaxValue) * 160) : 6;
+                    const successHeight =
+                      item.successes > 0 ? Math.max(10, (item.successes / graphMaxValue) * 160) : 6;
+                    const shortDate = item.dateKey.slice(5);
+
+                    return (
+                      <View key={item.dateKey} style={styles.graphItem}>
+                        <Text style={styles.graphRate}>성공률 {item.successRate}%</Text>
+                        <View style={styles.barArea}>
+                          <View style={[styles.bar, styles.attemptBar, { height: attemptHeight }]} />
+                          <View style={[styles.bar, styles.successBar, { height: successHeight }]} />
+                        </View>
+                        <Text style={styles.graphDate}>{shortDate}</Text>
+                        <Text style={styles.graphCount}>시도 {item.attempts}</Text>
+                        <Text style={styles.graphCount}>성공 {item.successes}</Text>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            )}
+          </View>
+        ) : null}
 
         {selectedDateKey ? (
           <View style={styles.recordCard}>
@@ -358,6 +428,12 @@ const styles = StyleSheet.create({
   dotRed: {
     backgroundColor: colors.danger,
   },
+  dotAttempt: {
+    backgroundColor: colors.secondary,
+  },
+  dotSuccess: {
+    backgroundColor: '#32cd32',
+  },
   recordsSection: {
     marginTop: 4,
     gap: 14,
@@ -366,6 +442,88 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 20,
     fontWeight: '900',
+  },
+  graphButtonRow: {
+    alignItems: 'flex-start',
+  },
+  graphCard: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  graphTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+    marginBottom: 8,
+  },
+  graphDescription: {
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  graphLegend: {
+    flexDirection: 'row',
+    gap: 14,
+    marginBottom: 12,
+  },
+  graphScroll: {
+    gap: 14,
+    paddingRight: 10,
+    alignItems: 'flex-end',
+  },
+  graphItem: {
+    width: 92,
+    alignItems: 'center',
+  },
+  graphRate: {
+    color: colors.textAccent,
+    fontSize: 13,
+    fontWeight: '900',
+    marginBottom: 8,
+  },
+  barArea: {
+    height: 180,
+    width: '100%',
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  bar: {
+    width: 22,
+    borderRadius: 10,
+  },
+  attemptBar: {
+    backgroundColor: colors.secondary,
+  },
+  successBar: {
+    backgroundColor: '#32cd32',
+  },
+  graphDate: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 10,
+  },
+  graphCount: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: 4,
+  },
+  graphEmpty: {
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 22,
   },
   recordCard: {
     backgroundColor: colors.surfaceStrong,
@@ -394,7 +552,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 14,
     lineHeight: 22,
-    marginBottom: 12,
   },
   liveFeedbackBox: {
     backgroundColor: 'rgba(0,0,0,0.22)',

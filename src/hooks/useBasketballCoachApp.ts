@@ -15,13 +15,14 @@ import type {
   BallColorOption,
   DribbleAnalysis,
   FeedbackMoment,
-  FireworkItem,
-  LessonMode,
-  LessonRecord,
-  LessonReviewClip,
-  ShootAnalysis,
-  SkillKey,
-} from '../types/app';
+    FireworkItem,
+    LessonMode,
+    LessonRecord,
+    LessonReviewClip,
+    ShotGraphDatum,
+    ShootAnalysis,
+    SkillKey,
+  } from '../types/app';
 import { getCalendarCells } from '../utils/calendar';
 import { formatDateKey } from '../utils/date';
 import { buildDribbleFeedbackText, buildShootFeedbackText } from '../utils/feedback';
@@ -355,6 +356,7 @@ export function useBasketballCoachApp() {
   const [homework, setHomework] = useState<string[]>([]);
   const [attendance, setAttendance] = useState<Record<string, string>>({});
   const [lessonRecords, setLessonRecords] = useState<LessonRecord[]>([]);
+  const [shotAttemptRecords, setShotAttemptRecords] = useState<Record<string, number>>({});
   const [shotSuccessRecords, setShotSuccessRecords] = useState<Record<string, number>>({});
   const [selectedDateKey, setSelectedDateKey] = useState('');
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -396,6 +398,7 @@ export function useBasketballCoachApp() {
   const shootAutoEndTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingReviewStopRef = useRef(false);
   const pendingShootReviewRef = useRef(false);
+  const pendingShootRecordingStopRef = useRef(false);
   const startCueSoundRef = useRef<Audio.Sound | null>(null);
   const webStartCueContextRef = useRef<any>(null);
   const latestDribbleAnalysisRef = useRef<DribbleAnalysis | null>(null);
@@ -414,6 +417,24 @@ export function useBasketballCoachApp() {
     [lessonRecords, selectedDateKey]
   );
   const selectedDateShotCount = selectedDateKey ? shotSuccessRecords[selectedDateKey] || 0 : 0;
+  const shotGraphData = useMemo<ShotGraphDatum[]>(() => {
+    const allDateKeys = Array.from(
+      new Set([...Object.keys(shotAttemptRecords), ...Object.keys(shotSuccessRecords)])
+    ).sort();
+
+    return allDateKeys.map((dateKey) => {
+      const attempts = shotAttemptRecords[dateKey] || 0;
+      const successes = shotSuccessRecords[dateKey] || 0;
+      const successRate = attempts > 0 ? Math.min(100, Math.round((successes / attempts) * 100)) : 0;
+
+      return {
+        dateKey,
+        attempts,
+        successes,
+        successRate,
+      };
+    });
+  }, [shotAttemptRecords, shotSuccessRecords]);
 
   useEffect(() => {
     latestFeedbackRef.current = feedbackText;
@@ -447,9 +468,23 @@ export function useBasketballCoachApp() {
         const parsedLessonRecords = parseStoredJson<
           Array<LessonRecord | (Omit<LessonRecord, 'feedbackTimeline'> & { feedbackTimeline?: FeedbackMoment[] | string[] })>
         >(stored[STORAGE_KEYS.lessonRecords], []).map((record) => normalizeLessonRecord(record));
+        const parsedShotAttempts = parseStoredJson<Record<string, number>>(stored[STORAGE_KEYS.shotAttempts], {});
         const parsedShotSuccess = parseStoredJson<Record<string, number>>(stored[STORAGE_KEYS.shotSuccess], {});
         const parsedBallBrand = parseStoredJson<BallBrandOption>(stored[STORAGE_KEYS.ballBrand], DEFAULT_BALL_BRAND);
         const parsedBallColors = parseStoredJson<BallColorOption[]>(stored[STORAGE_KEYS.ballColors], DEFAULT_BALL_COLORS);
+
+        const derivedShotAttempts = parsedLessonRecords.reduce<Record<string, number>>((accumulator, record) => {
+          if (record.mode !== 'shoot') {
+            return accumulator;
+          }
+
+          accumulator[record.dateKey] = (accumulator[record.dateKey] || 0) + 1;
+          return accumulator;
+        }, {});
+
+        for (const [dateKey, count] of Object.entries(derivedShotAttempts)) {
+          parsedShotAttempts[dateKey] = Math.max(parsedShotAttempts[dateKey] || 0, count);
+        }
 
         const todayKey = formatDateKey(new Date());
         parsedAttendance[todayKey] = 'attended';
@@ -457,6 +492,7 @@ export function useBasketballCoachApp() {
         setAttendance(parsedAttendance);
         setHomework(parsedHomework);
         setLessonRecords(parsedLessonRecords);
+        setShotAttemptRecords(parsedShotAttempts);
         setShotSuccessRecords(parsedShotSuccess);
         setSelectedBallBrand(parsedBallBrand);
         setSelectedBallColors(
@@ -488,6 +524,10 @@ export function useBasketballCoachApp() {
   useEffect(() => {
     void AsyncStorage.setItem(STORAGE_KEYS.lessonRecords, JSON.stringify(lessonRecords));
   }, [lessonRecords]);
+
+  useEffect(() => {
+    void AsyncStorage.setItem(STORAGE_KEYS.shotAttempts, JSON.stringify(shotAttemptRecords));
+  }, [shotAttemptRecords]);
 
   useEffect(() => {
     void AsyncStorage.setItem(STORAGE_KEYS.shotSuccess, JSON.stringify(shotSuccessRecords));
@@ -571,6 +611,36 @@ export function useBasketballCoachApp() {
     return () => clearTimeout(timer);
   }, [cameraError, isCameraReady, isLessonActive]);
 
+  useEffect(() => {
+    if (!isLessonActive) {
+      return undefined;
+    }
+
+    const timer = setInterval(() => {
+      if (dribbleLessonPhaseRef.current !== 'countdown') {
+        return;
+      }
+
+      const countdownStartedAt = stanceCountdownStartedAtRef.current;
+      if (!countdownStartedAt) {
+        return;
+      }
+
+      if (Date.now() - countdownStartedAt < DRIBBLE_STANCE_HOLD_MS) {
+        return;
+      }
+
+      if (lessonModeRef.current === 'shoot') {
+        startShootLessonFromCountdown();
+        return;
+      }
+
+      startDribbleLessonFromCountdown(latestDribbleAnalysisRef.current?.bodyFacing === 'front');
+    }, 80);
+
+    return () => clearInterval(timer);
+  }, [isLessonActive, startDribbleLessonFromCountdown, startShootLessonFromCountdown]);
+
   const appendFeedbackTimeline = useCallback((text: string) => {
     if (!isLessonActive || !text) {
       return;
@@ -634,6 +704,7 @@ export function useBasketballCoachApp() {
 
   const resetShootAnalysisTracking = useCallback(() => {
     pendingShootReviewRef.current = false;
+    pendingShootRecordingStopRef.current = false;
     latestShootAnalysisRef.current = null;
     shootAnalysisHistoryRef.current = [];
     shootCooldownUntilRef.current = null;
@@ -862,10 +933,11 @@ export function useBasketballCoachApp() {
 
   const saveLessonRecord = useCallback((videoUri: string, reviewClip?: LessonReviewClip | null) => {
     const dateKey = formatDateKey(new Date());
+    const mode = lessonModeRef.current;
     const nextRecord: LessonRecord = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       dateKey,
-      mode: lessonModeRef.current,
+      mode,
       feedback: latestFeedbackRef.current,
       feedbackTimeline: [...feedbackTimelineRef.current],
       videoUri,
@@ -875,8 +947,16 @@ export function useBasketballCoachApp() {
       reviewDurationMs: reviewClip?.durationMs,
     };
 
-      setLessonRecords((current) => [...current, nextRecord]);
-      setSelectedDateKey(dateKey);
+    setLessonRecords((current) => [...current, nextRecord]);
+
+    if (mode === 'shoot') {
+      setShotAttemptRecords((current) => ({
+        ...current,
+        [dateKey]: (current[dateKey] || 0) + 1,
+      }));
+    }
+
+    setSelectedDateKey(dateKey);
   }, []);
 
   const finalizeLessonSession = useCallback(
@@ -1294,20 +1374,66 @@ export function useBasketballCoachApp() {
       setShootResetToken(0);
       setRecordingStartToken(0);
       setRecordingStopToken(0);
-      setIsLessonActive(false);
-      setIsCameraActive(false);
-      setIsCameraReady(false);
+      setIsLessonActive(true);
+      setIsCameraActive(true);
+      setIsCameraReady(true);
       setCameraError('');
-      setDebugText('슛 촬영 분석이 끝났습니다. 다시 레슨 시작을 누르면 새 촬영을 할 수 있습니다.');
+      setImmediateLessonFeedback(`${finalFeedback}\n\n다시 슛 준비 자세를 맞춰 주세요. 준비 자세가 맞으면 3초 카운트가 다시 시작됩니다.`);
+      setDebugText('슛 촬영 분석이 끝났습니다. 다시 준비 자세를 맞춰 주세요.');
     },
-    [addLessonHomework, clearRecordingWait, resetShootAnalysisTracking, saveLessonRecord]
+    [addLessonHomework, clearRecordingWait, resetShootAnalysisTracking, saveLessonRecord, setImmediateLessonFeedback]
   );
+
+  function startDribbleLessonFromCountdown(isFrontDribble: boolean) {
+    if (dribbleLessonPhaseRef.current !== 'countdown') {
+      return;
+    }
+
+    dribbleLessonPhaseRef.current = 'active';
+    stanceCountdownStartedAtRef.current = null;
+    setCountdownValue(null);
+    setCurrentDribbleCount(0);
+    setDribbleResetToken(Date.now());
+    playStartCue();
+    setRecordingStartToken(Date.now());
+    setImmediateLessonFeedback(
+      isFrontDribble
+        ? '시작합니다. 지금부터 녹화를 시작하고 드리블 횟수를 셉니다. 설정한 횟수까지 드리블해 주세요.'
+        : '시작합니다. 이제 드리블을 진행해 주세요. 공 높이와 시선, 자세를 계속 분석합니다.'
+    );
+    setDebugText('카운트 완료, 드리블 시작');
+  }
+
+  function startShootLessonFromCountdown() {
+    if (dribbleLessonPhaseRef.current !== 'countdown') {
+      return;
+    }
+
+    shootLessonStartedRef.current = true;
+    dribbleLessonPhaseRef.current = 'active';
+    stanceCountdownStartedAtRef.current = null;
+    setCountdownValue(null);
+    pendingShootReviewRef.current = false;
+    pendingShootRecordingStopRef.current = false;
+    latestShootAnalysisRef.current = null;
+    shootAnalysisHistoryRef.current = [];
+    setShootResetToken(Date.now());
+    playStartCue();
+    if (!shootRecordingStartedRef.current) {
+      setRecordingStartToken(Date.now());
+      shootRecordingStartedRef.current = true;
+    }
+    setImmediateLessonFeedback('시작합니다. 이제 슛을 발사해 주세요. 촬영이 끝나면 2, 3번째 기준으로 결과를 알려드립니다.');
+    setDebugText('카운트 완료, 슛 촬영 시작');
+  }
 
   const applyDribbleAnalysis = useCallback(
     (analysis: DribbleAnalysis) => {
       if (lessonModeRef.current !== 'dribble') {
         return;
       }
+
+      latestDribbleAnalysisRef.current = analysis;
 
       const phase = dribbleLessonPhaseRef.current;
       const stanceReady = isDribbleStanceReady(analysis);
@@ -1372,19 +1498,7 @@ export function useBasketballCoachApp() {
         const elapsed = Date.now() - countdownStartedAt;
 
         if (elapsed >= DRIBBLE_STANCE_HOLD_MS) {
-          dribbleLessonPhaseRef.current = 'active';
-          stanceCountdownStartedAtRef.current = null;
-          setCountdownValue(null);
-          setCurrentDribbleCount(0);
-          setDribbleResetToken(Date.now());
-          playStartCue();
-          setRecordingStartToken(Date.now());
-          setImmediateLessonFeedback(
-            analysis.bodyFacing === 'front'
-              ? '시작합니다. 지금부터 녹화를 시작하고 드리블 횟수를 셉니다. 설정한 횟수까지 드리블해 주세요.'
-              : '시작합니다. 이제 드리블을 진행해 주세요. 공 높이와 시선, 자세를 계속 분석합니다.'
-          );
-          setDebugText('카운트 완료, 드리블 시작');
+          startDribbleLessonFromCountdown(analysis.bodyFacing === 'front');
           return;
         }
 
@@ -1408,7 +1522,7 @@ export function useBasketballCoachApp() {
       return;
       setDebugText(`슛 분석 중: ${analysis.summary}`);
     },
-    [finishDribbleRecordingForReview, playStartCue, setImmediateLessonFeedback, updateFrontDribbleWeakPoint]
+    [finishDribbleRecordingForReview, startDribbleLessonFromCountdown, updateFrontDribbleWeakPoint]
   );
 
   const applyShootAnalysisWithStance = useCallback(
@@ -1426,6 +1540,28 @@ export function useBasketballCoachApp() {
       const phase = dribbleLessonPhaseRef.current;
       const stanceReady = isShootStanceReady(analysis);
 
+      if (phase === 'cooldown') {
+        const cooldownUntil = shootCooldownUntilRef.current;
+
+        if (cooldownUntil && Date.now() < cooldownUntil) {
+          const remainingSeconds = Math.max(1, Math.ceil((cooldownUntil - Date.now()) / 1000));
+          setDebugText(`슛 발사 확인 후 녹화 마무리 중: ${remainingSeconds}초 남음`);
+          return;
+        }
+
+        if (shootRecordingStartedRef.current) {
+          pendingShootReviewRef.current = true;
+          pendingShootRecordingStopRef.current = true;
+          shootCooldownUntilRef.current = null;
+          setImmediateLessonFeedback('슛 촬영을 마무리하고 있습니다. 곧 2, 3번째 기준 분석 결과를 보여드립니다.');
+          setDebugText('슛 촬영을 마무리하고 분석 중입니다.');
+          setRecordingStopToken(Date.now());
+          return;
+        }
+
+        dribbleLessonPhaseRef.current = 'stance_setup';
+      }
+
       if (phase === 'active' || shootLessonStartedRef.current) {
         stanceCountdownStartedAtRef.current = null;
         setCountdownValue(null);
@@ -1435,15 +1571,29 @@ export function useBasketballCoachApp() {
 
         if (analysis.releaseDetected) {
           shootLessonStartedRef.current = false;
-          pendingShootReviewRef.current = true;
           dribbleLessonPhaseRef.current = 'cooldown';
-          setImmediateLessonFeedback('슛 발사를 확인했습니다. 녹화 영상을 분석하고 있습니다.');
-          setDebugText('슛 발사를 확인했습니다. 녹화를 마무리하고 분석하는 중입니다.');
-          setRecordingStopToken(Date.now());
+          shootCooldownUntilRef.current = Date.now() + SHOOT_RECOVERY_MS;
+          setImmediateLessonFeedback('슛 발사를 확인했습니다. 3초 뒤 녹화를 마치고 2, 3번째 기준을 분석합니다.');
+          setDebugText('슛 발사를 확인했습니다. 3초 뒤 녹화를 종료합니다.');
           return;
         }
 
         setDebugText('슛 촬영 중입니다. 공이 머리보다 높게 올라가는 발사 시점을 기다리고 있습니다.');
+        return;
+      }
+
+      if (phase === 'countdown') {
+        const countdownStartedAt = stanceCountdownStartedAtRef.current ?? Date.now();
+        const elapsed = Date.now() - countdownStartedAt;
+
+        if (elapsed >= DRIBBLE_STANCE_HOLD_MS) {
+          startShootLessonFromCountdown();
+          return;
+        }
+
+        const remainingSeconds = Math.max(1, Math.ceil((DRIBBLE_STANCE_HOLD_MS - elapsed) / 1000));
+        pendingFeedbackRef.current = `슛 준비 자세를 유지해 주세요.\n1. 팔 각도를 기준 범위 안으로 맞춰 주세요.\n2. ${remainingSeconds}초 동안 자세를 유지하면 녹화를 시작합니다.\n3. 슛이 끝난 뒤 2, 3번째 기준으로 결과를 알려드립니다.`;
+        setDebugText(`슛 준비 자세 유지 중: ${remainingSeconds}초 남음`);
         return;
       }
 
@@ -1464,38 +1614,9 @@ export function useBasketballCoachApp() {
         return;
       }
 
-      if (phase === 'countdown') {
-        const countdownStartedAt = stanceCountdownStartedAtRef.current ?? Date.now();
-        const elapsed = Date.now() - countdownStartedAt;
-
-        if (elapsed >= DRIBBLE_STANCE_HOLD_MS) {
-          shootLessonStartedRef.current = true;
-          dribbleLessonPhaseRef.current = 'active';
-          stanceCountdownStartedAtRef.current = null;
-          setCountdownValue(null);
-          pendingShootReviewRef.current = false;
-          latestShootAnalysisRef.current = null;
-          shootAnalysisHistoryRef.current = [];
-          setShootResetToken(Date.now());
-          playStartCue();
-          if (!shootRecordingStartedRef.current) {
-            setRecordingStartToken(Date.now());
-            shootRecordingStartedRef.current = true;
-          }
-          setImmediateLessonFeedback('시작합니다. 이제 슛을 발사해 주세요. 촬영이 끝나면 2, 3번째 기준으로 결과를 알려드립니다.');
-          setDebugText('카운트 완료, 슛 촬영 시작');
-          return;
-        }
-
-        const remainingSeconds = Math.max(1, Math.ceil((DRIBBLE_STANCE_HOLD_MS - elapsed) / 1000));
-        pendingFeedbackRef.current = `슛 준비 자세를 유지해 주세요.\n1. 팔 각도를 기준 범위 안으로 맞춰 주세요.\n2. ${remainingSeconds}초 동안 자세를 유지하면 녹화를 시작합니다.\n3. 슛이 끝난 뒤 2, 3번째 기준으로 결과를 알려드립니다.`;
-        setDebugText(`슛 준비 자세 유지 중: ${remainingSeconds}초 남음`);
-        return;
-      }
-
       setDebugText('슛 준비 자세를 확인하는 중입니다.');
     },
-    [playStartCue, setImmediateLessonFeedback]
+    [setImmediateLessonFeedback, startShootLessonFromCountdown]
   );
 
   const handlePoseMessage = useCallback(
@@ -1582,7 +1703,7 @@ export function useBasketballCoachApp() {
             return;
           }
 
-          if (pendingShootReviewRef.current) {
+          if (pendingShootReviewRef.current || pendingShootRecordingStopRef.current) {
             completeShootReview(payload.videoUri);
             return;
           }
@@ -1602,16 +1723,22 @@ export function useBasketballCoachApp() {
             return;
           }
 
-          if (pendingShootReviewRef.current) {
+          if (pendingShootReviewRef.current || pendingShootRecordingStopRef.current) {
             pendingShootReviewRef.current = false;
+            pendingShootRecordingStopRef.current = false;
             const finalFeedback = buildShootReviewFeedback(latestShootAnalysisRef.current);
             latestFeedbackRef.current = `${finalFeedback}\n\n영상 저장에는 실패했습니다.`;
             setFeedbackText(latestFeedbackRef.current);
             resetShootAnalysisTracking();
+            setRecordingStartToken(0);
             setRecordingStopToken(0);
-            setIsLessonActive(false);
-            setIsCameraActive(false);
-            setIsCameraReady(false);
+            setShootResetToken(0);
+            dribbleLessonPhaseRef.current = 'stance_setup';
+            shootLessonStartedRef.current = false;
+            setIsLessonActive(true);
+            setIsCameraActive(true);
+            setIsCameraReady(true);
+            setImmediateLessonFeedback(`${latestFeedbackRef.current}\n\n다시 슛 준비 자세를 맞춰 주세요.`);
             return;
           }
 
@@ -1698,6 +1825,7 @@ export function useBasketballCoachApp() {
     selectedDateKey,
     selectedDateRecords,
     selectedDateShotCount,
+    shotGraphData,
     calendarCells,
     selectedSkillKey,
     selectedBallBrand,

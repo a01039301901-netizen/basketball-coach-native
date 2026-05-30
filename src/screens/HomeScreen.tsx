@@ -6,6 +6,7 @@ interface HomeScreenProps {
   onOpenLesson: () => void;
   onOpenDiary: () => void;
   onOpenSkill: () => void;
+  onOpenRules: () => void;
   onOpenSettings: () => void;
 }
 
@@ -27,7 +28,7 @@ function HomeMenuButton({ title, subtitle, onPress }: HomeMenuButtonProps) {
   );
 }
 
-export function HomeScreen({ homeworkToShow, onOpenLesson, onOpenDiary, onOpenSkill, onOpenSettings }: HomeScreenProps) {
+export function HomeScreen({ homeworkToShow, onOpenLesson, onOpenDiary, onOpenSkill, onOpenRules, onOpenSettings }: HomeScreenProps) {
   const { width } = useWindowDimensions();
   const isWide = width >= 860;
 
@@ -56,6 +57,11 @@ export function HomeScreen({ homeworkToShow, onOpenLesson, onOpenDiary, onOpenSk
             title="프로 기술 배우기"
             subtitle="선수별 핵심 기술 포인트와 연결된 영상으로 오늘 연습할 동작을 골라보세요."
             onPress={onOpenSkill}
+          />
+          <HomeMenuButton
+            title="농구 규칙 가이드"
+            subtitle="경기 목표, 득점, 드리블 반칙, 시간 규칙까지 초보자용 기본 규칙을 한 번에 확인해 보세요."
+            onPress={onOpenRules}
           />
         </View>
       </View>

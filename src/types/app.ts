@@ -1,4 +1,4 @@
-export type AppScreen = 'home' | 'lesson' | 'skill' | 'diary' | 'settings';
+export type AppScreen = 'home' | 'lesson' | 'skill' | 'diary' | 'settings' | 'rules';
 
 export type LessonMode = 'dribble' | 'shoot';
 
@@ -58,6 +58,13 @@ export interface FireworkItem {
   emoji: string;
   left: `${number}%`;
   top: `${number}%`;
+}
+
+export interface ShotGraphDatum {
+  dateKey: string;
+  attempts: number;
+  successes: number;
+  successRate: number;
 }
 
 export type EyeFocusState = 'ball' | 'forward' | 'unknown';
