@@ -2,6 +2,7 @@
 
 export function buildPoseWebHtml(
   lessonMode: 'dribble' | 'shoot' = 'dribble',
+  dribbleLessonView: 'side' | 'front' = 'side',
   selectedBallBrand: 'wilson' | 'spalding' | 'molten' = 'wilson',
   selectedBallColors: string[] = ['orange']
 ): string {
@@ -66,6 +67,7 @@ export function buildPoseWebHtml(
 
     <script type="module">
       const lessonMode = ${JSON.stringify(lessonMode)};
+      const dribbleLessonView = ${JSON.stringify(dribbleLessonView)};
       const selectedBallBrand = ${JSON.stringify(selectedBallBrand)};
       const selectedBallColors = ${JSON.stringify(selectedBallColors)};
       const video = document.getElementById("video");
@@ -812,7 +814,7 @@ export function buildPoseWebHtml(
       }
 
       function classifyStanceState(bodyFacing, torsoLeanAngle, frontStanceAngle) {
-        if (bodyFacing === "front") {
+        if (dribbleLessonView === "front") {
           if (frontStanceAngle === null) {
             return "unknown";
           }
@@ -976,11 +978,12 @@ export function buildPoseWebHtml(
         const shoulderMid = visible(leftShoulder) && visible(rightShoulder) ? midpoint(leftShoulder, rightShoulder) : null;
         const hipMid = visible(leftHip) && visible(rightHip) ? midpoint(leftHip, rightHip) : null;
         const neck = shoulderMid;
-        const bodyFacing = classifyBodyFacing(landmarks);
+        const detectedBodyFacing = classifyBodyFacing(landmarks);
+        const bodyFacing = lessonMode === "dribble" ? dribbleLessonView : detectedBodyFacing;
         const frontStanceAngle = classifyFrontStanceAngle(landmarks, hipMid);
         const torsoLeanAngle = getTorsoLeanAngle(shoulderMid, hipMid);
         const stanceState = classifyStanceState(bodyFacing, torsoLeanAngle, frontStanceAngle);
-        const dribbleStarted = bodyFacing === "front" ? true : didDribbleStart(landmarks, ball);
+        const dribbleStarted = dribbleLessonView === "front" ? true : didDribbleStart(landmarks, ball);
 
         if (dribbleStarted) {
           updateDribbleBounceTracking(landmarks, ball);
@@ -989,8 +992,8 @@ export function buildPoseWebHtml(
         const eyeFocus = classifyEyeFocus(landmarks, neck);
         const dribbleHeight = dribbleStarted ? classifyDribbleHeight(landmarks, neck, hipMid) : "unknown";
         const torsoPosture = classifyTorsoPosture(shoulderMid, hipMid, torsoLeanAngle);
-        const frontBallLaneState = bodyFacing === "front" ? classifyFrontBallLaneState(landmarks, ball) : "unknown";
-        const footSpacingState = bodyFacing === "front" ? classifyFootSpacingState(landmarks) : "unknown";
+        const frontBallLaneState = dribbleLessonView === "front" ? classifyFrontBallLaneState(landmarks, ball) : "unknown";
+        const footSpacingState = dribbleLessonView === "front" ? classifyFootSpacingState(landmarks) : "unknown";
         const handBalanceState = dribbleCount >= 2 && Math.abs(leftHandDribbleCount - rightHandDribbleCount) >= 2
           ? "unbalanced"
           : dribbleCount > 0
@@ -1441,10 +1444,11 @@ export function buildPoseWebHtml(
 
 export function buildPoseBootstrapScript(
   lessonMode: 'dribble' | 'shoot' = 'dribble',
+  dribbleLessonView: 'side' | 'front' = 'side',
   selectedBallBrand: 'wilson' | 'spalding' | 'molten' = 'wilson',
   selectedBallColors: string[] = ['orange']
 ): string {
-  const html = JSON.stringify(buildPoseWebHtml(lessonMode, selectedBallBrand, selectedBallColors));
+  const html = JSON.stringify(buildPoseWebHtml(lessonMode, dribbleLessonView, selectedBallBrand, selectedBallColors));
 
   return `
     document.open();

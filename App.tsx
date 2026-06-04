@@ -26,6 +26,7 @@ export default function App() {
           {app.screen === 'home' && (
             <HomeScreen
               homeworkToShow={app.homeworkToShow}
+              onDeleteHomeworkItem={app.deleteHomeworkItem}
               onOpenLesson={() => void app.navigateTo('lesson')}
               onOpenDiary={() => void app.navigateTo('diary')}
               onOpenSkill={() => void app.navigateTo('skill')}
@@ -37,23 +38,25 @@ export default function App() {
           {app.screen === 'lesson' && (
             <LessonScreen
               lessonMode={app.lessonMode}
+              dribbleLessonView={app.dribbleLessonView}
               selectedBallBrand={app.selectedBallBrand}
               selectedBallColors={app.selectedBallColors}
               isCameraActive={app.isCameraActive}
               isLessonActive={app.isLessonActive}
-                isCameraReady={app.isCameraReady}
-                cameraSessionKey={app.cameraSessionKey}
-                countdownValue={app.countdownValue}
-                dribbleResetToken={app.dribbleResetToken}
-                shootResetToken={app.shootResetToken}
-                recordingStartToken={app.recordingStartToken}
-                recordingStopToken={app.recordingStopToken}
+              isCameraReady={app.isCameraReady}
+              cameraSessionKey={app.cameraSessionKey}
+              countdownValue={app.countdownValue}
+              dribbleResetToken={app.dribbleResetToken}
+              shootResetToken={app.shootResetToken}
+              recordingStartToken={app.recordingStartToken}
+              recordingStopToken={app.recordingStopToken}
               debugText={app.debugText}
               feedbackText={app.feedbackText}
               lessonReview={app.lessonReview}
               currentDribbleCount={app.currentDribbleCount}
               cameraError={app.cameraError}
               onSelectMode={app.changeLessonMode}
+              onSelectDribbleLessonView={app.changeDribbleLessonView}
               onBeginLesson={(dribbleTargetCount) => void app.beginLesson(dribbleTargetCount)}
               onEndLesson={() => void app.endLesson()}
               onRegisterSuccessfulShot={app.registerSuccessfulShot}

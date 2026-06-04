@@ -1,8 +1,10 @@
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { SmallButton } from '../components/common/Buttons';
 import { colors } from '../theme/colors';
 
 interface HomeScreenProps {
   homeworkToShow: string[];
+  onDeleteHomeworkItem: (item: string) => void;
   onOpenLesson: () => void;
   onOpenDiary: () => void;
   onOpenSkill: () => void;
@@ -28,7 +30,15 @@ function HomeMenuButton({ title, subtitle, onPress }: HomeMenuButtonProps) {
   );
 }
 
-export function HomeScreen({ homeworkToShow, onOpenLesson, onOpenDiary, onOpenSkill, onOpenRules, onOpenSettings }: HomeScreenProps) {
+export function HomeScreen({
+  homeworkToShow,
+  onDeleteHomeworkItem,
+  onOpenLesson,
+  onOpenDiary,
+  onOpenSkill,
+  onOpenRules,
+  onOpenSettings,
+}: HomeScreenProps) {
   const { width } = useWindowDimensions();
   const isWide = width >= 860;
 
@@ -42,10 +52,11 @@ export function HomeScreen({ homeworkToShow, onOpenLesson, onOpenDiary, onOpenSk
         <Pressable onPress={onOpenSettings} style={({ pressed }) => [styles.settingsButton, pressed && styles.pressed]}>
           <Text style={styles.settingsButtonText}>설정</Text>
         </Pressable>
+
         <View style={styles.menuButtons}>
           <HomeMenuButton
             title="AI에게 레슨 받기"
-            subtitle="카메라로 실시간 자세와 공 움직임을 분석하면서 코칭 피드백을 받아보세요."
+            subtitle="카메라로 자세와 움직임을 분석하면서 실시간 코칭 피드백을 받아보세요."
             onPress={onOpenLesson}
           />
           <HomeMenuButton
@@ -54,14 +65,9 @@ export function HomeScreen({ homeworkToShow, onOpenLesson, onOpenDiary, onOpenSk
             onPress={onOpenDiary}
           />
           <HomeMenuButton
-            title="프로 기술 배우기"
-            subtitle="선수별 핵심 기술 포인트와 연결된 영상으로 오늘 연습할 동작을 골라보세요."
+            title="농구 기술 배우기"
+            subtitle="슛폼, 드리블, 수비 기술 영상을 보고 설명까지 함께 확인해보세요."
             onPress={onOpenSkill}
-          />
-          <HomeMenuButton
-            title="농구 규칙 가이드"
-            subtitle="경기 목표, 득점, 드리블 반칙, 시간 규칙까지 초보자용 기본 규칙을 한 번에 확인해 보세요."
-            onPress={onOpenRules}
           />
         </View>
       </View>
@@ -73,15 +79,29 @@ export function HomeScreen({ homeworkToShow, onOpenLesson, onOpenDiary, onOpenSk
         <View style={styles.homeworkList}>
           {homeworkToShow.map((item) => (
             <View key={item} style={styles.homeworkItem}>
-              <View style={styles.homeworkBullet} />
-              <Text style={styles.homeworkText}>{item}</Text>
+              <View style={styles.homeworkBody}>
+                <View style={styles.homeworkBullet} />
+                <Text style={styles.homeworkText}>{item}</Text>
+              </View>
+              <Pressable
+                onPress={() => onDeleteHomeworkItem(item)}
+                style={({ pressed }) => [styles.deleteBadge, pressed && styles.pressed]}
+              >
+                <Text style={styles.deleteBadgeText}>X</Text>
+              </Pressable>
             </View>
           ))}
         </View>
 
         <View style={styles.homeTipBox}>
           <Text style={styles.tipTitle}>연습 팁</Text>
-          <Text style={styles.tipText}>레슨 전에 공간을 밝게 하고, 공과 전신이 함께 보이도록 거리를 맞추면 분석 정확도가 더 좋아집니다.</Text>
+          <Text style={styles.tipText}>
+            레슨 전에 공간을 밝게 하고, 공과 전신이 화면에 잘 보이도록 거리를 맞추면 분석 정확도가 더 좋아집니다.
+          </Text>
+        </View>
+
+        <View style={styles.rulesButtonRow}>
+          <SmallButton title="농구 규칙 가이드" onPress={onOpenRules} variant="dark" />
         </View>
       </View>
     </View>
@@ -213,7 +233,8 @@ const styles = StyleSheet.create({
   },
   homeworkItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 12,
     backgroundColor: 'rgba(255,255,255,0.13)',
     borderRadius: 16,
@@ -221,6 +242,12 @@ const styles = StyleSheet.create({
     borderLeftColor: '#ff9f1c',
     paddingHorizontal: 16,
     paddingVertical: 16,
+  },
+  homeworkBody: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
   },
   homeworkBullet: {
     width: 10,
@@ -234,6 +261,21 @@ const styles = StyleSheet.create({
     color: colors.textSoft,
     fontSize: 15,
     lineHeight: 22,
+  },
+  deleteBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  deleteBadgeText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '900',
   },
   homeTipBox: {
     marginTop: 18,
@@ -251,6 +293,10 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 14,
     lineHeight: 22,
+  },
+  rulesButtonRow: {
+    marginTop: 14,
+    alignItems: 'flex-start',
   },
   pressed: {
     opacity: 0.9,

@@ -2,11 +2,12 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useEffect, useRef } from 'react';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { colors } from '../../theme/colors';
-import type { BallBrandOption, BallColorOption, LessonMode } from '../../types/app';
+import type { BallBrandOption, BallColorOption, DribbleLessonView, LessonMode } from '../../types/app';
 import { buildPoseBootstrapScript, POSE_WEB_BOOTSTRAP_URL } from './poseWebHtml';
 
 interface LessonCameraProps {
   lessonMode: LessonMode;
+  dribbleLessonView: DribbleLessonView;
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
   isCameraActive: boolean;
@@ -22,6 +23,7 @@ interface LessonCameraProps {
 
 export function LessonCamera({
   lessonMode,
+  dribbleLessonView,
   selectedBallBrand,
   selectedBallColors,
   isCameraActive,
@@ -86,7 +88,12 @@ export function LessonCamera({
             source={{ uri: POSE_WEB_BOOTSTRAP_URL }}
             style={styles.webview}
             onMessage={onPoseMessage}
-            injectedJavaScriptBeforeContentLoaded={buildPoseBootstrapScript(lessonMode, selectedBallBrand, selectedBallColors)}
+            injectedJavaScriptBeforeContentLoaded={buildPoseBootstrapScript(
+              lessonMode,
+              dribbleLessonView,
+              selectedBallBrand,
+              selectedBallColors
+            )}
             javaScriptEnabled
             domStorageEnabled
             allowsInlineMediaPlayback
