@@ -1,7 +1,7 @@
 export type AppScreen = 'home' | 'lesson' | 'skill' | 'diary' | 'settings' | 'rules';
 
 export type LessonMode = 'dribble' | 'shoot';
-export type DribbleLessonView = 'side' | 'front';
+export type DribbleLessonView = 'front' | 'side';
 
 export type CalendarCell =
   | {
@@ -14,19 +14,19 @@ export type CalendarCell =
       date: number;
       dateKey: string;
       status: string;
-      streakCount?: number;
       variant: 'default' | 'attended' | 'absent';
     };
 
 export type SkillKey = 'shoot' | 'crossover' | 'layup' | 'stepback' | 'spin' | 'defense';
 export type BallColorOption = 'orange' | 'brown' | 'yellow' | 'white' | 'black' | 'gray' | 'red';
 export type BallBrandOption = 'wilson' | 'spalding' | 'molten';
+export type PositionOption = 'none' | 'defense' | 'offense';
 
 export interface Skill {
   title: string;
-  videoType: string;
-  description: string;
-  videoUrl: string;
+  player: string;
+  point: string;
+  query: string;
 }
 
 export interface FeedbackMoment {
@@ -67,6 +67,17 @@ export interface ShotGraphDatum {
   attempts: number;
   successes: number;
   successRate: number;
+}
+
+export interface HomeworkProgressItem {
+  id: 'dribble' | 'shoot';
+  title: string;
+  current: number;
+  target: number;
+  progressPercent: number;
+  isCompleted: boolean;
+  progressText: string;
+  completionText: string;
 }
 
 export type EyeFocusState = 'ball' | 'forward' | 'unknown';

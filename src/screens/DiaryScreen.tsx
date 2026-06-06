@@ -20,8 +20,26 @@ interface DiaryScreenProps {
   onDeleteRecord: (recordId: string) => void;
 }
 
+type RecordFilter = 'all' | 'dribble' | 'shoot';
+
 function getRecordTitle(mode: LessonRecord['mode']) {
   return mode === 'shoot' ? '슛 분석' : '드리블 분석';
+}
+
+function getRecordModeLabel(mode: LessonRecord['mode']) {
+  return mode === 'shoot' ? '슛 레슨' : '드리블 레슨';
+}
+
+function getRecordFilterLabel(filter: RecordFilter) {
+  if (filter === 'dribble') {
+    return '드리블 분석';
+  }
+
+  if (filter === 'shoot') {
+    return '슛 분석';
+  }
+
+  return '전체';
 }
 
 function getSyncedFeedback(timeline: FeedbackMoment[], fallback: string, positionMillis: number) {
@@ -55,77 +73,29 @@ export function DiaryScreen({
   onDeleteRecord,
 }: DiaryScreenProps) {
   const { width } = useWindowDimensions();
-  const isWide = width >= 1080;
+  const isWide = width >= 980;
   const [playbackFeedback, setPlaybackFeedback] = useState<Record<string, string>>({});
-  const [showAllShotGraphModal, setShowAllShotGraphModal] = useState(false);
+  const [showAllShotGraph, setShowAllShotGraph] = useState(false);
+  const [recordFilter, setRecordFilter] = useState<RecordFilter>('all');
+  const [showRecordFilterMenu, setShowRecordFilterMenu] = useState(false);
   const videoRefs = useRef<Record<string, Video | null>>({});
   const playbackPollersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
-
-  const selectedShotGraphDatum = useMemo(
+  const selectedShotGraph = useMemo(
     () => shotGraphData.find((item) => item.dateKey === selectedDateKey) ?? null,
     [selectedDateKey, shotGraphData]
   );
-
-  const selectedGraphMaxValue = useMemo(
-    () =>
-      selectedShotGraphDatum
-        ? Math.max(1, selectedShotGraphDatum.attempts, selectedShotGraphDatum.successes)
-        : 1,
-    [selectedShotGraphDatum]
+  const graphMaxValue = useMemo(
+    () => Math.max(1, selectedShotGraph?.attempts ?? 0, selectedShotGraph?.successes ?? 0),
+    [selectedShotGraph]
   );
+  const allGraphChartWidth = useMemo(() => Math.max(320, shotGraphData.length * 86 + 48), [shotGraphData.length]);
+  const filteredDateRecords = useMemo(() => {
+    if (recordFilter === 'all') {
+      return selectedDateRecords;
+    }
 
-  const allShotGraphChart = useMemo(() => {
-    const chartHeight = 250;
-    const chartWidth = Math.max(320, shotGraphData.length * 90);
-    const chartPaddingX = 34;
-    const chartPaddingTop = 24;
-    const chartBottom = chartHeight - 34;
-    const usableWidth = Math.max(1, chartWidth - chartPaddingX * 2);
-    const usableHeight = Math.max(1, chartBottom - chartPaddingTop - 16);
-    const maxAttempts = Math.max(1, ...shotGraphData.map((item) => item.attempts));
-
-    const points = shotGraphData.map((item, index) => {
-      const x =
-        shotGraphData.length <= 1
-          ? chartWidth / 2
-          : chartPaddingX + (usableWidth * index) / Math.max(1, shotGraphData.length - 1);
-      const y = chartPaddingTop + ((100 - item.successRate) / 100) * usableHeight;
-      const barHeight = item.attempts > 0 ? Math.max(10, (item.attempts / maxAttempts) * usableHeight) : 6;
-
-      return {
-        ...item,
-        shortDate: item.dateKey.slice(5),
-        x,
-        y,
-        barHeight,
-        barTop: chartBottom - barHeight,
-      };
-    });
-
-    const segments = points.slice(0, -1).map((point, index) => {
-      const nextPoint = points[index + 1];
-      const deltaX = nextPoint.x - point.x;
-      const deltaY = nextPoint.y - point.y;
-      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-      const angle = (Math.atan2(deltaY, deltaX) * 180) / Math.PI;
-
-      return {
-        key: `${point.dateKey}-${nextPoint.dateKey}`,
-        width: distance,
-        left: (point.x + nextPoint.x) / 2 - distance / 2,
-        top: (point.y + nextPoint.y) / 2 - 2,
-        angle,
-      };
-    });
-
-    return {
-      chartWidth,
-      chartHeight,
-      chartBottom,
-      points,
-      segments,
-    };
-  }, [shotGraphData]);
+    return selectedDateRecords.filter((record) => record.mode === recordFilter);
+  }, [recordFilter, selectedDateRecords]);
 
   useEffect(() => {
     setPlaybackFeedback((current) => {
@@ -232,60 +202,6 @@ export function DiaryScreen({
     }
   }
 
-  const recordContent = (
-    <>
-      <Text style={styles.recordsTitle}>
-        {selectedDateKey ? `${selectedDateKey} 레슨 기록` : '날짜를 선택하면 레슨 기록을 볼 수 있습니다.'}
-      </Text>
-
-      {selectedDateKey ? (
-        <View style={styles.recordCard}>
-          <Text style={styles.recordMeta}>슛 성공 기록: {selectedDateShotCount}개</Text>
-        </View>
-      ) : null}
-
-      {selectedDateKey && selectedDateRecords.length === 0 ? (
-        <View style={styles.recordCard}>
-          <Text style={styles.recordText}>이 날짜에 저장된 레슨 영상이 없습니다.</Text>
-        </View>
-      ) : null}
-
-      {selectedDateRecords.map((record) => {
-        const syncedFeedback = playbackFeedback[record.id] || record.feedback;
-
-        return (
-          <View key={record.id} style={styles.recordCard}>
-            <Text style={styles.recordTitle}>{getRecordTitle(record.mode)}</Text>
-            <Text style={styles.recordMeta}>{record.createdAt}</Text>
-
-            {record.videoUri ? (
-              <Video
-                ref={(instance) => {
-                  videoRefs.current[record.id] = instance;
-                }}
-                source={{ uri: record.videoUri }}
-                useNativeControls
-                shouldPlay={false}
-                isLooping={false}
-                progressUpdateIntervalMillis={200}
-                resizeMode={ResizeMode.COVER}
-                style={styles.recordVideo}
-                onPlaybackStatusUpdate={(status) => handlePlaybackStatus(record, status)}
-              />
-            ) : null}
-
-            <View style={styles.liveFeedbackBox}>
-              <Text style={styles.liveFeedbackLabel}>영상과 함께 보는 실시간 피드백</Text>
-              <Text style={styles.liveFeedbackText}>{syncedFeedback}</Text>
-            </View>
-
-            <SmallButton title="기록 삭제" onPress={() => onDeleteRecord(record.id)} variant="red" />
-          </View>
-        );
-      })}
-    </>
-  );
-
   return (
     <Card title="기록일지">
       <View style={styles.calendarTop}>
@@ -306,6 +222,11 @@ export function DiaryScreen({
             return <View key={cell.key} style={[styles.dayCell, styles.dayCellEmpty]} />;
           }
 
+          const isFireStatus = cell.status.startsWith('🔥');
+          const isCheckStatus = cell.status.startsWith('✔️');
+          const isEmojiStatus = isFireStatus || isCheckStatus || cell.status === '💧' || cell.status === '🤦‍♂️';
+          const isStreakStatus = cell.status.includes('×(');
+
           return (
             <Pressable
               key={cell.key}
@@ -319,7 +240,17 @@ export function DiaryScreen({
               ]}
             >
               <Text style={styles.dayNumber}>{cell.date}</Text>
-              <Text style={[styles.dayStatus, cell.status === '🔥' && styles.dayStatusFire]}>{cell.status}</Text>
+              <Text
+                style={[
+                  styles.dayStatus,
+                  isEmojiStatus && styles.dayStatusEmoji,
+                  isFireStatus && styles.dayStatusFire,
+                  isCheckStatus && styles.dayStatusCheck,
+                  isStreakStatus && styles.dayStatusStreak,
+                ]}
+              >
+                {cell.status}
+              </Text>
             </Pressable>
           );
         })}
@@ -327,108 +258,290 @@ export function DiaryScreen({
 
       <View style={styles.legend}>
         <View style={styles.legendItem}>
-          <View style={[styles.dot, styles.dotGreen]} />
+          <Text style={styles.legendEmoji}>🔥</Text>
           <Text style={styles.legendText}>출석</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.dot, styles.dotRed]} />
+          <Text style={styles.legendEmoji}>💧</Text>
           <Text style={styles.legendText}>결석</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <Text style={styles.legendEmoji}>🤦‍♂️</Text>
+          <Text style={styles.legendText}>연속 출석 후 결석</Text>
         </View>
       </View>
 
-      <View style={[styles.contentRow, isWide && styles.contentRowWide]}>
-        <View style={[styles.graphColumn, isWide && styles.graphColumnWide]}>
-          <View style={styles.graphCard}>
-            <Text style={styles.graphTitle}>
-              {selectedDateKey ? `${selectedDateKey} 슛 성공도` : '날짜별 슛 성공도'}
-            </Text>
-            <Text style={styles.graphDescription}>
-              {selectedDateKey
-                ? '선택한 날짜의 슛 시도 수와 슛 성공 수를 비교합니다.'
-                : '달력에서 날짜를 선택하면 해당 날짜의 슛 시도 수와 슛 성공 수를 비교해서 보여줍니다.'}
-            </Text>
+      <View style={styles.recordsSection}>
+        <Text style={styles.recordsTitle}>
+          {selectedDateKey ? `${selectedDateKey} 레슨 기록` : '날짜를 선택하면 레슨 기록을 볼 수 있습니다.'}
+        </Text>
 
-            {!selectedDateKey ? (
-              <Text style={styles.graphEmpty}>날짜를 선택하면 해당 날짜의 성공도 그래프가 여기에 표시됩니다.</Text>
-            ) : !selectedShotGraphDatum ? (
-              <Text style={styles.graphEmpty}>선택한 날짜에는 아직 슛 기록이 없습니다.</Text>
+        <View style={[styles.contentRow, isWide && styles.contentRowWide]}>
+          <View style={[styles.graphColumn, isWide && styles.graphColumnWide]}>
+            <View style={styles.graphCard}>
+              <Text style={styles.graphTitle}>{selectedDateKey ? `${selectedDateKey} 슛 성공도` : '슛 성공도 그래프'}</Text>
+              <Text style={styles.graphDescription}>
+                {selectedDateKey
+                  ? '선택한 날짜의 슛 시도 수와 성공 수를 바로 확인할 수 있습니다.'
+                  : '날짜를 선택하면 해당 날짜의 슛 성공도 그래프가 여기에 표시됩니다.'}
+              </Text>
+
+              {selectedDateKey && selectedShotGraph ? (
+                <>
+                  <View style={styles.graphLegend}>
+                    <View style={styles.legendItem}>
+                      <View style={[styles.dot, styles.dotAttempt]} />
+                      <Text style={styles.legendText}>슛 시도</Text>
+                    </View>
+                    <View style={styles.legendItem}>
+                      <View style={[styles.dot, styles.dotSuccess]} />
+                      <Text style={styles.legendText}>슛 성공</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.graphSingleWrap}>
+                    <Text style={styles.graphRateLarge}>성공률 {selectedShotGraph.successRate}%</Text>
+                    <View style={styles.barAreaLarge}>
+                      <View style={styles.barColumn}>
+                        <Text style={styles.barValue}>{selectedShotGraph.attempts}</Text>
+                        <View
+                          style={[
+                            styles.barLarge,
+                            styles.attemptBar,
+                            {
+                              height:
+                                selectedShotGraph.attempts > 0
+                                  ? Math.max(18, (selectedShotGraph.attempts / graphMaxValue) * 220)
+                                  : 10,
+                            },
+                          ]}
+                        />
+                        <Text style={styles.barLabel}>슛 시도</Text>
+                      </View>
+
+                      <View style={styles.barColumn}>
+                        <Text style={styles.barValue}>{selectedShotGraph.successes}</Text>
+                        <View
+                          style={[
+                            styles.barLarge,
+                            styles.successBar,
+                            {
+                              height:
+                                selectedShotGraph.successes > 0
+                                  ? Math.max(18, (selectedShotGraph.successes / graphMaxValue) * 220)
+                                  : 10,
+                            },
+                          ]}
+                        />
+                        <Text style={styles.barLabel}>슛 성공</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.graphDateLarge}>{selectedShotGraph.dateKey.slice(5)}</Text>
+                    <Text style={styles.graphCount}>슛 성공 기록: {selectedDateShotCount}개</Text>
+                  </View>
+                </>
+              ) : selectedDateKey ? (
+                <Text style={styles.graphEmpty}>선택한 날짜에는 아직 슛 기록이 없습니다.</Text>
+              ) : (
+                <Text style={styles.graphEmpty}>날짜를 선택하면 그래프가 표시됩니다.</Text>
+              )}
+
+              <View style={styles.allGraphButtonRow}>
+                <SmallButton title="모든 슛 성공도 보기" onPress={() => setShowAllShotGraph(true)} variant="dark" />
+              </View>
+            </View>
+          </View>
+
+          <View style={[styles.recordsColumn, isWide && styles.recordsColumnWide]}>
+            <View style={styles.recordFilterWrap}>
+              <Pressable
+                onPress={() => setShowRecordFilterMenu((current) => !current)}
+                style={({ pressed }) => [
+                  styles.recordFilterDropdown,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.recordFilterDropdownText}>기록 보기: {getRecordFilterLabel(recordFilter)}</Text>
+                <Text style={styles.recordFilterDropdownIcon}>{showRecordFilterMenu ? '▲' : '▼'}</Text>
+              </Pressable>
+
+              {showRecordFilterMenu ? (
+                <View style={styles.recordFilterMenu}>
+                  {(['all', 'dribble', 'shoot'] as RecordFilter[]).map((filterOption) => (
+                    <Pressable
+                      key={filterOption}
+                      onPress={() => {
+                        setRecordFilter(filterOption);
+                        setShowRecordFilterMenu(false);
+                      }}
+                      style={({ pressed }) => [
+                        styles.recordFilterMenuItem,
+                        recordFilter === filterOption && styles.recordFilterMenuItemActive,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.recordFilterMenuText,
+                          recordFilter === filterOption && styles.recordFilterMenuTextActive,
+                        ]}
+                      >
+                        {getRecordFilterLabel(filterOption)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+
+            {isWide ? (
+              <View style={styles.recordsPanel}>
+                <ScrollView
+                  nestedScrollEnabled
+                  style={styles.recordsScroll}
+                  contentContainerStyle={styles.recordsScrollContent}
+                  showsVerticalScrollIndicator
+                >
+                  {selectedDateKey && filteredDateRecords.length === 0 ? (
+                    <View style={styles.recordCard}>
+                      <Text style={styles.recordText}>
+                        {recordFilter === 'all'
+                          ? '이 날짜에 저장된 레슨 영상이 없습니다.'
+                          : `이 날짜에 저장된 ${recordFilter === 'shoot' ? '슛 분석' : '드리블 분석'} 영상이 없습니다.`}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {filteredDateRecords.map((record) => {
+                    const syncedFeedback = playbackFeedback[record.id] || record.feedback;
+
+                    return (
+                      <View
+                        key={record.id}
+                        style={[
+                          styles.recordCard,
+                          record.mode === 'shoot' ? styles.recordCardShoot : styles.recordCardDribble,
+                        ]}
+                      >
+                        <View style={styles.recordHeader}>
+                          <View
+                            style={[
+                              styles.recordBadge,
+                              record.mode === 'shoot' ? styles.recordBadgeShoot : styles.recordBadgeDribble,
+                            ]}
+                          >
+                            <Text style={styles.recordBadgeText}>{getRecordModeLabel(record.mode)}</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.recordTitle}>{getRecordTitle(record.mode)}</Text>
+                        <Text style={styles.recordMeta}>{record.createdAt}</Text>
+
+                        {record.videoUri ? (
+                          <Video
+                            ref={(instance) => {
+                              videoRefs.current[record.id] = instance;
+                            }}
+                            source={{ uri: record.videoUri }}
+                            useNativeControls
+                            shouldPlay={false}
+                            isLooping={false}
+                            progressUpdateIntervalMillis={200}
+                            resizeMode={ResizeMode.COVER}
+                            style={styles.recordVideo}
+                            onPlaybackStatusUpdate={(status) => handlePlaybackStatus(record, status)}
+                          />
+                        ) : null}
+
+                        <View style={styles.liveFeedbackBox}>
+                          <Text style={styles.liveFeedbackLabel}>영상과 함께 보는 실시간 피드백</Text>
+                          <Text style={styles.liveFeedbackText}>{syncedFeedback}</Text>
+                        </View>
+
+                        <SmallButton title="기록 삭제" onPress={() => onDeleteRecord(record.id)} variant="red" />
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              </View>
             ) : (
               <>
-                <View style={styles.graphLegend}>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.dot, styles.dotAttempt]} />
-                    <Text style={styles.legendText}>슛 시도</Text>
+                {selectedDateKey && filteredDateRecords.length === 0 ? (
+                  <View style={styles.recordCard}>
+                    <Text style={styles.recordText}>
+                      {recordFilter === 'all'
+                        ? '이 날짜에 저장된 레슨 영상이 없습니다.'
+                        : `이 날짜에 저장된 ${recordFilter === 'shoot' ? '슛 분석' : '드리블 분석'} 영상이 없습니다.`}
+                    </Text>
                   </View>
-                  <View style={styles.legendItem}>
-                    <View style={[styles.dot, styles.dotSuccess]} />
-                    <Text style={styles.legendText}>슛 성공</Text>
-                  </View>
-                </View>
+                ) : null}
 
-                {(() => {
-                  const item = selectedShotGraphDatum;
-                  const attemptHeight = item.attempts > 0 ? Math.max(18, (item.attempts / selectedGraphMaxValue) * 230) : 10;
-                  const successHeight = item.successes > 0 ? Math.max(18, (item.successes / selectedGraphMaxValue) * 230) : 10;
-                  const shortDate = item.dateKey.slice(5);
+                {filteredDateRecords.map((record) => {
+                  const syncedFeedback = playbackFeedback[record.id] || record.feedback;
 
                   return (
-                    <View style={styles.graphSingleWrap}>
-                      <Text style={styles.graphRateLarge}>성공률 {item.successRate}%</Text>
-                      <View style={styles.barAreaLarge}>
-                        <View style={styles.barColumn}>
-                          <Text style={styles.barValue}>{item.attempts}</Text>
-                          <View style={[styles.barLarge, styles.attemptBar, { height: attemptHeight }]} />
-                          <Text style={styles.barLabel}>슛 시도</Text>
-                        </View>
-                        <View style={styles.barColumn}>
-                          <Text style={styles.barValue}>{item.successes}</Text>
-                          <View style={[styles.barLarge, styles.successBar, { height: successHeight }]} />
-                          <Text style={styles.barLabel}>슛 성공</Text>
+                    <View
+                      key={record.id}
+                      style={[
+                        styles.recordCard,
+                        record.mode === 'shoot' ? styles.recordCardShoot : styles.recordCardDribble,
+                      ]}
+                    >
+                      <View style={styles.recordHeader}>
+                        <View
+                          style={[
+                            styles.recordBadge,
+                            record.mode === 'shoot' ? styles.recordBadgeShoot : styles.recordBadgeDribble,
+                          ]}
+                        >
+                          <Text style={styles.recordBadgeText}>{getRecordModeLabel(record.mode)}</Text>
                         </View>
                       </View>
-                      <Text style={styles.graphDateLarge}>{shortDate}</Text>
+                      <Text style={styles.recordTitle}>{getRecordTitle(record.mode)}</Text>
+                      <Text style={styles.recordMeta}>{record.createdAt}</Text>
+
+                      {record.videoUri ? (
+                        <Video
+                          ref={(instance) => {
+                            videoRefs.current[record.id] = instance;
+                          }}
+                          source={{ uri: record.videoUri }}
+                          useNativeControls
+                          shouldPlay={false}
+                          isLooping={false}
+                          progressUpdateIntervalMillis={200}
+                          resizeMode={ResizeMode.COVER}
+                          style={styles.recordVideo}
+                          onPlaybackStatusUpdate={(status) => handlePlaybackStatus(record, status)}
+                        />
+                      ) : null}
+
+                      <View style={styles.liveFeedbackBox}>
+                        <Text style={styles.liveFeedbackLabel}>영상과 함께 보는 실시간 피드백</Text>
+                        <Text style={styles.liveFeedbackText}>{syncedFeedback}</Text>
+                      </View>
+
+                      <SmallButton title="기록 삭제" onPress={() => onDeleteRecord(record.id)} variant="red" />
                     </View>
                   );
-                })()}
+                })}
               </>
             )}
           </View>
-
-          <View style={styles.allGraphButtonRow}>
-            <SmallButton title="모든 슛 성공도 보기" onPress={() => setShowAllShotGraphModal(true)} variant="dark" />
-          </View>
-        </View>
-
-        <View style={[styles.recordsSection, isWide && styles.recordsSectionWide]}>
-          {isWide ? (
-            <View style={styles.recordsPanel}>
-              <ScrollView
-                nestedScrollEnabled
-                style={styles.recordsScroll}
-                contentContainerStyle={styles.recordsScrollContent}
-                showsVerticalScrollIndicator
-              >
-                {recordContent}
-              </ScrollView>
-            </View>
-          ) : (
-            recordContent
-          )}
         </View>
       </View>
 
       <Modal
-        visible={showAllShotGraphModal}
+        visible={showAllShotGraph}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowAllShotGraphModal(false)}
+        onRequestClose={() => setShowAllShotGraph(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>모든 날짜 슛 성공도 변화</Text>
+              <Text style={styles.modalTitle}>모든 날짜 슛 성공도</Text>
               <Pressable
-                onPress={() => setShowAllShotGraphModal(false)}
+                onPress={() => setShowAllShotGraph(false)}
                 style={({ pressed }) => [styles.modalCloseButton, pressed && styles.pressed]}
               >
                 <Text style={styles.modalCloseText}>닫기</Text>
@@ -436,104 +549,57 @@ export function DiaryScreen({
             </View>
 
             <Text style={styles.modalDescription}>
-              날짜별 성공률 변화는 꺾은선그래프로, 슛 시도 횟수는 막대그래프로 함께 보여줍니다.
+              가로축은 날짜, 세로축은 각 날짜의 슛 성공률입니다. 막대를 보면 날짜별 성공도를 한눈에 비교할 수 있습니다.
             </Text>
-
-            <View style={styles.modalLegend}>
-              <View style={styles.legendItem}>
-                <View style={styles.modalLegendLine} />
-                <Text style={styles.legendText}>성공률 변화</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={styles.modalLegendBar} />
-                <Text style={styles.legendText}>슛 시도 횟수</Text>
-              </View>
-            </View>
 
             {shotGraphData.length === 0 ? (
               <Text style={styles.graphEmpty}>아직 저장된 슛 레슨 기록이 없습니다.</Text>
             ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.allGraphScroll}>
-                <View style={[styles.lineChartArea, { width: allShotGraphChart.chartWidth, height: allShotGraphChart.chartHeight }]}>
-                  <View style={styles.lineChartGuideTop}>
-                    <Text style={styles.lineChartGuideText}>100%</Text>
+              <>
+                <View style={styles.modalGuideLegend}>
+                  <View style={styles.modalGuideItem}>
+                    <View style={styles.modalGuideLine} />
+                    <Text style={styles.legendText}>성공률 기준선</Text>
                   </View>
-                  <View style={styles.lineChartGuideUpperMid}>
-                    <Text style={styles.lineChartGuideText}>75%</Text>
+                  <View style={styles.modalGuideItem}>
+                    <View style={styles.modalGuideBar} />
+                    <Text style={styles.legendText}>날짜별 성공률</Text>
                   </View>
-                  <View style={styles.lineChartGuideMid}>
-                    <Text style={styles.lineChartGuideText}>50%</Text>
-                  </View>
-                  <View style={styles.lineChartGuideLowerMid}>
-                    <Text style={styles.lineChartGuideText}>25%</Text>
-                  </View>
-                  <View style={styles.lineChartGuideBottom}>
-                    <Text style={styles.lineChartGuideText}>0%</Text>
-                  </View>
-
-                  {allShotGraphChart.points.map((point) => (
-                    <View
-                      key={`${point.dateKey}-bar`}
-                      style={[
-                        styles.lineBarWrap,
-                        {
-                          left: point.x - 17,
-                          top: point.barTop,
-                        },
-                      ]}
-                    >
-                      <Text style={styles.lineBarValue}>{point.attempts}</Text>
-                      <View style={[styles.lineBar, { height: point.barHeight }]} />
-                    </View>
-                  ))}
-
-                  {allShotGraphChart.segments.map((segment) => (
-                    <View
-                      key={segment.key}
-                      style={[
-                        styles.lineSegment,
-                        {
-                          width: segment.width,
-                          left: segment.left,
-                          top: segment.top,
-                          transform: [{ rotate: `${segment.angle}deg` }],
-                        },
-                      ]}
-                    />
-                  ))}
-
-                  {allShotGraphChart.points.map((point) => (
-                    <View
-                      key={point.dateKey}
-                      style={[
-                        styles.linePointWrap,
-                        {
-                          left: point.x - 34,
-                          top: point.y - 34,
-                        },
-                      ]}
-                    >
-                      <Text style={styles.linePointRate}>{point.successRate}%</Text>
-                      <View style={styles.linePoint} />
-                    </View>
-                  ))}
-
-                  {allShotGraphChart.points.map((point) => (
-                    <View
-                      key={`${point.dateKey}-axis`}
-                      style={[
-                        styles.lineAxisLabelWrap,
-                        {
-                          left: point.x - 28,
-                          top: allShotGraphChart.chartBottom + 8,
-                        },
-                      ]}
-                    >
-                      <Text style={styles.lineAxisLabel}>{point.shortDate}</Text>
-                    </View>
-                  ))}
                 </View>
-              </ScrollView>
+
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.allGraphScroll}>
+                  <View style={[styles.allGraphArea, { width: allGraphChartWidth }]}>
+                    <View style={styles.allGraphGuideTop}>
+                      <Text style={styles.allGraphGuideText}>100%</Text>
+                    </View>
+                    <View style={styles.allGraphGuideUpper}>
+                      <Text style={styles.allGraphGuideText}>75%</Text>
+                    </View>
+                    <View style={styles.allGraphGuideMiddle}>
+                      <Text style={styles.allGraphGuideText}>50%</Text>
+                    </View>
+                    <View style={styles.allGraphGuideLower}>
+                      <Text style={styles.allGraphGuideText}>25%</Text>
+                    </View>
+                    <View style={styles.allGraphGuideBottom}>
+                      <Text style={styles.allGraphGuideText}>0%</Text>
+                    </View>
+
+                    {shotGraphData.map((item, index) => {
+                      const left = 40 + index * 86;
+                      const barHeight = item.successRate > 0 ? Math.max(14, (item.successRate / 100) * 220) : 10;
+
+                      return (
+                        <View key={item.dateKey} style={[styles.allGraphBarWrap, { left }]}>
+                          <Text style={styles.allGraphBarValue}>{item.successRate}%</Text>
+                          <View style={[styles.allGraphBar, { height: barHeight }]} />
+                          <Text style={styles.allGraphAxisLabel}>{item.dateKey.slice(5)}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              </>
             )}
           </View>
         </View>
@@ -611,13 +677,25 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 6,
   },
+  dayStatusEmoji: {
+    fontSize: 24,
+    lineHeight: 28,
+    marginTop: 1,
+  },
   dayStatusFire: {
-    fontSize: 20,
+    fontSize: 26,
+  },
+  dayStatusCheck: {
+    fontSize: 24,
+  },
+  dayStatusStreak: {
+    fontSize: 18,
     lineHeight: 22,
-    marginTop: 2,
+    marginTop: 3,
   },
   legend: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 14,
     marginTop: 18,
     marginBottom: 18,
@@ -630,6 +708,10 @@ const styles = StyleSheet.create({
   legendText: {
     color: colors.text,
     fontSize: 14,
+  },
+  legendEmoji: {
+    fontSize: 18,
+    lineHeight: 20,
   },
   dot: {
     width: 14,
@@ -648,6 +730,15 @@ const styles = StyleSheet.create({
   dotSuccess: {
     backgroundColor: '#32cd32',
   },
+  recordsSection: {
+    marginTop: 4,
+    gap: 14,
+  },
+  recordsTitle: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '900',
+  },
   contentRow: {
     gap: 16,
   },
@@ -659,21 +750,75 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   graphColumnWide: {
-    width: 360,
+    width: 340,
     flexShrink: 0,
   },
-  allGraphButtonRow: {
-    marginTop: 12,
-    alignItems: 'stretch',
-  },
-  recordsSection: {
-    marginTop: 4,
+  recordsColumn: {
     gap: 14,
   },
-  recordsSectionWide: {
+  recordsColumnWide: {
     flex: 1,
-    marginTop: 0,
     minHeight: 760,
+  },
+  recordFilterWrap: {
+    position: 'relative',
+    alignSelf: 'flex-start',
+    minWidth: 170,
+    zIndex: 10,
+  },
+  recordFilterDropdown: {
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  recordFilterDropdownText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  recordFilterDropdownIcon: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  recordFilterMenu: {
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
+    borderRadius: 16,
+    padding: 6,
+    backgroundColor: '#241a14',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    gap: 4,
+    shadowColor: '#000000',
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  recordFilterMenuItem: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  recordFilterMenuItemActive: {
+    backgroundColor: 'rgba(255,159,28,0.18)',
+  },
+  recordFilterMenuText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  recordFilterMenuTextActive: {
+    color: colors.text,
   },
   recordsPanel: {
     height: 760,
@@ -689,11 +834,6 @@ const styles = StyleSheet.create({
   recordsScrollContent: {
     gap: 14,
     padding: 12,
-  },
-  recordsTitle: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: '900',
   },
   graphCard: {
     backgroundColor: 'rgba(255,255,255,0.06)',
@@ -724,7 +864,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 300,
+    minHeight: 290,
+  },
+  allGraphButtonRow: {
+    marginTop: 12,
+    alignItems: 'stretch',
   },
   graphRateLarge: {
     color: colors.textAccent,
@@ -779,6 +923,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginTop: 14,
   },
+  graphCount: {
+    color: colors.textMuted,
+    fontSize: 14,
+    marginTop: 4,
+  },
   graphEmpty: {
     color: colors.textMuted,
     fontSize: 14,
@@ -831,79 +980,85 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 16,
   },
-  modalLegend: {
+  modalGuideLegend: {
     flexDirection: 'row',
     gap: 18,
     marginBottom: 14,
     flexWrap: 'wrap',
   },
-  modalLegendLine: {
+  modalGuideItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  modalGuideLine: {
     width: 24,
     height: 4,
     borderRadius: 999,
-    backgroundColor: colors.primary,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
-  modalLegendBar: {
+  modalGuideBar: {
     width: 18,
     height: 14,
     borderRadius: 6,
-    backgroundColor: 'rgba(255,159,28,0.35)',
+    backgroundColor: 'rgba(255,159,28,0.42)',
     borderWidth: 1,
-    borderColor: 'rgba(255,159,28,0.7)',
+    borderColor: 'rgba(255,159,28,0.78)',
   },
   allGraphScroll: {
     paddingRight: 12,
   },
-  lineChartArea: {
+  allGraphArea: {
+    height: 320,
     position: 'relative',
     borderRadius: 20,
     backgroundColor: 'rgba(0,0,0,0.22)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
-    paddingTop: 10,
-    paddingBottom: 24,
+    paddingTop: 14,
+    paddingBottom: 34,
   },
-  lineChartGuideTop: {
+  allGraphGuideTop: {
     position: 'absolute',
     left: 0,
     right: 0,
-    top: 18,
+    top: 22,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.08)',
   },
-  lineChartGuideUpperMid: {
+  allGraphGuideUpper: {
     position: 'absolute',
     left: 0,
     right: 0,
-    top: '31%',
+    top: '32%',
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.06)',
   },
-  lineChartGuideMid: {
+  allGraphGuideMiddle: {
     position: 'absolute',
     left: 0,
     right: 0,
-    top: '50%',
+    top: '52%',
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.06)',
   },
-  lineChartGuideLowerMid: {
+  allGraphGuideLower: {
     position: 'absolute',
     left: 0,
     right: 0,
-    top: '69%',
+    top: '72%',
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.06)',
   },
-  lineChartGuideBottom: {
+  allGraphGuideBottom: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 26,
+    bottom: 34,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.08)',
   },
-  lineChartGuideText: {
+  allGraphGuideText: {
     position: 'absolute',
     left: -6,
     top: -10,
@@ -913,71 +1068,71 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a130e',
     paddingHorizontal: 4,
   },
-  lineBarWrap: {
+  allGraphBarWrap: {
     position: 'absolute',
-    width: 34,
+    bottom: 42,
+    width: 56,
     alignItems: 'center',
     justifyContent: 'flex-end',
   },
-  lineBar: {
-    width: 34,
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
-    backgroundColor: 'rgba(255,159,28,0.35)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,159,28,0.7)',
-  },
-  lineBarValue: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  lineSegment: {
-    position: 'absolute',
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: colors.primary,
-  },
-  linePointWrap: {
-    position: 'absolute',
-    width: 68,
-    alignItems: 'center',
-  },
-  linePointRate: {
+  allGraphBarValue: {
     color: colors.textAccent,
     fontSize: 12,
     fontWeight: '900',
-    marginBottom: 6,
+    marginBottom: 8,
   },
-  linePoint: {
-    width: 14,
-    height: 14,
-    borderRadius: 999,
-    backgroundColor: colors.primary,
-    borderWidth: 3,
-    borderColor: '#ffd6a8',
+  allGraphBar: {
+    width: 42,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    backgroundColor: 'rgba(255,159,28,0.42)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,159,28,0.78)',
   },
-  linePointDate: {
+  allGraphAxisLabel: {
     color: colors.textSoft,
     fontSize: 12,
     fontWeight: '800',
-    marginTop: 8,
-  },
-  lineAxisLabelWrap: {
-    position: 'absolute',
-    width: 56,
-    alignItems: 'center',
-  },
-  lineAxisLabel: {
-    color: colors.textSoft,
-    fontSize: 12,
-    fontWeight: '800',
+    marginTop: 10,
   },
   recordCard: {
     backgroundColor: colors.surfaceStrong,
     borderRadius: 18,
     padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  recordCardShoot: {
+    borderColor: 'rgba(255,159,28,0.5)',
+    backgroundColor: 'rgba(255,159,28,0.09)',
+  },
+  recordCardDribble: {
+    borderColor: 'rgba(80,180,255,0.45)',
+    backgroundColor: 'rgba(80,180,255,0.08)',
+  },
+  recordHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    marginBottom: 10,
+  },
+  recordBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+  },
+  recordBadgeShoot: {
+    backgroundColor: 'rgba(255,159,28,0.16)',
+    borderColor: 'rgba(255,159,28,0.45)',
+  },
+  recordBadgeDribble: {
+    backgroundColor: 'rgba(80,180,255,0.14)',
+    borderColor: 'rgba(80,180,255,0.38)',
+  },
+  recordBadgeText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '900',
   },
   recordTitle: {
     color: colors.text,

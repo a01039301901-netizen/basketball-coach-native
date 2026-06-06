@@ -26,7 +26,8 @@ export default function App() {
           {app.screen === 'home' && (
             <HomeScreen
               homeworkToShow={app.homeworkToShow}
-              onDeleteHomeworkItem={app.deleteHomeworkItem}
+              isHomeworkVisible={app.isHomeworkRevealed}
+              onRevealHomework={app.revealHomework}
               onOpenLesson={() => void app.navigateTo('lesson')}
               onOpenDiary={() => void app.navigateTo('diary')}
               onOpenSkill={() => void app.navigateTo('skill')}
@@ -38,17 +39,17 @@ export default function App() {
           {app.screen === 'lesson' && (
             <LessonScreen
               lessonMode={app.lessonMode}
-              dribbleLessonView={app.dribbleLessonView}
+              selectedDribbleView={app.selectedDribbleView}
               selectedBallBrand={app.selectedBallBrand}
               selectedBallColors={app.selectedBallColors}
               isCameraActive={app.isCameraActive}
               isLessonActive={app.isLessonActive}
-              isCameraReady={app.isCameraReady}
-              cameraSessionKey={app.cameraSessionKey}
-              countdownValue={app.countdownValue}
-              dribbleResetToken={app.dribbleResetToken}
-              shootResetToken={app.shootResetToken}
-              recordingStartToken={app.recordingStartToken}
+                isCameraReady={app.isCameraReady}
+                cameraSessionKey={app.cameraSessionKey}
+                countdownValue={app.countdownValue}
+                dribbleResetToken={app.dribbleResetToken}
+                shootResetToken={app.shootResetToken}
+                recordingStartToken={app.recordingStartToken}
               recordingStopToken={app.recordingStopToken}
               debugText={app.debugText}
               feedbackText={app.feedbackText}
@@ -56,8 +57,8 @@ export default function App() {
               currentDribbleCount={app.currentDribbleCount}
               cameraError={app.cameraError}
               onSelectMode={app.changeLessonMode}
-              onSelectDribbleLessonView={app.changeDribbleLessonView}
-              onBeginLesson={(dribbleTargetCount) => void app.beginLesson(dribbleTargetCount)}
+              onSelectDribbleView={app.setSelectedDribbleView}
+              onBeginLesson={(dribbleTargetCount, dribbleView) => void app.beginLesson(dribbleTargetCount, dribbleView)}
               onEndLesson={() => void app.endLesson()}
               onRegisterSuccessfulShot={app.registerSuccessfulShot}
               onPoseMessage={app.handlePoseMessage}
@@ -90,8 +91,10 @@ export default function App() {
             <SettingsScreen
               selectedBallBrand={app.selectedBallBrand}
               selectedBallColors={app.selectedBallColors}
+              selectedPosition={app.selectedPosition}
               onSelectBallBrand={app.selectBallBrand}
               onToggleBallColor={app.toggleBallColor}
+              onSelectPosition={app.selectPosition}
             />
           )}
 

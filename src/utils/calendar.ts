@@ -1,14 +1,15 @@
 import type { CalendarCell } from '../types/app';
+import { DAILY_DRIBBLE_TARGET, DAILY_SHOOT_TARGET } from './homework';
 
-function formatAttendanceKey(date: Date) {
+function formatDateKey(date: Date) {
   return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
 }
 
-function getAttendanceStreak(targetDate: Date, attendance: Record<string, string>) {
+function getAttendanceStreak(date: Date, attendance: Record<string, string>) {
   let streak = 0;
-  const cursor = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+  const cursor = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-  while (attendance[formatAttendanceKey(cursor)] === 'attended') {
+  while (attendance[formatDateKey(cursor)] === 'attended') {
     streak += 1;
     cursor.setDate(cursor.getDate() - 1);
   }
@@ -16,34 +17,24 @@ function getAttendanceStreak(targetDate: Date, attendance: Record<string, string
   return streak;
 }
 
-function isPastDate(targetDate: Date, todayFloor: Date) {
-  return targetDate.getTime() < todayFloor.getTime();
+function hasCompletedHomework(
+  dateKey: string,
+  dailyDribbleRecords: Record<string, number>,
+  shotAttemptRecords: Record<string, number>
+) {
+  return (dailyDribbleRecords[dateKey] || 0) >= DAILY_DRIBBLE_TARGET && (shotAttemptRecords[dateKey] || 0) >= DAILY_SHOOT_TARGET;
 }
 
-function getAbsenceStatus(targetDate: Date, attendance: Record<string, string>, todayFloor: Date) {
-  const previousDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate() - 1);
-  const previousKey = formatAttendanceKey(previousDate);
-
-  if (attendance[previousKey] === 'attended') {
-    return '🤦‍♂️';
-  }
-
-  let cursor = previousDate;
-
-  while (isPastDate(cursor, todayFloor)) {
-    const cursorKey = formatAttendanceKey(cursor);
-
-    if (attendance[cursorKey] === 'attended') {
-      return '💧';
-    }
-
-    cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() - 1);
-  }
-
-  return '결석';
+function buildAttendanceStatus(baseEmoji: '✔️' | '🔥', streak: number) {
+  return streak >= 2 ? `${baseEmoji}×(${streak})` : baseEmoji;
 }
 
-export function getCalendarCells(currentDate: Date, attendance: Record<string, string>): CalendarCell[] {
+export function getCalendarCells(
+  currentDate: Date,
+  attendance: Record<string, string>,
+  dailyDribbleRecords: Record<string, number>,
+  shotAttemptRecords: Record<string, number>
+): CalendarCell[] {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const firstDay = new Date(year, month, 1).getDay();
@@ -61,14 +52,17 @@ export function getCalendarCells(currentDate: Date, attendance: Record<string, s
     const targetDate = new Date(year, month, date);
     let status = '미체크';
     let variant: 'default' | 'attended' | 'absent' = 'default';
-    let streakCount: number | undefined;
 
     if (attendance[dateKey] === 'attended') {
-      status = '🔥';
+      const streak = getAttendanceStreak(targetDate, attendance);
+      const baseEmoji = hasCompletedHomework(dateKey, dailyDribbleRecords, shotAttemptRecords) ? '🔥' : '✔️';
+      status = buildAttendanceStatus(baseEmoji, streak);
       variant = 'attended';
-      streakCount = getAttendanceStreak(targetDate, attendance);
-    } else if (isPastDate(targetDate, todayFloor)) {
-      status = getAbsenceStatus(targetDate, attendance, todayFloor);
+    } else if (targetDate < todayFloor) {
+      const previousDate = new Date(year, month, date - 1);
+      const previousStreak = getAttendanceStreak(previousDate, attendance);
+
+      status = previousStreak >= 2 ? '🤦‍♂️' : '💧';
       variant = 'absent';
     }
 
@@ -78,7 +72,6 @@ export function getCalendarCells(currentDate: Date, attendance: Record<string, s
       date,
       dateKey,
       status,
-      streakCount,
       variant,
     });
   }

@@ -1,10 +1,12 @@
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SmallButton } from '../components/common/Buttons';
 import { colors } from '../theme/colors';
+import type { HomeworkProgressItem } from '../types/app';
 
 interface HomeScreenProps {
-  homeworkToShow: string[];
-  onDeleteHomeworkItem: (item: string) => void;
+  homeworkToShow: HomeworkProgressItem[];
+  isHomeworkVisible: boolean;
+  onRevealHomework: () => void;
   onOpenLesson: () => void;
   onOpenDiary: () => void;
   onOpenSkill: () => void;
@@ -32,7 +34,8 @@ function HomeMenuButton({ title, subtitle, onPress }: HomeMenuButtonProps) {
 
 export function HomeScreen({
   homeworkToShow,
-  onDeleteHomeworkItem,
+  isHomeworkVisible,
+  onRevealHomework,
   onOpenLesson,
   onOpenDiary,
   onOpenSkill,
@@ -56,17 +59,17 @@ export function HomeScreen({
         <View style={styles.menuButtons}>
           <HomeMenuButton
             title="AI에게 레슨 받기"
-            subtitle="카메라로 자세와 움직임을 분석하면서 실시간 코칭 피드백을 받아보세요."
+            subtitle="카메라로 실시간 자세와 공 움직임을 분석하면서 코칭 피드백을 받아보세요."
             onPress={onOpenLesson}
           />
           <HomeMenuButton
             title="기록일지"
-            subtitle="날짜별 출석, 슛 성공 기록, 저장한 레슨 영상을 한눈에 확인할 수 있어요."
+            subtitle="날짜별 출석, 슛 기록, 저장한 레슨 영상을 한눈에 확인할 수 있어요."
             onPress={onOpenDiary}
           />
           <HomeMenuButton
-            title="농구 기술 배우기"
-            subtitle="슛폼, 드리블, 수비 기술 영상을 보고 설명까지 함께 확인해보세요."
+            title="프로 기술 배우기"
+            subtitle="배우고 싶은 농구 기술과 선수 영상을 보고 오늘의 연습 동작을 골라보세요."
             onPress={onOpenSkill}
           />
         </View>
@@ -76,32 +79,43 @@ export function HomeScreen({
         <View style={styles.sideAccent} />
         <Text style={styles.panelTitle}>오늘의 연습 숙제</Text>
 
-        <View style={styles.homeworkList}>
-          {homeworkToShow.map((item) => (
-            <View key={item} style={styles.homeworkItem}>
-              <View style={styles.homeworkBody}>
-                <View style={styles.homeworkBullet} />
-                <Text style={styles.homeworkText}>{item}</Text>
+        {isHomeworkVisible ? (
+          <View style={styles.homeworkList}>
+            {homeworkToShow.map((item) => (
+              <View key={item.id} style={styles.homeworkItem}>
+                <View style={styles.homeworkHeader}>
+                  <View style={[styles.homeworkBullet, item.isCompleted && styles.homeworkBulletCompleted]} />
+                  <Text style={styles.homeworkText}>{item.title}</Text>
+                </View>
+                <View style={styles.homeworkMetaRow}>
+                  <Text style={styles.homeworkStatus}>{item.completionText}</Text>
+                  <Text style={styles.homeworkProgress}>{item.progressText}</Text>
+                </View>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${item.progressPercent}%` }]} />
+                </View>
               </View>
-              <Pressable
-                onPress={() => onDeleteHomeworkItem(item)}
-                style={({ pressed }) => [styles.deleteBadge, pressed && styles.pressed]}
-              >
-                <Text style={styles.deleteBadgeText}>X</Text>
-              </Pressable>
-            </View>
-          ))}
+            ))}
+          </View>
+        ) : (
+          <View style={styles.homeworkHiddenCard}>
+            <Text style={styles.homeworkHiddenTitle}>오늘의 숙제 확인하기</Text>
+            <Text style={styles.homeworkHiddenText}>버튼을 누르면 오늘 해야 할 숙제 내용과 진행도가 나타나고, 그 상태로 계속 유지됩니다.</Text>
+            <Pressable onPress={onRevealHomework} style={({ pressed }) => [styles.homeworkRevealButton, pressed && styles.pressed]}>
+              <Text style={styles.homeworkRevealButtonText}>오늘의 숙제 확인하기</Text>
+            </Pressable>
+          </View>
+        )}
+
+        <View style={styles.rulesButtonWrap}>
+          <SmallButton title="농구 규칙 가이드" onPress={onOpenRules} variant="dark" />
         </View>
 
         <View style={styles.homeTipBox}>
           <Text style={styles.tipTitle}>연습 팁</Text>
           <Text style={styles.tipText}>
-            레슨 전에 공간을 밝게 하고, 공과 전신이 화면에 잘 보이도록 거리를 맞추면 분석 정확도가 더 좋아집니다.
+            숙제 진행도는 오늘 날짜 기준으로 계산됩니다. 드리블은 누적 횟수, 슛은 시도 횟수가 바로 퍼센트로 반영됩니다.
           </Text>
-        </View>
-
-        <View style={styles.rulesButtonRow}>
-          <SmallButton title="농구 규칙 가이드" onPress={onOpenRules} variant="dark" />
         </View>
       </View>
     </View>
@@ -231,10 +245,41 @@ const styles = StyleSheet.create({
     gap: 14,
     marginTop: 20,
   },
-  homeworkItem: {
-    flexDirection: 'row',
+  homeworkHiddenCard: {
+    marginTop: 20,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.24)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 18,
+    paddingVertical: 22,
     alignItems: 'center',
-    justifyContent: 'space-between',
+  },
+  homeworkHiddenTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+    marginBottom: 8,
+  },
+  homeworkHiddenText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+  homeworkRevealButton: {
+    marginTop: 16,
+    borderRadius: 999,
+    backgroundColor: colors.secondary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  homeworkRevealButtonText: {
+    color: '#1b130c',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  homeworkItem: {
     gap: 12,
     backgroundColor: 'rgba(255,255,255,0.13)',
     borderRadius: 16,
@@ -243,39 +288,57 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
   },
-  homeworkBody: {
-    flex: 1,
+  homeworkHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 12,
   },
   homeworkBullet: {
     width: 10,
     height: 10,
     borderRadius: 999,
-    marginTop: 6,
     backgroundColor: '#ffd17d',
+  },
+  homeworkBulletCompleted: {
+    backgroundColor: '#77d970',
   },
   homeworkText: {
     flex: 1,
     color: colors.textSoft,
     fontSize: 15,
     lineHeight: 22,
+    fontWeight: '800',
   },
-  deleteBadge: {
-    width: 28,
-    height: 28,
+  homeworkMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  homeworkStatus: {
+    color: '#ffe1b5',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  homeworkProgress: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  progressTrack: {
+    width: '100%',
+    height: 8,
     borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.22)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    overflow: 'hidden',
   },
-  deleteBadgeText: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '900',
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#ffb347',
+  },
+  rulesButtonWrap: {
+    marginTop: 16,
+    alignSelf: 'flex-start',
   },
   homeTipBox: {
     marginTop: 18,
@@ -293,10 +356,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 14,
     lineHeight: 22,
-  },
-  rulesButtonRow: {
-    marginTop: 14,
-    alignItems: 'flex-start',
   },
   pressed: {
     opacity: 0.9,

@@ -1,34 +1,49 @@
-import { REQUIRED_HOMEWORK, REQUIRED_SKILL_HOMEWORK } from '../constants/content';
-import type { LessonMode } from '../types/app';
+import type { HomeworkProgressItem } from '../types/app';
 
-const DEFAULT_HOMEWORK = [REQUIRED_HOMEWORK, REQUIRED_SKILL_HOMEWORK];
+export const DAILY_DRIBBLE_HOMEWORK_TITLE = '드리블 50개 연습하기';
+export const DAILY_SHOOT_HOMEWORK_TITLE = '슛 10번 연습하기';
+export const DAILY_DRIBBLE_TARGET = 50;
+export const DAILY_SHOOT_TARGET = 10;
 
-export function normalizeHomework(homework: string[]): string[] {
-  const uniqueHomework = homework.filter((item, index, array) => array.indexOf(item) === index);
-  const missingDefaults = DEFAULT_HOMEWORK.filter((item) => !uniqueHomework.includes(item));
-
-  if (missingDefaults.length === 0) {
-    return uniqueHomework.slice(0, 4);
+function clampProgress(current: number, target: number) {
+  if (target <= 0) {
+    return 0;
   }
 
-  return [...DEFAULT_HOMEWORK, ...uniqueHomework.filter((item) => !DEFAULT_HOMEWORK.includes(item))].slice(0, 4);
+  return Math.min(target, Math.max(0, current));
 }
 
-export function getHomeworkToShow(homework: string[]): string[] {
-  return homework.slice(0, 4);
+function toProgressItem(
+  id: HomeworkProgressItem['id'],
+  title: string,
+  current: number,
+  target: number
+): HomeworkProgressItem {
+  const safeCurrent = clampProgress(current, target);
+  const progressPercent = Math.round((safeCurrent / target) * 100);
+  const isCompleted = safeCurrent >= target;
+
+  return {
+    id,
+    title,
+    current: safeCurrent,
+    target,
+    progressPercent,
+    isCompleted,
+    progressText: `${progressPercent}% (${safeCurrent}/${target})`,
+    completionText: isCompleted ? '숙제 완수' : '진행 중',
+  };
 }
 
-export function buildLessonHomework(mode: LessonMode): string {
-  return mode === 'shoot' ? '슛 30개 연습하기' : '드리블 50개 연습하기';
+export function buildDailyHomeworkProgress(dribbleCount: number, shootAttempts: number): HomeworkProgressItem[] {
+  return [
+    toProgressItem('dribble', DAILY_DRIBBLE_HOMEWORK_TITLE, dribbleCount, DAILY_DRIBBLE_TARGET),
+    toProgressItem('shoot', DAILY_SHOOT_HOMEWORK_TITLE, shootAttempts, DAILY_SHOOT_TARGET),
+  ];
 }
 
-export function mergeHomework(homework: string[], nextHomework: string): string[] {
-  const pinnedItems = homework.filter((item) => DEFAULT_HOMEWORK.includes(item));
-  const customItems = homework.filter((item) => !DEFAULT_HOMEWORK.includes(item) && item !== nextHomework);
-
-  return [...pinnedItems, nextHomework, ...customItems].slice(0, 4);
-}
-
-export function removeHomework(homework: string[], targetHomework: string): string[] {
-  return homework.filter((item) => item !== targetHomework);
+export function getHomeworkCompletionMessage(type: HomeworkProgressItem['id']): string {
+  return type === 'dribble'
+    ? `${DAILY_DRIBBLE_HOMEWORK_TITLE} 숙제를 완수했어요.`
+    : `${DAILY_SHOOT_HOMEWORK_TITLE} 숙제를 완수했어요.`;
 }

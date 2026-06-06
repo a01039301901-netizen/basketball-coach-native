@@ -1,31 +1,80 @@
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card } from '../components/common/Card';
-import { BALL_BRAND_OPTIONS, BALL_COLOR_OPTIONS } from '../constants/settings';
+import { BALL_BRAND_OPTIONS, BALL_COLOR_OPTIONS, POSITION_OPTIONS } from '../constants/settings';
 import { colors } from '../theme/colors';
-import type { BallBrandOption, BallColorOption } from '../types/app';
+import type { BallBrandOption, BallColorOption, PositionOption } from '../types/app';
 
 interface SettingsScreenProps {
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
+  selectedPosition: PositionOption;
   onSelectBallBrand: (brand: BallBrandOption) => void;
   onToggleBallColor: (color: BallColorOption) => void;
+  onSelectPosition: (position: PositionOption) => void;
 }
 
 export function SettingsScreen({
   selectedBallBrand,
   selectedBallColors,
+  selectedPosition,
   onSelectBallBrand,
   onToggleBallColor,
+  onSelectPosition,
 }: SettingsScreenProps) {
+  const [isPositionOpen, setIsPositionOpen] = useState(false);
+
+  const selectedPositionLabel = useMemo(
+    () => POSITION_OPTIONS.find((option) => option.key === selectedPosition)?.label ?? '없음',
+    [selectedPosition]
+  );
+
   return (
     <View style={styles.contentGap}>
-      <Card title="공 인식 설정" style={styles.card}>
+      <Card title="인식 설정" style={styles.card}>
         <Text style={styles.lead}>
-          사용하는 농구공 브랜드를 먼저 고르면 해당 브랜드에 맞는 공 색과 이음선 기준으로 인식을 보강합니다.
-          아래 색상은 세부 조정용이라 여러 개를 함께 켤 수 있습니다.
+          사용하는 농구공 브랜드와 색상을 먼저 고르면 공 인식이 더 안정적으로 동작합니다. 아래에서 사용자 포지션도 함께
+          선택할 수 있어요.
         </Text>
 
-        <Text style={styles.sectionTitle}>농구공 브랜드</Text>
+        <Text style={styles.sectionTitle}>사용자 포지션 정하기</Text>
+        <View style={styles.positionWrap}>
+          <Pressable
+            onPress={() => setIsPositionOpen((current) => !current)}
+            style={({ pressed }) => [styles.positionTrigger, pressed && styles.pressed]}
+          >
+            <Text style={styles.positionTriggerLabel}>현재 선택</Text>
+            <Text style={styles.positionTriggerValue}>{selectedPositionLabel}</Text>
+            <Text style={styles.positionTriggerArrow}>{isPositionOpen ? '▲' : '▼'}</Text>
+          </Pressable>
+
+          {isPositionOpen ? (
+            <View style={styles.positionDropdown}>
+              {POSITION_OPTIONS.map((option) => {
+                const active = selectedPosition === option.key;
+
+                return (
+                  <Pressable
+                    key={option.key}
+                    onPress={() => {
+                      onSelectPosition(option.key);
+                      setIsPositionOpen(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.positionOption,
+                      active && styles.positionOptionActive,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text style={[styles.positionOptionText, active && styles.positionOptionTextActive]}>{option.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+        </View>
+
+        <Text style={[styles.sectionTitle, styles.sectionSpacing]}>농구공 브랜드</Text>
         <View style={styles.optionList}>
           {BALL_BRAND_OPTIONS.map((option) => {
             const active = selectedBallBrand === option.key;
@@ -52,7 +101,7 @@ export function SettingsScreen({
           })}
         </View>
 
-        <Text style={[styles.sectionTitle, styles.colorsTitle]}>세부 색상 조정</Text>
+        <Text style={[styles.sectionTitle, styles.sectionSpacing]}>공 색상 조정</Text>
         <View style={styles.optionList}>
           {BALL_COLOR_OPTIONS.map((option) => {
             const active = selectedBallColors.includes(option.key);
@@ -78,7 +127,7 @@ export function SettingsScreen({
                 />
                 <View style={styles.optionTextWrap}>
                   <Text style={styles.optionTitle}>{option.label}</Text>
-                  <Text style={styles.optionSubtitle}>{active ? '현재 인식 색상에 포함됨' : '탭해서 인식 색상에 추가'}</Text>
+                  <Text style={styles.optionSubtitle}>{active ? '현재 인식 색상에 포함됨' : '이 색상을 인식 목록에 추가'}</Text>
                 </View>
                 <View style={[styles.checkBadge, active && styles.checkBadgeActive]}>
                   <Text style={styles.checkBadgeText}>{active ? 'ON' : 'OFF'}</Text>
@@ -111,8 +160,63 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginBottom: 14,
   },
-  colorsTitle: {
+  sectionSpacing: {
     marginTop: 24,
+  },
+  positionWrap: {
+    gap: 10,
+  },
+  positionTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  positionTriggerLabel: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  positionTriggerValue: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  positionTriggerArrow: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  positionDropdown: {
+    gap: 8,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    padding: 10,
+  },
+  positionOption: {
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  positionOptionActive: {
+    backgroundColor: 'rgba(255,159,28,0.2)',
+  },
+  positionOptionText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  positionOptionTextActive: {
+    color: colors.text,
   },
   optionList: {
     gap: 14,

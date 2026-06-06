@@ -1,4 +1,4 @@
-import type { BallBrandOption, BallColorOption } from '../types/app';
+import type { BallBrandOption, BallColorOption, PositionOption } from '../types/app';
 
 export const BALL_COLOR_OPTIONS: Array<{ key: BallColorOption; label: string; accent: string }> = [
   { key: 'orange', label: '주황색', accent: '#ff9f1c' },
@@ -28,3 +28,11 @@ export const BALL_BRAND_PRESETS: Record<BallBrandOption, BallColorOption[]> = {
 
 export const DEFAULT_BALL_BRAND: BallBrandOption = 'wilson';
 export const DEFAULT_BALL_COLORS: BallColorOption[] = BALL_BRAND_PRESETS[DEFAULT_BALL_BRAND];
+
+export const POSITION_OPTIONS: Array<{ key: PositionOption; label: string }> = [
+  { key: 'none', label: '없음' },
+  { key: 'defense', label: '수비수' },
+  { key: 'offense', label: '공격수' },
+];
+
+export const DEFAULT_POSITION: PositionOption = 'none';

@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Card } from '../components/common/Card';
-import { SkillVideoPlayer } from '../components/skill/SkillVideoPlayer';
 import { SKILLS } from '../constants/content';
+import { Card } from '../components/common/Card';
+import { SmallButton } from '../components/common/Buttons';
 import { colors } from '../theme/colors';
 import type { SkillKey } from '../types/app';
 
@@ -11,14 +11,12 @@ interface SkillScreenProps {
   onOpenSkillVideo: () => void;
 }
 
-export function SkillScreen({ selectedSkillKey, onSelectSkill }: SkillScreenProps) {
+export function SkillScreen({ selectedSkillKey, onSelectSkill, onOpenSkillVideo }: SkillScreenProps) {
   const selectedSkill = selectedSkillKey ? SKILLS[selectedSkillKey] : null;
 
   return (
-    <Card title="농구 기술 배우기">
-      <Text style={styles.paragraph}>
-        배우고 싶은 농구 기술을 고르면, 이 화면 안에서 바로 영상을 보고 아래 설명으로 핵심 동작도 함께 확인할 수 있습니다.
-      </Text>
+    <Card title="새로운 기술 배우기">
+      <Text style={styles.paragraph}>배우고 싶은 기술을 고르면 대표 선수와 관찰 포인트를 보여주고, 유튜브 검색으로 바로 이어집니다.</Text>
 
       <View style={styles.skillGrid}>
         {Object.entries(SKILLS).map(([key, value]) => (
@@ -40,15 +38,12 @@ export function SkillScreen({ selectedSkillKey, onSelectSkill }: SkillScreenProp
         {selectedSkill ? (
           <>
             <Text style={styles.skillTitle}>{selectedSkill.title}</Text>
-            <Text style={styles.skillType}>{selectedSkill.videoType}</Text>
-            <SkillVideoPlayer videoUrl={selectedSkill.videoUrl} />
-            <View style={styles.descriptionCard}>
-              <Text style={styles.descriptionLabel}>기술 설명</Text>
-              <Text style={styles.skillInfo}>{selectedSkill.description}</Text>
-            </View>
+            <Text style={styles.skillInfo}>대표 선수: {selectedSkill.player}</Text>
+            <Text style={styles.skillInfo}>관찰 포인트: {selectedSkill.point}</Text>
+            <SmallButton title="유튜브에서 보기" onPress={onOpenSkillVideo} />
           </>
         ) : (
-          <Text style={styles.skillInfo}>기술을 선택하면 여기에서 영상을 재생하고 설명을 볼 수 있습니다.</Text>
+          <Text style={styles.skillInfo}>기술을 선택하면 여기에서 설명과 영상 이동 버튼을 볼 수 있어요.</Text>
         )}
       </View>
     </Card>
@@ -86,30 +81,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceStrong,
     borderRadius: 20,
     padding: 18,
-    gap: 12,
+    gap: 10,
   },
   skillTitle: {
     color: colors.text,
     fontSize: 22,
     fontWeight: '900',
-  },
-  skillType: {
-    color: colors.textAccent,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  descriptionCard: {
-    backgroundColor: 'rgba(0,0,0,0.22)',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  descriptionLabel: {
-    color: colors.textSoft,
-    fontSize: 13,
-    fontWeight: '900',
-    marginBottom: 8,
   },
   skillInfo: {
     color: colors.textSoft,
