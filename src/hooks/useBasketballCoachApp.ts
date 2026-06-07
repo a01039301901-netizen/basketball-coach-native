@@ -524,7 +524,6 @@ export function useBasketballCoachApp() {
           STORAGE_KEYS.ballColors,
           STORAGE_KEYS.ballBrand,
           STORAGE_KEYS.position,
-          STORAGE_KEYS.homeworkRevealed,
         ]);
 
         if (!isMounted) {
@@ -542,7 +541,6 @@ export function useBasketballCoachApp() {
         const parsedBallBrand = parseStoredJson<BallBrandOption>(stored[STORAGE_KEYS.ballBrand], DEFAULT_BALL_BRAND);
         const parsedBallColors = parseStoredJson<BallColorOption[]>(stored[STORAGE_KEYS.ballColors], DEFAULT_BALL_COLORS);
         const parsedPosition = parseStoredJson<PositionOption>(stored[STORAGE_KEYS.position], DEFAULT_POSITION);
-        const parsedHomeworkRevealed = parseStoredJson<boolean>(stored[STORAGE_KEYS.homeworkRevealed], false);
 
         const derivedShotAttempts = parsedLessonRecords.reduce<Record<string, number>>((accumulator, record) => {
           if (record.mode !== 'shoot') {
@@ -570,7 +568,6 @@ export function useBasketballCoachApp() {
           parsedBallColors.length > 0 ? parsedBallColors : BALL_BRAND_PRESETS[parsedBallBrand] ?? DEFAULT_BALL_COLORS
         );
         setSelectedPosition(parsedPosition);
-        setIsHomeworkRevealed(parsedHomeworkRevealed);
         setSelectedDateKey(todayKey);
 
         await AsyncStorage.setItem(STORAGE_KEYS.attendance, JSON.stringify(parsedAttendance));
@@ -617,10 +614,6 @@ export function useBasketballCoachApp() {
   useEffect(() => {
     void AsyncStorage.setItem(STORAGE_KEYS.position, JSON.stringify(selectedPosition));
   }, [selectedPosition]);
-
-  useEffect(() => {
-    void AsyncStorage.setItem(STORAGE_KEYS.homeworkRevealed, JSON.stringify(isHomeworkRevealed));
-  }, [isHomeworkRevealed]);
 
   useEffect(() => {
     return () => {

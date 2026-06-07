@@ -100,7 +100,7 @@ export function HomeScreen({
         ) : (
           <View style={styles.homeworkHiddenCard}>
             <Text style={styles.homeworkHiddenTitle}>오늘의 숙제 확인하기</Text>
-            <Text style={styles.homeworkHiddenText}>버튼을 누르면 오늘 해야 할 숙제 내용과 진행도가 나타나고, 그 상태로 계속 유지됩니다.</Text>
+            <Text style={styles.homeworkHiddenText}>버튼을 누르면 오늘 해야 할 숙제 내용과 진행도가 나타나고, 앱 안에서는 계속 보입니다.</Text>
             <Pressable onPress={onRevealHomework} style={({ pressed }) => [styles.homeworkRevealButton, pressed && styles.pressed]}>
               <Text style={styles.homeworkRevealButtonText}>오늘의 숙제 확인하기</Text>
             </Pressable>

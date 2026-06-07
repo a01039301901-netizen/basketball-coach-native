@@ -8,5 +8,4 @@ export const STORAGE_KEYS = {
   ballColors: 'basketballBallColors',
   ballBrand: 'basketballBallBrand',
   position: 'basketballPosition',
-  homeworkRevealed: 'basketballHomeworkRevealed',
 } as const;
