@@ -6,7 +6,7 @@ import { Card } from '../components/common/Card';
 import { DAY_NAMES } from '../constants/content';
 import { colors } from '../theme/colors';
 import type { CalendarCell, FeedbackMoment, LessonRecord, ShotGraphDatum } from '../types/app';
-import { formatMonthTitle } from '../utils/date';
+import { formatDateKey, formatMonthTitle } from '../utils/date';
 
 interface DiaryScreenProps {
   currentDate: Date;
@@ -40,6 +40,19 @@ function getRecordFilterLabel(filter: RecordFilter) {
   }
 
   return '전체';
+}
+
+function parseDateKeyToDate(dateKey: string) {
+  const [yearText, monthText, dayText] = dateKey.split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return new Date();
+  }
+
+  return new Date(year, month - 1, day);
 }
 
 function getSyncedFeedback(timeline: FeedbackMoment[], fallback: string, positionMillis: number) {
@@ -76,6 +89,7 @@ export function DiaryScreen({
   const isWide = width >= 980;
   const [playbackFeedback, setPlaybackFeedback] = useState<Record<string, string>>({});
   const [showAllShotGraph, setShowAllShotGraph] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [recordFilter, setRecordFilter] = useState<RecordFilter>('all');
   const [showRecordFilterMenu, setShowRecordFilterMenu] = useState(false);
   const videoRefs = useRef<Record<string, Video | null>>({});
@@ -88,7 +102,26 @@ export function DiaryScreen({
     () => Math.max(1, selectedShotGraph?.attempts ?? 0, selectedShotGraph?.successes ?? 0),
     [selectedShotGraph]
   );
-  const allGraphChartWidth = useMemo(() => Math.max(320, shotGraphData.length * 86 + 48), [shotGraphData.length]);
+  const allShotGraphData = useMemo(() => shotGraphData.filter((item) => item.attempts >= 10), [shotGraphData]);
+  const allGraphChartWidth = useMemo(() => Math.max(320, allShotGraphData.length * 86 + 48), [allShotGraphData.length]);
+  const selectedDate = useMemo(() => (selectedDateKey ? parseDateKeyToDate(selectedDateKey) : new Date()), [selectedDateKey]);
+  const selectedDateAttendance = useMemo(() => {
+    const selectedCell = calendarCells.find((cell) => cell.type === 'day' && cell.dateKey === selectedDateKey);
+
+    if (!selectedCell || selectedCell.type !== 'day') {
+      return { icon: '•', label: '미체크', isDefault: true };
+    }
+
+    if (selectedCell.variant === 'attended') {
+      return { icon: '✅', label: '출석', isDefault: false };
+    }
+
+    if (selectedCell.variant === 'absent') {
+      return { icon: '❌', label: '결석', isDefault: false };
+    }
+
+    return { icon: '•', label: '미체크', isDefault: true };
+  }, [calendarCells, selectedDateKey]);
   const filteredDateRecords = useMemo(() => {
     if (recordFilter === 'all') {
       return selectedDateRecords;
@@ -96,6 +129,14 @@ export function DiaryScreen({
 
     return selectedDateRecords.filter((record) => record.mode === recordFilter);
   }, [recordFilter, selectedDateRecords]);
+
+  const moveSelectedDate = useCallback(
+    (delta: number) => {
+      const nextDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() + delta);
+      onOpenDate(formatDateKey(nextDate));
+    },
+    [onOpenDate, selectedDate]
+  );
 
   useEffect(() => {
     setPlaybackFeedback((current) => {
@@ -204,71 +245,24 @@ export function DiaryScreen({
 
   return (
     <Card title="기록일지">
-      <View style={styles.calendarTop}>
-        <SmallButton title="이전 달" onPress={() => onChangeMonth(-1)} variant="dark" />
-        <Text style={styles.monthTitle}>{formatMonthTitle(currentDate)}</Text>
-        <SmallButton title="다음 달" onPress={() => onChangeMonth(1)} variant="dark" />
-      </View>
-
-      <View style={styles.calendarGrid}>
-        {DAY_NAMES.map((name) => (
-          <View key={name} style={styles.dayName}>
-            <Text style={styles.dayNameText}>{name}</Text>
-          </View>
-        ))}
-
-        {calendarCells.map((cell) => {
-          if (cell.type === 'empty') {
-            return <View key={cell.key} style={[styles.dayCell, styles.dayCellEmpty]} />;
-          }
-
-          const isFireStatus = cell.status.startsWith('🔥');
-          const isCheckStatus = cell.status.startsWith('✔️');
-          const isEmojiStatus = isFireStatus || isCheckStatus || cell.status === '💧' || cell.status === '🤦‍♂️';
-          const isStreakStatus = cell.status.includes('×(');
-
-          return (
-            <Pressable
-              key={cell.key}
-              onPress={() => onOpenDate(cell.dateKey)}
-              style={({ pressed }) => [
-                styles.dayCell,
-                cell.variant === 'attended' && styles.dayCellAttended,
-                cell.variant === 'absent' && styles.dayCellAbsent,
-                selectedDateKey === cell.dateKey && styles.dayCellSelected,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text style={styles.dayNumber}>{cell.date}</Text>
-              <Text
-                style={[
-                  styles.dayStatus,
-                  isEmojiStatus && styles.dayStatusEmoji,
-                  isFireStatus && styles.dayStatusFire,
-                  isCheckStatus && styles.dayStatusCheck,
-                  isStreakStatus && styles.dayStatusStreak,
-                ]}
-              >
-                {cell.status}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <View style={styles.legend}>
-        <View style={styles.legendItem}>
-          <Text style={styles.legendEmoji}>🔥</Text>
-          <Text style={styles.legendText}>출석</Text>
+      <View style={styles.dateSelectorRow}>
+        <View style={[styles.dateStatusBadge, selectedDateAttendance.isDefault && styles.dateStatusBadgeDefault]}>
+          <Text style={styles.dateStatusText}>
+            {selectedDateAttendance.icon} {selectedDateAttendance.label}
+          </Text>
         </View>
-        <View style={styles.legendItem}>
-          <Text style={styles.legendEmoji}>💧</Text>
-          <Text style={styles.legendText}>결석</Text>
+
+        <View style={styles.dateSelectorMain}>
+          <Pressable onPress={() => moveSelectedDate(-1)} style={({ pressed }) => [styles.dateArrowButton, pressed && styles.pressed]}>
+            <Text style={styles.dateArrowText}>{'<'}</Text>
+          </Pressable>
+          <Text style={styles.dateSelectorText}>{selectedDateKey || formatDateKey(selectedDate)}</Text>
+          <Pressable onPress={() => moveSelectedDate(1)} style={({ pressed }) => [styles.dateArrowButton, pressed && styles.pressed]}>
+            <Text style={styles.dateArrowText}>{'>'}</Text>
+          </Pressable>
         </View>
-        <View style={styles.legendItem}>
-          <Text style={styles.legendEmoji}>🤦‍♂️</Text>
-          <Text style={styles.legendText}>연속 출석 후 결석</Text>
-        </View>
+
+        <SmallButton title="달력" onPress={() => setShowCalendarModal(true)} variant="dark" />
       </View>
 
       <View style={styles.recordsSection}>
@@ -530,6 +524,92 @@ export function DiaryScreen({
         </View>
       </View>
 
+      <Modal visible={showCalendarModal} transparent animationType="fade" onRequestClose={() => setShowCalendarModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, styles.calendarModalCard]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>날짜 선택</Text>
+              <Pressable
+                onPress={() => setShowCalendarModal(false)}
+                style={({ pressed }) => [styles.modalCloseButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.modalCloseText}>닫기</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.calendarTop}>
+              <SmallButton title="이전 달" onPress={() => onChangeMonth(-1)} variant="dark" />
+              <Text style={styles.monthTitle}>{formatMonthTitle(currentDate)}</Text>
+              <SmallButton title="다음 달" onPress={() => onChangeMonth(1)} variant="dark" />
+            </View>
+
+            <View style={styles.calendarGrid}>
+              {DAY_NAMES.map((name) => (
+                <View key={name} style={styles.dayName}>
+                  <Text style={styles.dayNameText}>{name}</Text>
+                </View>
+              ))}
+
+              {calendarCells.map((cell) => {
+                if (cell.type === 'empty') {
+                  return <View key={cell.key} style={[styles.dayCell, styles.dayCellEmpty]} />;
+                }
+
+                const isFireStatus = cell.status.startsWith('🔥');
+                const isCheckStatus = cell.status.startsWith('✔️');
+                const isEmojiStatus = isFireStatus || isCheckStatus || cell.status === '💧' || cell.status === '🤦‍♂️';
+                const isStreakStatus = cell.status.includes('×(');
+
+                return (
+                  <Pressable
+                    key={cell.key}
+                    onPress={() => {
+                      onOpenDate(cell.dateKey);
+                      setShowCalendarModal(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.dayCell,
+                      cell.variant === 'attended' && styles.dayCellAttended,
+                      cell.variant === 'absent' && styles.dayCellAbsent,
+                      selectedDateKey === cell.dateKey && styles.dayCellSelected,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text style={styles.dayNumber}>{cell.date}</Text>
+                    <Text
+                      style={[
+                        styles.dayStatus,
+                        isEmojiStatus && styles.dayStatusEmoji,
+                        isFireStatus && styles.dayStatusFire,
+                        isCheckStatus && styles.dayStatusCheck,
+                        isStreakStatus && styles.dayStatusStreak,
+                      ]}
+                    >
+                      {cell.status}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={styles.legend}>
+              <View style={styles.legendItem}>
+                <Text style={styles.legendEmoji}>🔥</Text>
+                <Text style={styles.legendText}>출석</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <Text style={styles.legendEmoji}>💧</Text>
+                <Text style={styles.legendText}>결석</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <Text style={styles.legendEmoji}>🤦‍♂️</Text>
+                <Text style={styles.legendText}>연속 출석 후 결석</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <Modal
         visible={showAllShotGraph}
         transparent
@@ -552,8 +632,8 @@ export function DiaryScreen({
               가로축은 날짜, 세로축은 각 날짜의 슛 성공률입니다. 막대를 보면 날짜별 성공도를 한눈에 비교할 수 있습니다.
             </Text>
 
-            {shotGraphData.length === 0 ? (
-              <Text style={styles.graphEmpty}>아직 저장된 슛 레슨 기록이 없습니다.</Text>
+            {allShotGraphData.length === 0 ? (
+              <Text style={styles.graphEmpty}>슛 시도 횟수가 10회 이상인 날짜만 그래프에 표시됩니다.</Text>
             ) : (
               <>
                 <View style={styles.modalGuideLegend}>
@@ -585,7 +665,7 @@ export function DiaryScreen({
                       <Text style={styles.allGraphGuideText}>0%</Text>
                     </View>
 
-                    {shotGraphData.map((item, index) => {
+                    {allShotGraphData.map((item, index) => {
                       const left = 40 + index * 86;
                       const barHeight = item.successRate > 0 ? Math.max(14, (item.successRate / 100) * 220) : 10;
 
@@ -609,6 +689,66 @@ export function DiaryScreen({
 }
 
 const styles = StyleSheet.create({
+  dateSelectorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 18,
+  },
+  dateSelectorMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    width: 320,
+    maxWidth: '100%',
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  dateArrowButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  dateArrowText: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  dateStatusBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    backgroundColor: 'rgba(255,159,28,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,159,28,0.35)',
+  },
+  dateStatusBadgeDefault: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  dateStatusText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  dateSelectorText: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '900',
+    textAlign: 'center',
+    minWidth: 0,
+  },
   calendarTop: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -626,10 +766,10 @@ const styles = StyleSheet.create({
   calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
   dayName: {
-    width: '14%',
+    width: '14.2857%',
     minHeight: 42,
     borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.14)',
@@ -643,7 +783,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   dayCell: {
-    width: '14%',
+    width: '14.2857%',
     minHeight: 78,
     borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.08)',
@@ -947,6 +1087,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a130e',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
+  },
+  calendarModalCard: {
+    maxWidth: 960,
+    width: '100%',
+    alignSelf: 'center',
   },
   modalHeader: {
     flexDirection: 'row',

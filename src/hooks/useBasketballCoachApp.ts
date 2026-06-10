@@ -70,6 +70,19 @@ function parseStoredJson<T>(value: string | null, fallback: T): T {
   return value ? (JSON.parse(value) as T) : fallback;
 }
 
+function parseDateKeyToDate(dateKey: string) {
+  const [yearText, monthText, dayText] = dateKey.split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return new Date();
+  }
+
+  return new Date(year, month - 1, day);
+}
+
 function parseTimelineTimestamp(value: string) {
   const match = value.match(/^\[(\d{2}):(\d{2})\]\s*(.*)$/);
 
@@ -1122,7 +1135,9 @@ export function useBasketballCoachApp() {
 
     setScreen(nextScreen);
     if (nextScreen === 'diary' && !selectedDateKey) {
-      setSelectedDateKey(formatDateKey(new Date()));
+      const today = new Date();
+      setSelectedDateKey(formatDateKey(today));
+      setCurrentDate(today);
     }
   }
 
@@ -1419,8 +1434,9 @@ export function useBasketballCoachApp() {
     pendingFeedbackRef.current = null;
     setCountdownValue(null);
     setIsLessonActive(false);
+    setIsCameraReady(false);
     setRecordingStopToken(Date.now());
-    setDebugText('목표 드리블 횟수에 도달했습니다. 녹화를 마무리하는 중입니다.');
+    setDebugText('목표 드리블 횟수에 도달했습니다. 종료 호루라기를 울리고 카메라 연결을 끄는 중입니다.');
   }, [clearShootAutoEnd]);
 
   const completeDribbleReview = useCallback(
@@ -1877,10 +1893,30 @@ export function useBasketballCoachApp() {
           setDebugText(payload.message || '영상 저장에 실패했습니다. 피드백만 유지한 상태로 종료합니다.');
 
           if (pendingReviewStopRef.current) {
+            clearRecordingWait();
             pendingReviewStopRef.current = false;
+            lessonStartedAtRef.current = null;
+            dribbleLessonPhaseRef.current = 'stance_setup';
+            shootLessonStartedRef.current = false;
+            resetShootAnalysisTracking();
+            dribbleTargetCountRef.current = null;
+            dribbleAutoEndingRef.current = false;
+            stanceCountdownStartedAtRef.current = null;
+            feedbackTimelineRef.current = [];
+            pendingFeedbackRef.current = null;
+            setCurrentDribbleCount(0);
+            setCountdownValue(null);
+            setDribbleResetToken(0);
+            setShootResetToken(0);
+            setRecordingStartToken(0);
             setRecordingStopToken(0);
             setIsLessonActive(false);
-            setIsCameraActive(true);
+            setIsCameraActive(false);
+            setIsCameraReady(false);
+            setCameraError('');
+            latestFeedbackRef.current = `${latestFeedbackRef.current}\n\n영상 저장에는 실패했지만 목표 드리블 횟수를 채워 레슨은 종료되었습니다.`;
+            setFeedbackText(latestFeedbackRef.current);
+            setDebugText('목표 드리블 횟수를 모두 채워 레슨이 종료되었습니다. 카메라 연결도 꺼졌습니다.');
             return;
           }
 
@@ -1917,11 +1953,23 @@ export function useBasketballCoachApp() {
         setDebugText('카메라 상태 메시지를 처리하는 중 문제가 발생했습니다.');
       }
     },
-    [applyDribbleAnalysis, applyShootAnalysisWithStance, completeDribbleReview, completeShootReview, finalizeLessonSession, isCameraActive, isLessonActive]
+    [
+      applyDribbleAnalysis,
+      applyShootAnalysisWithStance,
+      clearRecordingWait,
+      completeDribbleReview,
+      completeShootReview,
+      finalizeLessonSession,
+      isCameraActive,
+      isLessonActive,
+      resetShootAnalysisTracking,
+      setImmediateLessonFeedback,
+    ]
   );
 
   function openDiaryDate(dateKey: string) {
     setSelectedDateKey(dateKey);
+    setCurrentDate(parseDateKeyToDate(dateKey));
   }
 
   function changeMonth(delta: number) {
