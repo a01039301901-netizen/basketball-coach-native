@@ -1,7 +1,29 @@
 export type AppScreen = 'home' | 'lesson' | 'skill' | 'diary' | 'settings' | 'rules';
+export type AuthMode = 'login' | 'signup';
+export type AccountGender = 'male' | 'female' | 'other';
 
 export type LessonMode = 'dribble' | 'shoot';
 export type DribbleLessonView = 'front' | 'side';
+
+export interface UserAccount {
+  id: string;
+  name: string;
+  age: number;
+  gender: AccountGender;
+  password: string;
+  createdAt: string;
+}
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  age: number;
+  gender: AccountGender;
+}
+
+export interface AuthSession {
+  userId: string;
+}
 
 export type CalendarCell =
   | {
@@ -123,6 +145,9 @@ export interface ShootAnalysis {
   lowestLegAngle: number | null;
   headPeakY: number | null;
   releaseDetected: boolean;
+  ballNearShootingHand: boolean;
+  shootingHandRaised: boolean;
+  readyPoseDetected: boolean;
   armAngleState: ShootArmAngleState;
   releaseTiming: ShootReleaseTimingState;
   legAngleState: ShootLegAngleState;

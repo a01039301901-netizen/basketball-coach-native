@@ -102,11 +102,19 @@ export function LessonCamera({
     }
 
     const iframeWindow = iframeRef.current?.contentWindow as
-      | (Window & { __codexStopRecordingForReview?: () => void })
+      | (Window & {
+          __codexStopRecordingForReview?: () => void;
+          __codexStopRecordingAndDisconnectCamera?: () => void;
+        })
       | undefined;
 
+    if (lessonMode === 'dribble') {
+      iframeWindow?.__codexStopRecordingAndDisconnectCamera?.();
+      return;
+    }
+
     iframeWindow?.__codexStopRecordingForReview?.();
-  }, [isCameraActive, recordingStopToken]);
+  }, [isCameraActive, lessonMode, recordingStopToken]);
 
   const srcDoc = useMemo(
     () => buildPoseWebHtml(lessonMode, selectedBallBrand, selectedBallColors),

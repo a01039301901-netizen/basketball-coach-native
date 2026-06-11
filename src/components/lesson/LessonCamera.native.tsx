@@ -71,10 +71,15 @@ export function LessonCamera({
       return;
     }
 
+    const stopScript =
+      lessonMode === 'dribble'
+        ? "window.__codexStopRecordingAndDisconnectCamera && window.__codexStopRecordingAndDisconnectCamera(); true;"
+        : "window.__codexStopRecordingForReview && window.__codexStopRecordingForReview(); true;";
+
     webViewRef.current?.injectJavaScript(
-      "window.__codexStopRecordingForReview && window.__codexStopRecordingForReview(); true;"
+      stopScript
     );
-  }, [isCameraActive, recordingStopToken]);
+  }, [isCameraActive, lessonMode, recordingStopToken]);
 
   return (
     <View style={styles.videoWrap}>

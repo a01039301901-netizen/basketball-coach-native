@@ -1,8 +1,9 @@
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { FireworkBurst } from './src/components/common/FireworkBurst';
 import { Header } from './src/components/common/Header';
 import { useBasketballCoachApp } from './src/hooks/useBasketballCoachApp';
+import { AuthScreen } from './src/screens/AuthScreen';
 import { DiaryScreen } from './src/screens/DiaryScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { LessonScreen } from './src/screens/LessonScreen';
@@ -13,6 +14,7 @@ import { colors } from './src/theme/colors';
 
 export default function App() {
   const app = useBasketballCoachApp();
+  const showBack = Boolean(app.currentUser && app.screen !== 'home');
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -21,9 +23,25 @@ export default function App() {
         <View style={styles.backgroundGlowTop} />
         <View style={styles.backgroundGlowBottom} />
         <FireworkBurst visible={app.showFireworks} items={app.fireworks} />
-        <Header showBack={app.screen !== 'home'} onBack={() => void app.navigateTo('home')} />
+        <Header showBack={showBack} onBack={() => void app.navigateTo('home')} />
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {app.screen === 'home' && (
+          {!app.isReady && (
+            <View style={styles.loadingCard}>
+              <Text style={styles.loadingTitle}>앱 준비 중</Text>
+              <Text style={styles.loadingText}>로그인 정보와 레슨 데이터를 불러오고 있습니다.</Text>
+            </View>
+          )}
+
+          {app.isReady && !app.currentUser && (
+            <AuthScreen
+              mode={app.authMode}
+              onChangeMode={app.changeAuthMode}
+              onLogin={app.login}
+              onSignup={app.signup}
+            />
+          )}
+
+          {app.isReady && app.currentUser && app.screen === 'home' && (
             <HomeScreen
               homeworkToShow={app.homeworkToShow}
               isHomeworkVisible={app.isHomeworkRevealed}
@@ -36,7 +54,7 @@ export default function App() {
             />
           )}
 
-          {app.screen === 'lesson' && (
+          {app.isReady && app.currentUser && app.screen === 'lesson' && (
             <LessonScreen
               lessonMode={app.lessonMode}
               selectedDribbleView={app.selectedDribbleView}
@@ -65,7 +83,7 @@ export default function App() {
             />
           )}
 
-          {app.screen === 'skill' && (
+          {app.isReady && app.currentUser && app.screen === 'skill' && (
             <SkillScreen
               selectedSkillKey={app.selectedSkillKey}
               onSelectSkill={app.selectSkill}
@@ -73,7 +91,7 @@ export default function App() {
             />
           )}
 
-          {app.screen === 'diary' && (
+          {app.isReady && app.currentUser && app.screen === 'diary' && (
             <DiaryScreen
               currentDate={app.currentDate}
               calendarCells={app.calendarCells}
@@ -87,18 +105,20 @@ export default function App() {
             />
           )}
 
-          {app.screen === 'settings' && (
+          {app.isReady && app.currentUser && app.screen === 'settings' && (
             <SettingsScreen
+              currentUser={app.currentUser}
               selectedBallBrand={app.selectedBallBrand}
               selectedBallColors={app.selectedBallColors}
               selectedPosition={app.selectedPosition}
               onSelectBallBrand={app.selectBallBrand}
               onToggleBallColor={app.toggleBallColor}
               onSelectPosition={app.selectPosition}
+              onLogout={() => void app.logout()}
             />
           )}
 
-          {app.screen === 'rules' && <RulesGuideScreen />}
+          {app.isReady && app.currentUser && app.screen === 'rules' && <RulesGuideScreen />}
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -138,5 +158,23 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 32,
     gap: 18,
+  },
+  loadingCard: {
+    borderRadius: 24,
+    padding: 24,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  loadingTitle: {
+    color: colors.text,
+    fontSize: 24,
+    fontWeight: '900',
+    marginBottom: 10,
+  },
+  loadingText: {
+    color: colors.textMuted,
+    fontSize: 15,
+    lineHeight: 22,
   },
 });

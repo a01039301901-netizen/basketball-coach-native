@@ -146,6 +146,7 @@ export function buildPoseWebHtml(
       let shootHeadPeakY = null;
       let shootReleaseDetected = false;
       let shootReleaseTiming = "unknown";
+      let cameraStreamStopped = false;
 
       function post(payload) {
         if (window.ReactNativeWebView) {
@@ -173,6 +174,21 @@ export function buildPoseWebHtml(
         shootHeadPeakY = null;
         shootReleaseDetected = false;
         shootReleaseTiming = "unknown";
+      }
+
+      function disconnectCameraStream() {
+        if (cameraStreamStopped) {
+          return;
+        }
+
+        cameraStreamStopped = true;
+
+        if (video.srcObject) {
+          video.srcObject.getTracks().forEach((track) => track.stop());
+          video.srcObject = null;
+        }
+
+        setHud("카메라 연결을 종료했습니다.");
       }
 
       function finalizeRecording() {
@@ -254,6 +270,7 @@ export function buildPoseWebHtml(
 
       function stopRecordingForReview() {
         if (!recorder || recorder.state === "inactive") {
+          post({ type: "recording_error", message: "녹화 중이 아니라 종료 영상을 저장하지 못했습니다." });
           return;
         }
 
@@ -261,8 +278,21 @@ export function buildPoseWebHtml(
         recorder.stop();
       }
 
+      function stopRecordingAndDisconnectCamera() {
+        if (!recorder || recorder.state === "inactive") {
+          disconnectCameraStream();
+          post({ type: "recording_error", message: "녹화 중이 아니라 종료 영상을 저장하지 못했습니다." });
+          return;
+        }
+
+        recorderStopping = true;
+        recorder.stop();
+        disconnectCameraStream();
+      }
+
       window.__codexRestartRecordingFromCue = restartRecordingFromCue;
       window.__codexStopRecordingForReview = stopRecordingForReview;
+      window.__codexStopRecordingAndDisconnectCamera = stopRecordingAndDisconnectCamera;
       window.__codexResetDribbleTracking = resetDribbleTracking;
       window.__codexResetShootTracking = resetShootTracking;
 
@@ -800,11 +830,11 @@ export function buildPoseWebHtml(
           return "unknown";
         }
 
-        if (torsoLeanAngle < 15) {
+        if (torsoLeanAngle < 40) {
           return "high";
         }
 
-        if (torsoLeanAngle > 45) {
+        if (torsoLeanAngle > 80) {
           return "low";
         }
 
@@ -817,11 +847,11 @@ export function buildPoseWebHtml(
             return "unknown";
           }
 
-          if (frontStanceAngle < 40) {
+          if (frontStanceAngle < 140) {
             return "too_low";
           }
 
-          if (frontStanceAngle > 60) {
+          if (frontStanceAngle > 170) {
             return "too_upright";
           }
 
@@ -832,11 +862,11 @@ export function buildPoseWebHtml(
           return "unknown";
         }
 
-        if (torsoLeanAngle < 15) {
+        if (torsoLeanAngle < 40) {
           return "too_upright";
         }
 
-        if (torsoLeanAngle > 45) {
+        if (torsoLeanAngle > 80) {
           return "too_low";
         }
 
@@ -844,14 +874,23 @@ export function buildPoseWebHtml(
       }
 
       function classifyFrontStanceAngle(landmarks, hipMid) {
+        const leftAnkle = landmarks[INDEX.leftAnkle];
         const leftKnee = landmarks[INDEX.leftKnee];
+        const leftHip = landmarks[INDEX.leftHip];
+        const rightAnkle = landmarks[INDEX.rightAnkle];
         const rightKnee = landmarks[INDEX.rightKnee];
+        const rightHip = landmarks[INDEX.rightHip];
 
-        if (!hipMid || !visible(leftKnee) || !visible(rightKnee)) {
+        const legAngles = [
+          visible(leftAnkle) && visible(leftKnee) && visible(leftHip) ? angleAt(leftAnkle, leftKnee, leftHip) : null,
+          visible(rightAnkle) && visible(rightKnee) && visible(rightHip) ? angleAt(rightAnkle, rightKnee, rightHip) : null,
+        ].filter((value) => value !== null);
+
+        if (legAngles.length === 0) {
           return null;
         }
 
-        return angleAt(leftKnee, hipMid, rightKnee);
+        return legAngles.reduce((sum, value) => sum + value, 0) / legAngles.length;
       }
 
       function classifyFrontBallLaneState(landmarks, ball) {
@@ -1057,6 +1096,7 @@ export function buildPoseWebHtml(
         const armAngle = shootingSide === "left" ? leftArmAngle : shootingSide === "right" ? rightArmAngle : null;
         const shootingShoulder = shootingSide === "left" ? leftShoulder : shootingSide === "right" ? rightShoulder : null;
         const shootingWrist = shootingSide === "left" ? leftWrist : shootingSide === "right" ? rightWrist : null;
+        const ballPoint = ball ? { x: ball.x, y: ball.y, visibility: 1 } : null;
 
         let armAngleState = "unknown";
         if (armAngle !== null) {
@@ -1069,6 +1109,16 @@ export function buildPoseWebHtml(
           }
         }
 
+        const ballNearShootingHand =
+          Boolean(ballPoint) &&
+          visible(shootingWrist) &&
+          distanceBetween(shootingWrist, ballPoint) <= 0.16;
+        const shootingHandRaised =
+          visible(shootingShoulder) &&
+          visible(shootingWrist) &&
+          shootingWrist.y <= shootingShoulder.y + 0.05;
+        const readyPoseDetected = armAngleState === "balanced" && ballNearShootingHand && shootingHandRaised;
+
         const legAngles = [angleAt(leftHip, leftKnee, leftAnkle), angleAt(rightHip, rightKnee, rightAnkle)].filter((value) => value !== null);
         const legAngle = legAngles.length > 0 ? legAngles.reduce((sum, value) => sum + value, 0) / legAngles.length : null;
 
@@ -1080,9 +1130,9 @@ export function buildPoseWebHtml(
         const referenceLegAngle = shootLowestLegAngle ?? legAngle;
         let legAngleState = "unknown";
         if (referenceLegAngle !== null) {
-          if (referenceLegAngle < 100) {
+          if (referenceLegAngle < 120) {
             legAngleState = "low";
-          } else if (referenceLegAngle > 130) {
+          } else if (referenceLegAngle > 140) {
             legAngleState = "high";
           } else {
             legAngleState = "balanced";
@@ -1126,11 +1176,15 @@ export function buildPoseWebHtml(
           lowestLegAngle: shootLowestLegAngle,
           headPeakY: shootHeadPeakY,
           releaseDetected: shootReleaseDetected,
+          ballNearShootingHand,
+          shootingHandRaised,
+          readyPoseDetected,
           armAngleState,
           releaseTiming,
           legAngleState,
           summary: [
             "Arm:" + (armAngleState === "narrow" ? "narrow" : armAngleState === "wide" ? "wide" : armAngleState === "balanced" ? "balanced" : "unknown"),
+            "Ready:" + (readyPoseDetected ? "yes" : "no"),
             "Timing:" + (releaseTiming === "early" ? "early" : releaseTiming === "late" ? "late" : releaseTiming === "balanced" ? "balanced" : "unknown"),
             "Leg:" + (legAngleState === "low" ? "low" : legAngleState === "high" ? "high" : legAngleState === "balanced" ? "balanced" : "unknown"),
             "Release:" + (shootReleaseDetected ? "yes" : "no"),
@@ -1382,6 +1436,7 @@ export function buildPoseWebHtml(
           }
         });
 
+        cameraStreamStopped = false;
         video.srcObject = stream;
         await video.play();
         resizeCanvas();
@@ -1397,6 +1452,10 @@ export function buildPoseWebHtml(
       }
 
       function loop() {
+        if (cameraStreamStopped) {
+          return;
+        }
+
         if (!poseLandmarker || video.readyState < 2) {
           requestAnimationFrame(loop);
           return;
@@ -1428,9 +1487,7 @@ export function buildPoseWebHtml(
           recorderStopping = true;
           recorder.stop();
         }
-        if (video.srcObject) {
-          video.srcObject.getTracks().forEach((track) => track.stop());
-        }
+        disconnectCameraStream();
       });
 
       start();
@@ -1453,4 +1510,3 @@ export function buildPoseBootstrapScript(
     true;
   `;
 }
-

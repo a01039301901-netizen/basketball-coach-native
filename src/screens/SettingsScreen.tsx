@@ -1,26 +1,42 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
 import { BALL_BRAND_OPTIONS, BALL_COLOR_OPTIONS, POSITION_OPTIONS } from '../constants/settings';
 import { colors } from '../theme/colors';
-import type { BallBrandOption, BallColorOption, PositionOption } from '../types/app';
+import type { AuthUser, BallBrandOption, BallColorOption, PositionOption } from '../types/app';
 
 interface SettingsScreenProps {
+  currentUser: AuthUser;
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
   selectedPosition: PositionOption;
   onSelectBallBrand: (brand: BallBrandOption) => void;
   onToggleBallColor: (color: BallColorOption) => void;
   onSelectPosition: (position: PositionOption) => void;
+  onLogout: () => void;
+}
+
+function formatGenderLabel(gender: AuthUser['gender']) {
+  switch (gender) {
+    case 'male':
+      return '남성';
+    case 'female':
+      return '여성';
+    default:
+      return '기타';
+  }
 }
 
 export function SettingsScreen({
+  currentUser,
   selectedBallBrand,
   selectedBallColors,
   selectedPosition,
   onSelectBallBrand,
   onToggleBallColor,
   onSelectPosition,
+  onLogout,
 }: SettingsScreenProps) {
   const [isPositionOpen, setIsPositionOpen] = useState(false);
 
@@ -31,13 +47,35 @@ export function SettingsScreen({
 
   return (
     <View style={styles.contentGap}>
+      <Card title="계정" style={styles.accountCard}>
+        <Text style={styles.lead}>현재 로그인한 계정입니다. 다른 계정으로 바꾸려면 로그아웃 후 다시 로그인해 주세요.</Text>
+
+        <View style={styles.accountInfoWrap}>
+          <View style={styles.accountInfoRow}>
+            <Text style={styles.accountLabel}>이름</Text>
+            <Text style={styles.accountValue}>{currentUser.name}</Text>
+          </View>
+          <View style={styles.accountInfoRow}>
+            <Text style={styles.accountLabel}>나이</Text>
+            <Text style={styles.accountValue}>{currentUser.age}세</Text>
+          </View>
+          <View style={styles.accountInfoRow}>
+            <Text style={styles.accountLabel}>성별</Text>
+            <Text style={styles.accountValue}>{formatGenderLabel(currentUser.gender)}</Text>
+          </View>
+        </View>
+
+        <View style={styles.logoutWrap}>
+          <SmallButton title="로그아웃" onPress={onLogout} variant="red" />
+        </View>
+      </Card>
+
       <Card title="인식 설정" style={styles.card}>
         <Text style={styles.lead}>
-          사용하는 농구공 브랜드와 색상을 먼저 고르면 공 인식이 더 안정적으로 동작합니다. 아래에서 사용자 포지션도 함께
-          선택할 수 있어요.
+          사용 중인 포지션과 공 브랜드, 색상을 맞춰 두면 드리블과 슛 분석이 조금 더 자연스럽게 동작합니다.
         </Text>
 
-        <Text style={styles.sectionTitle}>사용자 포지션 정하기</Text>
+        <Text style={styles.sectionTitle}>포지션 설정</Text>
         <View style={styles.positionWrap}>
           <Pressable
             onPress={() => setIsPositionOpen((current) => !current)}
@@ -45,7 +83,7 @@ export function SettingsScreen({
           >
             <Text style={styles.positionTriggerLabel}>현재 선택</Text>
             <Text style={styles.positionTriggerValue}>{selectedPositionLabel}</Text>
-            <Text style={styles.positionTriggerArrow}>{isPositionOpen ? '▲' : '▼'}</Text>
+            <Text style={styles.positionTriggerArrow}>{isPositionOpen ? '접기' : '열기'}</Text>
           </Pressable>
 
           {isPositionOpen ? (
@@ -83,11 +121,7 @@ export function SettingsScreen({
               <Pressable
                 key={option.key}
                 onPress={() => onSelectBallBrand(option.key)}
-                style={({ pressed }) => [
-                  styles.optionButton,
-                  active && styles.optionButtonActive,
-                  pressed && styles.pressed,
-                ]}
+                style={({ pressed }) => [styles.optionButton, active && styles.optionButtonActive, pressed && styles.pressed]}
               >
                 <View style={styles.optionTextWrap}>
                   <Text style={styles.optionTitle}>{option.label}</Text>
@@ -110,11 +144,7 @@ export function SettingsScreen({
               <Pressable
                 key={option.key}
                 onPress={() => onToggleBallColor(option.key)}
-                style={({ pressed }) => [
-                  styles.optionButton,
-                  active && styles.optionButtonActive,
-                  pressed && styles.pressed,
-                ]}
+                style={({ pressed }) => [styles.optionButton, active && styles.optionButtonActive, pressed && styles.pressed]}
               >
                 <View
                   style={[
@@ -127,7 +157,7 @@ export function SettingsScreen({
                 />
                 <View style={styles.optionTextWrap}>
                   <Text style={styles.optionTitle}>{option.label}</Text>
-                  <Text style={styles.optionSubtitle}>{active ? '현재 인식 색상에 포함됨' : '이 색상을 인식 목록에 추가'}</Text>
+                  <Text style={styles.optionSubtitle}>{active ? '현재 인식 대상에 포함됨' : '이 색상을 인식 목록에 추가'}</Text>
                 </View>
                 <View style={[styles.checkBadge, active && styles.checkBadgeActive]}>
                   <Text style={styles.checkBadgeText}>{active ? 'ON' : 'OFF'}</Text>
@@ -148,11 +178,43 @@ const styles = StyleSheet.create({
   card: {
     minHeight: 320,
   },
+  accountCard: {
+    minHeight: 0,
+  },
   lead: {
     color: colors.textMuted,
     fontSize: 15,
     lineHeight: 23,
     marginBottom: 20,
+  },
+  accountInfoWrap: {
+    gap: 12,
+  },
+  accountInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  accountLabel: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  accountValue: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  logoutWrap: {
+    marginTop: 18,
+    alignSelf: 'flex-start',
   },
   sectionTitle: {
     color: colors.textSoft,

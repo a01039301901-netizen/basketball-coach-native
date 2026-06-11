@@ -1,4 +1,6 @@
 export const STORAGE_KEYS = {
+  accounts: 'basketballAccounts',
+  session: 'basketballSession',
   attendance: 'basketballAttendance',
   homework: 'basketballHomework',
   lessonRecords: 'basketballLessonRecords',

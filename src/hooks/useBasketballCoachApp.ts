@@ -10,7 +10,11 @@ import { SKILLS } from '../constants/content';
 import { BALL_BRAND_PRESETS, DEFAULT_BALL_BRAND, DEFAULT_BALL_COLORS, DEFAULT_POSITION } from '../constants/settings';
 import { STORAGE_KEYS } from '../constants/storage';
 import type {
+  AccountGender,
   AppScreen,
+  AuthMode,
+  AuthSession,
+  AuthUser,
   BallBrandOption,
   BallColorOption,
   DribbleAnalysis,
@@ -25,6 +29,7 @@ import type {
   ShotGraphDatum,
   ShootAnalysis,
   SkillKey,
+  UserAccount,
 } from '../types/app';
 import { getCalendarCells } from '../utils/calendar';
 import { formatDateKey } from '../utils/date';
@@ -39,6 +44,7 @@ import {
 const FEEDBACK_UPDATE_INTERVAL_MS = 1500;
 const DRIBBLE_STANCE_HOLD_MS = 3000;
 const SHOOT_RECOVERY_MS = 3000;
+const DEFAULT_DEBUG_TEXT = '카메라와 MediaPipe를 준비하고 있습니다.';
 
 type DribbleLessonPhase = 'stance_setup' | 'countdown' | 'await_dribble' | 'active' | 'cooldown';
 type FrontDribbleCriterionNumber = 1 | 2 | 3 | 4;
@@ -47,6 +53,19 @@ interface FrontDribbleWeakPoint {
   criterionNumber: FrontDribbleCriterionNumber;
   feedbackText: string;
   count: number;
+}
+
+interface AuthFormValues {
+  name: string;
+  age: string;
+  gender: AccountGender;
+  password: string;
+  keepSignedIn: boolean;
+}
+
+interface AuthActionResult {
+  success: boolean;
+  message: string;
 }
 
 const DEFAULT_DRIBBLE_FEEDBACK =
@@ -64,6 +83,46 @@ function createFireworks(): FireworkItem[] {
     left: `${12 + Math.random() * 74}%` as `${number}%`,
     top: `${10 + Math.random() * 42}%` as `${number}%`,
   }));
+}
+
+function normalizeAccountName(name: string) {
+  return name.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+}
+
+function buildAccountStorageKey(baseKey: string, userId: string) {
+  return `${baseKey}:${userId}`;
+}
+
+function getAccountStorageKeys(userId: string) {
+  return {
+    attendance: buildAccountStorageKey(STORAGE_KEYS.attendance, userId),
+    lessonRecords: buildAccountStorageKey(STORAGE_KEYS.lessonRecords, userId),
+    dribbleCounts: buildAccountStorageKey(STORAGE_KEYS.dribbleCounts, userId),
+    shotAttempts: buildAccountStorageKey(STORAGE_KEYS.shotAttempts, userId),
+    shotSuccess: buildAccountStorageKey(STORAGE_KEYS.shotSuccess, userId),
+    ballColors: buildAccountStorageKey(STORAGE_KEYS.ballColors, userId),
+    ballBrand: buildAccountStorageKey(STORAGE_KEYS.ballBrand, userId),
+    position: buildAccountStorageKey(STORAGE_KEYS.position, userId),
+  } as const;
+}
+
+function toAuthUser(account: UserAccount): AuthUser {
+  return {
+    id: account.id,
+    name: account.name,
+    age: account.age,
+    gender: account.gender,
+  };
+}
+
+function parseAgeInput(value: string) {
+  const numericAge = Number(value.trim());
+
+  if (!Number.isInteger(numericAge) || numericAge <= 0 || numericAge > 120) {
+    return null;
+  }
+
+  return numericAge;
 }
 
 function parseStoredJson<T>(value: string | null, fallback: T): T {
@@ -315,7 +374,7 @@ function buildDribbleStanceFeedback(analysis: DribbleAnalysis) {
 }
 
 function isShootStanceReady(analysis: ShootAnalysis) {
-  return analysis.armAngleState === 'balanced';
+  return analysis.readyPoseDetected;
 }
 
 function buildDribbleStanceFeedbackV2(analysis: DribbleAnalysis) {
@@ -323,22 +382,22 @@ function buildDribbleStanceFeedbackV2(analysis: DribbleAnalysis) {
     analysis.stanceState === 'ready'
       ? `상체 기울기 ${analysis.torsoLeanAngle ? analysis.torsoLeanAngle.toFixed(1) : '--'}도로 준비 자세가 좋습니다.`
       : analysis.stanceState === 'too_upright'
-        ? `상체 기울기가 ${analysis.torsoLeanAngle ? analysis.torsoLeanAngle.toFixed(1) : '--'}도예요. 15~45도가 되도록 조금 더 숙여 주세요.`
+        ? `상체 기울기가 ${analysis.torsoLeanAngle ? analysis.torsoLeanAngle.toFixed(1) : '--'}도예요. 40~80도가 되도록 조금 더 숙여 주세요.`
         : analysis.stanceState === 'too_low'
           ? `상체 기울기가 ${analysis.torsoLeanAngle ? analysis.torsoLeanAngle.toFixed(1) : '--'}도예요. 너무 많이 숙였으니 조금 세워 주세요.`
           : '어깨와 엉덩이가 잘 보이도록 서서 상체 기울기를 다시 확인해 주세요.';
 
-  return `드리블 준비 자세\n1. 엉덩이에서 어깨까지의 상체 기울기를 15~45도로 맞춰 주세요.\n2. 이 자세를 3초 동안 유지하면 드리블을 시작하라고 알려드립니다.\n3. ${torsoLine}`;
+  return `드리블 준비 자세\n1. 엉덩이에서 어깨까지의 상체 기울기를 40~80도로 맞춰 주세요.\n2. 이 자세를 3초 동안 유지하면 드리블을 시작하라고 알려드립니다.\n3. ${torsoLine}`;
 }
 
 function buildDribbleStanceFeedbackV3(analysis: DribbleAnalysis) {
   if (analysis.bodyFacing === 'front') {
     const stanceLine =
       analysis.stanceState === 'ready'
-        ? `무릎-엉덩이-무릎 각도 ${analysis.frontStanceAngle ? analysis.frontStanceAngle.toFixed(1) : '--'}도로 준비 자세가 잘 잡혔습니다.`
-        : `무릎-엉덩이-무릎 각도가 ${analysis.frontStanceAngle ? analysis.frontStanceAngle.toFixed(1) : '--'}도예요. 40~60도가 되도록 자세를 다시 맞춰 주세요.`;
+        ? `발-무릎-엉덩이 각도 ${analysis.frontStanceAngle ? analysis.frontStanceAngle.toFixed(1) : '--'}도로 준비 자세가 잘 잡혔습니다.`
+        : `발-무릎-엉덩이 각도가 ${analysis.frontStanceAngle ? analysis.frontStanceAngle.toFixed(1) : '--'}도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.`;
 
-    return `정면 드리블 준비 자세\n1. 자세를 낮춰 왼쪽 무릎, 엉덩이, 오른쪽 무릎 사이 각도를 40~60도로 맞춰 주세요.\n2. 이 자세를 3초 동안 유지하면 드리블을 시작하라고 알려드립니다.\n3. ${stanceLine}`;
+    return `정면 드리블 준비 자세\n1. 자세를 낮춰 발-무릎-엉덩이 각도를 140~170도로 맞춰 주세요.\n2. 이 자세를 3초 동안 유지하면 드리블을 시작하라고 알려드립니다.\n3. ${stanceLine}`;
   }
 
   return buildDribbleStanceFeedbackV2(analysis);
@@ -347,7 +406,7 @@ function buildDribbleStanceFeedbackV3(analysis: DribbleAnalysis) {
 function buildDribbleStanceFeedbackForView(analysis: DribbleAnalysis, expectedView: DribbleLessonView) {
   if (expectedView === 'front') {
     if (analysis.bodyFacing === 'side') {
-      return '정면 드리블 준비 자세\n1. 카메라를 정면으로 바라보게 서 주세요.\n2. 왼쪽 무릎, 엉덩이, 오른쪽 무릎이 함께 보이도록 맞춰 주세요.\n3. 정면이 확인되면 3초 카운트 뒤 드리블을 시작합니다.';
+      return '정면 드리블 준비 자세\n1. 카메라를 정면으로 바라보게 서 주세요.\n2. 발, 무릎, 엉덩이가 함께 잘 보이도록 맞춰 주세요.\n3. 정면이 확인되면 3초 카운트 뒤 드리블을 시작합니다.';
     }
 
     return buildDribbleStanceFeedbackV3(analysis);
@@ -361,6 +420,14 @@ function buildDribbleStanceFeedbackForView(analysis: DribbleAnalysis, expectedVi
 }
 
 function buildShootStanceFeedback(analysis: ShootAnalysis) {
+  if (analysis.armAngleState === 'balanced' && !analysis.ballNearShootingHand) {
+    return '슛 준비 자세\n1. 팔 각도는 좋습니다. 공을 슈팅 손 가까이 붙여 준비 자세를 보여 주세요.\n2. 공과 슈팅 손 위치가 함께 맞으면 3초 뒤 슛을 시작합니다.\n3. 공이 손에서 너무 멀어 보이면 카운트가 시작되지 않습니다.';
+  }
+
+  if (analysis.armAngleState === 'balanced' && !analysis.shootingHandRaised) {
+    return '슛 준비 자세\n1. 팔 각도는 좋습니다. 슈팅 손과 공을 어깨 높이까지 들어 올려 주세요.\n2. 손 높이와 공 위치가 함께 맞으면 3초 뒤 슛을 시작합니다.\n3. 준비 자세가 무너지면 다시 자세부터 맞춥니다.';
+  }
+
   const armLine =
     analysis.armAngleState === 'balanced'
       ? '슛을 시작하기 좋은 팔 각도입니다. 지금 자세를 유지해 주세요.'
@@ -388,7 +455,7 @@ function buildFrontCriterionFeedback(
 ) {
   switch (criterionNumber) {
     case 1:
-      return `무릎-엉덩이-무릎 각도가 ${analysis.frontStanceAngle ? analysis.frontStanceAngle.toFixed(1) : '--'}도예요. 40~60도가 되도록 자세를 다시 맞춰 주세요.`;
+      return `발-무릎-엉덩이 각도가 ${analysis.frontStanceAngle ? analysis.frontStanceAngle.toFixed(1) : '--'}도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.`;
     case 2:
       return '공이 다리 사이에 들어가 있습니다. 공을 다리 사이에서 드리블하지 말고 옆에서 드리블해 주세요.';
     case 3:
@@ -406,6 +473,11 @@ function buildFrontCriterionFeedback(
 
 export function useBasketballCoachApp() {
   const [screen, setScreen] = useState<AppScreen>('home');
+  const [authMode, setAuthMode] = useState<AuthMode>('login');
+  const [accounts, setAccounts] = useState<UserAccount[]>([]);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [isAccountDataReady, setIsAccountDataReady] = useState(false);
   const [lessonMode, setLessonMode] = useState<LessonMode>('dribble');
   const [attendance, setAttendance] = useState<Record<string, string>>({});
   const [dailyDribbleRecords, setDailyDribbleRecords] = useState<Record<string, number>>({});
@@ -419,7 +491,7 @@ export function useBasketballCoachApp() {
   const [selectedBallColors, setSelectedBallColors] = useState<BallColorOption[]>(DEFAULT_BALL_COLORS);
   const [selectedPosition, setSelectedPosition] = useState<PositionOption>(DEFAULT_POSITION);
   const [isHomeworkRevealed, setIsHomeworkRevealed] = useState(false);
-  const [debugText, setDebugText] = useState('카메라와 MediaPipe를 준비하고 있습니다.');
+  const [debugText, setDebugText] = useState(DEFAULT_DEBUG_TEXT);
   const [feedbackText, setFeedbackText] = useState(DEFAULT_DRIBBLE_FEEDBACK);
   const [lessonReview, setLessonReview] = useState<LessonReviewClip | null>(null);
   const [selectedDribbleView, setSelectedDribbleView] = useState<DribbleLessonView>('front');
@@ -464,11 +536,14 @@ export function useBasketballCoachApp() {
   const dailyDribbleRecordsRef = useRef<Record<string, number>>({});
   const shotAttemptRecordsRef = useRef<Record<string, number>>({});
   const shootAnalysisHistoryRef = useRef<ShootAnalysis[]>([]);
+  const shootFeedbackLockedRef = useRef(false);
   const frontDribbleCriterionCountsRef = useRef<Record<FrontDribbleCriterionNumber, number>>(createFrontDribbleCriterionCounter());
   const frontDribbleWeakPointRef = useRef<FrontDribbleWeakPoint | null>(null);
   const frontDribbleSummaryShownRef = useRef(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
+  const currentUserId = currentUser?.id ?? '';
+  const isReady = isAuthReady && (!currentUser || isAccountDataReady);
   const selectedSkill = selectedSkillKey ? SKILLS[selectedSkillKey] : null;
   const todayKey = formatDateKey(new Date());
   const homeworkToShow = useMemo<HomeworkProgressItem[]>(
@@ -503,6 +578,80 @@ export function useBasketballCoachApp() {
     });
   }, [shotAttemptRecords, shotSuccessRecords]);
 
+  const resetAccountState = useCallback(() => {
+    const resetDate = new Date();
+    const resetDateKey = formatDateKey(resetDate);
+
+    setScreen('home');
+    setLessonMode('dribble');
+    setAttendance({});
+    setDailyDribbleRecords({});
+    setLessonRecords([]);
+    setShotAttemptRecords({});
+    setShotSuccessRecords({});
+    setSelectedDateKey(resetDateKey);
+    setCurrentDate(resetDate);
+    setSelectedSkillKey('');
+    setSelectedBallBrand(DEFAULT_BALL_BRAND);
+    setSelectedBallColors(DEFAULT_BALL_COLORS);
+    setSelectedPosition(DEFAULT_POSITION);
+    setIsHomeworkRevealed(false);
+    setDebugText(DEFAULT_DEBUG_TEXT);
+    setFeedbackText(DEFAULT_DRIBBLE_FEEDBACK);
+    setLessonReview(null);
+    setSelectedDribbleView('front');
+    setCurrentDribbleCount(0);
+    setIsLessonActive(false);
+    setIsCameraActive(false);
+    setIsCameraReady(false);
+    setCameraError('');
+    setCameraSessionKey(0);
+    setCountdownValue(null);
+    setDribbleResetToken(0);
+    setShootResetToken(0);
+    setRecordingStartToken(0);
+    setRecordingStopToken(0);
+    setFireworks([]);
+    setShowFireworks(false);
+
+    latestFeedbackRef.current = DEFAULT_DRIBBLE_FEEDBACK;
+    pendingFeedbackRef.current = null;
+    lessonModeRef.current = 'dribble';
+    selectedDribbleViewRef.current = 'front';
+    lessonStartedAtRef.current = null;
+    dribbleLessonPhaseRef.current = 'stance_setup';
+    shootLessonStartedRef.current = false;
+    shootCooldownUntilRef.current = null;
+    shootRecordingStartedRef.current = false;
+    dribbleTargetCountRef.current = null;
+    dribbleAutoEndingRef.current = false;
+    stanceCountdownStartedAtRef.current = null;
+    feedbackTimelineRef.current = [];
+    pendingStopSaveRef.current = false;
+    pendingReviewStopRef.current = false;
+    pendingShootReviewRef.current = false;
+    pendingShootRecordingStopRef.current = false;
+    latestDribbleAnalysisRef.current = null;
+    latestShootAnalysisRef.current = null;
+    dailyDribbleRecordsRef.current = {};
+    shotAttemptRecordsRef.current = {};
+    shootAnalysisHistoryRef.current = [];
+    shootFeedbackLockedRef.current = false;
+    frontDribbleCriterionCountsRef.current = createFrontDribbleCriterionCounter();
+    frontDribbleWeakPointRef.current = null;
+    frontDribbleSummaryShownRef.current = false;
+  }, []);
+
+  const persistSession = useCallback(async (userId: string, keepSignedIn: boolean) => {
+    if (keepSignedIn) {
+      const nextSession: AuthSession = { userId };
+      await AsyncStorage.setItem(STORAGE_KEYS.session, JSON.stringify(nextSession));
+      return;
+    }
+
+    await AsyncStorage.removeItem(STORAGE_KEYS.session);
+  }, []);
+
   useEffect(() => {
     latestFeedbackRef.current = feedbackText;
   }, [feedbackText]);
@@ -526,17 +675,71 @@ export function useBasketballCoachApp() {
   useEffect(() => {
     let isMounted = true;
 
-    async function loadData() {
+    async function loadAuthState() {
       try {
+        const entries = await AsyncStorage.multiGet([STORAGE_KEYS.accounts, STORAGE_KEYS.session]);
+        const stored = Object.fromEntries(entries);
+        const parsedAccounts = parseStoredJson<UserAccount[]>(stored[STORAGE_KEYS.accounts], []);
+        const parsedSession = parseStoredJson<AuthSession | null>(stored[STORAGE_KEYS.session], null);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setAccounts(parsedAccounts);
+        setAuthMode(parsedAccounts.length > 0 ? 'login' : 'signup');
+
+        if (parsedSession?.userId) {
+          const sessionAccount = parsedAccounts.find((account) => account.id === parsedSession.userId);
+
+          if (sessionAccount) {
+            setCurrentUser(toAuthUser(sessionAccount));
+          } else {
+            await AsyncStorage.removeItem(STORAGE_KEYS.session);
+          }
+        }
+      } catch {
+        Alert.alert('불러오기 실패', '로그인 정보를 읽는 중 문제가 발생했습니다.');
+      } finally {
+        if (isMounted) {
+          setIsAuthReady(true);
+        }
+      }
+    }
+
+    void loadAuthState();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!currentUserId) {
+      resetAccountState();
+      setIsAccountDataReady(false);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    setIsAccountDataReady(false);
+    resetAccountState();
+
+    async function loadAccountData() {
+      try {
+        const scopedKeys = getAccountStorageKeys(currentUserId);
         const entries = await AsyncStorage.multiGet([
-          STORAGE_KEYS.attendance,
-          STORAGE_KEYS.lessonRecords,
-          STORAGE_KEYS.dribbleCounts,
-          STORAGE_KEYS.shotAttempts,
-          STORAGE_KEYS.shotSuccess,
-          STORAGE_KEYS.ballColors,
-          STORAGE_KEYS.ballBrand,
-          STORAGE_KEYS.position,
+          scopedKeys.attendance,
+          scopedKeys.lessonRecords,
+          scopedKeys.dribbleCounts,
+          scopedKeys.shotAttempts,
+          scopedKeys.shotSuccess,
+          scopedKeys.ballColors,
+          scopedKeys.ballBrand,
+          scopedKeys.position,
         ]);
 
         if (!isMounted) {
@@ -544,16 +747,16 @@ export function useBasketballCoachApp() {
         }
 
         const stored = Object.fromEntries(entries);
-        const parsedAttendance = parseStoredJson<Record<string, string>>(stored[STORAGE_KEYS.attendance], {});
+        const parsedAttendance = parseStoredJson<Record<string, string>>(stored[scopedKeys.attendance], {});
         const parsedLessonRecords = parseStoredJson<
           Array<LessonRecord | (Omit<LessonRecord, 'feedbackTimeline'> & { feedbackTimeline?: FeedbackMoment[] | string[] })>
-        >(stored[STORAGE_KEYS.lessonRecords], []).map((record) => normalizeLessonRecord(record));
-        const parsedDribbleCounts = parseStoredJson<Record<string, number>>(stored[STORAGE_KEYS.dribbleCounts], {});
-        const parsedShotAttempts = parseStoredJson<Record<string, number>>(stored[STORAGE_KEYS.shotAttempts], {});
-        const parsedShotSuccess = parseStoredJson<Record<string, number>>(stored[STORAGE_KEYS.shotSuccess], {});
-        const parsedBallBrand = parseStoredJson<BallBrandOption>(stored[STORAGE_KEYS.ballBrand], DEFAULT_BALL_BRAND);
-        const parsedBallColors = parseStoredJson<BallColorOption[]>(stored[STORAGE_KEYS.ballColors], DEFAULT_BALL_COLORS);
-        const parsedPosition = parseStoredJson<PositionOption>(stored[STORAGE_KEYS.position], DEFAULT_POSITION);
+        >(stored[scopedKeys.lessonRecords], []).map((record) => normalizeLessonRecord(record));
+        const parsedDribbleCounts = parseStoredJson<Record<string, number>>(stored[scopedKeys.dribbleCounts], {});
+        const parsedShotAttempts = parseStoredJson<Record<string, number>>(stored[scopedKeys.shotAttempts], {});
+        const parsedShotSuccess = parseStoredJson<Record<string, number>>(stored[scopedKeys.shotSuccess], {});
+        const parsedBallBrand = parseStoredJson<BallBrandOption>(stored[scopedKeys.ballBrand], DEFAULT_BALL_BRAND);
+        const parsedBallColors = parseStoredJson<BallColorOption[]>(stored[scopedKeys.ballColors], DEFAULT_BALL_COLORS);
+        const parsedPosition = parseStoredJson<PositionOption>(stored[scopedKeys.position], DEFAULT_POSITION);
 
         const derivedShotAttempts = parsedLessonRecords.reduce<Record<string, number>>((accumulator, record) => {
           if (record.mode !== 'shoot') {
@@ -568,8 +771,8 @@ export function useBasketballCoachApp() {
           parsedShotAttempts[dateKey] = Math.max(parsedShotAttempts[dateKey] || 0, count);
         }
 
-        const todayKey = formatDateKey(new Date());
-        parsedAttendance[todayKey] = 'attended';
+        const nextTodayKey = formatDateKey(new Date());
+        parsedAttendance[nextTodayKey] = 'attended';
 
         setAttendance(parsedAttendance);
         setDailyDribbleRecords(parsedDribbleCounts);
@@ -581,52 +784,91 @@ export function useBasketballCoachApp() {
           parsedBallColors.length > 0 ? parsedBallColors : BALL_BRAND_PRESETS[parsedBallBrand] ?? DEFAULT_BALL_COLORS
         );
         setSelectedPosition(parsedPosition);
-        setSelectedDateKey(todayKey);
+        setSelectedDateKey(nextTodayKey);
+        setCurrentDate(new Date());
 
-        await AsyncStorage.setItem(STORAGE_KEYS.attendance, JSON.stringify(parsedAttendance));
+        await AsyncStorage.setItem(scopedKeys.attendance, JSON.stringify(parsedAttendance));
       } catch {
-        Alert.alert('불러오기 실패', '저장한 데이터를 읽는 중 문제가 발생했습니다.');
+        if (isMounted) {
+          Alert.alert('불러오기 실패', '계정 데이터를 읽는 중 문제가 발생했습니다.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsAccountDataReady(true);
+        }
       }
     }
 
-    void loadData();
+    void loadAccountData();
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [currentUserId, resetAccountState]);
 
   useEffect(() => {
-    void AsyncStorage.setItem(STORAGE_KEYS.attendance, JSON.stringify(attendance));
-  }, [attendance]);
+    if (!currentUserId || !isAccountDataReady) {
+      return;
+    }
+
+    void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).attendance, JSON.stringify(attendance));
+  }, [attendance, currentUserId, isAccountDataReady]);
 
   useEffect(() => {
-    void AsyncStorage.setItem(STORAGE_KEYS.lessonRecords, JSON.stringify(lessonRecords));
-  }, [lessonRecords]);
+    if (!currentUserId || !isAccountDataReady) {
+      return;
+    }
+
+    void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).lessonRecords, JSON.stringify(lessonRecords));
+  }, [currentUserId, isAccountDataReady, lessonRecords]);
 
   useEffect(() => {
-    void AsyncStorage.setItem(STORAGE_KEYS.dribbleCounts, JSON.stringify(dailyDribbleRecords));
-  }, [dailyDribbleRecords]);
+    if (!currentUserId || !isAccountDataReady) {
+      return;
+    }
+
+    void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).dribbleCounts, JSON.stringify(dailyDribbleRecords));
+  }, [currentUserId, dailyDribbleRecords, isAccountDataReady]);
 
   useEffect(() => {
-    void AsyncStorage.setItem(STORAGE_KEYS.shotAttempts, JSON.stringify(shotAttemptRecords));
-  }, [shotAttemptRecords]);
+    if (!currentUserId || !isAccountDataReady) {
+      return;
+    }
+
+    void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).shotAttempts, JSON.stringify(shotAttemptRecords));
+  }, [currentUserId, isAccountDataReady, shotAttemptRecords]);
 
   useEffect(() => {
-    void AsyncStorage.setItem(STORAGE_KEYS.shotSuccess, JSON.stringify(shotSuccessRecords));
-  }, [shotSuccessRecords]);
+    if (!currentUserId || !isAccountDataReady) {
+      return;
+    }
+
+    void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).shotSuccess, JSON.stringify(shotSuccessRecords));
+  }, [currentUserId, isAccountDataReady, shotSuccessRecords]);
 
   useEffect(() => {
-    void AsyncStorage.setItem(STORAGE_KEYS.ballColors, JSON.stringify(selectedBallColors));
-  }, [selectedBallColors]);
+    if (!currentUserId || !isAccountDataReady) {
+      return;
+    }
+
+    void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).ballColors, JSON.stringify(selectedBallColors));
+  }, [currentUserId, isAccountDataReady, selectedBallColors]);
 
   useEffect(() => {
-    void AsyncStorage.setItem(STORAGE_KEYS.ballBrand, JSON.stringify(selectedBallBrand));
-  }, [selectedBallBrand]);
+    if (!currentUserId || !isAccountDataReady) {
+      return;
+    }
+
+    void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).ballBrand, JSON.stringify(selectedBallBrand));
+  }, [currentUserId, isAccountDataReady, selectedBallBrand]);
 
   useEffect(() => {
-    void AsyncStorage.setItem(STORAGE_KEYS.position, JSON.stringify(selectedPosition));
-  }, [selectedPosition]);
+    if (!currentUserId || !isAccountDataReady) {
+      return;
+    }
+
+    void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).position, JSON.stringify(selectedPosition));
+  }, [currentUserId, isAccountDataReady, selectedPosition]);
 
   useEffect(() => {
     return () => {
@@ -796,6 +1038,7 @@ export function useBasketballCoachApp() {
     shootAnalysisHistoryRef.current = [];
     shootCooldownUntilRef.current = null;
     shootRecordingStartedRef.current = false;
+    shootFeedbackLockedRef.current = false;
   }, []);
 
   const resetFrontDribbleTrackingSummary = useCallback(() => {
@@ -1128,6 +1371,120 @@ export function useBasketballCoachApp() {
     ]
   );
 
+  function changeAuthMode(nextMode: AuthMode) {
+    setAuthMode(nextMode);
+  }
+
+  async function login({ name, age, gender, password, keepSignedIn }: AuthFormValues): Promise<AuthActionResult> {
+    const trimmedName = name.trim();
+    const trimmedPassword = password.trim();
+    const parsedAge = parseAgeInput(age);
+
+    if (!trimmedName || parsedAge === null || !trimmedPassword) {
+      return {
+        success: false,
+        message: '이름, 나이, 성별, 비밀번호를 모두 정확히 입력해 주세요.',
+      };
+    }
+
+    if (accounts.length === 0) {
+      return {
+        success: false,
+        message: '아직 등록된 계정이 없습니다. 회원가입으로 첫 계정을 만들어 주세요.',
+      };
+    }
+
+    const normalizedName = normalizeAccountName(trimmedName);
+    const matchedAccount = accounts.find(
+      (account) =>
+        normalizeAccountName(account.name) === normalizedName &&
+        account.age === parsedAge &&
+        account.gender === gender
+    );
+
+    if (!matchedAccount) {
+      return {
+        success: false,
+        message: '입력한 이름, 나이, 성별과 일치하는 계정을 찾지 못했습니다.',
+      };
+    }
+
+    if (matchedAccount.password !== trimmedPassword) {
+      return {
+        success: false,
+        message: '비밀번호가 일치하지 않습니다.',
+      };
+    }
+
+    await persistSession(matchedAccount.id, keepSignedIn);
+    setCurrentUser(toAuthUser(matchedAccount));
+    setAuthMode('login');
+
+    return {
+      success: true,
+      message: '로그인되었습니다.',
+    };
+  }
+
+  async function signup({ name, age, gender, password, keepSignedIn }: AuthFormValues): Promise<AuthActionResult> {
+    const trimmedName = name.trim();
+    const trimmedPassword = password.trim();
+    const parsedAge = parseAgeInput(age);
+
+    if (!trimmedName || parsedAge === null || !trimmedPassword) {
+      return {
+        success: false,
+        message: '이름, 나이, 성별, 비밀번호를 모두 정확히 입력해 주세요.',
+      };
+    }
+
+    const normalizedName = normalizeAccountName(trimmedName);
+    const duplicatedAccount = accounts.find(
+      (account) =>
+        normalizeAccountName(account.name) === normalizedName &&
+        account.age === parsedAge &&
+        account.gender === gender
+    );
+
+    if (duplicatedAccount) {
+      return {
+        success: false,
+        message: '같은 이름, 나이, 성별로 이미 만들어진 계정이 있습니다. 로그인으로 이동해 주세요.',
+      };
+    }
+
+    const nextAccount: UserAccount = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: trimmedName,
+      age: parsedAge,
+      gender,
+      password: trimmedPassword,
+      createdAt: new Date().toISOString(),
+    };
+    const nextAccounts = [...accounts, nextAccount];
+
+    await AsyncStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(nextAccounts));
+    await persistSession(nextAccount.id, keepSignedIn);
+    setAccounts(nextAccounts);
+    setCurrentUser(toAuthUser(nextAccount));
+    setAuthMode('login');
+
+    return {
+      success: true,
+      message: '회원가입이 완료되었습니다.',
+    };
+  }
+
+  async function logout() {
+    if (screen === 'lesson' && (isLessonActive || isCameraActive)) {
+      await endLesson(true);
+    }
+
+    await AsyncStorage.removeItem(STORAGE_KEYS.session);
+    setCurrentUser(null);
+    setAuthMode(accounts.length > 0 ? 'login' : 'signup');
+  }
+
   async function navigateTo(nextScreen: AppScreen) {
     if (screen === 'lesson' && nextScreen !== 'lesson' && (isLessonActive || isCameraActive)) {
       await endLesson(true);
@@ -1197,6 +1554,9 @@ export function useBasketballCoachApp() {
             lowestLegAngle: null,
             headPeakY: null,
             releaseDetected: false,
+            ballNearShootingHand: false,
+            shootingHandRaised: false,
+            readyPoseDetected: false,
             armAngleState: 'unknown',
             releaseTiming: 'unknown',
             legAngleState: 'unknown',
@@ -1279,6 +1639,9 @@ export function useBasketballCoachApp() {
         lowestLegAngle: null,
         headPeakY: null,
         releaseDetected: false,
+        ballNearShootingHand: false,
+        shootingHandRaised: false,
+        readyPoseDetected: false,
         armAngleState: 'unknown',
         releaseTiming: 'unknown',
         legAngleState: 'unknown',
@@ -1437,7 +1800,59 @@ export function useBasketballCoachApp() {
     setIsCameraReady(false);
     setRecordingStopToken(Date.now());
     setDebugText('목표 드리블 횟수에 도달했습니다. 종료 호루라기를 울리고 카메라 연결을 끄는 중입니다.');
-  }, [clearShootAutoEnd]);
+
+    recordingFallbackTimeoutRef.current = setTimeout(() => {
+      if (!pendingReviewStopRef.current) {
+        return;
+      }
+
+      clearRecordingWait();
+      pendingReviewStopRef.current = false;
+
+      const frontWeakPoint = finalizeFrontDribbleWeakPoint();
+      const finalFeedback = frontWeakPoint
+        ? `${latestFeedbackRef.current}\n\n가장 보완이 필요한 기준은 ${frontWeakPoint.criterionNumber}번입니다. ${frontWeakPoint.feedbackText}`
+        : latestFeedbackRef.current;
+      const completedDribbleHomework = recordDailyDribbleProgress(dribbleTargetCountRef.current ?? 0);
+      const completedFeedback = completedDribbleHomework
+        ? `${finalFeedback}\n\n${getHomeworkCompletionMessage('dribble')}`
+        : finalFeedback;
+
+      lessonStartedAtRef.current = null;
+      dribbleLessonPhaseRef.current = 'stance_setup';
+      shootLessonStartedRef.current = false;
+      resetShootAnalysisTracking();
+      dribbleTargetCountRef.current = null;
+      dribbleAutoEndingRef.current = false;
+      stanceCountdownStartedAtRef.current = null;
+      feedbackTimelineRef.current = [];
+      pendingFeedbackRef.current = null;
+      setCurrentDribbleCount(0);
+      setCountdownValue(null);
+      setDribbleResetToken(0);
+      setShootResetToken(0);
+      setRecordingStartToken(0);
+      setRecordingStopToken(0);
+      latestFeedbackRef.current = completedFeedback;
+      setFeedbackText(completedFeedback);
+      setLessonReview(null);
+      setIsLessonActive(false);
+      setIsCameraActive(false);
+      setIsCameraReady(false);
+      setCameraError('');
+      setDebugText('목표 드리블 횟수를 모두 채워 레슨이 자동으로 종료되었습니다.');
+      if (completedDribbleHomework) {
+        celebrateHomeworkCompletion();
+      }
+    }, 4000);
+  }, [
+    celebrateHomeworkCompletion,
+    clearRecordingWait,
+    clearShootAutoEnd,
+    finalizeFrontDribbleWeakPoint,
+    recordDailyDribbleProgress,
+    resetShootAnalysisTracking,
+  ]);
 
   const completeDribbleReview = useCallback(
     (videoUri: string) => {
@@ -1542,10 +1957,9 @@ export function useBasketballCoachApp() {
       setIsCameraReady(true);
       setCameraError('');
       const completionText = completedShootHomework ? `\n\n${getHomeworkCompletionMessage('shoot')}` : '';
-      setImmediateLessonFeedback(
-        `${finalFeedback}${completionText}\n\n다시 슛 준비 자세를 맞춰 주세요. 준비 자세가 맞으면 3초 카운트가 다시 시작됩니다.`
-      );
-      setDebugText('슛 촬영 분석이 끝났습니다. 다시 준비 자세를 맞춰 주세요.');
+      shootFeedbackLockedRef.current = true;
+      setImmediateLessonFeedback(`${finalFeedback}${completionText}`);
+      setDebugText('슛 촬영 분석이 끝났습니다. 결과 피드백을 유지합니다.');
       if (completedShootHomework) {
         celebrateHomeworkCompletion();
       }
@@ -1683,11 +2097,11 @@ export function useBasketballCoachApp() {
         pendingFeedbackRef.current =
           targetView === 'front'
             ? `정면 드리블 준비 자세를 유지해 주세요.
-1. 무릎-엉덩이-무릎 각도를 40~60도로 유지해 주세요.
+1. 발-무릎-엉덩이 각도를 140~170도로 유지해 주세요.
 2. ${remainingSeconds}초 동안 자세를 유지하면 녹화와 드리블 카운트가 시작됩니다.
 3. 공과 하체가 함께 잘 보이도록 서 주세요.`
             : `옆모습 드리블 준비 자세를 유지해 주세요.
-1. 상체 기울기를 기준 범위 안으로 맞춰 주세요.
+1. 상체 기울기를 40~80도로 유지해 주세요.
 2. ${remainingSeconds}초 동안 자세를 유지하면 드리블을 시작합니다.
 3. 공과 상체가 함께 잘 보이도록 서 주세요.`;
         setDebugText(`준비 자세 유지 중: ${remainingSeconds}초 남음`);
@@ -1717,6 +2131,15 @@ export function useBasketballCoachApp() {
       const phase = dribbleLessonPhaseRef.current;
       const stanceReady = isShootStanceReady(analysis);
 
+      if (shootFeedbackLockedRef.current) {
+        if (!stanceReady) {
+          setDebugText('이전 슛 피드백을 유지하는 중입니다. 다시 준비 자세가 맞으면 다음 슛을 시작합니다.');
+          return;
+        }
+
+        shootFeedbackLockedRef.current = false;
+      }
+
       if (phase === 'cooldown') {
         const cooldownUntil = shootCooldownUntilRef.current;
 
@@ -1730,7 +2153,6 @@ export function useBasketballCoachApp() {
           pendingShootReviewRef.current = true;
           pendingShootRecordingStopRef.current = true;
           shootCooldownUntilRef.current = null;
-          setImmediateLessonFeedback('슛 촬영을 마무리하고 있습니다. 곧 2, 3번째 기준 분석 결과를 보여드립니다.');
           setDebugText('슛 촬영을 마무리하고 분석 중입니다.');
           setRecordingStopToken(Date.now());
           return;
@@ -2027,6 +2449,9 @@ export function useBasketballCoachApp() {
   }
 
   return {
+    isReady,
+    authMode,
+    currentUser,
     screen,
     lessonMode,
     homeworkToShow,
@@ -2058,6 +2483,10 @@ export function useBasketballCoachApp() {
     cameraError,
     fireworks,
     showFireworks,
+    changeAuthMode,
+    login,
+    signup,
+    logout,
     navigateTo,
     changeLessonMode,
     beginLesson,
