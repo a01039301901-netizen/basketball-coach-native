@@ -10,6 +10,7 @@ interface LessonCameraProps {
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
   isCameraActive: boolean;
+  isCameraPreviewHidden: boolean;
   isLessonActive: boolean;
   isCameraReady: boolean;
   countdownValue: number | null;
@@ -25,6 +26,7 @@ export function LessonCamera({
   selectedBallBrand,
   selectedBallColors,
   isCameraActive,
+  isCameraPreviewHidden,
   isLessonActive,
   isCameraReady,
   countdownValue,
@@ -89,7 +91,7 @@ export function LessonCamera({
             ref={webViewRef}
             originWhitelist={['https://*']}
             source={{ uri: POSE_WEB_BOOTSTRAP_URL }}
-            style={styles.webview}
+            style={[styles.webview, isCameraPreviewHidden && styles.hiddenCapture]}
             onMessage={onPoseMessage}
             injectedJavaScriptBeforeContentLoaded={buildPoseBootstrapScript(lessonMode, selectedBallBrand, selectedBallColors)}
             javaScriptEnabled
@@ -127,6 +129,12 @@ export function LessonCamera({
               모바일에서는 WebView 안에서 inner.html 방식으로 MediaPipe를 실행합니다.
             </Text>
           </View>
+          {isCameraPreviewHidden ? (
+            <View style={styles.placeholderOverlay}>
+              <Text style={styles.placeholderTitle}>카메라 종료 중</Text>
+              <Text style={styles.placeholderText}>목표 횟수를 채워 카메라를 끄고 레슨 결과를 정리하고 있습니다.</Text>
+            </View>
+          ) : null}
         </>
       ) : (
         <View style={styles.placeholder}>
@@ -153,6 +161,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.cameraBg,
   },
+  hiddenCapture: {
+    opacity: 0,
+  },
   loading: {
     flex: 1,
     alignItems: 'center',
@@ -173,6 +184,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     pointerEvents: 'none',
+  },
+  placeholderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    backgroundColor: colors.cameraBg,
   },
   badge: {
     alignSelf: 'flex-start',

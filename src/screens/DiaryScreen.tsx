@@ -17,6 +17,7 @@ interface DiaryScreenProps {
   shotGraphData: ShotGraphDatum[];
   onChangeMonth: (delta: number) => void;
   onOpenDate: (dateKey: string) => void;
+  onAdjustShotSuccess: (delta: number) => void;
   onDeleteRecord: (recordId: string) => void;
 }
 
@@ -83,6 +84,7 @@ export function DiaryScreen({
   shotGraphData,
   onChangeMonth,
   onOpenDate,
+  onAdjustShotSuccess,
   onDeleteRecord,
 }: DiaryScreenProps) {
   const { width } = useWindowDimensions();
@@ -331,7 +333,33 @@ export function DiaryScreen({
                       </View>
                     </View>
                     <Text style={styles.graphDateLarge}>{selectedShotGraph.dateKey.slice(5)}</Text>
-                    <Text style={styles.graphCount}>슛 성공 기록: {selectedDateShotCount}개</Text>
+                    <View style={styles.shotAdjustRow}>
+                      <Text style={styles.graphCount}>슛 성공 기록: {selectedDateShotCount}개</Text>
+                      <View style={styles.shotAdjustControls}>
+                        <Pressable
+                          onPress={() => onAdjustShotSuccess(-1)}
+                          disabled={selectedDateShotCount <= 0}
+                          style={({ pressed }) => [
+                            styles.shotAdjustButton,
+                            selectedDateShotCount <= 0 && styles.shotAdjustButtonDisabled,
+                            pressed && selectedDateShotCount > 0 && styles.pressed,
+                          ]}
+                        >
+                          <Text style={styles.shotAdjustButtonText}>-</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => onAdjustShotSuccess(1)}
+                          disabled={selectedDateShotCount >= selectedShotGraph.attempts}
+                          style={({ pressed }) => [
+                            styles.shotAdjustButton,
+                            selectedDateShotCount >= selectedShotGraph.attempts && styles.shotAdjustButtonDisabled,
+                            pressed && selectedDateShotCount < selectedShotGraph.attempts && styles.pressed,
+                          ]}
+                        >
+                          <Text style={styles.shotAdjustButtonText}>+</Text>
+                        </Pressable>
+                      </View>
+                    </View>
                   </View>
                 </>
               ) : selectedDateKey ? (
@@ -1067,6 +1095,34 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 14,
     marginTop: 4,
+  },
+  shotAdjustRow: {
+    marginTop: 6,
+    alignItems: 'center',
+    gap: 10,
+  },
+  shotAdjustControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  shotAdjustButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  shotAdjustButtonDisabled: {
+    opacity: 0.4,
+  },
+  shotAdjustButtonText: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '900',
   },
   graphEmpty: {
     color: colors.textMuted,

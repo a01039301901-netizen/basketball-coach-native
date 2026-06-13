@@ -56,6 +56,7 @@ interface FrontDribbleWeakPoint {
 }
 
 interface AuthFormValues {
+  nickname: string;
   name: string;
   age: string;
   gender: AccountGender;
@@ -66,6 +67,28 @@ interface AuthFormValues {
 interface AuthActionResult {
   success: boolean;
   message: string;
+}
+
+interface TransferCodeResult {
+  success: boolean;
+  message: string;
+  code?: string;
+}
+
+interface AccountTransferPayload {
+  version: 1;
+  exportedAt: string;
+  account: UserAccount;
+  data: {
+    attendance: Record<string, string>;
+    lessonRecords: LessonRecord[];
+    dribbleCounts: Record<string, number>;
+    shotAttempts: Record<string, number>;
+    shotSuccess: Record<string, number>;
+    ballColors: BallColorOption[];
+    ballBrand: BallBrandOption;
+    position: PositionOption;
+  };
 }
 
 const DEFAULT_DRIBBLE_FEEDBACK =
@@ -89,6 +112,25 @@ function normalizeAccountName(name: string) {
   return name.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
 }
 
+function normalizeNickname(nickname: string) {
+  return nickname.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+}
+
+function buildUniqueNickname(baseNickname: string, usedNicknames: Set<string>, fallbackSeed: string) {
+  const trimmedBase = baseNickname.trim().replace(/\s+/g, ' ');
+  const fallbackBase = trimmedBase || `user-${fallbackSeed.slice(-4)}`;
+  let candidate = fallbackBase;
+  let suffix = 1;
+
+  while (usedNicknames.has(normalizeNickname(candidate))) {
+    suffix += 1;
+    candidate = `${fallbackBase}-${suffix}`;
+  }
+
+  usedNicknames.add(normalizeNickname(candidate));
+  return candidate;
+}
+
 function buildAccountStorageKey(baseKey: string, userId: string) {
   return `${baseKey}:${userId}`;
 }
@@ -109,6 +151,7 @@ function getAccountStorageKeys(userId: string) {
 function toAuthUser(account: UserAccount): AuthUser {
   return {
     id: account.id,
+    nickname: account.nickname,
     name: account.name,
     age: account.age,
     gender: account.gender,
@@ -127,6 +170,196 @@ function parseAgeInput(value: string) {
 
 function parseStoredJson<T>(value: string | null, fallback: T): T {
   return value ? (JSON.parse(value) as T) : fallback;
+}
+
+function isRecordObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isAccountGender(value: unknown): value is AccountGender {
+  return value === 'male' || value === 'female';
+}
+
+function sanitizeStoredAccounts(value: unknown): UserAccount[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const usedNicknames = new Set<string>();
+
+  return value
+    .map((entry, index) => {
+      if (!isRecordObject(entry)) {
+        return null;
+      }
+
+      if (
+        typeof entry.id !== 'string' ||
+        typeof entry.name !== 'string' ||
+        typeof entry.age !== 'number' ||
+        !Number.isFinite(entry.age) ||
+        !isAccountGender(entry.gender) ||
+        typeof entry.password !== 'string' ||
+        typeof entry.createdAt !== 'string'
+      ) {
+        return null;
+      }
+
+      const fallbackSeed = entry.id || String(index + 1);
+      const rawNickname = typeof entry.nickname === 'string' ? entry.nickname : entry.name;
+      const nickname = buildUniqueNickname(rawNickname, usedNicknames, fallbackSeed);
+
+      return {
+        id: entry.id,
+        nickname,
+        name: entry.name.trim(),
+        age: Math.trunc(entry.age),
+        gender: entry.gender,
+        password: entry.password,
+        createdAt: entry.createdAt,
+      };
+    })
+    .filter((account): account is UserAccount => Boolean(account));
+}
+
+function isBallBrandOption(value: unknown): value is BallBrandOption {
+  return value === 'wilson' || value === 'spalding' || value === 'molten';
+}
+
+function isPositionOption(value: unknown): value is PositionOption {
+  return value === 'none' || value === 'defense' || value === 'offense';
+}
+
+function isBallColorOption(value: unknown): value is BallColorOption {
+  return value === 'orange' || value === 'brown' || value === 'yellow' || value === 'white' || value === 'black' || value === 'gray' || value === 'red';
+}
+
+function sanitizeStringRecord(value: unknown): Record<string, string> {
+  if (!isRecordObject(value)) {
+    return {};
+  }
+
+  const next: Record<string, string> = {};
+
+  for (const [key, entryValue] of Object.entries(value)) {
+    if (typeof entryValue === 'string') {
+      next[key] = entryValue;
+    }
+  }
+
+  return next;
+}
+
+function sanitizeNumberRecord(value: unknown): Record<string, number> {
+  if (!isRecordObject(value)) {
+    return {};
+  }
+
+  const next: Record<string, number> = {};
+
+  for (const [key, entryValue] of Object.entries(value)) {
+    if (typeof entryValue === 'number' && Number.isFinite(entryValue)) {
+      next[key] = entryValue;
+    }
+  }
+
+  return next;
+}
+
+function sanitizeLessonRecords(value: unknown): LessonRecord[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      if (!isRecordObject(entry)) {
+        return null;
+      }
+
+      const id = typeof entry.id === 'string' ? entry.id : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const dateKey = typeof entry.dateKey === 'string' ? entry.dateKey : formatDateKey(new Date());
+      const mode = entry.mode === 'shoot' ? 'shoot' : 'dribble';
+      const feedback = typeof entry.feedback === 'string' ? entry.feedback : '';
+      const createdAt = typeof entry.createdAt === 'string' ? entry.createdAt : new Date().toISOString();
+      const reviewFeedback = typeof entry.reviewFeedback === 'string' ? entry.reviewFeedback : undefined;
+      const reviewStartAtMs =
+        typeof entry.reviewStartAtMs === 'number' && Number.isFinite(entry.reviewStartAtMs) ? entry.reviewStartAtMs : undefined;
+      const reviewDurationMs =
+        typeof entry.reviewDurationMs === 'number' && Number.isFinite(entry.reviewDurationMs) ? entry.reviewDurationMs : undefined;
+
+      return normalizeLessonRecord({
+        id,
+        dateKey,
+        mode,
+        feedback,
+        feedbackTimeline: Array.isArray(entry.feedbackTimeline)
+          ? (entry.feedbackTimeline as FeedbackMoment[] | string[])
+          : undefined,
+        videoUri: '',
+        createdAt,
+        reviewFeedback,
+        reviewStartAtMs,
+        reviewDurationMs,
+      });
+    })
+    .filter((record): record is LessonRecord => Boolean(record));
+}
+
+function sanitizeTransferPayload(value: unknown): AccountTransferPayload | null {
+  if (!isRecordObject(value) || value.version !== 1) {
+    return null;
+  }
+
+  const accountValue = value.account;
+  const dataValue = value.data;
+
+  if (!isRecordObject(accountValue) || !isRecordObject(dataValue)) {
+    return null;
+  }
+
+  if (
+    typeof accountValue.id !== 'string' ||
+    (typeof accountValue.nickname !== 'string' && typeof accountValue.name !== 'string') ||
+    typeof accountValue.name !== 'string' ||
+    typeof accountValue.age !== 'number' ||
+    !Number.isFinite(accountValue.age) ||
+    !isAccountGender(accountValue.gender) ||
+    typeof accountValue.password !== 'string' ||
+    typeof accountValue.createdAt !== 'string'
+  ) {
+    return null;
+  }
+
+  const ballBrand = isBallBrandOption(dataValue.ballBrand) ? dataValue.ballBrand : DEFAULT_BALL_BRAND;
+  const ballColors = Array.isArray(dataValue.ballColors)
+    ? dataValue.ballColors.filter(isBallColorOption)
+    : DEFAULT_BALL_COLORS;
+  const position = isPositionOption(dataValue.position) ? dataValue.position : DEFAULT_POSITION;
+
+  return {
+    version: 1,
+    exportedAt: typeof value.exportedAt === 'string' ? value.exportedAt : new Date().toISOString(),
+    account: {
+      id: accountValue.id,
+      nickname: typeof accountValue.nickname === 'string' ? accountValue.nickname : accountValue.name,
+      name: accountValue.name,
+      age: Math.trunc(accountValue.age),
+      gender: accountValue.gender,
+      password: accountValue.password,
+      createdAt: accountValue.createdAt,
+    },
+    data: {
+      attendance: sanitizeStringRecord(dataValue.attendance),
+      lessonRecords: sanitizeLessonRecords(dataValue.lessonRecords),
+      dribbleCounts: sanitizeNumberRecord(dataValue.dribbleCounts),
+      shotAttempts: sanitizeNumberRecord(dataValue.shotAttempts),
+      shotSuccess: sanitizeNumberRecord(dataValue.shotSuccess),
+      ballColors: ballColors.length > 0 ? ballColors : DEFAULT_BALL_COLORS,
+      ballBrand,
+      position,
+    },
+  };
 }
 
 function parseDateKeyToDate(dateKey: string) {
@@ -498,6 +731,7 @@ export function useBasketballCoachApp() {
   const [currentDribbleCount, setCurrentDribbleCount] = useState(0);
   const [isLessonActive, setIsLessonActive] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
+  const [isCameraPreviewHidden, setIsCameraPreviewHidden] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [cameraSessionKey, setCameraSessionKey] = useState(0);
@@ -540,6 +774,7 @@ export function useBasketballCoachApp() {
   const frontDribbleCriterionCountsRef = useRef<Record<FrontDribbleCriterionNumber, number>>(createFrontDribbleCriterionCounter());
   const frontDribbleWeakPointRef = useRef<FrontDribbleWeakPoint | null>(null);
   const frontDribbleSummaryShownRef = useRef(false);
+  const shotSuccessRecordsRef = useRef<Record<string, number>>({});
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
   const currentUserId = currentUser?.id ?? '';
@@ -635,6 +870,7 @@ export function useBasketballCoachApp() {
     latestShootAnalysisRef.current = null;
     dailyDribbleRecordsRef.current = {};
     shotAttemptRecordsRef.current = {};
+    shotSuccessRecordsRef.current = {};
     shootAnalysisHistoryRef.current = [];
     shootFeedbackLockedRef.current = false;
     frontDribbleCriterionCountsRef.current = createFrontDribbleCriterionCounter();
@@ -665,6 +901,10 @@ export function useBasketballCoachApp() {
   }, [shotAttemptRecords]);
 
   useEffect(() => {
+    shotSuccessRecordsRef.current = shotSuccessRecords;
+  }, [shotSuccessRecords]);
+
+  useEffect(() => {
     lessonModeRef.current = lessonMode;
   }, [lessonMode]);
 
@@ -679,7 +919,7 @@ export function useBasketballCoachApp() {
       try {
         const entries = await AsyncStorage.multiGet([STORAGE_KEYS.accounts, STORAGE_KEYS.session]);
         const stored = Object.fromEntries(entries);
-        const parsedAccounts = parseStoredJson<UserAccount[]>(stored[STORAGE_KEYS.accounts], []);
+        const parsedAccounts = sanitizeStoredAccounts(parseStoredJson<unknown[]>(stored[STORAGE_KEYS.accounts], []));
         const parsedSession = parseStoredJson<AuthSession | null>(stored[STORAGE_KEYS.session], null);
 
         if (!isMounted) {
@@ -688,6 +928,7 @@ export function useBasketballCoachApp() {
 
         setAccounts(parsedAccounts);
         setAuthMode(parsedAccounts.length > 0 ? 'login' : 'signup');
+        await AsyncStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(parsedAccounts));
 
         if (parsedSession?.userId) {
           const sessionAccount = parsedAccounts.find((account) => account.id === parsedSession.userId);
@@ -1293,6 +1534,37 @@ export function useBasketballCoachApp() {
     return previous < DAILY_SHOOT_TARGET && next >= DAILY_SHOOT_TARGET;
   }, []);
 
+  const recordSuccessfulShot = useCallback(
+    (options?: { preserveFeedback?: boolean; debugMessage?: string; celebrate?: boolean }) => {
+      const todayKey = formatDateKey(new Date());
+      const nextCount = (shotSuccessRecordsRef.current[todayKey] || 0) + 1;
+      const nextRecords = {
+        ...shotSuccessRecordsRef.current,
+        [todayKey]: nextCount,
+      };
+
+      shotSuccessRecordsRef.current = nextRecords;
+      setShotSuccessRecords(nextRecords);
+
+      if (!options?.preserveFeedback) {
+        const nextText = `오늘 슛 성공 ${nextCount}개를 기록했습니다.`;
+        setFeedbackAndRemember(nextText);
+      }
+
+      if (options?.debugMessage) {
+        setDebugText(options.debugMessage);
+      }
+
+      if (options?.celebrate !== false) {
+        setFireworks(createFireworks());
+        setShowFireworks(true);
+      }
+
+      return nextCount;
+    },
+    [setFeedbackAndRemember]
+  );
+
   const saveLessonRecord = useCallback((videoUri: string, reviewClip?: LessonReviewClip | null) => {
     const dateKey = formatDateKey(new Date());
     const mode = lessonModeRef.current;
@@ -1353,6 +1625,7 @@ export function useBasketballCoachApp() {
       setDribbleResetToken(0);
       setRecordingStartToken(0);
       setRecordingStopToken(0);
+      setIsCameraPreviewHidden(false);
       setIsLessonActive(false);
       setIsCameraActive(false);
       setIsCameraReady(false);
@@ -1375,37 +1648,162 @@ export function useBasketballCoachApp() {
     setAuthMode(nextMode);
   }
 
-  async function login({ name, age, gender, password, keepSignedIn }: AuthFormValues): Promise<AuthActionResult> {
+  async function createTransferCode(): Promise<TransferCodeResult> {
+    if (!currentUserId) {
+      return {
+        success: false,
+        message: '전송 코드를 만들려면 먼저 로그인해 주세요.',
+      };
+    }
+
+    const currentAccount = accounts.find((account) => account.id === currentUserId);
+
+    if (!currentAccount) {
+      return {
+        success: false,
+        message: '현재 계정 정보를 찾지 못했습니다. 다시 로그인한 뒤 시도해 주세요.',
+      };
+    }
+
+    const payload: AccountTransferPayload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      account: currentAccount,
+      data: {
+        attendance,
+        lessonRecords: lessonRecords.map((record) => ({
+          ...record,
+          videoUri: '',
+        })),
+        dribbleCounts: dailyDribbleRecords,
+        shotAttempts: shotAttemptRecords,
+        shotSuccess: shotSuccessRecords,
+        ballColors: selectedBallColors,
+        ballBrand: selectedBallBrand,
+        position: selectedPosition,
+      },
+    };
+
+    return {
+      success: true,
+      message: '전송 코드를 만들었습니다. 휴대폰 로그인 화면에서 붙여넣으면 계정을 가져올 수 있습니다.',
+      code: JSON.stringify(payload),
+    };
+  }
+
+  async function importAccountTransfer(code: string): Promise<AuthActionResult> {
+    const trimmedCode = code.trim();
+
+    if (!trimmedCode) {
+      return {
+        success: false,
+        message: '붙여넣은 전송 코드가 비어 있습니다.',
+      };
+    }
+
+    let parsedPayload: unknown;
+
+    try {
+      parsedPayload = JSON.parse(trimmedCode);
+    } catch {
+      return {
+        success: false,
+        message: '전송 코드를 읽지 못했습니다. 컴퓨터에서 만든 코드를 그대로 붙여넣어 주세요.',
+      };
+    }
+
+    const payload = sanitizeTransferPayload(parsedPayload);
+
+    if (!payload) {
+      return {
+        success: false,
+        message: '지원하지 않는 전송 코드입니다. 최신 앱에서 다시 코드를 만들어 주세요.',
+      };
+    }
+
+    const normalizedNickname = normalizeNickname(payload.account.nickname);
+    const existingAccount =
+      accounts.find((account) => account.id === payload.account.id) ??
+      accounts.find((account) => normalizeNickname(account.nickname) === normalizedNickname);
+    const targetAccountId = existingAccount?.id ?? payload.account.id;
+    const nextAccount: UserAccount = {
+      ...payload.account,
+      nickname: payload.account.nickname.trim().replace(/\s+/g, ' '),
+      id: targetAccountId,
+    };
+    const scopedKeys = getAccountStorageKeys(targetAccountId);
+    const nextAccounts = [
+      ...accounts.filter((account) => {
+        if (account.id === targetAccountId) {
+          return false;
+        }
+
+        return normalizeNickname(account.nickname) !== normalizedNickname;
+      }),
+      nextAccount,
+    ];
+
+    await AsyncStorage.multiSet([
+      [STORAGE_KEYS.accounts, JSON.stringify(nextAccounts)],
+      [scopedKeys.attendance, JSON.stringify(payload.data.attendance)],
+      [scopedKeys.lessonRecords, JSON.stringify(payload.data.lessonRecords)],
+      [scopedKeys.dribbleCounts, JSON.stringify(payload.data.dribbleCounts)],
+      [scopedKeys.shotAttempts, JSON.stringify(payload.data.shotAttempts)],
+      [scopedKeys.shotSuccess, JSON.stringify(payload.data.shotSuccess)],
+      [scopedKeys.ballColors, JSON.stringify(payload.data.ballColors)],
+      [scopedKeys.ballBrand, JSON.stringify(payload.data.ballBrand)],
+      [scopedKeys.position, JSON.stringify(payload.data.position)],
+    ]);
+    await persistSession(targetAccountId, true);
+
+    setAccounts(nextAccounts);
+    setCurrentUser(toAuthUser(nextAccount));
+    setAuthMode('login');
+
+    return {
+      success: true,
+      message: '계정을 가져와서 바로 로그인했습니다.',
+    };
+  }
+
+  async function login({ nickname, name, age, gender, password, keepSignedIn }: AuthFormValues): Promise<AuthActionResult> {
+    const trimmedNickname = nickname.trim();
     const trimmedName = name.trim();
     const trimmedPassword = password.trim();
     const parsedAge = parseAgeInput(age);
 
-    if (!trimmedName || parsedAge === null || !trimmedPassword) {
+    if (!trimmedNickname || !trimmedName || parsedAge === null || !trimmedPassword) {
       return {
         success: false,
-        message: '이름, 나이, 성별, 비밀번호를 모두 정확히 입력해 주세요.',
+        message: '닉네임, 이름, 나이, 성별, 비밀번호를 모두 정확히 입력해 주세요.',
       };
     }
 
     if (accounts.length === 0) {
       return {
         success: false,
-        message: '아직 등록된 계정이 없습니다. 회원가입으로 첫 계정을 만들어 주세요.',
+        message: '이 기기에는 아직 등록된 계정이 없습니다. 컴퓨터에서 만든 계정은 아래 전송 코드로 가져오거나 회원가입으로 새로 만들어 주세요.',
       };
     }
 
-    const normalizedName = normalizeAccountName(trimmedName);
-    const matchedAccount = accounts.find(
-      (account) =>
-        normalizeAccountName(account.name) === normalizedName &&
-        account.age === parsedAge &&
-        account.gender === gender
-    );
+    const normalizedNickname = normalizeNickname(trimmedNickname);
+    const matchedAccount = accounts.find((account) => normalizeNickname(account.nickname) === normalizedNickname);
 
     if (!matchedAccount) {
       return {
         success: false,
-        message: '입력한 이름, 나이, 성별과 일치하는 계정을 찾지 못했습니다.',
+        message: '입력한 닉네임과 일치하는 계정을 찾지 못했습니다.',
+      };
+    }
+
+    if (
+      normalizeAccountName(matchedAccount.name) !== normalizeAccountName(trimmedName) ||
+      matchedAccount.age !== parsedAge ||
+      matchedAccount.gender !== gender
+    ) {
+      return {
+        success: false,
+        message: '닉네임은 맞지만 이름, 나이 또는 성별 정보가 계정과 일치하지 않습니다.',
       };
     }
 
@@ -1426,35 +1824,32 @@ export function useBasketballCoachApp() {
     };
   }
 
-  async function signup({ name, age, gender, password, keepSignedIn }: AuthFormValues): Promise<AuthActionResult> {
+  async function signup({ nickname, name, age, gender, password, keepSignedIn }: AuthFormValues): Promise<AuthActionResult> {
+    const trimmedNickname = nickname.trim();
     const trimmedName = name.trim();
     const trimmedPassword = password.trim();
     const parsedAge = parseAgeInput(age);
 
-    if (!trimmedName || parsedAge === null || !trimmedPassword) {
+    if (!trimmedNickname || !trimmedName || parsedAge === null || !trimmedPassword) {
       return {
         success: false,
-        message: '이름, 나이, 성별, 비밀번호를 모두 정확히 입력해 주세요.',
+        message: '닉네임, 이름, 나이, 성별, 비밀번호를 모두 정확히 입력해 주세요.',
       };
     }
 
-    const normalizedName = normalizeAccountName(trimmedName);
-    const duplicatedAccount = accounts.find(
-      (account) =>
-        normalizeAccountName(account.name) === normalizedName &&
-        account.age === parsedAge &&
-        account.gender === gender
-    );
+    const normalizedNickname = normalizeNickname(trimmedNickname);
+    const duplicatedAccount = accounts.find((account) => normalizeNickname(account.nickname) === normalizedNickname);
 
     if (duplicatedAccount) {
       return {
         success: false,
-        message: '같은 이름, 나이, 성별로 이미 만들어진 계정이 있습니다. 로그인으로 이동해 주세요.',
+        message: '이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해 주세요.',
       };
     }
 
     const nextAccount: UserAccount = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      nickname: trimmedNickname,
       name: trimmedName,
       age: parsedAge,
       gender,
@@ -1544,6 +1939,7 @@ export function useBasketballCoachApp() {
     setShootResetToken(0);
     setRecordingStartToken(0);
     setRecordingStopToken(0);
+    setIsCameraPreviewHidden(false);
     setLessonReview(null);
     setImmediateLessonFeedback(
       mode === 'shoot'
@@ -1608,6 +2004,7 @@ export function useBasketballCoachApp() {
     setDribbleResetToken(0);
     setShootResetToken(0);
     setRecordingStopToken(0);
+    setIsCameraPreviewHidden(false);
     setLessonReview(null);
     if (mode === 'dribble') {
       setImmediateLessonFeedback(buildDribbleStanceFeedbackForView({
@@ -1698,6 +2095,7 @@ export function useBasketballCoachApp() {
     setRecordingStartToken(0);
     setRecordingStopToken(0);
     setLessonReview(null);
+    setIsCameraPreviewHidden(false);
     setIsLessonActive(true);
     setIsCameraActive(true);
     setIsCameraReady(false);
@@ -1752,6 +2150,7 @@ export function useBasketballCoachApp() {
       setShootResetToken(0);
       setRecordingStartToken(0);
       setRecordingStopToken(0);
+      setIsCameraPreviewHidden(false);
       setIsCameraActive(false);
       setIsCameraReady(false);
       setCameraError('');
@@ -1798,6 +2197,7 @@ export function useBasketballCoachApp() {
     setCountdownValue(null);
     setIsLessonActive(false);
     setIsCameraReady(false);
+    setIsCameraPreviewHidden(true);
     setRecordingStopToken(Date.now());
     setDebugText('목표 드리블 횟수에 도달했습니다. 종료 호루라기를 울리고 카메라 연결을 끄는 중입니다.');
 
@@ -1833,6 +2233,7 @@ export function useBasketballCoachApp() {
       setShootResetToken(0);
       setRecordingStartToken(0);
       setRecordingStopToken(0);
+      setIsCameraPreviewHidden(false);
       latestFeedbackRef.current = completedFeedback;
       setFeedbackText(completedFeedback);
       setLessonReview(null);
@@ -1895,6 +2296,7 @@ export function useBasketballCoachApp() {
       setShootResetToken(0);
       setRecordingStartToken(0);
       setRecordingStopToken(0);
+      setIsCameraPreviewHidden(false);
       latestFeedbackRef.current = completedFeedback;
       setFeedbackText(completedFeedback);
       setLessonReview(finalReviewClip);
@@ -1952,6 +2354,7 @@ export function useBasketballCoachApp() {
       setShootResetToken(0);
       setRecordingStartToken(0);
       setRecordingStopToken(0);
+      setIsCameraPreviewHidden(false);
       setIsLessonActive(true);
       setIsCameraActive(true);
       setIsCameraReady(true);
@@ -2225,6 +2628,7 @@ export function useBasketballCoachApp() {
           | { type: 'ready' }
           | { type: 'stream_started' }
           | { type: 'recording_started' }
+          | { type: 'shoot_success_gesture' }
           | { type: 'status'; message: string }
           | { type: 'points'; summary: string }
           | { type: 'dribble_analysis'; analysis: DribbleAnalysis }
@@ -2258,6 +2662,18 @@ export function useBasketballCoachApp() {
             });
           }
           setDebugText('영상 녹화를 시작했습니다.');
+          return;
+        }
+
+        if (payload.type === 'shoot_success_gesture') {
+          if (lessonModeRef.current !== 'shoot') {
+            return;
+          }
+
+          recordSuccessfulShot({
+            preserveFeedback: true,
+            debugMessage: '슛 발사 1초 뒤 X자 팔 동작을 확인해 슛 성공 1회를 자동 기록했습니다.',
+          });
           return;
         }
 
@@ -2332,6 +2748,7 @@ export function useBasketballCoachApp() {
             setShootResetToken(0);
             setRecordingStartToken(0);
             setRecordingStopToken(0);
+            setIsCameraPreviewHidden(false);
             setIsLessonActive(false);
             setIsCameraActive(false);
             setIsCameraReady(false);
@@ -2352,6 +2769,7 @@ export function useBasketballCoachApp() {
             setRecordingStartToken(0);
             setRecordingStopToken(0);
             setShootResetToken(0);
+            setIsCameraPreviewHidden(false);
             dribbleLessonPhaseRef.current = 'stance_setup';
             shootLessonStartedRef.current = false;
             setIsLessonActive(true);
@@ -2384,6 +2802,7 @@ export function useBasketballCoachApp() {
       finalizeLessonSession,
       isCameraActive,
       isLessonActive,
+      recordSuccessfulShot,
       resetShootAnalysisTracking,
       setImmediateLessonFeedback,
     ]
@@ -2404,18 +2823,35 @@ export function useBasketballCoachApp() {
       return;
     }
 
-    const todayKey = formatDateKey(new Date());
-    const nextCount = (shotSuccessRecords[todayKey] || 0) + 1;
+    recordSuccessfulShot();
+  }
 
-    setShotSuccessRecords((current) => ({
-      ...current,
-      [todayKey]: nextCount,
-    }));
+  function adjustSelectedDateShotSuccess(delta: number) {
+    if (!selectedDateKey || delta === 0) {
+      return;
+    }
 
-    const nextText = `오늘 슛 성공 ${nextCount}개를 기록했습니다.`;
-    setFeedbackAndRemember(nextText);
-    setFireworks(createFireworks());
-    setShowFireworks(true);
+    const maxAttempts = shotAttemptRecords[selectedDateKey] || 0;
+
+    setShotSuccessRecords((current) => {
+      const currentCount = current[selectedDateKey] || 0;
+      const nextCount = Math.max(0, Math.min(maxAttempts, currentCount + delta));
+
+      if (nextCount === currentCount) {
+        return current;
+      }
+
+      if (nextCount === 0) {
+        const next = { ...current };
+        delete next[selectedDateKey];
+        return next;
+      }
+
+      return {
+        ...current,
+        [selectedDateKey]: nextCount,
+      };
+    });
   }
 
   async function openSkillVideo() {
@@ -2472,6 +2908,7 @@ export function useBasketballCoachApp() {
     lessonReview,
     currentDribbleCount,
     isCameraActive,
+    isCameraPreviewHidden,
     isLessonActive,
     isCameraReady,
     cameraSessionKey,
@@ -2484,6 +2921,8 @@ export function useBasketballCoachApp() {
     fireworks,
     showFireworks,
     changeAuthMode,
+    createTransferCode,
+    importAccountTransfer,
     login,
     signup,
     logout,
@@ -2493,6 +2932,7 @@ export function useBasketballCoachApp() {
     endLesson,
     handlePoseMessage,
     registerSuccessfulShot,
+    adjustSelectedDateShotSuccess,
     selectSkill,
     selectBallBrand,
     toggleBallColor,

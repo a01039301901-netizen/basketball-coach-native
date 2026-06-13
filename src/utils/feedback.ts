@@ -69,9 +69,9 @@ export function buildDribbleFeedbackText(analysis: DribbleAnalysis): string {
 export function buildShootFeedbackText(analysis: ShootAnalysis): string {
   const armLine =
     analysis.armAngleState === 'narrow'
-      ? '준비 자세에서 팔 각도가 좁습니다. 어깨, 팔꿈치, 손목 각도를 조금 더 벌려 90~110도로 맞춰 주세요.'
+      ? '준비 자세에서 팔 각도가 좁습니다. 어깨, 팔꿈치, 손목 각도를 조금 더 벌려 80~120도로 맞춰 주세요.'
       : analysis.armAngleState === 'wide'
-        ? '준비 자세에서 팔 각도가 넓습니다. 팔을 조금 더 모아 90~110도로 맞춰 주세요.'
+        ? '준비 자세에서 팔 각도가 넓습니다. 팔을 조금 더 모아 80~120도로 맞춰 주세요.'
         : analysis.armAngleState === 'balanced'
           ? '슛 준비 자세의 팔 각도는 좋습니다. 그대로 유지해 보세요.'
           : '어깨, 팔꿈치, 손목이 잘 보이도록 서서 준비 자세를 다시 잡아 주세요.';

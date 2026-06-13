@@ -1,10 +1,16 @@
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
 import { BALL_BRAND_OPTIONS, BALL_COLOR_OPTIONS, POSITION_OPTIONS } from '../constants/settings';
 import { colors } from '../theme/colors';
 import type { AuthUser, BallBrandOption, BallColorOption, PositionOption } from '../types/app';
+
+interface TransferCodeResult {
+  success: boolean;
+  message: string;
+  code?: string;
+}
 
 interface SettingsScreenProps {
   currentUser: AuthUser;
@@ -15,17 +21,11 @@ interface SettingsScreenProps {
   onToggleBallColor: (color: BallColorOption) => void;
   onSelectPosition: (position: PositionOption) => void;
   onLogout: () => void;
+  onCreateTransferCode: () => Promise<TransferCodeResult>;
 }
 
 function formatGenderLabel(gender: AuthUser['gender']) {
-  switch (gender) {
-    case 'male':
-      return '남성';
-    case 'female':
-      return '여성';
-    default:
-      return '기타';
-  }
+  return gender === 'male' ? '남성' : '여성';
 }
 
 export function SettingsScreen({
@@ -37,13 +37,44 @@ export function SettingsScreen({
   onToggleBallColor,
   onSelectPosition,
   onLogout,
+  onCreateTransferCode,
 }: SettingsScreenProps) {
   const [isPositionOpen, setIsPositionOpen] = useState(false);
+  const [transferCode, setTransferCode] = useState('');
+  const [transferMessage, setTransferMessage] = useState('');
+  const [isGeneratingTransferCode, setIsGeneratingTransferCode] = useState(false);
 
   const selectedPositionLabel = useMemo(
     () => POSITION_OPTIONS.find((option) => option.key === selectedPosition)?.label ?? '없음',
     [selectedPosition]
   );
+
+  async function handleCreateTransferCode() {
+    if (isGeneratingTransferCode) {
+      return;
+    }
+
+    setIsGeneratingTransferCode(true);
+    const result = await onCreateTransferCode();
+    setTransferMessage(result.message);
+    setTransferCode(result.code ?? '');
+    setIsGeneratingTransferCode(false);
+  }
+
+  async function handleShareTransferCode() {
+    if (!transferCode) {
+      return;
+    }
+
+    try {
+      await Share.share({
+        title: '농구 코치 계정 전송 코드',
+        message: transferCode,
+      });
+    } catch {
+      setTransferMessage('공유 창을 열지 못했습니다. 전송 코드 내용을 직접 복사해 주세요.');
+    }
+  }
 
   return (
     <View style={styles.contentGap}>
@@ -51,6 +82,10 @@ export function SettingsScreen({
         <Text style={styles.lead}>현재 로그인한 계정입니다. 다른 계정으로 바꾸려면 로그아웃 후 다시 로그인해 주세요.</Text>
 
         <View style={styles.accountInfoWrap}>
+          <View style={styles.accountInfoRow}>
+            <Text style={styles.accountLabel}>닉네임</Text>
+            <Text style={styles.accountValue}>{currentUser.nickname}</Text>
+          </View>
           <View style={styles.accountInfoRow}>
             <Text style={styles.accountLabel}>이름</Text>
             <Text style={styles.accountValue}>{currentUser.name}</Text>
@@ -65,9 +100,38 @@ export function SettingsScreen({
           </View>
         </View>
 
-        <View style={styles.logoutWrap}>
+        <View style={styles.accountActionRow}>
+          <SmallButton
+            title={isGeneratingTransferCode ? '코드 생성 중..' : '전송 코드 만들기'}
+            onPress={() => void handleCreateTransferCode()}
+            disabled={isGeneratingTransferCode}
+          />
           <SmallButton title="로그아웃" onPress={onLogout} variant="red" />
         </View>
+
+        {transferMessage ? <Text style={styles.transferMessage}>{transferMessage}</Text> : null}
+
+        {transferCode ? (
+          <View style={styles.transferPanel}>
+            <Text style={styles.transferTitle}>계정 전송 코드</Text>
+            <Text style={styles.transferDescription}>
+              이 코드를 휴대폰 로그인 화면의 가져오기 칸에 붙여넣어 주세요. 영상 파일은 옮겨지지 않고 계정, 기록, 설정만 이동합니다.
+            </Text>
+            <TextInput
+              value={transferCode}
+              onChangeText={setTransferCode}
+              style={styles.transferInput}
+              multiline
+              autoCapitalize="none"
+              autoCorrect={false}
+              selectTextOnFocus
+            />
+            <View style={styles.transferActions}>
+              <SmallButton title="공유하기" onPress={() => void handleShareTransferCode()} />
+              <SmallButton title="코드 숨기기" onPress={() => setTransferCode('')} variant="dark" />
+            </View>
+          </View>
+        ) : null}
       </Card>
 
       <Card title="인식 설정" style={styles.card}>
@@ -212,9 +276,53 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '900',
   },
-  logoutWrap: {
+  accountActionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
     marginTop: 18,
-    alignSelf: 'flex-start',
+  },
+  transferMessage: {
+    marginTop: 14,
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  transferPanel: {
+    marginTop: 16,
+    gap: 12,
+    borderRadius: 18,
+    padding: 16,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  transferTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  transferDescription: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  transferInput: {
+    minHeight: 120,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    color: colors.text,
+    fontSize: 14,
+    textAlignVertical: 'top',
+  },
+  transferActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
   sectionTitle: {
     color: colors.textSoft,

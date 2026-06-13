@@ -7,6 +7,7 @@ interface LessonCameraProps {
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
   isCameraActive: boolean;
+  isCameraPreviewHidden: boolean;
   isLessonActive: boolean;
   isCameraReady: boolean;
   countdownValue: number | null;

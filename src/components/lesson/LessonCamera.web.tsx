@@ -10,6 +10,7 @@ interface LessonCameraProps {
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
   isCameraActive: boolean;
+  isCameraPreviewHidden: boolean;
   isLessonActive: boolean;
   isCameraReady: boolean;
   countdownValue: number | null;
@@ -25,6 +26,7 @@ export function LessonCamera({
   selectedBallBrand,
   selectedBallColors,
   isCameraActive,
+  isCameraPreviewHidden,
   isLessonActive,
   isCameraReady,
   countdownValue,
@@ -129,7 +131,7 @@ export function LessonCamera({
             ref: iframeRef,
             srcDoc,
             allow: 'camera; microphone; autoplay',
-            style: styles.iframe as unknown as React.CSSProperties,
+            style: StyleSheet.flatten([styles.iframe, isCameraPreviewHidden && styles.hiddenCapture]) as unknown as React.CSSProperties,
           })}
           <View style={styles.overlay}>
             <View style={styles.badge}>
@@ -144,6 +146,12 @@ export function LessonCamera({
               </View>
             ) : null}
           </View>
+          {isCameraPreviewHidden ? (
+            <View style={styles.placeholderOverlay}>
+              <Text style={styles.placeholderTitle}>카메라 종료 중</Text>
+              <Text style={styles.placeholderText}>목표 횟수를 채워 카메라를 끄고 레슨 결과를 정리하고 있습니다.</Text>
+            </View>
+          ) : null}
         </>
       ) : (
         <View style={styles.placeholder}>
@@ -172,6 +180,9 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: colors.cameraBg,
   },
+  hiddenCapture: {
+    opacity: 0,
+  },
   overlay: {
     position: 'absolute',
     left: 0,
@@ -181,6 +192,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     pointerEvents: 'none',
+  },
+  placeholderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    backgroundColor: colors.cameraBg,
   },
   badge: {
     alignSelf: 'flex-start',

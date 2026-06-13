@@ -6,6 +6,7 @@ import { colors } from '../theme/colors';
 import type { AccountGender, AuthMode } from '../types/app';
 
 interface AuthSubmitValues {
+  nickname: string;
   name: string;
   age: string;
   gender: AccountGender;
@@ -18,20 +19,26 @@ interface AuthActionResult {
   message: string;
 }
 
+interface TransferImportResult {
+  success: boolean;
+  message: string;
+}
+
 interface AuthScreenProps {
   mode: AuthMode;
   onChangeMode: (mode: AuthMode) => void;
   onLogin: (values: AuthSubmitValues) => Promise<AuthActionResult>;
   onSignup: (values: AuthSubmitValues) => Promise<AuthActionResult>;
+  onImportAccount?: (code: string) => Promise<TransferImportResult>;
 }
 
 const GENDER_OPTIONS: Array<{ key: AccountGender; label: string }> = [
   { key: 'male', label: '남성' },
   { key: 'female', label: '여성' },
-  { key: 'other', label: '기타' },
 ];
 
-export function AuthScreen({ mode, onChangeMode, onLogin, onSignup }: AuthScreenProps) {
+export function AuthScreen({ mode, onChangeMode, onLogin, onSignup, onImportAccount }: AuthScreenProps) {
+  const [nickname, setNickname] = useState('');
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
   const [gender, setGender] = useState<AccountGender>('male');
@@ -39,10 +46,18 @@ export function AuthScreen({ mode, onChangeMode, onLogin, onSignup }: AuthScreen
   const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [transferCode, setTransferCode] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState('');
 
   useEffect(() => {
     setStatusMessage('');
   }, [mode]);
+
+  useEffect(() => {
+    setImportMessage('');
+  }, [isImportOpen]);
 
   async function handleSubmit() {
     if (isSubmitting) {
@@ -51,6 +66,7 @@ export function AuthScreen({ mode, onChangeMode, onLogin, onSignup }: AuthScreen
 
     setIsSubmitting(true);
     const submitValues = {
+      nickname,
       name,
       age,
       gender,
@@ -63,6 +79,17 @@ export function AuthScreen({ mode, onChangeMode, onLogin, onSignup }: AuthScreen
     setIsSubmitting(false);
   }
 
+  async function handleImport() {
+    if (!onImportAccount || isImporting) {
+      return;
+    }
+
+    setIsImporting(true);
+    const result = await onImportAccount(transferCode);
+    setImportMessage(result.message);
+    setIsImporting(false);
+  }
+
   const isLogin = mode === 'login';
 
   return (
@@ -70,17 +97,30 @@ export function AuthScreen({ mode, onChangeMode, onLogin, onSignup }: AuthScreen
       <Card title={isLogin ? '로그인' : '회원가입'} style={styles.card}>
         <Text style={styles.subtitle}>
           {isLogin
-            ? '이름, 나이, 성별, 비밀번호를 입력해 기존 계정에 연결하세요.'
-            : '이름, 나이, 성별, 비밀번호를 설정해 새 농구 레슨 계정을 만드세요.'}
+            ? '이름, 나이, 성별, 비밀번호를 입력해 기존 계정으로 로그인해 주세요.'
+            : '이름, 나이, 성별, 비밀번호를 설정해서 농구 코치 계정을 만들어 주세요.'}
         </Text>
 
         <View style={styles.form}>
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>닉네임</Text>
+            <TextInput
+              value={nickname}
+              onChangeText={setNickname}
+              placeholder="닉네임을 입력해 주세요"
+              placeholderTextColor="rgba(255,255,255,0.45)"
+              style={styles.input}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+
           <View style={styles.fieldGroup}>
             <Text style={styles.label}>이름</Text>
             <TextInput
               value={name}
               onChangeText={setName}
-              placeholder="이름을 입력하세요"
+              placeholder="이름을 입력해 주세요"
               placeholderTextColor="rgba(255,255,255,0.45)"
               style={styles.input}
               autoCapitalize="words"
@@ -92,7 +132,7 @@ export function AuthScreen({ mode, onChangeMode, onLogin, onSignup }: AuthScreen
             <TextInput
               value={age}
               onChangeText={setAge}
-              placeholder="나이를 입력하세요"
+              placeholder="나이를 입력해 주세요"
               placeholderTextColor="rgba(255,255,255,0.45)"
               style={styles.input}
               keyboardType="number-pad"
@@ -123,7 +163,7 @@ export function AuthScreen({ mode, onChangeMode, onLogin, onSignup }: AuthScreen
             <TextInput
               value={password}
               onChangeText={setPassword}
-              placeholder="비밀번호를 입력하세요"
+              placeholder="비밀번호를 입력해 주세요"
               placeholderTextColor="rgba(255,255,255,0.45)"
               style={styles.input}
               secureTextEntry
@@ -133,7 +173,7 @@ export function AuthScreen({ mode, onChangeMode, onLogin, onSignup }: AuthScreen
 
         <Pressable onPress={() => setKeepSignedIn((current) => !current)} style={({ pressed }) => [styles.keepRow, pressed && styles.pressed]}>
           <View style={[styles.checkbox, keepSignedIn && styles.checkboxActive]}>
-            {keepSignedIn ? <Text style={styles.checkboxMark}>✓</Text> : null}
+            {keepSignedIn ? <Text style={styles.checkboxMark}>OK</Text> : null}
           </View>
           <View style={styles.keepTextWrap}>
             <Text style={styles.keepTitle}>로그인 상태 유지</Text>
@@ -145,7 +185,7 @@ export function AuthScreen({ mode, onChangeMode, onLogin, onSignup }: AuthScreen
 
         <View style={styles.actionRow}>
           <SmallButton
-            title={isSubmitting ? '처리 중...' : isLogin ? '로그인' : '회원가입'}
+            title={isSubmitting ? '처리 중.' : isLogin ? '로그인' : '회원가입'}
             onPress={() => void handleSubmit()}
             disabled={isSubmitting}
           />
@@ -157,7 +197,45 @@ export function AuthScreen({ mode, onChangeMode, onLogin, onSignup }: AuthScreen
           />
         </View>
 
-        <Text style={styles.footnote}>계정 정보와 로그인 상태는 현재 기기 내부 저장소에 보관됩니다.</Text>
+        {onImportAccount ? (
+          <View style={styles.importSection}>
+            <Pressable
+              onPress={() => setIsImportOpen((current) => !current)}
+              style={({ pressed }) => [styles.importToggle, pressed && styles.pressed]}
+            >
+              <Text style={styles.importToggleTitle}>다른 기기 계정 가져오기</Text>
+              <Text style={styles.importToggleSubtitle}>
+                컴퓨터에서 만든 전송 코드를 붙여 넣으면 이 기기에서도 같은 계정으로 바로 로그인할 수 있습니다.
+              </Text>
+            </Pressable>
+
+            {isImportOpen ? (
+              <View style={styles.importPanel}>
+                <Text style={styles.importLabel}>전송 코드</Text>
+                <TextInput
+                  value={transferCode}
+                  onChangeText={setTransferCode}
+                  placeholder="컴퓨터 설정 화면에서 만든 전송 코드를 여기에 붙여 넣어 주세요"
+                  placeholderTextColor="rgba(255,255,255,0.45)"
+                  style={[styles.input, styles.importInput]}
+                  multiline
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {importMessage ? <Text style={styles.importMessage}>{importMessage}</Text> : null}
+                <SmallButton
+                  title={isImporting ? '가져오는 중.' : '계정 가져오기'}
+                  onPress={() => void handleImport()}
+                  disabled={isImporting}
+                />
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        <Text style={styles.footnote}>
+          계정 정보와 로그인 상태는 기기마다 따로 저장됩니다. 다른 기기 계정은 전송 코드로만 옮겨 주세요.
+        </Text>
       </Card>
     </View>
   );
@@ -253,7 +331,7 @@ const styles = StyleSheet.create({
   },
   checkboxMark: {
     color: '#24160b',
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '900',
   },
   keepTextWrap: {
@@ -279,6 +357,50 @@ const styles = StyleSheet.create({
   actionRow: {
     gap: 12,
     marginTop: 20,
+  },
+  importSection: {
+    marginTop: 18,
+    gap: 12,
+  },
+  importToggle: {
+    borderRadius: 18,
+    padding: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    gap: 6,
+  },
+  importToggleTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  importToggleSubtitle: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  importPanel: {
+    gap: 12,
+    borderRadius: 18,
+    padding: 16,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  importLabel: {
+    color: colors.textSoft,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  importInput: {
+    minHeight: 120,
+    textAlignVertical: 'top',
+  },
+  importMessage: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
   },
   footnote: {
     marginTop: 18,

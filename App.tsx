@@ -38,6 +38,7 @@ export default function App() {
               onChangeMode={app.changeAuthMode}
               onLogin={app.login}
               onSignup={app.signup}
+              onImportAccount={app.importAccountTransfer}
             />
           )}
 
@@ -61,6 +62,7 @@ export default function App() {
               selectedBallBrand={app.selectedBallBrand}
               selectedBallColors={app.selectedBallColors}
               isCameraActive={app.isCameraActive}
+              isCameraPreviewHidden={app.isCameraPreviewHidden}
               isLessonActive={app.isLessonActive}
                 isCameraReady={app.isCameraReady}
                 cameraSessionKey={app.cameraSessionKey}
@@ -101,6 +103,7 @@ export default function App() {
               shotGraphData={app.shotGraphData}
               onChangeMonth={app.changeMonth}
               onOpenDate={app.openDiaryDate}
+              onAdjustShotSuccess={app.adjustSelectedDateShotSuccess}
               onDeleteRecord={(recordId) => void app.deleteLessonRecord(recordId)}
             />
           )}
@@ -115,6 +118,7 @@ export default function App() {
               onToggleBallColor={app.toggleBallColor}
               onSelectPosition={app.selectPosition}
               onLogout={() => void app.logout()}
+              onCreateTransferCode={app.createTransferCode}
             />
           )}
 

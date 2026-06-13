@@ -145,6 +145,8 @@ export function buildPoseWebHtml(
       let shootLowestLegAngle = null;
       let shootHeadPeakY = null;
       let shootReleaseDetected = false;
+      let shootReleaseDetectedAtMs = null;
+      let shootSuccessGestureEvaluated = false;
       let shootReleaseTiming = "unknown";
       let cameraStreamStopped = false;
 
@@ -173,6 +175,8 @@ export function buildPoseWebHtml(
         shootLowestLegAngle = null;
         shootHeadPeakY = null;
         shootReleaseDetected = false;
+        shootReleaseDetectedAtMs = null;
+        shootSuccessGestureEvaluated = false;
         shootReleaseTiming = "unknown";
       }
 
@@ -350,6 +354,53 @@ export function buildPoseWebHtml(
 
         const cosine = Math.min(1, Math.max(-1, dot / (magAB * magCB)));
         return Math.acos(cosine) * 180 / Math.PI;
+      }
+
+      function orientation(a, b, c) {
+        return (b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y);
+      }
+
+      function onSegment(a, b, c) {
+        return (
+          Math.min(a.x, c.x) <= b.x &&
+          b.x <= Math.max(a.x, c.x) &&
+          Math.min(a.y, c.y) <= b.y &&
+          b.y <= Math.max(a.y, c.y)
+        );
+      }
+
+      function segmentsIntersect(a, b, c, d) {
+        if (!visible(a) || !visible(b) || !visible(c) || !visible(d)) {
+          return false;
+        }
+
+        const o1 = orientation(a, b, c);
+        const o2 = orientation(a, b, d);
+        const o3 = orientation(c, d, a);
+        const o4 = orientation(c, d, b);
+
+        if (o1 === 0 && onSegment(a, c, b)) return true;
+        if (o2 === 0 && onSegment(a, d, b)) return true;
+        if (o3 === 0 && onSegment(c, a, d)) return true;
+        if (o4 === 0 && onSegment(c, b, d)) return true;
+
+        return (o1 > 0) !== (o2 > 0) && (o3 > 0) !== (o4 > 0);
+      }
+
+      function detectArmsCrossedX(leftShoulder, leftWrist, rightShoulder, rightWrist) {
+        if (!visible(leftShoulder) || !visible(leftWrist) || !visible(rightShoulder) || !visible(rightWrist)) {
+          return false;
+        }
+
+        const shoulderWidth = distanceBetween(leftShoulder, rightShoulder);
+        const wristsDistance = distanceBetween(leftWrist, rightWrist);
+        const wristsAlignedVertically = Math.abs(leftWrist.y - rightWrist.y) <= 0.18;
+
+        return (
+          segmentsIntersect(leftShoulder, leftWrist, rightShoulder, rightWrist) &&
+          wristsDistance <= shoulderWidth * 1.35 &&
+          wristsAlignedVertically
+        );
       }
 
       function rgbToHsv(r, g, b) {
@@ -1097,12 +1148,13 @@ export function buildPoseWebHtml(
         const shootingShoulder = shootingSide === "left" ? leftShoulder : shootingSide === "right" ? rightShoulder : null;
         const shootingWrist = shootingSide === "left" ? leftWrist : shootingSide === "right" ? rightWrist : null;
         const ballPoint = ball ? { x: ball.x, y: ball.y, visibility: 1 } : null;
+        const armsCrossedX = detectArmsCrossedX(leftShoulder, leftWrist, rightShoulder, rightWrist);
 
         let armAngleState = "unknown";
         if (armAngle !== null) {
-          if (armAngle < 90) {
+          if (armAngle < 80) {
             armAngleState = "narrow";
-          } else if (armAngle > 110) {
+          } else if (armAngle > 120) {
             armAngleState = "wide";
           } else {
             armAngleState = "balanced";
@@ -1153,6 +1205,8 @@ export function buildPoseWebHtml(
 
         if (releaseDetectedNow) {
           shootReleaseDetected = true;
+          shootReleaseDetectedAtMs = performance.now();
+          shootSuccessGestureEvaluated = false;
 
           if (releaseVelocity !== null) {
             if (releaseVelocity < -0.003) {
@@ -1164,6 +1218,19 @@ export function buildPoseWebHtml(
             }
           } else {
             shootReleaseTiming = "balanced";
+          }
+        }
+
+        if (
+          shootReleaseDetected &&
+          !shootSuccessGestureEvaluated &&
+          shootReleaseDetectedAtMs !== null &&
+          performance.now() - shootReleaseDetectedAtMs >= 1000
+        ) {
+          shootSuccessGestureEvaluated = true;
+
+          if (armsCrossedX) {
+            post({ type: "shoot_success_gesture" });
           }
         }
 

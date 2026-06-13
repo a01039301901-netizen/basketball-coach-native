@@ -15,6 +15,7 @@ interface LessonScreenProps {
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
   isCameraActive: boolean;
+  isCameraPreviewHidden: boolean;
   isLessonActive: boolean;
   isCameraReady: boolean;
   cameraSessionKey: number;
@@ -119,6 +120,7 @@ export function LessonScreen({
   selectedBallBrand,
   selectedBallColors,
   isCameraActive,
+  isCameraPreviewHidden,
   isLessonActive,
   isCameraReady,
   cameraSessionKey,
@@ -251,6 +253,7 @@ export function LessonScreen({
               selectedBallBrand={selectedBallBrand}
               selectedBallColors={selectedBallColors}
               isCameraActive={isCameraActive}
+              isCameraPreviewHidden={isCameraPreviewHidden}
               isLessonActive={isLessonActive}
               isCameraReady={isCameraReady}
               countdownValue={countdownValue}
@@ -405,7 +408,7 @@ export function LessonScreen({
             {shootGuideStep === 0 ? (
               <>
                 <Text style={styles.modalBody}>
-                  슛을 하기 위한 준비 자세로 공을 90도로 들어 주세요. 그러면 카운트가 시작됩니다.
+                  슛을 하기 위한 준비 자세로 팔 각도를 80~120도 범위에 맞춰 공을 들어 주세요. 그러면 카운트가 시작됩니다.
                 </Text>
                 <Text style={styles.modalHint}>어깨, 팔꿈치, 손목 각도가 잘 보이도록 화면 안으로 들어와 주세요.</Text>
               </>
