@@ -1,5 +1,6 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SmallButton } from './src/components/common/Buttons';
 import { FireworkBurst } from './src/components/common/FireworkBurst';
 import { Header } from './src/components/common/Header';
@@ -16,6 +17,75 @@ import { colors } from './src/theme/colors';
 export default function App() {
   const app = useBasketballCoachApp();
   const showBack = Boolean(app.currentUser && app.screen !== 'home');
+  const isLessonScreen = app.isReady && app.currentUser && app.screen === 'lesson';
+  const shouldAnimateHeader = Platform.OS !== 'web';
+  const headerVisibility = useRef(new Animated.Value(1)).current;
+  const headerVisibilityTargetRef = useRef<0 | 1>(1);
+  const lastScrollYRef = useRef(0);
+  const [headerMeasuredHeight, setHeaderMeasuredHeight] = useState(0);
+  const effectiveHeaderHeight = Math.max(headerMeasuredHeight, 96);
+
+  const animateHeader = useCallback(
+    (nextValue: 0 | 1) => {
+      if (headerVisibilityTargetRef.current === nextValue) {
+        return;
+      }
+
+      headerVisibilityTargetRef.current = nextValue;
+      Animated.timing(headerVisibility, {
+        toValue: nextValue,
+        duration: 220,
+        useNativeDriver: false,
+      }).start();
+    },
+    [headerVisibility]
+  );
+
+  const handleScroll = useCallback(
+    (event: { nativeEvent: { contentOffset: { y: number } } }) => {
+      if (!shouldAnimateHeader) {
+        return;
+      }
+
+      const nextScrollY = Math.max(0, event.nativeEvent.contentOffset.y);
+
+      if (nextScrollY <= 4) {
+        lastScrollYRef.current = 0;
+        animateHeader(1);
+        return;
+      }
+
+      const delta = nextScrollY - lastScrollYRef.current;
+
+      if (delta > 10) {
+        animateHeader(0);
+      } else if (delta < -10) {
+        animateHeader(1);
+      }
+
+      lastScrollYRef.current = nextScrollY;
+    },
+    [animateHeader, shouldAnimateHeader]
+  );
+
+  useEffect(() => {
+    lastScrollYRef.current = 0;
+    headerVisibilityTargetRef.current = 1;
+    headerVisibility.setValue(1);
+  }, [app.currentUser, app.screen, headerVisibility, shouldAnimateHeader]);
+
+  const animatedHeaderHeight = headerVisibility.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, effectiveHeaderHeight],
+  });
+  const animatedHeaderOpacity = headerVisibility.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+  const animatedHeaderTranslateY = headerVisibility.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-Math.round(effectiveHeaderHeight * 0.18), 0],
+  });
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -24,8 +94,72 @@ export default function App() {
         <View style={styles.backgroundGlowTop} />
         <View style={styles.backgroundGlowBottom} />
         <FireworkBurst visible={app.showFireworks} items={app.fireworks} />
-        <Header showBack={showBack} onBack={() => void app.navigateTo('home')} />
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {!isLessonScreen && shouldAnimateHeader ? (
+          <Animated.View
+            style={[
+              styles.headerAnimatedWrap,
+              {
+                height: animatedHeaderHeight,
+                opacity: animatedHeaderOpacity,
+                transform: [{ translateY: animatedHeaderTranslateY }],
+              },
+            ]}
+          >
+            <View
+              onLayout={(event) => {
+                const nextHeight = Math.round(event.nativeEvent.layout.height);
+
+                if (nextHeight > 0 && nextHeight !== headerMeasuredHeight) {
+                  setHeaderMeasuredHeight(nextHeight);
+                }
+              }}
+            >
+              <Header showBack={showBack} onBack={() => void app.navigateTo('home')} />
+            </View>
+          </Animated.View>
+        ) : null}
+        {!isLessonScreen && !shouldAnimateHeader ? (
+          <Header showBack={showBack} onBack={() => void app.navigateTo('home')} />
+        ) : null}
+        {isLessonScreen ? (
+          <View style={styles.lessonScreenWrap}>
+            <LessonScreen
+              lessonMode={app.lessonMode}
+              selectedDribbleView={app.selectedDribbleView}
+              selectedBallBrand={app.selectedBallBrand}
+              selectedBallColors={app.selectedBallColors}
+              isCameraActive={app.isCameraActive}
+              isCameraPreviewHidden={app.isCameraPreviewHidden}
+              isLessonActive={app.isLessonActive}
+              isCameraReady={app.isCameraReady}
+              cameraSessionKey={app.cameraSessionKey}
+              countdownValue={app.countdownValue}
+              dribbleResetToken={app.dribbleResetToken}
+              shootResetToken={app.shootResetToken}
+              recordingStartToken={app.recordingStartToken}
+              recordingStopToken={app.recordingStopToken}
+              debugText={app.debugText}
+              feedbackText={app.feedbackText}
+              lessonReview={app.lessonReview}
+              currentDribbleCount={app.currentDribbleCount}
+              cameraError={app.cameraError}
+              isShootSuccessButtonVisible={app.isShootSuccessButtonVisible}
+              onSelectMode={app.changeLessonMode}
+              onSelectDribbleView={app.setSelectedDribbleView}
+              onBeginLesson={(dribbleTargetCount, dribbleView) => void app.beginLesson(dribbleTargetCount, dribbleView)}
+              onEndLesson={() => void app.endLesson()}
+              onRegisterSuccessfulShot={app.registerSuccessfulShot}
+              onGoHome={() => void app.navigateTo('home')}
+              onPoseMessage={app.handlePoseMessage}
+            />
+          </View>
+        ) : (
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            onScroll={shouldAnimateHeader ? handleScroll : undefined}
+            scrollEventThrottle={shouldAnimateHeader ? 16 : undefined}
+          >
           {!app.isReady && (
             <View style={styles.loadingCard}>
               <Text style={styles.loadingTitle}>앱을 준비하는 중입니다</Text>
@@ -61,37 +195,6 @@ export default function App() {
               onOpenSkill={() => void app.navigateTo('skill')}
               onOpenRules={() => void app.navigateTo('rules')}
               onOpenSettings={() => void app.navigateTo('settings')}
-            />
-          )}
-
-          {app.isReady && app.currentUser && app.screen === 'lesson' && (
-            <LessonScreen
-              lessonMode={app.lessonMode}
-              selectedDribbleView={app.selectedDribbleView}
-              selectedBallBrand={app.selectedBallBrand}
-              selectedBallColors={app.selectedBallColors}
-              isCameraActive={app.isCameraActive}
-              isCameraPreviewHidden={app.isCameraPreviewHidden}
-              isLessonActive={app.isLessonActive}
-              isCameraReady={app.isCameraReady}
-              cameraSessionKey={app.cameraSessionKey}
-              countdownValue={app.countdownValue}
-              dribbleResetToken={app.dribbleResetToken}
-              shootResetToken={app.shootResetToken}
-              recordingStartToken={app.recordingStartToken}
-              recordingStopToken={app.recordingStopToken}
-              debugText={app.debugText}
-              feedbackText={app.feedbackText}
-              lessonReview={app.lessonReview}
-              currentDribbleCount={app.currentDribbleCount}
-              cameraError={app.cameraError}
-              isShootSuccessButtonVisible={app.isShootSuccessButtonVisible}
-              onSelectMode={app.changeLessonMode}
-              onSelectDribbleView={app.setSelectedDribbleView}
-              onBeginLesson={(dribbleTargetCount, dribbleView) => void app.beginLesson(dribbleTargetCount, dribbleView)}
-              onEndLesson={() => void app.endLesson()}
-              onRegisterSuccessfulShot={app.registerSuccessfulShot}
-              onPoseMessage={app.handlePoseMessage}
             />
           )}
 
@@ -135,7 +238,8 @@ export default function App() {
           )}
 
           {app.isReady && app.currentUser && app.screen === 'rules' && <RulesGuideScreen />}
-        </ScrollView>
+          </ScrollView>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -174,6 +278,14 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 32,
     gap: 18,
+  },
+  lessonScreenWrap: {
+    flex: 1,
+    minHeight: 0,
+    paddingBottom: 32,
+  },
+  headerAnimatedWrap: {
+    overflow: 'hidden',
   },
   loadingCard: {
     borderRadius: 24,

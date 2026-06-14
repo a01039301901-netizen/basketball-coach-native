@@ -1,6 +1,6 @@
 import { type AVPlaybackStatus, ResizeMode, Video } from 'expo-av';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions, type ViewStyle } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
@@ -35,6 +35,7 @@ interface LessonScreenProps {
   onBeginLesson: (dribbleTargetCount?: number, dribbleView?: DribbleLessonView) => void;
   onEndLesson: () => void;
   onRegisterSuccessfulShot: () => void;
+  onGoHome: () => void;
   onPoseMessage: (event: WebViewMessageEvent) => void;
 }
 
@@ -115,6 +116,171 @@ function ReviewClipPlayer({ clip }: ReviewClipPlayerProps) {
   );
 }
 
+interface RealtimeCoachingPanelProps {
+  lessonMode: LessonMode;
+  debugText: string;
+  currentDribbleCount: number;
+  feedbackText: string;
+  lessonReview: LessonReviewClip | null;
+  cameraError: string;
+  isWideLayout: boolean;
+}
+
+type CoachingSectionKey = 'status' | 'dribbleCount' | 'feedback' | 'review' | 'camera' | 'tips';
+
+interface CoachingSectionProps {
+  title: string;
+  hidden: boolean;
+  onHide: () => void;
+  children: React.ReactNode;
+}
+
+function CoachingSection({ title, hidden, onHide, children }: CoachingSectionProps) {
+  if (hidden) {
+    return null;
+  }
+
+  return (
+    <View style={styles.sectionBlock}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionLabel}>{title}</Text>
+        <Pressable onPress={onHide} style={({ pressed }) => [styles.sectionHideButton, pressed && styles.pressed]}>
+          <Text style={styles.sectionHideButtonText}>숨기기</Text>
+        </Pressable>
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function RealtimeCoachingPanel({
+  lessonMode,
+  debugText,
+  currentDribbleCount,
+  feedbackText,
+  lessonReview,
+  cameraError,
+  isWideLayout,
+}: RealtimeCoachingPanelProps) {
+  const modeLabel = lessonMode === 'shoot' ? '슛 분석' : '드리블 분석';
+  const modeSummary =
+    lessonMode === 'shoot'
+      ? '준비자세와 발사 흐름을 보면서 바로 고치면 좋은 점을 알려드려요.'
+      : '드리블 리듬과 자세를 따라가며 지금 바로 바꾸면 좋은 점을 알려드려요.';
+  const [hiddenSections, setHiddenSections] = useState<Record<CoachingSectionKey, boolean>>({
+    status: false,
+    dribbleCount: false,
+    feedback: false,
+    review: false,
+    camera: false,
+    tips: false,
+  });
+
+  const availableHiddenSectionLabels = [
+    hiddenSections.status ? { key: 'status' as const, label: '현재 흐름' } : null,
+    hiddenSections.dribbleCount && lessonMode === 'dribble' ? { key: 'dribbleCount' as const, label: '드리블 횟수' } : null,
+    hiddenSections.feedback ? { key: 'feedback' as const, label: '핵심 피드백' } : null,
+    hiddenSections.review && lessonReview ? { key: 'review' as const, label: '문제 장면 복기' } : null,
+    hiddenSections.camera && cameraError ? { key: 'camera' as const, label: '카메라 알림' } : null,
+    hiddenSections.tips ? { key: 'tips' as const, label: '촬영 팁' } : null,
+  ].filter((item): item is { key: CoachingSectionKey; label: string } => Boolean(item));
+
+  function hideSection(sectionKey: CoachingSectionKey) {
+    setHiddenSections((current) => ({
+      ...current,
+      [sectionKey]: true,
+    }));
+  }
+
+  function showSection(sectionKey: CoachingSectionKey) {
+    setHiddenSections((current) => ({
+      ...current,
+      [sectionKey]: false,
+    }));
+  }
+
+  return (
+    <>
+      {!isWideLayout ? <View style={styles.panelGrip} /> : null}
+
+      <View style={styles.coachingHero}>
+        <View style={styles.coachingHeroTop}>
+          <View style={styles.liveBadge}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveBadgeText}>LIVE COACH</Text>
+          </View>
+          <View style={styles.modePill}>
+            <Text style={styles.modePillText}>{modeLabel}</Text>
+          </View>
+        </View>
+
+        <Text style={styles.sideTitle}>실시간 코칭</Text>
+        <Text style={styles.sideSubtitle}>{modeSummary}</Text>
+      </View>
+
+      {availableHiddenSectionLabels.length > 0 ? (
+        <View style={styles.hiddenSectionWrap}>
+          <Text style={styles.hiddenSectionLabel}>숨긴 창 다시 보기</Text>
+          <View style={styles.hiddenSectionChipRow}>
+            {availableHiddenSectionLabels.map((item) => (
+              <Pressable
+                key={item.key}
+                onPress={() => showSection(item.key)}
+                style={({ pressed }) => [styles.hiddenSectionChip, pressed && styles.pressed]}
+              >
+                <Text style={styles.hiddenSectionChipText}>{item.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      <CoachingSection title="현재 흐름" hidden={hiddenSections.status} onHide={() => hideSection('status')}>
+        <InfoBox label="진행 상태" text={debugText} />
+      </CoachingSection>
+
+      {lessonMode === 'dribble' ? (
+        <CoachingSection title="드리블 횟수" hidden={hiddenSections.dribbleCount} onHide={() => hideSection('dribbleCount')}>
+          <InfoBox label="드리블 횟수" text={`${currentDribbleCount}회`} />
+        </CoachingSection>
+      ) : null}
+
+      <CoachingSection title="핵심 피드백" hidden={hiddenSections.feedback} onHide={() => hideSection('feedback')}>
+        <InfoBox label="실시간 피드백" text={feedbackText} />
+      </CoachingSection>
+
+      {lessonReview ? (
+        <CoachingSection title="문제 장면 복기" hidden={hiddenSections.review} onHide={() => hideSection('review')}>
+          <ReviewClipPlayer clip={lessonReview} />
+        </CoachingSection>
+      ) : null}
+
+      {cameraError ? (
+        <CoachingSection title="카메라 알림" hidden={hiddenSections.camera} onHide={() => hideSection('camera')}>
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{cameraError}</Text>
+          </View>
+        </CoachingSection>
+      ) : null}
+
+      <CoachingSection title="촬영 팁" hidden={hiddenSections.tips} onHide={() => hideSection('tips')}>
+        <View style={styles.tipBox}>
+          <Text style={styles.tipTitle}>촬영 팁</Text>
+          <Text style={styles.tipText}>
+            몸 전체가 화면 안에 들어오면 어깨, 팔꿈치, 손목, 엉덩이, 무릎, 발을 더 안정적으로 인식합니다.
+          </Text>
+          <Text style={styles.tipText}>
+            밝은 장소에서 촬영하고, 공과 다리가 배경과 겹치지 않도록 서 주면 분석 정확도가 더 좋아집니다.
+          </Text>
+          <Text style={styles.tipText}>
+            슛 분석은 어깨부터 발끝까지, 드리블 분석은 손목과 상체가 잘 보이도록 맞춰 주세요.
+          </Text>
+        </View>
+      </CoachingSection>
+    </>
+  );
+}
+
 export function LessonScreen({
   lessonMode,
   selectedDribbleView,
@@ -141,19 +307,13 @@ export function LessonScreen({
   onBeginLesson,
   onEndLesson,
   onRegisterSuccessfulShot,
+  onGoHome,
   onPoseMessage,
 }: LessonScreenProps) {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const isWideLayout = width >= 1080;
-  const stickyCoachingCardStyle =
-    Platform.OS === 'web'
-      ? ({
-          position: 'sticky',
-          top: 20,
-          alignSelf: 'flex-start',
-          zIndex: 1,
-        } as unknown as ViewStyle)
-      : null;
+  const floatingCoachingHeight = isWideLayout ? Math.max(420, Math.min(height - 40, 760)) : Math.max(260, Math.min(height * 0.42, 380));
+  const floatingCoachingWidth = isWideLayout ? Math.max(320, Math.min(width * 0.32, 420)) : Math.min(width - 24, 420);
 
   const [showDribbleGuide, setShowDribbleGuide] = useState(false);
   const [dribbleGuideStep, setDribbleGuideStep] = useState(0);
@@ -231,92 +391,113 @@ export function LessonScreen({
   const shootConfirmLabel = shootGuideStep === 2 ? '레슨 시작' : '확인';
 
   return (
-    <View style={styles.contentGap}>
-      <Card title="AI 레슨 받기" style={styles.heroCard}>
-        <Text style={styles.leadText}>
-          실시간 자세 분석을 통해 드리블과 슛 동작을 확인하고, 지금 움직임에 맞는 코칭 피드백을 바로 볼 수 있습니다.
-        </Text>
+    <View style={styles.screenRoot}>
+      <View pointerEvents="box-none" style={styles.topActionOverlay}>
+        <Pressable onPress={onGoHome} style={({ pressed }) => [styles.homeChip, pressed && styles.pressed]}>
+          <Text style={styles.homeChipText}>메인으로</Text>
+        </Pressable>
+      </View>
 
-        <View style={[styles.lessonLayout, isWideLayout && styles.lessonLayoutWide]}>
-          <View style={styles.cameraCard}>
-            <View style={styles.modeButtons}>
-              <ModeButton
-                title="드리블 분석"
-                active={lessonMode === 'dribble'}
-                disabled={isLessonActive}
-                onPress={() => onSelectMode('dribble')}
-              />
-              <ModeButton
-                title="슛 분석"
-                active={lessonMode === 'shoot'}
-                disabled={isLessonActive}
-                onPress={() => onSelectMode('shoot')}
-              />
-            </View>
+      <ScrollView
+        style={styles.screenScroll}
+        contentContainerStyle={[
+          styles.contentGap,
+          styles.screenScrollContent,
+          isWideLayout ? styles.screenScrollContentWide : null,
+          !isWideLayout ? { paddingBottom: floatingCoachingHeight + 36 } : null,
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Card title="AI 레슨 받기" style={styles.heroCard}>
+          <Text style={styles.leadText}>
+            실시간 자세 분석을 통해 드리블과 슛 동작을 확인하고, 지금 움직임에 맞는 코칭 피드백을 바로 볼 수 있습니다.
+          </Text>
 
-            <View style={styles.modeStatus}>
-              <Text style={styles.modeStatusText}>현재 모드: {lessonMode === 'shoot' ? '슛 분석' : '드리블 분석'}</Text>
-            </View>
-
-            <LessonCamera
-              key={cameraSessionKey}
-              lessonMode={lessonMode}
-              selectedBallBrand={selectedBallBrand}
-              selectedBallColors={selectedBallColors}
-              isCameraActive={isCameraActive}
-              isCameraPreviewHidden={isCameraPreviewHidden}
-              isLessonActive={isLessonActive}
-              isCameraReady={isCameraReady}
-              countdownValue={countdownValue}
-              dribbleResetToken={dribbleResetToken}
-              shootResetToken={shootResetToken}
-              recordingStartToken={recordingStartToken}
-              recordingStopToken={recordingStopToken}
-              onPoseMessage={onPoseMessage}
-            />
-
-            <View style={styles.cameraControls}>
-              <SmallButton title="레슨 시작" onPress={openLessonStart} disabled={isLessonActive} />
-              {lessonMode === 'shoot' && isShootSuccessButtonVisible ? (
-                <SmallButton title="슛 성공" onPress={onRegisterSuccessfulShot} variant="dark" />
-              ) : null}
-              <SmallButton
-                title="레슨 끝내기"
-                onPress={onEndLesson}
-                variant="red"
-                disabled={!isLessonActive && !isCameraActive}
-              />
-            </View>
-          </View>
-
-          <View style={[styles.sideCard, stickyCoachingCardStyle]}>
-            <Text style={styles.sideTitle}>실시간 코칭</Text>
-            <InfoBox label="진행 상태" text={debugText} />
-            {lessonMode === 'dribble' ? <InfoBox label="드리블 횟수" text={`${currentDribbleCount}회`} /> : null}
-            <InfoBox label="실시간 피드백" text={feedbackText} />
-            {lessonReview ? <ReviewClipPlayer clip={lessonReview} /> : null}
-
-            {cameraError ? (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{cameraError}</Text>
+          <View style={[styles.lessonLayout, isWideLayout && styles.lessonLayoutWide]}>
+            <View style={styles.cameraCard}>
+              <View style={styles.modeButtons}>
+                <ModeButton
+                  title="드리블 분석"
+                  active={lessonMode === 'dribble'}
+                  disabled={isLessonActive}
+                  onPress={() => onSelectMode('dribble')}
+                />
+                <ModeButton
+                  title="슛 분석"
+                  active={lessonMode === 'shoot'}
+                  disabled={isLessonActive}
+                  onPress={() => onSelectMode('shoot')}
+                />
               </View>
-            ) : null}
 
-            <View style={styles.tipBox}>
-              <Text style={styles.tipTitle}>촬영 팁</Text>
-              <Text style={styles.tipText}>
-                몸 전체가 화면 안에 들어오면 어깨, 팔꿈치, 손목, 엉덩이, 무릎, 발을 더 안정적으로 인식합니다.
-              </Text>
-              <Text style={styles.tipText}>
-                밝은 장소에서 촬영하고, 공과 다리가 배경과 겹치지 않도록 서 주면 분석 정확도가 더 좋아집니다.
-              </Text>
-              <Text style={styles.tipText}>
-                슛 분석은 어깨부터 발끝까지, 드리블 분석은 손목과 상체가 잘 보이도록 맞춰 주세요.
-              </Text>
+              <View style={styles.modeStatus}>
+                <Text style={styles.modeStatusText}>현재 모드: {lessonMode === 'shoot' ? '슛 분석' : '드리블 분석'}</Text>
+              </View>
+
+              <LessonCamera
+                key={cameraSessionKey}
+                lessonMode={lessonMode}
+                selectedBallBrand={selectedBallBrand}
+                selectedBallColors={selectedBallColors}
+                isCameraActive={isCameraActive}
+                isCameraPreviewHidden={isCameraPreviewHidden}
+                isLessonActive={isLessonActive}
+                isCameraReady={isCameraReady}
+                countdownValue={countdownValue}
+                dribbleResetToken={dribbleResetToken}
+                shootResetToken={shootResetToken}
+                recordingStartToken={recordingStartToken}
+                recordingStopToken={recordingStopToken}
+                onPoseMessage={onPoseMessage}
+              />
+
+              <View style={styles.cameraControls}>
+                <SmallButton title="레슨 시작" onPress={openLessonStart} disabled={isLessonActive} />
+                {lessonMode === 'shoot' && isShootSuccessButtonVisible ? (
+                  <SmallButton title="슛 성공" onPress={onRegisterSuccessfulShot} variant="dark" />
+                ) : null}
+                <SmallButton
+                  title="레슨 끝내기"
+                  onPress={onEndLesson}
+                  variant="red"
+                  disabled={!isLessonActive && !isCameraActive}
+                />
+              </View>
             </View>
+
+            {isWideLayout ? <View style={[styles.sideCardSpacer, { width: floatingCoachingWidth }]} /> : null}
           </View>
+        </Card>
+      </ScrollView>
+
+      <View pointerEvents="box-none" style={styles.coachingOverlay}>
+        <View
+          style={[
+            styles.sideCard,
+            styles.sideCardFloating,
+            isWideLayout
+              ? { top: 0, right: 0, width: floatingCoachingWidth, maxHeight: floatingCoachingHeight }
+              : {
+                  left: 12,
+                  right: 12,
+                  bottom: 12,
+                  maxHeight: floatingCoachingHeight,
+                },
+          ]}
+        >
+          <ScrollView contentContainerStyle={styles.sideCardContent} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+            <RealtimeCoachingPanel
+              lessonMode={lessonMode}
+              debugText={debugText}
+              currentDribbleCount={currentDribbleCount}
+              feedbackText={feedbackText}
+              lessonReview={lessonReview}
+              cameraError={cameraError}
+              isWideLayout={isWideLayout}
+            />
+          </ScrollView>
         </View>
-      </Card>
+      </View>
 
       <Modal visible={showDribbleGuide} transparent animationType="fade" onRequestClose={closeDribbleGuide}>
         <View style={styles.modalBackdrop}>
@@ -462,6 +643,50 @@ const sharedPanel = {
 } as const;
 
 const styles = StyleSheet.create({
+  screenRoot: {
+    flex: 1,
+    minHeight: 0,
+    position: 'relative',
+  },
+  topActionOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+    paddingTop: 2,
+    paddingHorizontal: 4,
+    pointerEvents: 'box-none',
+  },
+  homeChip: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.72)',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  homeChipText: {
+    color: colors.lightButtonText,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  screenScroll: {
+    flex: 1,
+  },
+  screenScrollContent: {
+    paddingTop: 44,
+    paddingBottom: 32,
+  },
+  screenScrollContentWide: {
+    paddingRight: 12,
+  },
   contentGap: {
     gap: 18,
   },
@@ -487,17 +712,164 @@ const styles = StyleSheet.create({
   },
   sideCard: {
     ...sharedPanel,
-    flex: 0.8,
+    backgroundColor: 'rgba(22, 15, 11, 0.96)',
+    borderColor: 'rgba(255, 216, 168, 0.14)',
+    padding: 18,
+    overflow: 'hidden',
+  },
+  sideCardFloating: {
+    position: 'absolute',
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.34,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 12,
+  },
+  sideCardSpacer: {
+    minHeight: 1,
+  },
+  sideCardContent: {
+    paddingBottom: 8,
+  },
+  coachingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  panelGrip: {
+    alignSelf: 'center',
+    width: 52,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    marginBottom: 14,
+  },
+  coachingHero: {
+    marginBottom: 18,
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 145, 77, 0.11)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 216, 168, 0.14)',
+  },
+  coachingHeroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 12,
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: 'rgba(12, 8, 6, 0.34)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: colors.secondary,
+  },
+  liveBadgeText: {
+    color: '#ffe0bc',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  modePill: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  modePillText: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '800',
   },
   sideTitle: {
     color: colors.textSoft,
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '900',
-    marginBottom: 14,
+    marginBottom: 8,
+  },
+  sideSubtitle: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  hiddenSectionWrap: {
+    marginBottom: 16,
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  hiddenSectionLabel: {
+    color: '#ffe0bc',
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 10,
+    letterSpacing: 0.8,
+  },
+  hiddenSectionChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  hiddenSectionChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,145,77,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,216,168,0.14)',
+  },
+  hiddenSectionChipText: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  sectionBlock: {
+    marginBottom: 2,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 8,
+  },
+  sectionLabel: {
+    color: '#ffd8a8',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  sectionHideButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  sectionHideButtonText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '800',
   },
   reviewWrap: {
-    marginTop: 6,
-    marginBottom: 12,
+    marginTop: 0,
+    marginBottom: 14,
     padding: 14,
     borderRadius: 18,
     backgroundColor: 'rgba(255,255,255,0.08)',
@@ -582,10 +954,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   tipBox: {
-    marginTop: 4,
+    marginTop: 0,
     padding: 16,
     borderRadius: 18,
     backgroundColor: 'rgba(0,0,0,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
     gap: 8,
   },
   tipTitle: {
