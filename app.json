@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "AI 농구 코치",
+    "name": "Basketball Coach AI",
     "slug": "basketball-coach-native",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -16,16 +16,16 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "농구 자세 분석과 레슨 촬영을 위해 카메라 접근이 필요합니다.",
-          "microphonePermission": "레슨 영상을 녹화하기 위해 마이크 접근이 필요합니다."
+          "cameraPermission": "Allow Basketball Coach AI to use the camera for dribble and shooting analysis.",
+          "microphonePermission": "Allow Basketball Coach AI to use the microphone while recording lesson videos."
         }
       ]
     ],
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "농구 자세 분석과 레슨 촬영을 위해 카메라 접근이 필요합니다.",
-        "NSMicrophoneUsageDescription": "레슨 영상을 녹화하기 위해 마이크 접근이 필요합니다."
+        "NSCameraUsageDescription": "Allow Basketball Coach AI to use the camera for dribble and shooting analysis.",
+        "NSMicrophoneUsageDescription": "Allow Basketball Coach AI to use the microphone while recording lesson videos."
       }
     },
     "android": {

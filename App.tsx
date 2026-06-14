@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SmallButton } from './src/components/common/Buttons';
 import { FireworkBurst } from './src/components/common/FireworkBurst';
 import { Header } from './src/components/common/Header';
 import { useBasketballCoachApp } from './src/hooks/useBasketballCoachApp';
@@ -27,8 +28,16 @@ export default function App() {
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {!app.isReady && (
             <View style={styles.loadingCard}>
-              <Text style={styles.loadingTitle}>앱 준비 중</Text>
-              <Text style={styles.loadingText}>로그인 정보와 레슨 데이터를 불러오고 있습니다.</Text>
+              <Text style={styles.loadingTitle}>앱을 준비하는 중입니다</Text>
+              <Text style={styles.loadingText}>
+                {app.startupStatusText || '초기 데이터를 불러오고 있습니다. 잠시만 기다려 주세요.'}
+              </Text>
+              <Text style={styles.loadingHint}>
+                이 화면이 계속 유지되면 저장된 로그인 상태를 초기화하고 로그인 화면으로 바로 이동할 수 있습니다.
+              </Text>
+              <View style={styles.loadingActionRow}>
+                <SmallButton title="로그인 화면 바로 열기" onPress={() => void app.recoverStartupToLogin()} variant="dark" />
+              </View>
             </View>
           )}
 
@@ -64,18 +73,19 @@ export default function App() {
               isCameraActive={app.isCameraActive}
               isCameraPreviewHidden={app.isCameraPreviewHidden}
               isLessonActive={app.isLessonActive}
-                isCameraReady={app.isCameraReady}
-                cameraSessionKey={app.cameraSessionKey}
-                countdownValue={app.countdownValue}
-                dribbleResetToken={app.dribbleResetToken}
-                shootResetToken={app.shootResetToken}
-                recordingStartToken={app.recordingStartToken}
+              isCameraReady={app.isCameraReady}
+              cameraSessionKey={app.cameraSessionKey}
+              countdownValue={app.countdownValue}
+              dribbleResetToken={app.dribbleResetToken}
+              shootResetToken={app.shootResetToken}
+              recordingStartToken={app.recordingStartToken}
               recordingStopToken={app.recordingStopToken}
               debugText={app.debugText}
               feedbackText={app.feedbackText}
               lessonReview={app.lessonReview}
               currentDribbleCount={app.currentDribbleCount}
               cameraError={app.cameraError}
+              isShootSuccessButtonVisible={app.isShootSuccessButtonVisible}
               onSelectMode={app.changeLessonMode}
               onSelectDribbleView={app.setSelectedDribbleView}
               onBeginLesson={(dribbleTargetCount, dribbleView) => void app.beginLesson(dribbleTargetCount, dribbleView)}
@@ -114,9 +124,11 @@ export default function App() {
               selectedBallBrand={app.selectedBallBrand}
               selectedBallColors={app.selectedBallColors}
               selectedPosition={app.selectedPosition}
+              homeworkTestState={app.homeworkTestState}
               onSelectBallBrand={app.selectBallBrand}
               onToggleBallColor={app.toggleBallColor}
               onSelectPosition={app.selectPosition}
+              onApplyHomeworkTestState={app.applyHomeworkTestState}
               onLogout={() => void app.logout()}
               onCreateTransferCode={app.createTransferCode}
             />
@@ -180,5 +192,15 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 15,
     lineHeight: 22,
+  },
+  loadingHint: {
+    color: colors.textAccent,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 14,
+  },
+  loadingActionRow: {
+    marginTop: 16,
+    alignSelf: 'flex-start',
   },
 });

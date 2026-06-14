@@ -1169,7 +1169,7 @@ export function buildPoseWebHtml(
           visible(shootingShoulder) &&
           visible(shootingWrist) &&
           shootingWrist.y <= shootingShoulder.y + 0.05;
-        const readyPoseDetected = armAngleState === "balanced" && ballNearShootingHand && shootingHandRaised;
+        const readyPoseDetected = armAngleState === "balanced";
 
         const legAngles = [angleAt(leftHip, leftKnee, leftAnkle), angleAt(rightHip, rightKnee, rightAnkle)].filter((value) => value !== null);
         const legAngle = legAngles.length > 0 ? legAngles.reduce((sum, value) => sum + value, 0) / legAngles.length : null;

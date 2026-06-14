@@ -17,16 +17,22 @@ import type {
   AuthUser,
   BallBrandOption,
   BallColorOption,
+  CorrectionHomeworkState,
+  DailyHomeworkState,
   DribbleAnalysis,
   DribbleLessonView,
   FeedbackMoment,
   FireworkItem,
+  HomeworkFeedbackCategory,
   HomeworkProgressItem,
+  HomeworkStateRecord,
+  HomeworkTestState,
   LessonMode,
   LessonRecord,
   LessonReviewClip,
   PositionOption,
   ShotGraphDatum,
+  SkillVideoOpenEvent,
   ShootAnalysis,
   SkillKey,
   UserAccount,
@@ -35,15 +41,23 @@ import { getCalendarCells } from '../utils/calendar';
 import { formatDateKey } from '../utils/date';
 import { buildDribbleFeedbackText, buildShootFeedbackText } from '../utils/feedback';
 import {
+  buildCorrectionHomeworkState,
   buildDailyHomeworkProgress,
+  buildStage2UnlockSnapshot,
+  createEmptyDailyHomeworkState,
   DAILY_DRIBBLE_TARGET,
   DAILY_SHOOT_TARGET,
+  getDailyHomeworkState,
   getHomeworkCompletionMessage,
+  getRepresentativeHomeworkFeedbackCategory,
+  isDailyBaseHomeworkCompleted,
 } from '../utils/homework';
 
 const FEEDBACK_UPDATE_INTERVAL_MS = 1500;
 const DRIBBLE_STANCE_HOLD_MS = 3000;
 const SHOOT_RECOVERY_MS = 3000;
+const STORAGE_LOAD_TIMEOUT_MS = 4000;
+const STARTUP_RECOVERY_TIMEOUT_MS = 8000;
 const DEFAULT_DEBUG_TEXT = '카메라와 MediaPipe를 준비하고 있습니다.';
 
 type DribbleLessonPhase = 'stance_setup' | 'countdown' | 'await_dribble' | 'active' | 'cooldown';
@@ -88,6 +102,7 @@ interface AccountTransferPayload {
     ballColors: BallColorOption[];
     ballBrand: BallBrandOption;
     position: PositionOption;
+    homework: HomeworkStateRecord;
   };
 }
 
@@ -138,6 +153,7 @@ function buildAccountStorageKey(baseKey: string, userId: string) {
 function getAccountStorageKeys(userId: string) {
   return {
     attendance: buildAccountStorageKey(STORAGE_KEYS.attendance, userId),
+    homework: buildAccountStorageKey(STORAGE_KEYS.homework, userId),
     lessonRecords: buildAccountStorageKey(STORAGE_KEYS.lessonRecords, userId),
     dribbleCounts: buildAccountStorageKey(STORAGE_KEYS.dribbleCounts, userId),
     shotAttempts: buildAccountStorageKey(STORAGE_KEYS.shotAttempts, userId),
@@ -170,6 +186,23 @@ function parseAgeInput(value: string) {
 
 function parseStoredJson<T>(value: string | null, fallback: T): T {
   return value ? (JSON.parse(value) as T) : fallback;
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallbackValue: T): Promise<T> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((resolve) => {
+        timeoutHandle = setTimeout(() => resolve(fallbackValue), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  }
 }
 
 function isRecordObject(value: unknown): value is Record<string, unknown> {
@@ -234,6 +267,20 @@ function isBallColorOption(value: unknown): value is BallColorOption {
   return value === 'orange' || value === 'brown' || value === 'yellow' || value === 'white' || value === 'black' || value === 'gray' || value === 'red';
 }
 
+function isSkillKey(value: unknown): value is SkillKey {
+  return value === 'shoot' || value === 'crossover' || value === 'layup' || value === 'stepback' || value === 'spin' || value === 'defense';
+}
+
+function isHomeworkFeedbackCategory(value: unknown): value is HomeworkFeedbackCategory {
+  return (
+    value === 'dribble_balance' ||
+    value === 'torso_posture' ||
+    value === 'shoot_arm_angle' ||
+    value === 'shoot_release_timing' ||
+    value === 'leg_angle'
+  );
+}
+
 function sanitizeStringRecord(value: unknown): Record<string, string> {
   if (!isRecordObject(value)) {
     return {};
@@ -266,6 +313,97 @@ function sanitizeNumberRecord(value: unknown): Record<string, number> {
   return next;
 }
 
+function sanitizeSkillVideoEvents(value: unknown): SkillVideoOpenEvent[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      if (!isRecordObject(entry) || !isSkillKey(entry.skillKey) || typeof entry.openedAt !== 'string') {
+        return null;
+      }
+
+      return {
+        skillKey: entry.skillKey,
+        openedAt: entry.openedAt,
+      } satisfies SkillVideoOpenEvent;
+    })
+    .filter((event): event is SkillVideoOpenEvent => Boolean(event));
+}
+
+function sanitizeDailyHomeworkState(value: unknown): DailyHomeworkState {
+  if (!isRecordObject(value)) {
+    return createEmptyDailyHomeworkState();
+  }
+
+  const baseState = createEmptyDailyHomeworkState();
+  const stage2Unlock = isRecordObject(value.stage2Unlock)
+    && typeof value.stage2Unlock.unlockedAt === 'string'
+    && isPositionOption(value.stage2Unlock.position)
+    && typeof value.stage2Unlock.dribbleCount === 'number'
+    && Number.isFinite(value.stage2Unlock.dribbleCount)
+    && typeof value.stage2Unlock.shootAttemptCount === 'number'
+    && Number.isFinite(value.stage2Unlock.shootAttemptCount)
+    && typeof value.stage2Unlock.shotSuccessCount === 'number'
+    && Number.isFinite(value.stage2Unlock.shotSuccessCount)
+    && typeof value.stage2Unlock.lessonCount === 'number'
+    && Number.isFinite(value.stage2Unlock.lessonCount)
+      ? {
+          unlockedAt: value.stage2Unlock.unlockedAt,
+          position: value.stage2Unlock.position,
+          dribbleCount: Math.max(0, value.stage2Unlock.dribbleCount),
+          shootAttemptCount: Math.max(0, value.stage2Unlock.shootAttemptCount),
+          shotSuccessCount: Math.max(0, value.stage2Unlock.shotSuccessCount),
+          lessonCount: Math.max(0, value.stage2Unlock.lessonCount),
+        }
+      : null;
+  const handTotals = isRecordObject(value.handDribbleTotals)
+    ? {
+        left:
+          typeof value.handDribbleTotals.left === 'number' && Number.isFinite(value.handDribbleTotals.left)
+            ? Math.max(0, value.handDribbleTotals.left)
+            : 0,
+        right:
+          typeof value.handDribbleTotals.right === 'number' && Number.isFinite(value.handDribbleTotals.right)
+            ? Math.max(0, value.handDribbleTotals.right)
+            : 0,
+      }
+    : baseState.handDribbleTotals;
+  const correctionTask = isRecordObject(value.correctionTask)
+    && (value.correctionTask.direction === 'left' || value.correctionTask.direction === 'right')
+    && typeof value.correctionTask.baselineCount === 'number'
+    && Number.isFinite(value.correctionTask.baselineCount)
+    && typeof value.correctionTask.createdAt === 'string'
+      ? {
+          direction: value.correctionTask.direction === 'left' ? 'left' : 'right',
+          baselineCount: Math.max(0, value.correctionTask.baselineCount),
+          createdAt: value.correctionTask.createdAt,
+        } satisfies CorrectionHomeworkState
+      : null;
+
+  return {
+    stage2Unlock,
+    skillVideoEvents: sanitizeSkillVideoEvents(value.skillVideoEvents),
+    handDribbleTotals: handTotals,
+    correctionTask,
+  };
+}
+
+function sanitizeHomeworkStateRecord(value: unknown): HomeworkStateRecord {
+  if (!isRecordObject(value)) {
+    return {};
+  }
+
+  const next: HomeworkStateRecord = {};
+
+  for (const [dateKey, entryValue] of Object.entries(value)) {
+    next[dateKey] = sanitizeDailyHomeworkState(entryValue);
+  }
+
+  return next;
+}
+
 function sanitizeLessonRecords(value: unknown): LessonRecord[] {
   if (!Array.isArray(value)) {
     return [];
@@ -287,8 +425,20 @@ function sanitizeLessonRecords(value: unknown): LessonRecord[] {
         typeof entry.reviewStartAtMs === 'number' && Number.isFinite(entry.reviewStartAtMs) ? entry.reviewStartAtMs : undefined;
       const reviewDurationMs =
         typeof entry.reviewDurationMs === 'number' && Number.isFinite(entry.reviewDurationMs) ? entry.reviewDurationMs : undefined;
+      const dribbleView = entry.dribbleView === 'side' ? 'side' : entry.dribbleView === 'front' ? 'front' : undefined;
+      const leftHandDribbleCount =
+        typeof entry.leftHandDribbleCount === 'number' && Number.isFinite(entry.leftHandDribbleCount)
+          ? Math.max(0, entry.leftHandDribbleCount)
+          : undefined;
+      const rightHandDribbleCount =
+        typeof entry.rightHandDribbleCount === 'number' && Number.isFinite(entry.rightHandDribbleCount)
+          ? Math.max(0, entry.rightHandDribbleCount)
+          : undefined;
+      const representativeFeedbackCategory = isHomeworkFeedbackCategory(entry.representativeFeedbackCategory)
+        ? entry.representativeFeedbackCategory
+        : undefined;
 
-      return normalizeLessonRecord({
+      const nextRecord: LessonRecord = normalizeLessonRecord({
         id,
         dateKey,
         mode,
@@ -301,7 +451,13 @@ function sanitizeLessonRecords(value: unknown): LessonRecord[] {
         reviewFeedback,
         reviewStartAtMs,
         reviewDurationMs,
+        dribbleView,
+        leftHandDribbleCount,
+        rightHandDribbleCount,
+        representativeFeedbackCategory,
       });
+
+      return nextRecord;
     })
     .filter((record): record is LessonRecord => Boolean(record));
 }
@@ -358,6 +514,7 @@ function sanitizeTransferPayload(value: unknown): AccountTransferPayload | null 
       ballColors: ballColors.length > 0 ? ballColors : DEFAULT_BALL_COLORS,
       ballBrand,
       position,
+      homework: sanitizeHomeworkStateRecord(dataValue.homework),
     },
   };
 }
@@ -433,10 +590,24 @@ function normalizeFeedbackTimeline(
   return fallbackFeedback ? [{ atMs: 0, text: fallbackFeedback }] : [];
 }
 
-function normalizeLessonRecord(record: LessonRecord | (Omit<LessonRecord, 'feedbackTimeline'> & { feedbackTimeline?: FeedbackMoment[] | string[] })) {
-  return {
+function normalizeLessonRecord(
+  record: LessonRecord | (Omit<LessonRecord, 'feedbackTimeline'> & { feedbackTimeline?: FeedbackMoment[] | string[] })
+): LessonRecord {
+  const normalizedFeedbackTimeline = normalizeFeedbackTimeline(record.feedbackTimeline, record.feedback);
+  const nextRecord = {
     ...record,
-    feedbackTimeline: normalizeFeedbackTimeline(record.feedbackTimeline, record.feedback),
+    feedbackTimeline: normalizedFeedbackTimeline,
+  } as LessonRecord;
+  const representativeFeedbackCategory =
+    nextRecord.representativeFeedbackCategory ?? getRepresentativeHomeworkFeedbackCategory(nextRecord) ?? undefined;
+
+  if (!representativeFeedbackCategory) {
+    return nextRecord;
+  }
+
+  return {
+    ...nextRecord,
+    representativeFeedbackCategory,
   };
 }
 
@@ -653,14 +824,6 @@ function buildDribbleStanceFeedbackForView(analysis: DribbleAnalysis, expectedVi
 }
 
 function buildShootStanceFeedback(analysis: ShootAnalysis) {
-  if (analysis.armAngleState === 'balanced' && !analysis.ballNearShootingHand) {
-    return '슛 준비 자세\n1. 팔 각도는 좋습니다. 공을 슈팅 손 가까이 붙여 준비 자세를 보여 주세요.\n2. 공과 슈팅 손 위치가 함께 맞으면 3초 뒤 슛을 시작합니다.\n3. 공이 손에서 너무 멀어 보이면 카운트가 시작되지 않습니다.';
-  }
-
-  if (analysis.armAngleState === 'balanced' && !analysis.shootingHandRaised) {
-    return '슛 준비 자세\n1. 팔 각도는 좋습니다. 슈팅 손과 공을 어깨 높이까지 들어 올려 주세요.\n2. 손 높이와 공 위치가 함께 맞으면 3초 뒤 슛을 시작합니다.\n3. 준비 자세가 무너지면 다시 자세부터 맞춥니다.';
-  }
-
   const armLine =
     analysis.armAngleState === 'balanced'
       ? '슛을 시작하기 좋은 팔 각도입니다. 지금 자세를 유지해 주세요.'
@@ -670,7 +833,7 @@ function buildShootStanceFeedback(analysis: ShootAnalysis) {
           ? '준비 자세에서 팔 각도가 넓습니다. 팔을 조금 더 모아 주세요.'
           : '어깨, 팔꿈치, 손목이 잘 보이도록 서서 준비 자세를 다시 맞춰 주세요.';
 
-  return `슛 준비 자세\n1. ${armLine}\n2. 팔 각도가 기준에 맞으면 3초 뒤 슛을 시작합니다.\n3. 준비 자세가 무너지면 다시 자세부터 맞춥니다.`;
+  return `슛 준비 자세\n1. ${armLine}\n2. 팔 각도가 기준에 맞으면 3초 카운트를 시작하고, 끝나면 슛 레슨을 시작합니다.\n3. 준비 자세가 무너지면 다시 자세부터 맞춥니다.`;
 }
 
 function createFrontDribbleCriterionCounter(): Record<FrontDribbleCriterionNumber, number> {
@@ -714,6 +877,7 @@ export function useBasketballCoachApp() {
   const [lessonMode, setLessonMode] = useState<LessonMode>('dribble');
   const [attendance, setAttendance] = useState<Record<string, string>>({});
   const [dailyDribbleRecords, setDailyDribbleRecords] = useState<Record<string, number>>({});
+  const [homeworkState, setHomeworkState] = useState<HomeworkStateRecord>({});
   const [lessonRecords, setLessonRecords] = useState<LessonRecord[]>([]);
   const [shotAttemptRecords, setShotAttemptRecords] = useState<Record<string, number>>({});
   const [shotSuccessRecords, setShotSuccessRecords] = useState<Record<string, number>>({});
@@ -742,6 +906,8 @@ export function useBasketballCoachApp() {
   const [recordingStopToken, setRecordingStopToken] = useState(0);
   const [fireworks, setFireworks] = useState<FireworkItem[]>([]);
   const [showFireworks, setShowFireworks] = useState(false);
+  const [startupStatusText, setStartupStatusText] = useState('앱을 준비하고 있습니다.');
+  const [isShootSuccessButtonVisible, setIsShootSuccessButtonVisible] = useState(false);
 
   const feedbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pendingFeedbackRef = useRef<string | null>(null);
@@ -768,6 +934,7 @@ export function useBasketballCoachApp() {
   const latestDribbleAnalysisRef = useRef<DribbleAnalysis | null>(null);
   const latestShootAnalysisRef = useRef<ShootAnalysis | null>(null);
   const dailyDribbleRecordsRef = useRef<Record<string, number>>({});
+  const homeworkStateRef = useRef<HomeworkStateRecord>({});
   const shotAttemptRecordsRef = useRef<Record<string, number>>({});
   const shootAnalysisHistoryRef = useRef<ShootAnalysis[]>([]);
   const shootFeedbackLockedRef = useRef(false);
@@ -775,15 +942,62 @@ export function useBasketballCoachApp() {
   const frontDribbleWeakPointRef = useRef<FrontDribbleWeakPoint | null>(null);
   const frontDribbleSummaryShownRef = useRef(false);
   const shotSuccessRecordsRef = useRef<Record<string, number>>({});
+  const shootSuccessRecordedForCurrentAttemptRef = useRef(false);
+  const startupRecoveryTriggeredRef = useRef(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
   const currentUserId = currentUser?.id ?? '';
   const isReady = isAuthReady && (!currentUser || isAccountDataReady);
   const selectedSkill = selectedSkillKey ? SKILLS[selectedSkillKey] : null;
   const todayKey = formatDateKey(new Date());
+  const todayDribbleCount = dailyDribbleRecords[todayKey] || 0;
+  const todayShootAttemptCount = shotAttemptRecords[todayKey] || 0;
+  const todayShotSuccessCount = shotSuccessRecords[todayKey] || 0;
+  const todayHomeworkState = useMemo(() => getDailyHomeworkState(homeworkState, todayKey), [homeworkState, todayKey]);
+  const todayLessonCount = useMemo(
+    () => lessonRecords.filter((record) => record.dateKey === todayKey).length,
+    [lessonRecords, todayKey]
+  );
+  const homeworkTestState = useMemo<HomeworkTestState>(() => {
+    const correctionTask = todayHomeworkState.correctionTask;
+    const correctionDirection = correctionTask?.direction ?? 'none';
+    const correctionProgress =
+      correctionTask?.direction === 'left'
+        ? Math.max(0, todayHomeworkState.handDribbleTotals.left - correctionTask.baselineCount)
+        : correctionTask?.direction === 'right'
+          ? Math.max(0, todayHomeworkState.handDribbleTotals.right - correctionTask.baselineCount)
+          : 0;
+
+    return {
+      dribbleCount: todayDribbleCount,
+      shootAttemptCount: todayShootAttemptCount,
+      shotSuccessCount: todayShotSuccessCount,
+      skillVideoOpenCount: todayHomeworkState.skillVideoEvents.length,
+      leftHandTotal: todayHomeworkState.handDribbleTotals.left,
+      rightHandTotal: todayHomeworkState.handDribbleTotals.right,
+      isStage2Unlocked: Boolean(todayHomeworkState.stage2Unlock),
+      correctionDirection,
+      correctionProgress,
+    };
+  }, [todayDribbleCount, todayHomeworkState, todayShootAttemptCount, todayShotSuccessCount]);
   const homeworkToShow = useMemo<HomeworkProgressItem[]>(
-    () => buildDailyHomeworkProgress(dailyDribbleRecords[todayKey] || 0, shotAttemptRecords[todayKey] || 0),
-    [dailyDribbleRecords, shotAttemptRecords, todayKey]
+    () =>
+      buildDailyHomeworkProgress({
+        dateKey: todayKey,
+        dailyDribbleCount: todayDribbleCount,
+        shootAttemptCount: todayShootAttemptCount,
+        shotSuccessCount: todayShotSuccessCount,
+        lessonRecords,
+        dailyState: todayHomeworkState,
+      }),
+    [
+      lessonRecords,
+      todayDribbleCount,
+      todayHomeworkState,
+      todayKey,
+      todayShootAttemptCount,
+      todayShotSuccessCount,
+    ]
   );
   const calendarCells = useMemo(
     () => getCalendarCells(currentDate, attendance, dailyDribbleRecords, shotAttemptRecords),
@@ -821,6 +1035,7 @@ export function useBasketballCoachApp() {
     setLessonMode('dribble');
     setAttendance({});
     setDailyDribbleRecords({});
+    setHomeworkState({});
     setLessonRecords([]);
     setShotAttemptRecords({});
     setShotSuccessRecords({});
@@ -848,6 +1063,8 @@ export function useBasketballCoachApp() {
     setRecordingStopToken(0);
     setFireworks([]);
     setShowFireworks(false);
+    setStartupStatusText('앱을 준비하고 있습니다.');
+    setIsShootSuccessButtonVisible(false);
 
     latestFeedbackRef.current = DEFAULT_DRIBBLE_FEEDBACK;
     pendingFeedbackRef.current = null;
@@ -869,8 +1086,10 @@ export function useBasketballCoachApp() {
     latestDribbleAnalysisRef.current = null;
     latestShootAnalysisRef.current = null;
     dailyDribbleRecordsRef.current = {};
+    homeworkStateRef.current = {};
     shotAttemptRecordsRef.current = {};
     shotSuccessRecordsRef.current = {};
+    shootSuccessRecordedForCurrentAttemptRef.current = false;
     shootAnalysisHistoryRef.current = [];
     shootFeedbackLockedRef.current = false;
     frontDribbleCriterionCountsRef.current = createFrontDribbleCriterionCounter();
@@ -888,6 +1107,23 @@ export function useBasketballCoachApp() {
     await AsyncStorage.removeItem(STORAGE_KEYS.session);
   }, []);
 
+  const recoverStartupToLogin = useCallback(async () => {
+    startupRecoveryTriggeredRef.current = true;
+
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEYS.session);
+    } catch {
+      // Ignore session cleanup failures and continue to the login screen.
+    }
+
+    resetAccountState();
+    setCurrentUser(null);
+    setIsAuthReady(true);
+    setIsAccountDataReady(false);
+    setAuthMode(accounts.length > 0 ? 'login' : 'signup');
+    setStartupStatusText('로그인 화면을 준비하고 있습니다.');
+  }, [accounts.length, resetAccountState]);
+
   useEffect(() => {
     latestFeedbackRef.current = feedbackText;
   }, [feedbackText]);
@@ -895,6 +1131,10 @@ export function useBasketballCoachApp() {
   useEffect(() => {
     dailyDribbleRecordsRef.current = dailyDribbleRecords;
   }, [dailyDribbleRecords]);
+
+  useEffect(() => {
+    homeworkStateRef.current = homeworkState;
+  }, [homeworkState]);
 
   useEffect(() => {
     shotAttemptRecordsRef.current = shotAttemptRecords;
@@ -917,7 +1157,17 @@ export function useBasketballCoachApp() {
 
     async function loadAuthState() {
       try {
-        const entries = await AsyncStorage.multiGet([STORAGE_KEYS.accounts, STORAGE_KEYS.session]);
+        if (isMounted) {
+          setStartupStatusText('로그인 정보를 확인하고 있습니다.');
+        }
+        const entries = await withTimeout(
+          AsyncStorage.multiGet([STORAGE_KEYS.accounts, STORAGE_KEYS.session]),
+          STORAGE_LOAD_TIMEOUT_MS,
+          [
+            [STORAGE_KEYS.accounts, null],
+            [STORAGE_KEYS.session, null],
+          ] as [string, string | null][]
+        );
         const stored = Object.fromEntries(entries);
         const parsedAccounts = sanitizeStoredAccounts(parseStoredJson<unknown[]>(stored[STORAGE_KEYS.accounts], []));
         const parsedSession = parseStoredJson<AuthSession | null>(stored[STORAGE_KEYS.session], null);
@@ -928,6 +1178,13 @@ export function useBasketballCoachApp() {
 
         setAccounts(parsedAccounts);
         setAuthMode(parsedAccounts.length > 0 ? 'login' : 'signup');
+
+        if (startupRecoveryTriggeredRef.current) {
+          setStartupStatusText('로그인 화면을 준비하고 있습니다.');
+          return;
+        }
+
+        setStartupStatusText(parsedSession?.userId ? '저장된 계정을 불러오고 있습니다.' : '로그인 화면을 준비하고 있습니다.');
         await AsyncStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(parsedAccounts));
 
         if (parsedSession?.userId) {
@@ -940,6 +1197,9 @@ export function useBasketballCoachApp() {
           }
         }
       } catch {
+        if (isMounted) {
+          setStartupStatusText('로그인 정보를 읽지 못해 로그인 화면으로 이동합니다.');
+        }
         Alert.alert('불러오기 실패', '로그인 정보를 읽는 중 문제가 발생했습니다.');
       } finally {
         if (isMounted) {
@@ -961,6 +1221,7 @@ export function useBasketballCoachApp() {
     if (!currentUserId) {
       resetAccountState();
       setIsAccountDataReady(false);
+      setStartupStatusText('로그인 화면을 준비하고 있습니다.');
       return () => {
         isMounted = false;
       };
@@ -971,17 +1232,35 @@ export function useBasketballCoachApp() {
 
     async function loadAccountData() {
       try {
+        if (isMounted) {
+          setStartupStatusText('계정 데이터를 불러오고 있습니다.');
+        }
         const scopedKeys = getAccountStorageKeys(currentUserId);
-        const entries = await AsyncStorage.multiGet([
-          scopedKeys.attendance,
-          scopedKeys.lessonRecords,
-          scopedKeys.dribbleCounts,
-          scopedKeys.shotAttempts,
-          scopedKeys.shotSuccess,
-          scopedKeys.ballColors,
-          scopedKeys.ballBrand,
-          scopedKeys.position,
-        ]);
+        const entries = await withTimeout(
+          AsyncStorage.multiGet([
+            scopedKeys.attendance,
+            scopedKeys.homework,
+            scopedKeys.lessonRecords,
+            scopedKeys.dribbleCounts,
+            scopedKeys.shotAttempts,
+            scopedKeys.shotSuccess,
+            scopedKeys.ballColors,
+            scopedKeys.ballBrand,
+            scopedKeys.position,
+          ]),
+          STORAGE_LOAD_TIMEOUT_MS,
+          [
+            [scopedKeys.attendance, null],
+            [scopedKeys.homework, null],
+            [scopedKeys.lessonRecords, null],
+            [scopedKeys.dribbleCounts, null],
+            [scopedKeys.shotAttempts, null],
+            [scopedKeys.shotSuccess, null],
+            [scopedKeys.ballColors, null],
+            [scopedKeys.ballBrand, null],
+            [scopedKeys.position, null],
+          ] as [string, string | null][]
+        );
 
         if (!isMounted) {
           return;
@@ -989,6 +1268,7 @@ export function useBasketballCoachApp() {
 
         const stored = Object.fromEntries(entries);
         const parsedAttendance = parseStoredJson<Record<string, string>>(stored[scopedKeys.attendance], {});
+        const parsedHomework = sanitizeHomeworkStateRecord(parseStoredJson<unknown>(stored[scopedKeys.homework], {}));
         const parsedLessonRecords = parseStoredJson<
           Array<LessonRecord | (Omit<LessonRecord, 'feedbackTimeline'> & { feedbackTimeline?: FeedbackMoment[] | string[] })>
         >(stored[scopedKeys.lessonRecords], []).map((record) => normalizeLessonRecord(record));
@@ -1017,6 +1297,7 @@ export function useBasketballCoachApp() {
 
         setAttendance(parsedAttendance);
         setDailyDribbleRecords(parsedDribbleCounts);
+        setHomeworkState(parsedHomework);
         setLessonRecords(parsedLessonRecords);
         setShotAttemptRecords(parsedShotAttempts);
         setShotSuccessRecords(parsedShotSuccess);
@@ -1031,6 +1312,7 @@ export function useBasketballCoachApp() {
         await AsyncStorage.setItem(scopedKeys.attendance, JSON.stringify(parsedAttendance));
       } catch {
         if (isMounted) {
+          setStartupStatusText('계정 데이터를 읽지 못해 기본 화면으로 이동합니다.');
           Alert.alert('불러오기 실패', '계정 데이터를 읽는 중 문제가 발생했습니다.');
         }
       } finally {
@@ -1048,12 +1330,42 @@ export function useBasketballCoachApp() {
   }, [currentUserId, resetAccountState]);
 
   useEffect(() => {
+    if (isReady) {
+      startupRecoveryTriggeredRef.current = false;
+      setStartupStatusText('');
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      if (startupRecoveryTriggeredRef.current) {
+        return;
+      }
+
+      startupRecoveryTriggeredRef.current = true;
+      setStartupStatusText('시작이 오래 걸려 저장된 로그인 상태를 초기화하고 있습니다.');
+      void recoverStartupToLogin();
+    }, STARTUP_RECOVERY_TIMEOUT_MS);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [isReady, recoverStartupToLogin]);
+
+  useEffect(() => {
     if (!currentUserId || !isAccountDataReady) {
       return;
     }
 
     void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).attendance, JSON.stringify(attendance));
   }, [attendance, currentUserId, isAccountDataReady]);
+
+  useEffect(() => {
+    if (!currentUserId || !isAccountDataReady) {
+      return;
+    }
+
+    void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).homework, JSON.stringify(homeworkState));
+  }, [currentUserId, homeworkState, isAccountDataReady]);
 
   useEffect(() => {
     if (!currentUserId || !isAccountDataReady) {
@@ -1143,6 +1455,68 @@ export function useBasketballCoachApp() {
 
     return () => clearTimeout(timer);
   }, [showFireworks]);
+
+  const updateHomeworkStateForDate = useCallback(
+    (dateKey: string, updater: (current: DailyHomeworkState) => DailyHomeworkState) => {
+      setHomeworkState((current) => {
+        const currentDailyState = getDailyHomeworkState(current, dateKey);
+        const nextDailyState = updater(currentDailyState);
+        const nextState = {
+          ...current,
+          [dateKey]: nextDailyState,
+        };
+
+        homeworkStateRef.current = nextState;
+        return nextState;
+      });
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!currentUserId || !isAccountDataReady) {
+      return;
+    }
+
+    if (!isDailyBaseHomeworkCompleted(todayDribbleCount, todayShootAttemptCount) || todayHomeworkState.stage2Unlock) {
+      return;
+    }
+
+    setHomeworkState((current) => {
+      const currentDailyState = getDailyHomeworkState(current, todayKey);
+
+      if (currentDailyState.stage2Unlock) {
+        return current;
+      }
+
+      const nextState = {
+        ...current,
+        [todayKey]: {
+          ...currentDailyState,
+          stage2Unlock: buildStage2UnlockSnapshot(
+            selectedPosition,
+            todayDribbleCount,
+            todayShootAttemptCount,
+            todayShotSuccessCount,
+            todayLessonCount
+          ),
+        },
+      };
+
+      homeworkStateRef.current = nextState;
+      return nextState;
+    });
+  }, [
+    currentUserId,
+    isAccountDataReady,
+    todayDribbleCount,
+    todayHomeworkState.stage2Unlock,
+    todayKey,
+    todayLessonCount,
+    selectedPosition,
+    todayShootAttemptCount,
+    todayShotSuccessCount,
+  ]);
 
   useEffect(() => {
     const countdownStartedAt = stanceCountdownStartedAtRef.current;
@@ -1502,6 +1876,126 @@ export function useBasketballCoachApp() {
     setShowFireworks(true);
   }, []);
 
+  const recordSkillVideoOpen = useCallback(
+    (skillKey: SkillKey) => {
+      const dateKey = formatDateKey(new Date());
+
+      updateHomeworkStateForDate(dateKey, (current) => ({
+        ...current,
+        skillVideoEvents: [
+          ...current.skillVideoEvents,
+          {
+            skillKey,
+            openedAt: new Date().toISOString(),
+          },
+        ],
+      }));
+    },
+    [updateHomeworkStateForDate]
+  );
+
+  const recordFrontDribbleHomeworkData = useCallback(
+    (analysis: DribbleAnalysis | null) => {
+      if (!analysis || analysis.bodyFacing !== 'front') {
+        return;
+      }
+
+      const leftHandDribbleCount = Math.max(0, analysis.leftHandDribbleCount);
+      const rightHandDribbleCount = Math.max(0, analysis.rightHandDribbleCount);
+
+      if (leftHandDribbleCount === 0 && rightHandDribbleCount === 0) {
+        return;
+      }
+
+      const dateKey = formatDateKey(new Date());
+
+      updateHomeworkStateForDate(dateKey, (current) => {
+        const nextHandDribbleTotals = {
+          left: current.handDribbleTotals.left + leftHandDribbleCount,
+          right: current.handDribbleTotals.right + rightHandDribbleCount,
+        };
+
+        return {
+          ...current,
+          handDribbleTotals: nextHandDribbleTotals,
+          correctionTask: buildCorrectionHomeworkState(leftHandDribbleCount, rightHandDribbleCount, nextHandDribbleTotals),
+        };
+      });
+    },
+    [updateHomeworkStateForDate]
+  );
+
+  const applyHomeworkTestState = useCallback(
+    (nextState: HomeworkTestState) => {
+      const dateKey = formatDateKey(new Date());
+      const safeDribbleCount = Math.max(0, Math.trunc(nextState.dribbleCount));
+      const safeShootAttemptCount = Math.max(0, Math.trunc(nextState.shootAttemptCount));
+      const safeShotSuccessCount = Math.max(0, Math.min(Math.trunc(nextState.shotSuccessCount), safeShootAttemptCount));
+      const safeSkillVideoOpenCount = Math.max(0, Math.trunc(nextState.skillVideoOpenCount));
+      const safeLeftHandTotal = Math.max(0, Math.trunc(nextState.leftHandTotal));
+      const safeRightHandTotal = Math.max(0, Math.trunc(nextState.rightHandTotal));
+      const safeCorrectionProgress = Math.max(0, Math.trunc(nextState.correctionProgress));
+      const stage2Position = todayHomeworkState.stage2Unlock?.position ?? selectedPosition;
+      const skillKeyForTest: SkillKey =
+        stage2Position === 'defense' ? 'defense' : stage2Position === 'offense' ? 'shoot' : 'shoot';
+      const skillVideoEvents = Array.from({ length: safeSkillVideoOpenCount }, (_, index) => ({
+        skillKey: skillKeyForTest,
+        openedAt: new Date(Date.now() + index).toISOString(),
+      }));
+      const correctionTask =
+        nextState.correctionDirection === 'none'
+          ? null
+          : {
+              direction: nextState.correctionDirection,
+              baselineCount: Math.max(
+                0,
+                (nextState.correctionDirection === 'left' ? safeLeftHandTotal : safeRightHandTotal) - safeCorrectionProgress
+              ),
+              createdAt: new Date().toISOString(),
+            };
+      const stage2Unlock = nextState.isStage2Unlocked
+        ? todayHomeworkState.stage2Unlock ??
+          buildStage2UnlockSnapshot(
+            stage2Position,
+            safeDribbleCount,
+            safeShootAttemptCount,
+            safeShotSuccessCount,
+            todayLessonCount
+          )
+        : null;
+
+      dailyDribbleRecordsRef.current = {
+        ...dailyDribbleRecordsRef.current,
+        [dateKey]: safeDribbleCount,
+      };
+      setDailyDribbleRecords(dailyDribbleRecordsRef.current);
+
+      shotAttemptRecordsRef.current = {
+        ...shotAttemptRecordsRef.current,
+        [dateKey]: safeShootAttemptCount,
+      };
+      setShotAttemptRecords(shotAttemptRecordsRef.current);
+
+      shotSuccessRecordsRef.current = {
+        ...shotSuccessRecordsRef.current,
+        [dateKey]: safeShotSuccessCount,
+      };
+      setShotSuccessRecords(shotSuccessRecordsRef.current);
+
+      updateHomeworkStateForDate(dateKey, (current) => ({
+        ...current,
+        stage2Unlock,
+        skillVideoEvents,
+        handDribbleTotals: {
+          left: safeLeftHandTotal,
+          right: safeRightHandTotal,
+        },
+        correctionTask,
+      }));
+    },
+    [selectedPosition, todayHomeworkState.stage2Unlock, todayLessonCount, updateHomeworkStateForDate]
+  );
+
   const recordDailyDribbleProgress = useCallback(
     (count: number) => {
       const amount = Math.max(0, count);
@@ -1545,6 +2039,7 @@ export function useBasketballCoachApp() {
 
       shotSuccessRecordsRef.current = nextRecords;
       setShotSuccessRecords(nextRecords);
+      shootSuccessRecordedForCurrentAttemptRef.current = true;
 
       if (!options?.preserveFeedback) {
         const nextText = `오늘 슛 성공 ${nextCount}개를 기록했습니다.`;
@@ -1554,6 +2049,8 @@ export function useBasketballCoachApp() {
       if (options?.debugMessage) {
         setDebugText(options.debugMessage);
       }
+
+      setIsShootSuccessButtonVisible(false);
 
       if (options?.celebrate !== false) {
         setFireworks(createFireworks());
@@ -1568,7 +2065,8 @@ export function useBasketballCoachApp() {
   const saveLessonRecord = useCallback((videoUri: string, reviewClip?: LessonReviewClip | null) => {
     const dateKey = formatDateKey(new Date());
     const mode = lessonModeRef.current;
-    const nextRecord: LessonRecord = {
+    const latestDribbleAnalysis = latestDribbleAnalysisRef.current;
+    const nextRecord = normalizeLessonRecord({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       dateKey,
       mode,
@@ -1579,7 +2077,17 @@ export function useBasketballCoachApp() {
       reviewFeedback: reviewClip?.feedback,
       reviewStartAtMs: reviewClip?.startAtMs,
       reviewDurationMs: reviewClip?.durationMs,
-    };
+      dribbleView: mode === 'dribble' ? selectedDribbleViewRef.current : undefined,
+      leftHandDribbleCount:
+        mode === 'dribble' && selectedDribbleViewRef.current === 'front'
+          ? Math.max(0, latestDribbleAnalysis?.leftHandDribbleCount ?? 0)
+          : undefined,
+      rightHandDribbleCount:
+        mode === 'dribble' && selectedDribbleViewRef.current === 'front'
+          ? Math.max(0, latestDribbleAnalysis?.rightHandDribbleCount ?? 0)
+          : undefined,
+      representativeFeedbackCategory: undefined,
+    });
 
     setLessonRecords((current) => [...current, nextRecord]);
 
@@ -1630,6 +2138,7 @@ export function useBasketballCoachApp() {
       setIsCameraActive(false);
       setIsCameraReady(false);
       setCameraError('');
+      setIsShootSuccessButtonVisible(false);
       setDebugText('카메라와 MediaPipe를 준비하고 있습니다.');
     },
     [
@@ -1681,6 +2190,7 @@ export function useBasketballCoachApp() {
         ballColors: selectedBallColors,
         ballBrand: selectedBallBrand,
         position: selectedPosition,
+        homework: homeworkState,
       },
     };
 
@@ -1753,6 +2263,7 @@ export function useBasketballCoachApp() {
       [scopedKeys.ballColors, JSON.stringify(payload.data.ballColors)],
       [scopedKeys.ballBrand, JSON.stringify(payload.data.ballBrand)],
       [scopedKeys.position, JSON.stringify(payload.data.position)],
+      [scopedKeys.homework, JSON.stringify(payload.data.homework)],
     ]);
     await persistSession(targetAccountId, true);
 
@@ -1924,6 +2435,7 @@ export function useBasketballCoachApp() {
 
   function changeLessonMode(mode: LessonMode) {
     setLessonMode(mode);
+    setIsShootSuccessButtonVisible(false);
     dribbleLessonPhaseRef.current = 'stance_setup';
     shootLessonStartedRef.current = false;
     resetShootAnalysisTracking();
@@ -2006,6 +2518,7 @@ export function useBasketballCoachApp() {
     setRecordingStopToken(0);
     setIsCameraPreviewHidden(false);
     setLessonReview(null);
+    setIsShootSuccessButtonVisible(false);
     if (mode === 'dribble') {
       setImmediateLessonFeedback(buildDribbleStanceFeedbackForView({
         dribbleStarted: false,
@@ -2096,6 +2609,7 @@ export function useBasketballCoachApp() {
     setRecordingStopToken(0);
     setLessonReview(null);
     setIsCameraPreviewHidden(false);
+    setIsShootSuccessButtonVisible(false);
     setIsLessonActive(true);
     setIsCameraActive(true);
     setIsCameraReady(false);
@@ -2151,6 +2665,7 @@ export function useBasketballCoachApp() {
       setRecordingStartToken(0);
       setRecordingStopToken(0);
       setIsCameraPreviewHidden(false);
+      setIsShootSuccessButtonVisible(false);
       setIsCameraActive(false);
       setIsCameraReady(false);
       setCameraError('');
@@ -2213,6 +2728,7 @@ export function useBasketballCoachApp() {
       const finalFeedback = frontWeakPoint
         ? `${latestFeedbackRef.current}\n\n가장 보완이 필요한 기준은 ${frontWeakPoint.criterionNumber}번입니다. ${frontWeakPoint.feedbackText}`
         : latestFeedbackRef.current;
+      recordFrontDribbleHomeworkData(selectedDribbleViewRef.current === 'front' ? latestDribbleAnalysisRef.current : null);
       const completedDribbleHomework = recordDailyDribbleProgress(dribbleTargetCountRef.current ?? 0);
       const completedFeedback = completedDribbleHomework
         ? `${finalFeedback}\n\n${getHomeworkCompletionMessage('dribble')}`
@@ -2252,6 +2768,7 @@ export function useBasketballCoachApp() {
     clearShootAutoEnd,
     finalizeFrontDribbleWeakPoint,
     recordDailyDribbleProgress,
+    recordFrontDribbleHomeworkData,
     resetShootAnalysisTracking,
   ]);
 
@@ -2274,6 +2791,7 @@ export function useBasketballCoachApp() {
         feedback: finalFeedback,
       };
 
+      recordFrontDribbleHomeworkData(selectedDribbleViewRef.current === 'front' ? latestDribbleAnalysisRef.current : null);
       const completedDribbleHomework = recordDailyDribbleProgress(dribbleTargetCountRef.current ?? 0);
       saveLessonRecord(videoUri, finalReviewClip);
 
@@ -2314,6 +2832,7 @@ export function useBasketballCoachApp() {
       clearRecordingWait,
       finalizeFrontDribbleWeakPoint,
       recordDailyDribbleProgress,
+      recordFrontDribbleHomeworkData,
       resetShootAnalysisTracking,
       saveLessonRecord,
     ]
@@ -2359,6 +2878,7 @@ export function useBasketballCoachApp() {
       setIsCameraActive(true);
       setIsCameraReady(true);
       setCameraError('');
+      setIsShootSuccessButtonVisible(!shootSuccessRecordedForCurrentAttemptRef.current);
       const completionText = completedShootHomework ? `\n\n${getHomeworkCompletionMessage('shoot')}` : '';
       shootFeedbackLockedRef.current = true;
       setImmediateLessonFeedback(`${finalFeedback}${completionText}`);
@@ -2410,6 +2930,8 @@ export function useBasketballCoachApp() {
     pendingShootRecordingStopRef.current = false;
     latestShootAnalysisRef.current = null;
     shootAnalysisHistoryRef.current = [];
+    shootSuccessRecordedForCurrentAttemptRef.current = false;
+    setIsShootSuccessButtonVisible(false);
     setShootResetToken(Date.now());
     playStartCue();
     if (!shootRecordingStartedRef.current) {
@@ -2575,6 +3097,7 @@ export function useBasketballCoachApp() {
           shootLessonStartedRef.current = false;
           dribbleLessonPhaseRef.current = 'cooldown';
           shootCooldownUntilRef.current = Date.now() + SHOOT_RECOVERY_MS;
+          setIsShootSuccessButtonVisible(true);
           setImmediateLessonFeedback('슛 발사를 확인했습니다. 3초 뒤 녹화를 마치고 2, 3번째 기준을 분석합니다.');
           setDebugText('슛 발사를 확인했습니다. 3초 뒤 녹화를 종료합니다.');
           return;
@@ -2585,6 +3108,16 @@ export function useBasketballCoachApp() {
       }
 
       if (phase === 'countdown') {
+        if (!stanceReady) {
+          dribbleLessonPhaseRef.current = 'stance_setup';
+          stanceCountdownStartedAtRef.current = null;
+          setCountdownValue(null);
+          pendingFeedbackRef.current =
+            '슛 준비 자세가 흐트러졌습니다.\n1. 팔 각도를 다시 80~120도로 맞춰 주세요.\n2. 준비 자세가 다시 잡히면 3초 카운트를 처음부터 시작합니다.\n3. 카운트가 끝나면 그때 슛 레슨을 시작합니다.';
+          setDebugText('슛 준비 자세가 무너져 카운트를 다시 시작합니다.');
+          return;
+        }
+
         const countdownStartedAt = stanceCountdownStartedAtRef.current ?? Date.now();
         const elapsed = Date.now() - countdownStartedAt;
 
@@ -2594,7 +3127,7 @@ export function useBasketballCoachApp() {
         }
 
         const remainingSeconds = Math.max(1, Math.ceil((DRIBBLE_STANCE_HOLD_MS - elapsed) / 1000));
-        pendingFeedbackRef.current = `슛 준비 자세를 유지해 주세요.\n1. 팔 각도를 기준 범위 안으로 맞춰 주세요.\n2. ${remainingSeconds}초 동안 자세를 유지하면 녹화를 시작합니다.\n3. 슛이 끝난 뒤 2, 3번째 기준으로 결과를 알려드립니다.`;
+        pendingFeedbackRef.current = `슛 준비 자세를 유지해 주세요.\n1. 팔 각도를 기준 범위 안으로 맞춰 주세요.\n2. ${remainingSeconds}초 동안 자세를 유지하면 슛 레슨을 시작합니다.\n3. 슛이 끝난 뒤 2, 3번째 기준으로 결과를 알려드립니다.`;
         setDebugText(`슛 준비 자세 유지 중: ${remainingSeconds}초 남음`);
         return;
       }
@@ -2753,6 +3286,7 @@ export function useBasketballCoachApp() {
             setIsCameraActive(false);
             setIsCameraReady(false);
             setCameraError('');
+            setIsShootSuccessButtonVisible(false);
             latestFeedbackRef.current = `${latestFeedbackRef.current}\n\n영상 저장에는 실패했지만 목표 드리블 횟수를 채워 레슨은 종료되었습니다.`;
             setFeedbackText(latestFeedbackRef.current);
             setDebugText('목표 드리블 횟수를 모두 채워 레슨이 종료되었습니다. 카메라 연결도 꺼졌습니다.');
@@ -2775,6 +3309,7 @@ export function useBasketballCoachApp() {
             setIsLessonActive(true);
             setIsCameraActive(true);
             setIsCameraReady(true);
+            setIsShootSuccessButtonVisible(false);
             setImmediateLessonFeedback(`${latestFeedbackRef.current}\n\n다시 슛 준비 자세를 맞춰 주세요.`);
             return;
           }
@@ -2823,6 +3358,11 @@ export function useBasketballCoachApp() {
       return;
     }
 
+    if (!isShootSuccessButtonVisible) {
+      Alert.alert('슛 발사 확인 필요', '슛 발사를 먼저 인식한 뒤에 슛 성공을 기록할 수 있습니다.');
+      return;
+    }
+
     recordSuccessfulShot();
   }
 
@@ -2855,7 +3395,7 @@ export function useBasketballCoachApp() {
   }
 
   async function openSkillVideo() {
-    if (!selectedSkill) {
+    if (!selectedSkill || !selectedSkillKey) {
       return;
     }
 
@@ -2868,6 +3408,7 @@ export function useBasketballCoachApp() {
     }
 
     await Linking.openURL(url);
+    recordSkillVideoOpen(selectedSkillKey);
   }
 
   async function deleteLessonRecord(recordId: string) {
@@ -2891,6 +3432,7 @@ export function useBasketballCoachApp() {
     screen,
     lessonMode,
     homeworkToShow,
+    homeworkTestState,
     currentDate,
     selectedDateKey,
     selectedDateRecords,
@@ -2913,6 +3455,9 @@ export function useBasketballCoachApp() {
     isCameraReady,
     cameraSessionKey,
     countdownValue,
+    startupStatusText,
+    isShootSuccessButtonVisible,
+    recoverStartupToLogin,
     dribbleResetToken,
     shootResetToken,
     recordingStartToken,
@@ -2940,6 +3485,7 @@ export function useBasketballCoachApp() {
     setSelectedDribbleView,
     revealHomework,
     openSkillVideo,
+    applyHomeworkTestState,
     openDiaryDate,
     changeMonth,
     deleteLessonRecord,

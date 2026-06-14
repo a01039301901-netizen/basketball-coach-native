@@ -32,6 +32,17 @@ interface AuthScreenProps {
   onImportAccount?: (code: string) => Promise<TransferImportResult>;
 }
 
+function EyeIcon({ visible }: { visible: boolean }) {
+  return (
+    <View style={styles.eyeIconWrap}>
+      <View style={styles.eyeOuter}>
+        <View style={[styles.eyePupil, !visible && styles.eyePupilHidden]} />
+      </View>
+      {!visible ? <View style={styles.eyeSlash} /> : null}
+    </View>
+  );
+}
+
 const GENDER_OPTIONS: Array<{ key: AccountGender; label: string }> = [
   { key: 'male', label: '남성' },
   { key: 'female', label: '여성' },
@@ -43,6 +54,7 @@ export function AuthScreen({ mode, onChangeMode, onLogin, onSignup, onImportAcco
   const [age, setAge] = useState('');
   const [gender, setGender] = useState<AccountGender>('male');
   const [password, setPassword] = useState('');
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -53,6 +65,7 @@ export function AuthScreen({ mode, onChangeMode, onLogin, onSignup, onImportAcco
 
   useEffect(() => {
     setStatusMessage('');
+    setIsPasswordVisible(false);
   }, [mode]);
 
   useEffect(() => {
@@ -65,6 +78,7 @@ export function AuthScreen({ mode, onChangeMode, onLogin, onSignup, onImportAcco
     }
 
     setIsSubmitting(true);
+
     const submitValues = {
       nickname,
       name,
@@ -97,8 +111,8 @@ export function AuthScreen({ mode, onChangeMode, onLogin, onSignup, onImportAcco
       <Card title={isLogin ? '로그인' : '회원가입'} style={styles.card}>
         <Text style={styles.subtitle}>
           {isLogin
-            ? '이름, 나이, 성별, 비밀번호를 입력해 기존 계정으로 로그인해 주세요.'
-            : '이름, 나이, 성별, 비밀번호를 설정해서 농구 코치 계정을 만들어 주세요.'}
+            ? '닉네임, 이름, 나이, 성별, 비밀번호를 입력해 기존 계정으로 로그인해 주세요.'
+            : '닉네임, 이름, 나이, 성별, 비밀번호를 설정해서 새 계정을 만들어 주세요.'}
         </Text>
 
         <View style={styles.form}>
@@ -160,14 +174,23 @@ export function AuthScreen({ mode, onChangeMode, onLogin, onSignup, onImportAcco
 
           <View style={styles.fieldGroup}>
             <Text style={styles.label}>비밀번호</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="비밀번호를 입력해 주세요"
-              placeholderTextColor="rgba(255,255,255,0.45)"
-              style={styles.input}
-              secureTextEntry
-            />
+            <View style={styles.passwordRow}>
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                placeholder="비밀번호를 입력해 주세요"
+                placeholderTextColor="rgba(255,255,255,0.45)"
+                style={[styles.input, styles.passwordInput]}
+                secureTextEntry={!isPasswordVisible}
+              />
+              <Pressable
+                accessibilityLabel={isPasswordVisible ? '비밀번호 숨기기' : '비밀번호 보기'}
+                onPress={() => setIsPasswordVisible((current) => !current)}
+                style={({ pressed }) => [styles.passwordToggle, pressed && styles.pressed]}
+              >
+                <EyeIcon visible={isPasswordVisible} />
+              </Pressable>
+            </View>
           </View>
         </View>
 
@@ -185,7 +208,7 @@ export function AuthScreen({ mode, onChangeMode, onLogin, onSignup, onImportAcco
 
         <View style={styles.actionRow}>
           <SmallButton
-            title={isSubmitting ? '처리 중.' : isLogin ? '로그인' : '회원가입'}
+            title={isSubmitting ? '처리 중' : isLogin ? '로그인' : '회원가입'}
             onPress={() => void handleSubmit()}
             disabled={isSubmitting}
           />
@@ -224,7 +247,7 @@ export function AuthScreen({ mode, onChangeMode, onLogin, onSignup, onImportAcco
                 />
                 {importMessage ? <Text style={styles.importMessage}>{importMessage}</Text> : null}
                 <SmallButton
-                  title={isImporting ? '가져오는 중.' : '계정 가져오기'}
+                  title={isImporting ? '가져오는 중' : '계정 가져오기'}
                   onPress={() => void handleImport()}
                   disabled={isImporting}
                 />
@@ -275,6 +298,57 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     color: colors.text,
     fontSize: 15,
+  },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  passwordInput: {
+    flex: 1,
+  },
+  passwordToggle: {
+    width: 52,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  eyeIconWrap: {
+    width: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eyeOuter: {
+    width: 20,
+    height: 12,
+    borderWidth: 1.8,
+    borderColor: colors.textSoft,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  eyePupil: {
+    width: 5,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: colors.textSoft,
+  },
+  eyePupilHidden: {
+    opacity: 0.45,
+  },
+  eyeSlash: {
+    position: 'absolute',
+    width: 24,
+    height: 2,
+    borderRadius: 999,
+    backgroundColor: colors.textSoft,
+    transform: [{ rotate: '-38deg' }],
   },
   genderRow: {
     flexDirection: 'row',

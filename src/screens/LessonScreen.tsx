@@ -1,6 +1,6 @@
 import { type AVPlaybackStatus, ResizeMode, Video } from 'expo-av';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions, type ViewStyle } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
@@ -29,6 +29,7 @@ interface LessonScreenProps {
   lessonReview: LessonReviewClip | null;
   currentDribbleCount: number;
   cameraError: string;
+  isShootSuccessButtonVisible: boolean;
   onSelectMode: (mode: LessonMode) => void;
   onSelectDribbleView: (view: DribbleLessonView) => void;
   onBeginLesson: (dribbleTargetCount?: number, dribbleView?: DribbleLessonView) => void;
@@ -134,6 +135,7 @@ export function LessonScreen({
   lessonReview,
   currentDribbleCount,
   cameraError,
+  isShootSuccessButtonVisible,
   onSelectMode,
   onSelectDribbleView,
   onBeginLesson,
@@ -143,6 +145,15 @@ export function LessonScreen({
 }: LessonScreenProps) {
   const { width } = useWindowDimensions();
   const isWideLayout = width >= 1080;
+  const stickyCoachingCardStyle =
+    Platform.OS === 'web'
+      ? ({
+          position: 'sticky',
+          top: 20,
+          alignSelf: 'flex-start',
+          zIndex: 1,
+        } as unknown as ViewStyle)
+      : null;
 
   const [showDribbleGuide, setShowDribbleGuide] = useState(false);
   const [dribbleGuideStep, setDribbleGuideStep] = useState(0);
@@ -266,7 +277,7 @@ export function LessonScreen({
 
             <View style={styles.cameraControls}>
               <SmallButton title="레슨 시작" onPress={openLessonStart} disabled={isLessonActive} />
-              {lessonMode === 'shoot' ? (
+              {lessonMode === 'shoot' && isShootSuccessButtonVisible ? (
                 <SmallButton title="슛 성공" onPress={onRegisterSuccessfulShot} variant="dark" />
               ) : null}
               <SmallButton
@@ -278,10 +289,9 @@ export function LessonScreen({
             </View>
           </View>
 
-          <View style={styles.sideCard}>
+          <View style={[styles.sideCard, stickyCoachingCardStyle]}>
             <Text style={styles.sideTitle}>실시간 코칭</Text>
             <InfoBox label="진행 상태" text={debugText} />
-            {lessonMode === 'dribble' ? <InfoBox label="드리블 촬영" text={dribbleViewLabel} /> : null}
             {lessonMode === 'dribble' ? <InfoBox label="드리블 횟수" text={`${currentDribbleCount}회`} /> : null}
             <InfoBox label="실시간 피드백" text={feedbackText} />
             {lessonReview ? <ReviewClipPlayer clip={lessonReview} /> : null}

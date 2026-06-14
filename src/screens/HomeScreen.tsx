@@ -114,7 +114,7 @@ export function HomeScreen({
         <View style={styles.homeTipBox}>
           <Text style={styles.tipTitle}>연습 팁</Text>
           <Text style={styles.tipText}>
-            숙제 진행도는 오늘 날짜 기준으로 계산됩니다. 드리블은 누적 횟수, 슛은 시도 횟수가 바로 퍼센트로 반영됩니다.
+            숙제는 오늘 날짜 기준으로 단계별로 바뀝니다. 기본 숙제를 끝내면 포지션별 다음 숙제가 뜨고, 정면 드리블에서 좌우 차이가 크면 보정 숙제가 추가됩니다.
           </Text>
         </View>
       </View>

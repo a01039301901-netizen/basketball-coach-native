@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
 import { BALL_BRAND_OPTIONS, BALL_COLOR_OPTIONS, POSITION_OPTIONS } from '../constants/settings';
 import { colors } from '../theme/colors';
-import type { AuthUser, BallBrandOption, BallColorOption, PositionOption } from '../types/app';
+import type { AuthUser, BallBrandOption, BallColorOption, HomeworkTestState, PositionOption } from '../types/app';
 
 interface TransferCodeResult {
   success: boolean;
@@ -17,9 +17,11 @@ interface SettingsScreenProps {
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
   selectedPosition: PositionOption;
+  homeworkTestState: HomeworkTestState;
   onSelectBallBrand: (brand: BallBrandOption) => void;
   onToggleBallColor: (color: BallColorOption) => void;
   onSelectPosition: (position: PositionOption) => void;
+  onApplyHomeworkTestState: (nextState: HomeworkTestState) => void;
   onLogout: () => void;
   onCreateTransferCode: () => Promise<TransferCodeResult>;
 }
@@ -28,26 +30,77 @@ function formatGenderLabel(gender: AuthUser['gender']) {
   return gender === 'male' ? '남성' : '여성';
 }
 
+function getCorrectionDirectionLabel(direction: HomeworkTestState['correctionDirection']) {
+  if (direction === 'left') {
+    return '왼쪽 드리블';
+  }
+
+  if (direction === 'right') {
+    return '오른쪽 드리블';
+  }
+
+  return '없음';
+}
+
+function parseNumberInput(value: string) {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return 0;
+  }
+
+  const parsed = Number(trimmedValue);
+  return Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : 0;
+}
+
 export function SettingsScreen({
   currentUser,
   selectedBallBrand,
   selectedBallColors,
   selectedPosition,
+  homeworkTestState,
   onSelectBallBrand,
   onToggleBallColor,
   onSelectPosition,
+  onApplyHomeworkTestState,
   onLogout,
   onCreateTransferCode,
 }: SettingsScreenProps) {
   const [isPositionOpen, setIsPositionOpen] = useState(false);
+  const [isCorrectionOpen, setIsCorrectionOpen] = useState(false);
   const [transferCode, setTransferCode] = useState('');
   const [transferMessage, setTransferMessage] = useState('');
   const [isGeneratingTransferCode, setIsGeneratingTransferCode] = useState(false);
+  const [dribbleCountInput, setDribbleCountInput] = useState('0');
+  const [shootAttemptInput, setShootAttemptInput] = useState('0');
+  const [shotSuccessInput, setShotSuccessInput] = useState('0');
+  const [skillVideoInput, setSkillVideoInput] = useState('0');
+  const [leftHandInput, setLeftHandInput] = useState('0');
+  const [rightHandInput, setRightHandInput] = useState('0');
+  const [correctionProgressInput, setCorrectionProgressInput] = useState('0');
+  const [isStage2Unlocked, setIsStage2Unlocked] = useState(false);
+  const [correctionDirection, setCorrectionDirection] = useState<HomeworkTestState['correctionDirection']>('none');
 
   const selectedPositionLabel = useMemo(
     () => POSITION_OPTIONS.find((option) => option.key === selectedPosition)?.label ?? '없음',
     [selectedPosition]
   );
+  const correctionDirectionLabel = useMemo(
+    () => getCorrectionDirectionLabel(correctionDirection),
+    [correctionDirection]
+  );
+
+  useEffect(() => {
+    setDribbleCountInput(String(homeworkTestState.dribbleCount));
+    setShootAttemptInput(String(homeworkTestState.shootAttemptCount));
+    setShotSuccessInput(String(homeworkTestState.shotSuccessCount));
+    setSkillVideoInput(String(homeworkTestState.skillVideoOpenCount));
+    setLeftHandInput(String(homeworkTestState.leftHandTotal));
+    setRightHandInput(String(homeworkTestState.rightHandTotal));
+    setCorrectionProgressInput(String(homeworkTestState.correctionProgress));
+    setIsStage2Unlocked(homeworkTestState.isStage2Unlocked);
+    setCorrectionDirection(homeworkTestState.correctionDirection);
+  }, [homeworkTestState]);
 
   async function handleCreateTransferCode() {
     if (isGeneratingTransferCode) {
@@ -76,10 +129,40 @@ export function SettingsScreen({
     }
   }
 
+  function handleApplyHomeworkTestState() {
+    onApplyHomeworkTestState({
+      dribbleCount: parseNumberInput(dribbleCountInput),
+      shootAttemptCount: parseNumberInput(shootAttemptInput),
+      shotSuccessCount: parseNumberInput(shotSuccessInput),
+      skillVideoOpenCount: parseNumberInput(skillVideoInput),
+      leftHandTotal: parseNumberInput(leftHandInput),
+      rightHandTotal: parseNumberInput(rightHandInput),
+      isStage2Unlocked,
+      correctionDirection,
+      correctionProgress: parseNumberInput(correctionProgressInput),
+    });
+  }
+
+  function handleResetHomeworkTestState() {
+    onApplyHomeworkTestState({
+      dribbleCount: 0,
+      shootAttemptCount: 0,
+      shotSuccessCount: 0,
+      skillVideoOpenCount: 0,
+      leftHandTotal: 0,
+      rightHandTotal: 0,
+      isStage2Unlocked: false,
+      correctionDirection: 'none',
+      correctionProgress: 0,
+    });
+  }
+
   return (
     <View style={styles.contentGap}>
       <Card title="계정" style={styles.accountCard}>
-        <Text style={styles.lead}>현재 로그인한 계정입니다. 다른 계정으로 바꾸려면 로그아웃 후 다시 로그인해 주세요.</Text>
+        <Text style={styles.lead}>
+          현재 로그인한 계정입니다. 다른 계정으로 바꾸려면 로그아웃 후 다시 로그인해 주세요.
+        </Text>
 
         <View style={styles.accountInfoWrap}>
           <View style={styles.accountInfoRow}>
@@ -102,7 +185,7 @@ export function SettingsScreen({
 
         <View style={styles.accountActionRow}>
           <SmallButton
-            title={isGeneratingTransferCode ? '코드 생성 중..' : '전송 코드 만들기'}
+            title={isGeneratingTransferCode ? '코드 생성 중...' : '전송 코드 만들기'}
             onPress={() => void handleCreateTransferCode()}
             disabled={isGeneratingTransferCode}
           />
@@ -115,7 +198,7 @@ export function SettingsScreen({
           <View style={styles.transferPanel}>
             <Text style={styles.transferTitle}>계정 전송 코드</Text>
             <Text style={styles.transferDescription}>
-              이 코드를 휴대폰 로그인 화면의 가져오기 칸에 붙여넣어 주세요. 영상 파일은 옮겨지지 않고 계정, 기록, 설정만 이동합니다.
+              이 코드를 다른 로그인 화면의 가져오기 칸에 붙여넣어 주세요. 영상 파일은 옮겨지지 않고 계정, 기록, 설정만 이동합니다.
             </Text>
             <TextInput
               value={transferCode}
@@ -136,10 +219,10 @@ export function SettingsScreen({
 
       <Card title="인식 설정" style={styles.card}>
         <Text style={styles.lead}>
-          사용 중인 포지션과 공 브랜드, 색상을 맞춰 두면 드리블과 슛 분석이 조금 더 자연스럽게 동작합니다.
+          사용 중인 공과 포지션을 맞춰 두면 분석과 추천 숙제가 조금 더 자연스럽게 동작합니다.
         </Text>
 
-        <Text style={styles.sectionTitle}>포지션 설정</Text>
+        <Text style={styles.sectionTitle}>사용자 포지션</Text>
         <View style={styles.positionWrap}>
           <Pressable
             onPress={() => setIsPositionOpen((current) => !current)}
@@ -147,7 +230,7 @@ export function SettingsScreen({
           >
             <Text style={styles.positionTriggerLabel}>현재 선택</Text>
             <Text style={styles.positionTriggerValue}>{selectedPositionLabel}</Text>
-            <Text style={styles.positionTriggerArrow}>{isPositionOpen ? '접기' : '열기'}</Text>
+            <Text style={styles.positionTriggerArrow}>{isPositionOpen ? '닫기' : '열기'}</Text>
           </Pressable>
 
           {isPositionOpen ? (
@@ -229,6 +312,104 @@ export function SettingsScreen({
               </Pressable>
             );
           })}
+        </View>
+      </Card>
+
+      <Card title="숙제 테스트 조절" style={styles.card}>
+        <Text style={styles.lead}>
+          오늘 숙제 진행도를 테스트용으로 직접 바꿀 수 있습니다. 값을 입력한 뒤 적용하면 메인 숙제 창에 바로 반영됩니다.
+        </Text>
+
+        <View style={styles.testFieldGrid}>
+          <View style={styles.testField}>
+            <Text style={styles.testLabel}>오늘 드리블 횟수</Text>
+            <TextInput value={dribbleCountInput} onChangeText={setDribbleCountInput} style={styles.testInput} keyboardType="number-pad" />
+          </View>
+          <View style={styles.testField}>
+            <Text style={styles.testLabel}>오늘 슛 발사 횟수</Text>
+            <TextInput value={shootAttemptInput} onChangeText={setShootAttemptInput} style={styles.testInput} keyboardType="number-pad" />
+          </View>
+          <View style={styles.testField}>
+            <Text style={styles.testLabel}>오늘 슛 성공 횟수</Text>
+            <TextInput value={shotSuccessInput} onChangeText={setShotSuccessInput} style={styles.testInput} keyboardType="number-pad" />
+          </View>
+          <View style={styles.testField}>
+            <Text style={styles.testLabel}>오늘 기술 영상 열기 횟수</Text>
+            <TextInput value={skillVideoInput} onChangeText={setSkillVideoInput} style={styles.testInput} keyboardType="number-pad" />
+          </View>
+          <View style={styles.testField}>
+            <Text style={styles.testLabel}>왼손 드리블 누적</Text>
+            <TextInput value={leftHandInput} onChangeText={setLeftHandInput} style={styles.testInput} keyboardType="number-pad" />
+          </View>
+          <View style={styles.testField}>
+            <Text style={styles.testLabel}>오른손 드리블 누적</Text>
+            <TextInput value={rightHandInput} onChangeText={setRightHandInput} style={styles.testInput} keyboardType="number-pad" />
+          </View>
+          <Pressable
+            onPress={() => setIsStage2Unlocked((current) => !current)}
+            style={({ pressed }) => [
+              styles.testToggle,
+              isStage2Unlocked && styles.testToggleActive,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.testToggleTitle}>2단계 숙제 잠금 해제</Text>
+            <Text style={styles.testToggleValue}>{isStage2Unlocked ? '켜짐' : '꺼짐'}</Text>
+          </Pressable>
+          <View style={styles.testField}>
+            <Text style={styles.testLabel}>보정 숙제 진행도</Text>
+            <TextInput
+              value={correctionProgressInput}
+              onChangeText={setCorrectionProgressInput}
+              style={styles.testInput}
+              keyboardType="number-pad"
+            />
+          </View>
+        </View>
+
+        <View style={styles.positionWrap}>
+          <Pressable
+            onPress={() => setIsCorrectionOpen((current) => !current)}
+            style={({ pressed }) => [styles.positionTrigger, pressed && styles.pressed]}
+          >
+            <Text style={styles.positionTriggerLabel}>보정 숙제</Text>
+            <Text style={styles.positionTriggerValue}>{correctionDirectionLabel}</Text>
+            <Text style={styles.positionTriggerArrow}>{isCorrectionOpen ? '닫기' : '열기'}</Text>
+          </Pressable>
+
+          {isCorrectionOpen ? (
+            <View style={styles.positionDropdown}>
+              {[
+                { key: 'none' as const, label: '없음' },
+                { key: 'left' as const, label: '왼쪽 드리블 10회 더' },
+                { key: 'right' as const, label: '오른쪽 드리블 10회 더' },
+              ].map((option) => {
+                const active = correctionDirection === option.key;
+
+                return (
+                  <Pressable
+                    key={option.key}
+                    onPress={() => {
+                      setCorrectionDirection(option.key);
+                      setIsCorrectionOpen(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.positionOption,
+                      active && styles.positionOptionActive,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text style={[styles.positionOptionText, active && styles.positionOptionTextActive]}>{option.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+        </View>
+
+        <View style={styles.accountActionRow}>
+          <SmallButton title="테스트 값 적용" onPress={handleApplyHomeworkTestState} />
+          <SmallButton title="오늘 숙제 초기화" onPress={handleResetHomeworkTestState} variant="dark" />
         </View>
       </Card>
     </View>
@@ -390,6 +571,54 @@ const styles = StyleSheet.create({
   },
   optionList: {
     gap: 14,
+  },
+  testFieldGrid: {
+    gap: 12,
+  },
+  testField: {
+    gap: 8,
+  },
+  testLabel: {
+    color: colors.textSoft,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  testInput: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  testToggle: {
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  testToggleActive: {
+    backgroundColor: 'rgba(255,159,28,0.18)',
+    borderColor: 'rgba(255,159,28,0.4)',
+  },
+  testToggleTitle: {
+    color: colors.textSoft,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  testToggleValue: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '900',
   },
   optionButton: {
     flexDirection: 'row',

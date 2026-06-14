@@ -45,6 +45,16 @@ export type SkillKey = 'shoot' | 'crossover' | 'layup' | 'stepback' | 'spin' | '
 export type BallColorOption = 'orange' | 'brown' | 'yellow' | 'white' | 'black' | 'gray' | 'red';
 export type BallBrandOption = 'wilson' | 'spalding' | 'molten';
 export type PositionOption = 'none' | 'defense' | 'offense';
+export type HomeworkStage = 'base' | 'position_followup' | 'correction';
+export type HomeworkSource = 'daily' | 'position' | 'feedback' | 'dribble_balance';
+export type HomeworkFeedbackCategory =
+  | 'dribble_balance'
+  | 'torso_posture'
+  | 'shoot_arm_angle'
+  | 'shoot_release_timing'
+  | 'leg_angle';
+export type HomeworkCorrectionSide = 'left' | 'right';
+export type HomeworkTestCorrectionDirection = 'none' | HomeworkCorrectionSide;
 
 export interface Skill {
   title: string;
@@ -69,6 +79,10 @@ export interface LessonRecord {
   reviewFeedback?: string;
   reviewStartAtMs?: number;
   reviewDurationMs?: number;
+  dribbleView?: DribbleLessonView;
+  leftHandDribbleCount?: number;
+  rightHandDribbleCount?: number;
+  representativeFeedbackCategory?: HomeworkFeedbackCategory;
 }
 
 export interface LessonReviewClip {
@@ -94,14 +108,61 @@ export interface ShotGraphDatum {
 }
 
 export interface HomeworkProgressItem {
-  id: 'dribble' | 'shoot';
+  id: string;
   title: string;
+  stage: HomeworkStage;
+  source: HomeworkSource;
   current: number;
   target: number;
+  progress: number;
   progressPercent: number;
   isCompleted: boolean;
   progressText: string;
   completionText: string;
+}
+
+export interface SkillVideoOpenEvent {
+  skillKey: SkillKey;
+  openedAt: string;
+}
+
+export interface HomeworkUnlockSnapshot {
+  unlockedAt: string;
+  position: PositionOption;
+  dribbleCount: number;
+  shootAttemptCount: number;
+  shotSuccessCount: number;
+  lessonCount: number;
+}
+
+export interface CorrectionHomeworkState {
+  direction: HomeworkCorrectionSide;
+  baselineCount: number;
+  createdAt: string;
+}
+
+export interface DailyHomeworkState {
+  stage2Unlock: HomeworkUnlockSnapshot | null;
+  skillVideoEvents: SkillVideoOpenEvent[];
+  handDribbleTotals: {
+    left: number;
+    right: number;
+  };
+  correctionTask: CorrectionHomeworkState | null;
+}
+
+export type HomeworkStateRecord = Record<string, DailyHomeworkState>;
+
+export interface HomeworkTestState {
+  dribbleCount: number;
+  shootAttemptCount: number;
+  shotSuccessCount: number;
+  skillVideoOpenCount: number;
+  leftHandTotal: number;
+  rightHandTotal: number;
+  isStage2Unlocked: boolean;
+  correctionDirection: HomeworkTestCorrectionDirection;
+  correctionProgress: number;
 }
 
 export type EyeFocusState = 'ball' | 'forward' | 'unknown';
