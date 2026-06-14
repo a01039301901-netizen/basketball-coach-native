@@ -212,11 +212,10 @@ export default function App() {
               calendarCells={app.calendarCells}
               selectedDateKey={app.selectedDateKey}
               selectedDateRecords={app.selectedDateRecords}
-              selectedDateShotCount={app.selectedDateShotCount}
               shotGraphData={app.shotGraphData}
               onChangeMonth={app.changeMonth}
               onOpenDate={app.openDiaryDate}
-              onAdjustShotSuccess={app.adjustSelectedDateShotSuccess}
+              onToggleShotOutcome={app.toggleLessonRecordShotOutcome}
               onDeleteRecord={(recordId) => void app.deleteLessonRecord(recordId)}
             />
           )}

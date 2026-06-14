@@ -4,6 +4,7 @@ export type AccountGender = 'male' | 'female';
 
 export type LessonMode = 'dribble' | 'shoot';
 export type DribbleLessonView = 'front' | 'side';
+export type ShotOutcome = 'success' | 'failure';
 
 export interface UserAccount {
   id: string;
@@ -72,6 +73,7 @@ export interface LessonRecord {
   id: string;
   dateKey: string;
   mode: LessonMode;
+  shotOutcome?: ShotOutcome;
   feedback: string;
   feedbackTimeline: FeedbackMoment[];
   videoUri: string;

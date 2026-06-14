@@ -420,6 +420,8 @@ function sanitizeLessonRecords(value: unknown): LessonRecord[] {
       const id = typeof entry.id === 'string' ? entry.id : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const dateKey = typeof entry.dateKey === 'string' ? entry.dateKey : formatDateKey(new Date());
       const mode = entry.mode === 'shoot' ? 'shoot' : 'dribble';
+      const shotOutcome =
+        entry.shotOutcome === 'success' ? 'success' : entry.shotOutcome === 'failure' ? 'failure' : undefined;
       const feedback = typeof entry.feedback === 'string' ? entry.feedback : '';
       const createdAt = typeof entry.createdAt === 'string' ? entry.createdAt : new Date().toISOString();
       const reviewFeedback = typeof entry.reviewFeedback === 'string' ? entry.reviewFeedback : undefined;
@@ -444,6 +446,7 @@ function sanitizeLessonRecords(value: unknown): LessonRecord[] {
         id,
         dateKey,
         mode,
+        shotOutcome,
         feedback,
         feedbackTimeline: Array.isArray(entry.feedbackTimeline)
           ? (entry.feedbackTimeline as FeedbackMoment[] | string[])
@@ -596,8 +599,17 @@ function normalizeLessonRecord(
   record: LessonRecord | (Omit<LessonRecord, 'feedbackTimeline'> & { feedbackTimeline?: FeedbackMoment[] | string[] })
 ): LessonRecord {
   const normalizedFeedbackTimeline = normalizeFeedbackTimeline(record.feedbackTimeline, record.feedback);
+  const normalizedShotOutcome =
+    record.mode === 'shoot'
+      ? record.shotOutcome === 'success'
+        ? 'success'
+        : record.shotOutcome === 'failure'
+          ? 'failure'
+          : undefined
+      : undefined;
   const nextRecord = {
     ...record,
+    shotOutcome: normalizedShotOutcome,
     feedbackTimeline: normalizedFeedbackTimeline,
   } as LessonRecord;
   const representativeFeedbackCategory =
@@ -611,6 +623,65 @@ function normalizeLessonRecord(
     ...nextRecord,
     representativeFeedbackCategory,
   };
+}
+
+function hydrateLegacyShotOutcomes(
+  records: LessonRecord[],
+  legacyShotSuccessRecords: Record<string, number>
+): LessonRecord[] {
+  const nextRecords = [...records];
+  const unresolvedByDate = new Map<string, number[]>();
+  const existingSuccessCounts: Record<string, number> = {};
+
+  records.forEach((record, index) => {
+    if (record.mode !== 'shoot') {
+      return;
+    }
+
+    if (record.shotOutcome === 'success') {
+      existingSuccessCounts[record.dateKey] = (existingSuccessCounts[record.dateKey] || 0) + 1;
+      return;
+    }
+
+    if (record.shotOutcome === 'failure') {
+      return;
+    }
+
+    const pending = unresolvedByDate.get(record.dateKey) ?? [];
+    pending.push(index);
+    unresolvedByDate.set(record.dateKey, pending);
+  });
+
+  for (const [dateKey, indices] of unresolvedByDate.entries()) {
+    let remainingSuccesses = Math.max(0, (legacyShotSuccessRecords[dateKey] || 0) - (existingSuccessCounts[dateKey] || 0));
+
+    for (let index = indices.length - 1; index >= 0; index -= 1) {
+      const recordIndex = indices[index];
+      const record = nextRecords[recordIndex];
+
+      nextRecords[recordIndex] = normalizeLessonRecord({
+        ...record,
+        shotOutcome: remainingSuccesses > 0 ? 'success' : 'failure',
+      });
+
+      if (remainingSuccesses > 0) {
+        remainingSuccesses -= 1;
+      }
+    }
+  }
+
+  return nextRecords;
+}
+
+function deriveShotSuccessCounts(records: LessonRecord[]) {
+  return records.reduce<Record<string, number>>((accumulator, record) => {
+    if (record.mode !== 'shoot' || record.shotOutcome !== 'success') {
+      return accumulator;
+    }
+
+    accumulator[record.dateKey] = (accumulator[record.dateKey] || 0) + 1;
+    return accumulator;
+  }, {});
 }
 
 
@@ -1012,7 +1083,6 @@ export function useBasketballCoachApp() {
     () => lessonRecords.filter((record) => record.dateKey === selectedDateKey).slice().reverse(),
     [lessonRecords, selectedDateKey]
   );
-  const selectedDateShotCount = selectedDateKey ? shotSuccessRecords[selectedDateKey] || 0 : 0;
   const shotGraphData = useMemo<ShotGraphDatum[]>(() => {
     const allDateKeys = Array.from(
       new Set([...Object.keys(shotAttemptRecords), ...Object.keys(shotSuccessRecords)])
@@ -1281,11 +1351,13 @@ export function useBasketballCoachApp() {
         const parsedDribbleCounts = parseStoredJson<Record<string, number>>(stored[scopedKeys.dribbleCounts], {});
         const parsedShotAttempts = parseStoredJson<Record<string, number>>(stored[scopedKeys.shotAttempts], {});
         const parsedShotSuccess = parseStoredJson<Record<string, number>>(stored[scopedKeys.shotSuccess], {});
+        const hydratedLessonRecords = hydrateLegacyShotOutcomes(parsedLessonRecords, parsedShotSuccess);
+        const derivedShotSuccess = deriveShotSuccessCounts(hydratedLessonRecords);
         const parsedBallBrand = parseStoredJson<BallBrandOption>(stored[scopedKeys.ballBrand], DEFAULT_BALL_BRAND);
         const parsedBallColors = parseStoredJson<BallColorOption[]>(stored[scopedKeys.ballColors], DEFAULT_BALL_COLORS);
         const parsedPosition = parseStoredJson<PositionOption>(stored[scopedKeys.position], DEFAULT_POSITION);
 
-        const derivedShotAttempts = parsedLessonRecords.reduce<Record<string, number>>((accumulator, record) => {
+        const derivedShotAttempts = hydratedLessonRecords.reduce<Record<string, number>>((accumulator, record) => {
           if (record.mode !== 'shoot') {
             return accumulator;
           }
@@ -1304,9 +1376,9 @@ export function useBasketballCoachApp() {
         setAttendance(parsedAttendance);
         setDailyDribbleRecords(parsedDribbleCounts);
         setHomeworkState(parsedHomework);
-        setLessonRecords(parsedLessonRecords);
+        setLessonRecords(hydratedLessonRecords);
         setShotAttemptRecords(parsedShotAttempts);
-        setShotSuccessRecords(parsedShotSuccess);
+        setShotSuccessRecords(derivedShotSuccess);
         setSelectedBallBrand(parsedBallBrand);
         setSelectedBallColors(
           parsedBallColors.length > 0 ? parsedBallColors : BALL_BRAND_PRESETS[parsedBallBrand] ?? DEFAULT_BALL_COLORS
@@ -2127,31 +2199,68 @@ export function useBasketballCoachApp() {
     []
   );
 
+  const updateShotAttemptCount = useCallback((dateKey: string, delta: number) => {
+    if (delta === 0) {
+      return shotAttemptRecordsRef.current[dateKey] || 0;
+    }
+
+    const currentCount = shotAttemptRecordsRef.current[dateKey] || 0;
+    const nextCount = Math.max(0, currentCount + delta);
+
+    if (nextCount === currentCount) {
+      return currentCount;
+    }
+
+    const nextRecords = { ...shotAttemptRecordsRef.current };
+
+    if (nextCount === 0) {
+      delete nextRecords[dateKey];
+    } else {
+      nextRecords[dateKey] = nextCount;
+    }
+
+    shotAttemptRecordsRef.current = nextRecords;
+    setShotAttemptRecords(nextRecords);
+    return nextCount;
+  }, []);
+
+  const updateShotSuccessCount = useCallback((dateKey: string, delta: number) => {
+    if (delta === 0) {
+      return shotSuccessRecordsRef.current[dateKey] || 0;
+    }
+
+    const currentCount = shotSuccessRecordsRef.current[dateKey] || 0;
+    const nextCount = Math.max(0, currentCount + delta);
+
+    if (nextCount === currentCount) {
+      return currentCount;
+    }
+
+    const nextRecords = { ...shotSuccessRecordsRef.current };
+
+    if (nextCount === 0) {
+      delete nextRecords[dateKey];
+    } else {
+      nextRecords[dateKey] = nextCount;
+    }
+
+    shotSuccessRecordsRef.current = nextRecords;
+    setShotSuccessRecords(nextRecords);
+    return nextCount;
+  }, []);
+
   const recordDailyShootAttempt = useCallback(() => {
     const dateKey = formatDateKey(new Date());
     const previous = shotAttemptRecordsRef.current[dateKey] || 0;
-    const next = previous + 1;
-
-    shotAttemptRecordsRef.current = {
-      ...shotAttemptRecordsRef.current,
-      [dateKey]: next,
-    };
-    setShotAttemptRecords(shotAttemptRecordsRef.current);
+    const next = updateShotAttemptCount(dateKey, 1);
 
     return previous < DAILY_SHOOT_TARGET && next >= DAILY_SHOOT_TARGET;
-  }, []);
+  }, [updateShotAttemptCount]);
 
   const recordSuccessfulShot = useCallback(
     (options?: { preserveFeedback?: boolean; debugMessage?: string; celebrate?: boolean }) => {
       const todayKey = formatDateKey(new Date());
-      const nextCount = (shotSuccessRecordsRef.current[todayKey] || 0) + 1;
-      const nextRecords = {
-        ...shotSuccessRecordsRef.current,
-        [todayKey]: nextCount,
-      };
-
-      shotSuccessRecordsRef.current = nextRecords;
-      setShotSuccessRecords(nextRecords);
+      const nextCount = updateShotSuccessCount(todayKey, 1);
       shootSuccessRecordedForCurrentAttemptRef.current = true;
 
       if (!options?.preserveFeedback) {
@@ -2172,7 +2281,7 @@ export function useBasketballCoachApp() {
 
       return nextCount;
     },
-    [setFeedbackAndRemember]
+    [setFeedbackAndRemember, updateShotSuccessCount]
   );
 
   const saveLessonRecord = useCallback((videoUri: string, reviewClip?: LessonReviewClip | null) => {
@@ -2183,6 +2292,7 @@ export function useBasketballCoachApp() {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       dateKey,
       mode,
+      shotOutcome: mode === 'shoot' ? (shootSuccessRecordedForCurrentAttemptRef.current ? 'success' : 'failure') : undefined,
       feedback: latestFeedbackRef.current,
       feedbackTimeline: [...feedbackTimelineRef.current],
       videoUri,
@@ -3479,32 +3589,27 @@ export function useBasketballCoachApp() {
     recordSuccessfulShot();
   }
 
-  function adjustSelectedDateShotSuccess(delta: number) {
-    if (!selectedDateKey || delta === 0) {
+  function toggleLessonRecordShotOutcome(recordId: string) {
+    const record = lessonRecords.find((item) => item.id === recordId);
+
+    if (!record || record.mode !== 'shoot') {
       return;
     }
 
-    const maxAttempts = shotAttemptRecords[selectedDateKey] || 0;
+    const nextShotOutcome = record.shotOutcome === 'success' ? 'failure' : 'success';
+    const delta = nextShotOutcome === 'success' ? 1 : -1;
 
-    setShotSuccessRecords((current) => {
-      const currentCount = current[selectedDateKey] || 0;
-      const nextCount = Math.max(0, Math.min(maxAttempts, currentCount + delta));
-
-      if (nextCount === currentCount) {
-        return current;
-      }
-
-      if (nextCount === 0) {
-        const next = { ...current };
-        delete next[selectedDateKey];
-        return next;
-      }
-
-      return {
-        ...current,
-        [selectedDateKey]: nextCount,
-      };
-    });
+    setLessonRecords((current) =>
+      current.map((item) =>
+        item.id === recordId
+          ? normalizeLessonRecord({
+              ...item,
+              shotOutcome: nextShotOutcome,
+            })
+          : item
+      )
+    );
+    updateShotSuccessCount(record.dateKey, delta);
   }
 
   async function openSkillVideo() {
@@ -3535,6 +3640,14 @@ export function useBasketballCoachApp() {
       }
     }
 
+    if (record?.mode === 'shoot') {
+      updateShotAttemptCount(record.dateKey, -1);
+
+      if (record.shotOutcome === 'success') {
+        updateShotSuccessCount(record.dateKey, -1);
+      }
+    }
+
     setLessonRecords((current) => current.filter((item) => item.id !== recordId));
   }
 
@@ -3549,7 +3662,6 @@ export function useBasketballCoachApp() {
     currentDate,
     selectedDateKey,
     selectedDateRecords,
-    selectedDateShotCount,
     shotGraphData,
     calendarCells,
     selectedSkillKey,
@@ -3590,7 +3702,7 @@ export function useBasketballCoachApp() {
     endLesson,
     handlePoseMessage,
     registerSuccessfulShot,
-    adjustSelectedDateShotSuccess,
+    toggleLessonRecordShotOutcome,
     selectSkill,
     selectBallBrand,
     toggleBallColor,

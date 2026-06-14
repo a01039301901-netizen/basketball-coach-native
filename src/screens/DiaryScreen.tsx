@@ -13,15 +13,14 @@ interface DiaryScreenProps {
   calendarCells: CalendarCell[];
   selectedDateKey: string;
   selectedDateRecords: LessonRecord[];
-  selectedDateShotCount: number;
   shotGraphData: ShotGraphDatum[];
   onChangeMonth: (delta: number) => void;
   onOpenDate: (dateKey: string) => void;
-  onAdjustShotSuccess: (delta: number) => void;
+  onToggleShotOutcome: (recordId: string) => void;
   onDeleteRecord: (recordId: string) => void;
 }
 
-type RecordFilter = 'all' | 'dribble' | 'shoot';
+type RecordFilter = 'all' | 'dribble' | 'shoot' | 'shootSuccess';
 
 function getRecordTitle(mode: LessonRecord['mode']) {
   return mode === 'shoot' ? '슛 분석' : '드리블 분석';
@@ -31,6 +30,10 @@ function getRecordModeLabel(mode: LessonRecord['mode']) {
   return mode === 'shoot' ? '슛 레슨' : '드리블 레슨';
 }
 
+function getShotOutcomeLabel(shotOutcome: LessonRecord['shotOutcome']) {
+  return shotOutcome === 'success' ? '성공' : '실패';
+}
+
 function getRecordFilterLabel(filter: RecordFilter) {
   if (filter === 'dribble') {
     return '드리블 분석';
@@ -38,6 +41,10 @@ function getRecordFilterLabel(filter: RecordFilter) {
 
   if (filter === 'shoot') {
     return '슛 분석';
+  }
+
+  if (filter === 'shootSuccess') {
+    return '슛 성공';
   }
 
   return '전체';
@@ -80,11 +87,10 @@ export function DiaryScreen({
   calendarCells,
   selectedDateKey,
   selectedDateRecords,
-  selectedDateShotCount,
   shotGraphData,
   onChangeMonth,
   onOpenDate,
-  onAdjustShotSuccess,
+  onToggleShotOutcome,
   onDeleteRecord,
 }: DiaryScreenProps) {
   const { width } = useWindowDimensions();
@@ -127,6 +133,10 @@ export function DiaryScreen({
   const filteredDateRecords = useMemo(() => {
     if (recordFilter === 'all') {
       return selectedDateRecords;
+    }
+
+    if (recordFilter === 'shootSuccess') {
+      return selectedDateRecords.filter((record) => record.mode === 'shoot' && record.shotOutcome === 'success');
     }
 
     return selectedDateRecords.filter((record) => record.mode === recordFilter);
@@ -245,6 +255,7 @@ export function DiaryScreen({
     }
   }
 
+
   return (
     <Card title="기록일지">
       <View style={styles.dateSelectorRow}>
@@ -333,33 +344,10 @@ export function DiaryScreen({
                       </View>
                     </View>
                     <Text style={styles.graphDateLarge}>{selectedShotGraph.dateKey.slice(5)}</Text>
-                    <View style={styles.shotAdjustRow}>
-                      <Text style={styles.graphCount}>슛 성공 기록: {selectedDateShotCount}개</Text>
-                      <View style={styles.shotAdjustControls}>
-                        <Pressable
-                          onPress={() => onAdjustShotSuccess(-1)}
-                          disabled={selectedDateShotCount <= 0}
-                          style={({ pressed }) => [
-                            styles.shotAdjustButton,
-                            selectedDateShotCount <= 0 && styles.shotAdjustButtonDisabled,
-                            pressed && selectedDateShotCount > 0 && styles.pressed,
-                          ]}
-                        >
-                          <Text style={styles.shotAdjustButtonText}>-</Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => onAdjustShotSuccess(1)}
-                          disabled={selectedDateShotCount >= selectedShotGraph.attempts}
-                          style={({ pressed }) => [
-                            styles.shotAdjustButton,
-                            selectedDateShotCount >= selectedShotGraph.attempts && styles.shotAdjustButtonDisabled,
-                            pressed && selectedDateShotCount < selectedShotGraph.attempts && styles.pressed,
-                          ]}
-                        >
-                          <Text style={styles.shotAdjustButtonText}>+</Text>
-                        </Pressable>
-                      </View>
-                    </View>
+                    <Text style={styles.graphCount}>
+                      슛 성공 {selectedShotGraph.successes}개 / 시도 {selectedShotGraph.attempts}개
+                    </Text>
+                    <Text style={styles.graphHelper}>아래 슛 레슨 카드의 성공/실패 표시를 눌러 결과를 바꿀 수 있습니다.</Text>
                   </View>
                 </>
               ) : selectedDateKey ? (
@@ -389,7 +377,7 @@ export function DiaryScreen({
 
               {showRecordFilterMenu ? (
                 <View style={styles.recordFilterMenu}>
-                  {(['all', 'dribble', 'shoot'] as RecordFilter[]).map((filterOption) => (
+                  {(['all', 'dribble', 'shoot', 'shootSuccess'] as RecordFilter[]).map((filterOption) => (
                     <Pressable
                       key={filterOption}
                       onPress={() => {
@@ -428,8 +416,8 @@ export function DiaryScreen({
                     <View style={styles.recordCard}>
                       <Text style={styles.recordText}>
                         {recordFilter === 'all'
-                          ? '이 날짜에 저장된 레슨 영상이 없습니다.'
-                          : `이 날짜에 저장된 ${recordFilter === 'shoot' ? '슛 분석' : '드리블 분석'} 영상이 없습니다.`}
+                          ? '???????????? ??? ???????????.'
+                          : `이 날짜에 저장된 ${getRecordFilterLabel(recordFilter)} 기록이 없습니다.`}
                       </Text>
                     </View>
                   ) : null}
@@ -454,6 +442,22 @@ export function DiaryScreen({
                           >
                             <Text style={styles.recordBadgeText}>{getRecordModeLabel(record.mode)}</Text>
                           </View>
+
+                          {record.mode === 'shoot' ? (
+                            <Pressable
+                              onPress={() => onToggleShotOutcome(record.id)}
+                              style={({ pressed }) => [
+                                styles.shotOutcomeToggle,
+                                record.shotOutcome === 'success'
+                                  ? styles.shotOutcomeToggleSuccess
+                                  : styles.shotOutcomeToggleFailure,
+                                pressed && styles.pressed,
+                              ]}
+                            >
+                              <Text style={styles.shotOutcomeToggleLabel}>슛 결과</Text>
+                              <Text style={styles.shotOutcomeToggleValue}>{getShotOutcomeLabel(record.shotOutcome)}</Text>
+                            </Pressable>
+                          ) : null}
                         </View>
                         <Text style={styles.recordTitle}>{getRecordTitle(record.mode)}</Text>
                         <Text style={styles.recordMeta}>{record.createdAt}</Text>
@@ -491,8 +495,8 @@ export function DiaryScreen({
                   <View style={styles.recordCard}>
                     <Text style={styles.recordText}>
                       {recordFilter === 'all'
-                        ? '이 날짜에 저장된 레슨 영상이 없습니다.'
-                        : `이 날짜에 저장된 ${recordFilter === 'shoot' ? '슛 분석' : '드리블 분석'} 영상이 없습니다.`}
+                        ? '???????????? ??? ???????????.'
+                        : `이 날짜에 저장된 ${getRecordFilterLabel(recordFilter)} 기록이 없습니다.`}
                     </Text>
                   </View>
                 ) : null}
@@ -517,6 +521,22 @@ export function DiaryScreen({
                         >
                           <Text style={styles.recordBadgeText}>{getRecordModeLabel(record.mode)}</Text>
                         </View>
+
+                        {record.mode === 'shoot' ? (
+                          <Pressable
+                            onPress={() => onToggleShotOutcome(record.id)}
+                            style={({ pressed }) => [
+                              styles.shotOutcomeToggle,
+                              record.shotOutcome === 'success'
+                                ? styles.shotOutcomeToggleSuccess
+                                : styles.shotOutcomeToggleFailure,
+                              pressed && styles.pressed,
+                            ]}
+                          >
+                            <Text style={styles.shotOutcomeToggleLabel}>슛 결과</Text>
+                            <Text style={styles.shotOutcomeToggleValue}>{getShotOutcomeLabel(record.shotOutcome)}</Text>
+                          </Pressable>
+                        ) : null}
                       </View>
                       <Text style={styles.recordTitle}>{getRecordTitle(record.mode)}</Text>
                       <Text style={styles.recordMeta}>{record.createdAt}</Text>
@@ -1096,33 +1116,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 4,
   },
-  shotAdjustRow: {
-    marginTop: 6,
-    alignItems: 'center',
-    gap: 10,
-  },
-  shotAdjustControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  shotAdjustButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-  shotAdjustButtonDisabled: {
-    opacity: 0.4,
-  },
-  shotAdjustButtonText: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: '900',
+  graphHelper: {
+    color: colors.textSoft,
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 8,
+    textAlign: 'center',
   },
   graphEmpty: {
     color: colors.textMuted,
@@ -1313,7 +1312,9 @@ const styles = StyleSheet.create({
   },
   recordHeader: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
     marginBottom: 10,
   },
   recordBadge: {
@@ -1333,6 +1334,34 @@ const styles = StyleSheet.create({
   recordBadgeText: {
     color: colors.text,
     fontSize: 12,
+    fontWeight: '900',
+  },
+  shotOutcomeToggle: {
+    minWidth: 86,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shotOutcomeToggleSuccess: {
+    backgroundColor: 'rgba(50,205,50,0.14)',
+    borderColor: 'rgba(50,205,50,0.45)',
+  },
+  shotOutcomeToggleFailure: {
+    backgroundColor: 'rgba(255,99,71,0.14)',
+    borderColor: 'rgba(255,99,71,0.45)',
+  },
+  shotOutcomeToggleLabel: {
+    color: colors.textSoft,
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  shotOutcomeToggleValue: {
+    color: colors.text,
+    fontSize: 14,
     fontWeight: '900',
   },
   recordTitle: {

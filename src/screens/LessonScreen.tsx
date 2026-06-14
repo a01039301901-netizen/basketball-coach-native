@@ -1,6 +1,6 @@
 import { type AVPlaybackStatus, ResizeMode, Video } from 'expo-av';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Animated, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
@@ -144,8 +144,12 @@ function CoachingSection({ title, hidden, onHide, children }: CoachingSectionPro
     <View style={styles.sectionBlock}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionLabel}>{title}</Text>
-        <Pressable onPress={onHide} style={({ pressed }) => [styles.sectionHideButton, pressed && styles.pressed]}>
-          <Text style={styles.sectionHideButtonText}>숨기기</Text>
+        <Pressable
+          accessibilityLabel={`${title} 숨기기`}
+          onPress={onHide}
+          style={({ pressed }) => [styles.sectionHideButton, pressed && styles.pressed]}
+        >
+          <Text style={styles.sectionHideButtonText}>X</Text>
         </Pressable>
       </View>
       {children}
@@ -201,8 +205,6 @@ function RealtimeCoachingPanel({
 
   return (
     <>
-      {!isWideLayout ? <View style={styles.panelGrip} /> : null}
-
       <View style={styles.coachingHero}>
         <View style={styles.coachingHeroTop}>
           <View style={styles.liveBadge}>
@@ -281,6 +283,9 @@ function RealtimeCoachingPanel({
   );
 }
 
+const MOBILE_COACHING_DRAG_LIMIT = 120;
+const MOBILE_COACHING_HIDE_THRESHOLD = 72;
+
 export function LessonScreen({
   lessonMode,
   selectedDribbleView,
@@ -312,8 +317,11 @@ export function LessonScreen({
 }: LessonScreenProps) {
   const { width, height } = useWindowDimensions();
   const isWideLayout = width >= 1080;
+  const isMobileCoachingOverlay = !isWideLayout && Platform.OS !== 'web';
   const floatingCoachingHeight = isWideLayout ? Math.max(420, Math.min(height - 40, 760)) : Math.max(260, Math.min(height * 0.42, 380));
   const floatingCoachingWidth = isWideLayout ? Math.max(320, Math.min(width * 0.32, 420)) : Math.min(width - 24, 420);
+  const coachingDragTranslateY = useRef(new Animated.Value(0)).current;
+  const [isMobileCoachingHidden, setIsMobileCoachingHidden] = useState(false);
 
   const [showDribbleGuide, setShowDribbleGuide] = useState(false);
   const [dribbleGuideStep, setDribbleGuideStep] = useState(0);
@@ -389,6 +397,85 @@ export function LessonScreen({
 
   const dribbleConfirmLabel = dribbleGuideStep === 3 ? '레슨 시작' : '확인';
   const shootConfirmLabel = shootGuideStep === 2 ? '레슨 시작' : '확인';
+
+  const resetMobileCoachingPosition = useMemo(
+    () => () =>
+      Animated.spring(coachingDragTranslateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        speed: 18,
+        bounciness: 5,
+      }).start(),
+    [coachingDragTranslateY]
+  );
+
+  const hideMobileCoachingPanel = useMemo(
+    () => () =>
+      Animated.timing(coachingDragTranslateY, {
+        toValue: MOBILE_COACHING_DRAG_LIMIT,
+        duration: 180,
+        useNativeDriver: true,
+      }).start(() => {
+        setIsMobileCoachingHidden(true);
+        coachingDragTranslateY.setValue(0);
+      }),
+    [coachingDragTranslateY]
+  );
+
+  const showMobileCoachingPanel = useMemo(
+    () => () => {
+      setIsMobileCoachingHidden(false);
+      coachingDragTranslateY.setValue(MOBILE_COACHING_HIDE_THRESHOLD);
+      requestAnimationFrame(() => {
+        Animated.spring(coachingDragTranslateY, {
+          toValue: 0,
+          useNativeDriver: true,
+          speed: 16,
+          bounciness: 6,
+        }).start();
+      });
+    },
+    [coachingDragTranslateY]
+  );
+
+  const coachingDragResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+          isMobileCoachingOverlay &&
+          !isMobileCoachingHidden &&
+          gestureState.dy > 8 &&
+          Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onPanResponderMove: (_, gestureState) => {
+          coachingDragTranslateY.setValue(Math.max(0, Math.min(gestureState.dy, MOBILE_COACHING_DRAG_LIMIT)));
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.dy >= MOBILE_COACHING_HIDE_THRESHOLD || gestureState.vy >= 0.9) {
+            hideMobileCoachingPanel();
+            return;
+          }
+
+          resetMobileCoachingPosition();
+        },
+        onPanResponderTerminate: () => {
+          resetMobileCoachingPosition();
+        },
+      }),
+    [
+      coachingDragTranslateY,
+      hideMobileCoachingPanel,
+      isMobileCoachingHidden,
+      isMobileCoachingOverlay,
+      resetMobileCoachingPosition,
+    ]
+  );
+
+  useEffect(() => {
+    if (!isMobileCoachingOverlay) {
+      setIsMobileCoachingHidden(false);
+      coachingDragTranslateY.setValue(0);
+    }
+  }, [coachingDragTranslateY, isMobileCoachingOverlay]);
 
   return (
     <View style={styles.screenRoot}>
@@ -471,32 +558,47 @@ export function LessonScreen({
       </ScrollView>
 
       <View pointerEvents="box-none" style={styles.coachingOverlay}>
-        <View
-          style={[
-            styles.sideCard,
-            styles.sideCardFloating,
-            isWideLayout
-              ? { top: 0, right: 0, width: floatingCoachingWidth, maxHeight: floatingCoachingHeight }
-              : {
-                  left: 12,
-                  right: 12,
-                  bottom: 12,
-                  maxHeight: floatingCoachingHeight,
-                },
-          ]}
-        >
-          <ScrollView contentContainerStyle={styles.sideCardContent} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-            <RealtimeCoachingPanel
-              lessonMode={lessonMode}
-              debugText={debugText}
-              currentDribbleCount={currentDribbleCount}
-              feedbackText={feedbackText}
-              lessonReview={lessonReview}
-              cameraError={cameraError}
-              isWideLayout={isWideLayout}
-            />
-          </ScrollView>
-        </View>
+        {isMobileCoachingOverlay && isMobileCoachingHidden ? (
+          <View style={styles.coachingRestoreWrap}>
+            <Pressable onPress={showMobileCoachingPanel} style={({ pressed }) => [styles.coachingRestoreChip, pressed && styles.pressed]}>
+              <Text style={styles.coachingRestoreChipText}>실시간 코칭 열기</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Animated.View
+            style={[
+              styles.sideCard,
+              styles.sideCardFloating,
+              isWideLayout
+                ? { top: 0, right: 0, width: floatingCoachingWidth, maxHeight: floatingCoachingHeight }
+                : {
+                    left: 12,
+                    right: 12,
+                    bottom: 12,
+                    maxHeight: floatingCoachingHeight,
+                    transform: [{ translateY: coachingDragTranslateY }],
+                  },
+            ]}
+          >
+            {!isWideLayout ? (
+              <View {...coachingDragResponder.panHandlers} style={styles.panelDragHandle}>
+                <View style={styles.panelGrip} />
+                <Text style={styles.panelDragHint}>아래로 밀어 숨기기</Text>
+              </View>
+            ) : null}
+            <ScrollView contentContainerStyle={styles.sideCardContent} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+              <RealtimeCoachingPanel
+                lessonMode={lessonMode}
+                debugText={debugText}
+                currentDribbleCount={currentDribbleCount}
+                feedbackText={feedbackText}
+                lessonReview={lessonReview}
+                cameraError={cameraError}
+                isWideLayout={isWideLayout}
+              />
+            </ScrollView>
+          </Animated.View>
+        )}
       </View>
 
       <Modal visible={showDribbleGuide} transparent animationType="fade" onRequestClose={closeDribbleGuide}>
@@ -735,13 +837,48 @@ const styles = StyleSheet.create({
   coachingOverlay: {
     ...StyleSheet.absoluteFillObject,
   },
+  coachingRestoreWrap: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 12,
+    alignItems: 'center',
+  },
+  coachingRestoreChip: {
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(22, 15, 11, 0.96)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 216, 168, 0.18)',
+    shadowColor: '#000',
+    shadowOpacity: 0.26,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 10,
+  },
+  coachingRestoreChipText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  panelDragHandle: {
+    alignItems: 'center',
+    paddingTop: 2,
+    paddingBottom: 10,
+  },
   panelGrip: {
     alignSelf: 'center',
     width: 52,
     height: 5,
     borderRadius: 999,
     backgroundColor: 'rgba(255,255,255,0.22)',
-    marginBottom: 14,
+    marginBottom: 8,
+  },
+  panelDragHint: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '800',
   },
   coachingHero: {
     marginBottom: 18,
