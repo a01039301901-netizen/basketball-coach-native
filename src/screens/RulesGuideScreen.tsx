@@ -44,19 +44,19 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   heroCard: {
-    backgroundColor: 'rgba(255,139,43,0.12)',
-    borderColor: 'rgba(255,159,28,0.24)',
+    backgroundColor: colors.surfaceStrong,
+    borderColor: colors.border,
   },
   heroText: {
     color: colors.textSoft,
     fontSize: 15,
-    lineHeight: 24,
+    lineHeight: 22,
   },
   sectionCard: {
     gap: 10,
   },
   lineList: {
-    gap: 10,
+    gap: 8,
   },
   lineRow: {
     flexDirection: 'row',
@@ -64,8 +64,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   bullet: {
-    width: 9,
-    height: 9,
+    width: 7,
+    height: 7,
     borderRadius: 999,
     marginTop: 7,
     backgroundColor: colors.secondary,
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.textSoft,
     fontSize: 15,
-    lineHeight: 24,
+    lineHeight: 22,
   },
   sourceText: {
     marginTop: 12,
@@ -86,20 +86,20 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   memoryList: {
-    gap: 12,
+    gap: 10,
   },
   memoryItem: {
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.22)',
+    borderRadius: 14,
+    backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderColor: colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   memoryText: {
     color: colors.text,
     fontSize: 15,
-    lineHeight: 23,
+    lineHeight: 21,
     fontWeight: '700',
   },
 });

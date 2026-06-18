@@ -13,6 +13,7 @@ interface DiaryScreenProps {
   calendarCells: CalendarCell[];
   selectedDateKey: string;
   selectedDateRecords: LessonRecord[];
+  selectedDateDribbleCount: number;
   shotGraphData: ShotGraphDatum[];
   onChangeMonth: (delta: number) => void;
   onOpenDate: (dateKey: string) => void;
@@ -87,6 +88,7 @@ export function DiaryScreen({
   calendarCells,
   selectedDateKey,
   selectedDateRecords,
+  selectedDateDribbleCount,
   shotGraphData,
   onChangeMonth,
   onOpenDate,
@@ -347,7 +349,7 @@ export function DiaryScreen({
                     <Text style={styles.graphCount}>
                       슛 성공 {selectedShotGraph.successes}개 / 시도 {selectedShotGraph.attempts}개
                     </Text>
-                    <Text style={styles.graphHelper}>아래 슛 레슨 카드의 성공/실패 표시를 눌러 결과를 바꿀 수 있습니다.</Text>
+                    <Text style={styles.graphHelper}>해당 날짜 드리블 횟수: {selectedDateDribbleCount}회</Text>
                   </View>
                 </>
               ) : selectedDateKey ? (
@@ -741,8 +743,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    marginBottom: 18,
+    gap: 10,
+    marginBottom: 16,
   },
   dateSelectorMain: {
     flexDirection: 'row',
@@ -751,22 +753,22 @@ const styles = StyleSheet.create({
     gap: 10,
     width: 320,
     maxWidth: '100%',
-    borderRadius: 18,
+    borderRadius: 16,
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingVertical: 10,
+    backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.border,
   },
   dateArrowButton: {
-    width: 38,
-    height: 38,
+    width: 34,
+    height: 34,
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.border,
   },
   dateArrowText: {
     color: colors.text,
@@ -776,14 +778,14 @@ const styles = StyleSheet.create({
   dateStatusBadge: {
     borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 7,
-    backgroundColor: 'rgba(255,159,28,0.14)',
+    paddingVertical: 6,
+    backgroundColor: 'rgba(208,145,85,0.16)',
     borderWidth: 1,
-    borderColor: 'rgba(255,159,28,0.35)',
+    borderColor: 'rgba(208,145,85,0.28)',
   },
   dateStatusBadgeDefault: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.surfaceStrong,
+    borderColor: colors.border,
   },
   dateStatusText: {
     color: colors.text,
@@ -920,7 +922,7 @@ const styles = StyleSheet.create({
   },
   recordsSection: {
     marginTop: 4,
-    gap: 14,
+    gap: 12,
   },
   recordsTitle: {
     color: colors.text,
@@ -928,7 +930,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   contentRow: {
-    gap: 16,
+    gap: 14,
   },
   contentRowWide: {
     flexDirection: 'row',
@@ -955,12 +957,12 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   recordFilterDropdown: {
-    borderRadius: 14,
+    borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingVertical: 9,
+    backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.border,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -981,16 +983,12 @@ const styles = StyleSheet.create({
     top: 50,
     left: 0,
     right: 0,
-    borderRadius: 16,
+    borderRadius: 14,
     padding: 6,
-    backgroundColor: '#241a14',
+    backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.border,
     gap: 4,
-    shadowColor: '#000000',
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
   },
   recordFilterMenuItem: {
     borderRadius: 12,
@@ -998,7 +996,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   recordFilterMenuItemActive: {
-    backgroundColor: 'rgba(255,159,28,0.18)',
+    backgroundColor: 'rgba(208,145,85,0.18)',
   },
   recordFilterMenuText: {
     color: colors.textMuted,
@@ -1010,11 +1008,11 @@ const styles = StyleSheet.create({
   },
   recordsPanel: {
     height: 760,
-    borderRadius: 18,
+    borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
+    borderColor: colors.border,
   },
   recordsScroll: {
     flex: 1,
@@ -1024,11 +1022,11 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   graphCard: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 18,
+    backgroundColor: colors.surfaceStrong,
+    borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.border,
     minHeight: 430,
   },
   graphTitle: {
@@ -1067,15 +1065,15 @@ const styles = StyleSheet.create({
   barAreaLarge: {
     width: '100%',
     minHeight: 280,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.18)',
+    borderRadius: 16,
+    backgroundColor: colors.surface,
     paddingHorizontal: 24,
     paddingVertical: 18,
     flexDirection: 'row',
     justifyContent: 'space-evenly',
     alignItems: 'flex-end',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: colors.border,
   },
   barColumn: {
     flex: 1,
@@ -1137,11 +1135,11 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     maxHeight: '88%',
-    borderRadius: 24,
+    borderRadius: 18,
     padding: 20,
-    backgroundColor: '#1a130e',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: colors.border,
   },
   calendarModalCard: {
     maxWidth: 960,
@@ -1164,9 +1162,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.border,
   },
   modalCloseText: {
     color: colors.text,
@@ -1211,10 +1209,10 @@ const styles = StyleSheet.create({
   allGraphArea: {
     height: 320,
     position: 'relative',
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.22)',
+    borderRadius: 16,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.border,
     paddingTop: 14,
     paddingBottom: 34,
   },
@@ -1297,18 +1295,18 @@ const styles = StyleSheet.create({
   },
   recordCard: {
     backgroundColor: colors.surfaceStrong,
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 16,
+    padding: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.border,
   },
   recordCardShoot: {
-    borderColor: 'rgba(255,159,28,0.5)',
-    backgroundColor: 'rgba(255,159,28,0.09)',
+    borderColor: 'rgba(208,145,85,0.28)',
+    backgroundColor: colors.surfaceStrong,
   },
   recordCardDribble: {
-    borderColor: 'rgba(80,180,255,0.45)',
-    backgroundColor: 'rgba(80,180,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.surfaceStrong,
   },
   recordHeader: {
     flexDirection: 'row',
@@ -1388,12 +1386,12 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   liveFeedbackBox: {
-    backgroundColor: 'rgba(0,0,0,0.22)',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.border,
     minHeight: 96,
   },
   liveFeedbackLabel: {
@@ -1408,7 +1406,6 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   pressed: {
-    opacity: 0.88,
-    transform: [{ scale: 0.99 }],
+    opacity: 0.9,
   },
 });

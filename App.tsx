@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Animated, Platform, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SmallButton } from './src/components/common/Buttons';
 import { FireworkBurst } from './src/components/common/FireworkBurst';
 import { Header } from './src/components/common/Header';
@@ -16,14 +16,20 @@ import { colors } from './src/theme/colors';
 
 export default function App() {
   const app = useBasketballCoachApp();
+  const { width } = useWindowDimensions();
   const showBack = Boolean(app.currentUser && app.screen !== 'home');
   const isLessonScreen = app.isReady && app.currentUser && app.screen === 'lesson';
-  const shouldAnimateHeader = Platform.OS !== 'web';
+  const isHomeScreen = app.isReady && app.currentUser && app.screen === 'home';
   const headerVisibility = useRef(new Animated.Value(1)).current;
+  const settingsDrawerProgress = useRef(new Animated.Value(0)).current;
   const headerVisibilityTargetRef = useRef<0 | 1>(1);
   const lastScrollYRef = useRef(0);
   const [headerMeasuredHeight, setHeaderMeasuredHeight] = useState(0);
+  const [isSettingsDrawerVisible, setIsSettingsDrawerVisible] = useState(false);
+  const [shouldRenderSettingsDrawer, setShouldRenderSettingsDrawer] = useState(false);
   const effectiveHeaderHeight = Math.max(headerMeasuredHeight, 96);
+  const settingsDrawerWidth =
+    width >= 960 ? Math.min(width * 0.48, 460) : Math.min(Math.max(width * 0.82, 280), width - 16);
 
   const animateHeader = useCallback(
     (nextValue: 0 | 1) => {
@@ -43,10 +49,6 @@ export default function App() {
 
   const handleScroll = useCallback(
     (event: { nativeEvent: { contentOffset: { y: number } } }) => {
-      if (!shouldAnimateHeader) {
-        return;
-      }
-
       const nextScrollY = Math.max(0, event.nativeEvent.contentOffset.y);
 
       if (nextScrollY <= 4) {
@@ -65,14 +67,49 @@ export default function App() {
 
       lastScrollYRef.current = nextScrollY;
     },
-    [animateHeader, shouldAnimateHeader]
+    [animateHeader]
   );
 
   useEffect(() => {
     lastScrollYRef.current = 0;
     headerVisibilityTargetRef.current = 1;
     headerVisibility.setValue(1);
-  }, [app.currentUser, app.screen, headerVisibility, shouldAnimateHeader]);
+  }, [app.currentUser, app.screen, headerVisibility]);
+
+  useEffect(() => {
+    if (!isHomeScreen) {
+      setIsSettingsDrawerVisible(false);
+    }
+  }, [isHomeScreen]);
+
+  useEffect(() => {
+    if (isSettingsDrawerVisible) {
+      setShouldRenderSettingsDrawer(true);
+      Animated.spring(settingsDrawerProgress, {
+        toValue: 1,
+        useNativeDriver: true,
+        damping: 22,
+        stiffness: 220,
+        mass: 0.9,
+      }).start();
+      return;
+    }
+
+    if (!shouldRenderSettingsDrawer) {
+      settingsDrawerProgress.setValue(0);
+      return;
+    }
+
+    Animated.timing(settingsDrawerProgress, {
+      toValue: 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        setShouldRenderSettingsDrawer(false);
+      }
+    });
+  }, [isSettingsDrawerVisible, settingsDrawerProgress, shouldRenderSettingsDrawer]);
 
   const animatedHeaderHeight = headerVisibility.interpolate({
     inputRange: [0, 1],
@@ -86,15 +123,21 @@ export default function App() {
     inputRange: [0, 1],
     outputRange: [-Math.round(effectiveHeaderHeight * 0.18), 0],
   });
+  const settingsDrawerTranslateX = settingsDrawerProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [settingsDrawerWidth + 24, 0],
+  });
+  const settingsBackdropOpacity = settingsDrawerProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
       <View style={styles.appShell}>
-        <View style={styles.backgroundGlowTop} />
-        <View style={styles.backgroundGlowBottom} />
         <FireworkBurst visible={app.showFireworks} items={app.fireworks} />
-        {!isLessonScreen && shouldAnimateHeader ? (
+        {!isLessonScreen ? (
           <Animated.View
             style={[
               styles.headerAnimatedWrap,
@@ -117,9 +160,6 @@ export default function App() {
               <Header showBack={showBack} onBack={() => void app.navigateTo('home')} />
             </View>
           </Animated.View>
-        ) : null}
-        {!isLessonScreen && !shouldAnimateHeader ? (
-          <Header showBack={showBack} onBack={() => void app.navigateTo('home')} />
         ) : null}
         {isLessonScreen ? (
           <View style={styles.lessonScreenWrap}>
@@ -157,8 +197,8 @@ export default function App() {
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
-            onScroll={shouldAnimateHeader ? handleScroll : undefined}
-            scrollEventThrottle={shouldAnimateHeader ? 16 : undefined}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
           >
           {!app.isReady && (
             <View style={styles.loadingCard}>
@@ -194,7 +234,7 @@ export default function App() {
               onOpenDiary={() => void app.navigateTo('diary')}
               onOpenSkill={() => void app.navigateTo('skill')}
               onOpenRules={() => void app.navigateTo('rules')}
-              onOpenSettings={() => void app.navigateTo('settings')}
+              onOpenSettings={() => setIsSettingsDrawerVisible(true)}
             />
           )}
 
@@ -212,6 +252,7 @@ export default function App() {
               calendarCells={app.calendarCells}
               selectedDateKey={app.selectedDateKey}
               selectedDateRecords={app.selectedDateRecords}
+              selectedDateDribbleCount={app.selectedDateDribbleCount}
               shotGraphData={app.shotGraphData}
               onChangeMonth={app.changeMonth}
               onOpenDate={app.openDiaryDate}
@@ -239,6 +280,57 @@ export default function App() {
           {app.isReady && app.currentUser && app.screen === 'rules' && <RulesGuideScreen />}
           </ScrollView>
         )}
+        {shouldRenderSettingsDrawer && isHomeScreen ? (
+          <View pointerEvents="box-none" style={styles.settingsOverlay}>
+            <Pressable
+              onPress={() => setIsSettingsDrawerVisible(false)}
+              style={styles.settingsBackdropPressable}
+            >
+              <Animated.View style={[styles.settingsBackdrop, { opacity: settingsBackdropOpacity }]} />
+            </Pressable>
+            <Animated.View
+              style={[
+                styles.settingsDrawer,
+                {
+                  width: settingsDrawerWidth,
+                  transform: [{ translateX: settingsDrawerTranslateX }],
+                },
+              ]}
+            >
+              <View style={styles.settingsDrawerHeader}>
+                <Text style={styles.settingsDrawerTitle}>⚙️ 설정</Text>
+                <Pressable
+                  onPress={() => setIsSettingsDrawerVisible(false)}
+                  style={({ pressed }) => [styles.settingsDrawerCloseButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.settingsDrawerCloseText}>닫기</Text>
+                </Pressable>
+              </View>
+              <ScrollView
+                style={styles.settingsDrawerScroll}
+                contentContainerStyle={styles.settingsDrawerContent}
+                showsVerticalScrollIndicator={false}
+              >
+                <SettingsScreen
+                  currentUser={app.currentUser!}
+                  selectedBallBrand={app.selectedBallBrand}
+                  selectedBallColors={app.selectedBallColors}
+                  selectedPosition={app.selectedPosition}
+                  homeworkTestState={app.homeworkTestState}
+                  onSelectBallBrand={app.selectBallBrand}
+                  onToggleBallColor={app.toggleBallColor}
+                  onSelectPosition={app.selectPosition}
+                  onApplyHomeworkTestState={app.applyHomeworkTestState}
+                  onLogout={() => {
+                    setIsSettingsDrawerVisible(false);
+                    void app.logout();
+                  }}
+                  onCreateTransferCode={app.createTransferCode}
+                />
+              </ScrollView>
+            </Animated.View>
+          </View>
+        ) : null}
       </View>
     </SafeAreaView>
   );
@@ -252,31 +344,13 @@ const styles = StyleSheet.create({
   appShell: {
     flex: 1,
     backgroundColor: colors.background,
-    paddingHorizontal: 18,
-    paddingTop: 14,
+    paddingHorizontal: 16,
+    paddingTop: 12,
     position: 'relative',
-  },
-  backgroundGlowTop: {
-    position: 'absolute',
-    top: -120,
-    right: -50,
-    width: 260,
-    height: 260,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,145,77,0.18)',
-  },
-  backgroundGlowBottom: {
-    position: 'absolute',
-    bottom: 40,
-    left: -60,
-    width: 220,
-    height: 220,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,204,102,0.08)',
   },
   scrollContent: {
     paddingBottom: 32,
-    gap: 18,
+    gap: 16,
   },
   lessonScreenWrap: {
     flex: 1,
@@ -286,32 +360,95 @@ const styles = StyleSheet.create({
   headerAnimatedWrap: {
     overflow: 'hidden',
   },
-  loadingCard: {
-    borderRadius: 24,
-    padding: 24,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+  settingsOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 30,
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+  },
+  settingsBackdropPressable: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  settingsBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  settingsDrawer: {
+    height: '100%',
+    backgroundColor: colors.background,
+    borderLeftWidth: 1,
+    borderLeftColor: colors.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.26,
+    shadowRadius: 18,
+    shadowOffset: { width: -6, height: 0 },
+    elevation: 18,
+  },
+  settingsDrawerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  settingsDrawerTitle: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  settingsDrawerCloseButton: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: colors.border,
+  },
+  settingsDrawerCloseText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  settingsDrawerScroll: {
+    flex: 1,
+  },
+  settingsDrawerContent: {
+    padding: 18,
+    paddingBottom: 28,
+  },
+  loadingCard: {
+    borderRadius: 18,
+    padding: 20,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   loadingTitle: {
     color: colors.text,
-    fontSize: 24,
-    fontWeight: '900',
-    marginBottom: 10,
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 8,
   },
   loadingText: {
     color: colors.textMuted,
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 21,
   },
   loadingHint: {
     color: colors.textAccent,
     fontSize: 13,
-    lineHeight: 19,
-    marginTop: 14,
+    lineHeight: 18,
+    marginTop: 12,
   },
   loadingActionRow: {
-    marginTop: 16,
+    marginTop: 14,
     alignSelf: 'flex-start',
+  },
+  pressed: {
+    opacity: 0.9,
   },
 });

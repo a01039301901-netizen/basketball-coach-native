@@ -19,16 +19,16 @@ export function Card({ title, children, style }: CardProps) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 26,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: 22,
+    padding: 18,
     overflow: 'hidden',
   },
   title: {
     color: colors.textSoft,
-    fontSize: 24,
-    fontWeight: '900',
-    marginBottom: 12,
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 10,
   },
 });

@@ -817,7 +817,7 @@ function isDribbleStanceReady(analysis: DribbleAnalysis) {
 
 function isDribbleStanceReadyForView(analysis: DribbleAnalysis, expectedView: DribbleLessonView) {
   if (expectedView === 'front') {
-    return analysis.bodyFacing === 'front' && analysis.stanceState === 'ready';
+    return analysis.frontStanceAngle !== null && analysis.frontStanceAngle >= 140 && analysis.frontStanceAngle <= 170;
   }
 
   if (analysis.bodyFacing !== 'side') {
@@ -868,24 +868,20 @@ function buildDribbleStanceFeedbackV2(analysis: DribbleAnalysis) {
 }
 
 function buildDribbleStanceFeedbackV3(analysis: DribbleAnalysis) {
-  if (analysis.bodyFacing === 'front') {
-    const stanceLine =
-      analysis.stanceState === 'ready'
-        ? `발-무릎-엉덩이 각도 ${analysis.frontStanceAngle ? analysis.frontStanceAngle.toFixed(1) : '--'}도로 준비 자세가 잘 잡혔습니다.`
-        : `발-무릎-엉덩이 각도가 ${analysis.frontStanceAngle ? analysis.frontStanceAngle.toFixed(1) : '--'}도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.`;
-
-    return `정면 드리블 준비 자세\n1. 자세를 낮춰 발-무릎-엉덩이 각도를 140~170도로 맞춰 주세요.\n2. 이 자세를 3초 동안 유지하면 드리블을 시작하라고 알려드립니다.\n3. ${stanceLine}`;
+  if (analysis.frontStanceAngle === null) {
+    return '정면 드리블 준비 자세\n1. 발, 무릎, 엉덩이가 함께 보이도록 서 주세요.\n2. 발-무릎-엉덩이 각도를 140~170도로 맞추면 3초 카운트를 시작합니다.\n3. 하체가 잘 보이도록 자세를 다시 맞춰 주세요.';
   }
 
-  return buildDribbleStanceFeedbackV2(analysis);
+  const stanceLine =
+    analysis.frontStanceAngle >= 140 && analysis.frontStanceAngle <= 170
+      ? `발-무릎-엉덩이 각도 ${analysis.frontStanceAngle.toFixed(1)}도로 준비 자세가 잘 잡혔습니다.`
+      : `발-무릎-엉덩이 각도가 ${analysis.frontStanceAngle.toFixed(1)}도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.`;
+
+  return `정면 드리블 준비 자세\n1. 자세를 낮춰 발-무릎-엉덩이 각도를 140~170도로 맞춰 주세요.\n2. 이 자세를 3초 동안 유지하면 드리블을 시작하라고 알려드립니다.\n3. ${stanceLine}`;
 }
 
 function buildDribbleStanceFeedbackForView(analysis: DribbleAnalysis, expectedView: DribbleLessonView) {
   if (expectedView === 'front') {
-    if (analysis.bodyFacing === 'side') {
-      return '정면 드리블 준비 자세\n1. 카메라를 정면으로 바라보게 서 주세요.\n2. 발, 무릎, 엉덩이가 함께 잘 보이도록 맞춰 주세요.\n3. 정면이 확인되면 3초 카운트 뒤 드리블을 시작합니다.';
-    }
-
     return buildDribbleStanceFeedbackV3(analysis);
   }
 
@@ -1083,6 +1079,7 @@ export function useBasketballCoachApp() {
     () => lessonRecords.filter((record) => record.dateKey === selectedDateKey).slice().reverse(),
     [lessonRecords, selectedDateKey]
   );
+  const selectedDateDribbleCount = selectedDateKey ? dailyDribbleRecords[selectedDateKey] || 0 : 0;
   const shotGraphData = useMemo<ShotGraphDatum[]>(() => {
     const allDateKeys = Array.from(
       new Set([...Object.keys(shotAttemptRecords), ...Object.keys(shotSuccessRecords)])
@@ -3662,6 +3659,7 @@ export function useBasketballCoachApp() {
     currentDate,
     selectedDateKey,
     selectedDateRecords,
+    selectedDateDribbleCount,
     shotGraphData,
     calendarCells,
     selectedSkillKey,

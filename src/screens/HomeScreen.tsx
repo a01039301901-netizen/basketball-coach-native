@@ -1,7 +1,11 @@
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SmallButton } from '../components/common/Buttons';
 import { colors } from '../theme/colors';
 import type { HomeworkProgressItem } from '../types/app';
+
+type HomeMenuArtworkType = 'lesson' | 'diary' | 'skill';
+const lessonPlayerSilhouette = require('../../assets/lesson-player-silhouette.png');
+const diaryCalendarArt = require('../../assets/diary-calendar-art.png');
 
 interface HomeScreenProps {
   homeworkToShow: HomeworkProgressItem[];
@@ -15,18 +19,93 @@ interface HomeScreenProps {
 }
 
 interface HomeMenuButtonProps {
+  accentColor: string;
+  accentSoft: string;
+  artworkType: HomeMenuArtworkType;
+  label: string;
   title: string;
   subtitle: string;
   onPress: () => void;
+  isWide: boolean;
 }
 
-function HomeMenuButton({ title, subtitle, onPress }: HomeMenuButtonProps) {
+function HomeMenuArtwork({ type }: { type: HomeMenuArtworkType }) {
+  if (type === 'lesson') {
+    return (
+      <View pointerEvents="none" style={styles.lessonArtwork}>
+        <View style={styles.lessonArtworkGlow} />
+        <Image source={lessonPlayerSilhouette} resizeMode="contain" style={styles.lessonArtworkImage} />
+      </View>
+    );
+  }
+
+  if (type === 'diary') {
+    return (
+      <View pointerEvents="none" style={styles.diaryArtwork}>
+        <View style={styles.diaryArtworkBackdrop} />
+        <View style={styles.diaryArtworkGlow} />
+        <Image source={diaryCalendarArt} resizeMode="contain" style={styles.diaryArtworkImage} />
+      </View>
+    );
+  }
+
+  return null;
+}
+
+function HomeMenuButton({
+  accentColor,
+  accentSoft,
+  artworkType,
+  label,
+  title,
+  subtitle,
+  onPress,
+  isWide,
+}: HomeMenuButtonProps) {
+  const hasArtwork = artworkType !== 'skill';
+  const isDiaryArtwork = artworkType === 'diary';
+
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.mainButtonWrap, pressed && styles.pressed]}>
-      <View style={styles.mainButton}>
-        <View style={styles.mainButtonHighlight} />
-        <Text style={styles.mainButtonTitle}>{title}</Text>
-        <Text style={styles.mainButtonSubtitle}>{subtitle}</Text>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.mainButtonWrap, isWide && styles.mainButtonWrapWide, pressed && styles.pressed]}
+    >
+      <View
+        style={[
+          styles.mainButton,
+          isWide && styles.mainButtonWide,
+          hasArtwork && styles.mainButtonWithArtwork,
+          isDiaryArtwork && styles.mainButtonDiary,
+        ]}
+      >
+        <HomeMenuArtwork type={artworkType} />
+        <View style={[styles.mainButtonContent, isDiaryArtwork && styles.mainButtonContentDiary]}>
+          <View style={[styles.mainButtonTop, isDiaryArtwork && styles.mainButtonTopDiary]}>
+            <View style={[styles.mainButtonIcon, { backgroundColor: accentSoft }]}>
+              <View style={[styles.mainButtonIconDot, { backgroundColor: accentColor }]} />
+            </View>
+            <Text style={styles.mainButtonLabel}>{label}</Text>
+          </View>
+
+          <Text
+            style={[
+              styles.mainButtonTitle,
+              hasArtwork && styles.mainButtonTitleWithArtwork,
+              isDiaryArtwork && styles.mainButtonTitleDiary,
+            ]}
+          >
+            {title}
+          </Text>
+          <Text
+            style={[
+              styles.mainButtonSubtitle,
+              hasArtwork && styles.mainButtonSubtitleWithArtwork,
+              isDiaryArtwork && styles.mainButtonSubtitleDiary,
+            ]}
+          >
+            {subtitle}
+          </Text>
+        </View>
       </View>
     </Pressable>
   );
@@ -45,39 +124,101 @@ export function HomeScreen({
   const { width } = useWindowDimensions();
   const isWide = width >= 860;
 
+  const menuButtons = [
+    {
+      key: 'lesson',
+      accentColor: '#f7923a',
+      accentSoft: '#ffe0bf',
+      artworkType: 'lesson' as const,
+      label: '실시간 분석',
+      title: 'AI에게 레슨 받기',
+      subtitle: '카메라로 동작을 분석하고 실시간 코칭을 받을 수 있어요.',
+      onPress: onOpenLesson,
+    },
+    {
+      key: 'diary',
+      accentColor: '#7ab5ff',
+      accentSoft: '#dcecff',
+      artworkType: 'diary' as const,
+      label: '기록 확인',
+      title: '기록일지',
+      subtitle: '출석, 연습 기록, 저장한 레슨 영상을 날짜별로 확인할 수 있어요.',
+      onPress: onOpenDiary,
+    },
+    {
+      key: 'skill',
+      accentColor: '#90c95c',
+      accentSoft: '#e4f3cf',
+      artworkType: 'skill' as const,
+      label: '동작 학습',
+      title: '프로 레슨 배우기',
+      subtitle: '원하는 기술과 선수 영상을 보고 오늘 연습할 동작을 고를 수 있어요.',
+      onPress: onOpenSkill,
+    },
+  ];
+
   return (
-    <View style={[styles.layout, isWide && styles.layoutWide]}>
-      <View style={[styles.panel, styles.menuCard, isWide && styles.menuCardWide]}>
-        <View style={styles.panelGlow} />
-        <Text style={styles.panelTitle}>기능 선택</Text>
-        <Text style={styles.panelDescription}>원하는 기능을 선택해서 농구 연습을 시작해보세요.</Text>
+    <View style={styles.layout}>
+      <View style={styles.heroCard}>
+        <View style={styles.heroTextWrap}>
+          <Text style={styles.heroTitle}>오늘 어떤 연습을 시작할까요?</Text>
+          <Text style={styles.heroSubtitle}>필요한 기능을 바로 고를 수 있도록 메뉴를 간단하고 밝게 정리했습니다.</Text>
+        </View>
 
         <Pressable onPress={onOpenSettings} style={({ pressed }) => [styles.settingsButton, pressed && styles.pressed]}>
-          <Text style={styles.settingsButtonText}>설정</Text>
+          <Text style={styles.settingsButtonText}>⚙️</Text>
         </Pressable>
-
-        <View style={styles.menuButtons}>
-          <HomeMenuButton
-            title="AI에게 레슨 받기"
-            subtitle="카메라로 실시간 자세와 공 움직임을 분석하면서 코칭 피드백을 받아보세요."
-            onPress={onOpenLesson}
-          />
-          <HomeMenuButton
-            title="기록일지"
-            subtitle="날짜별 출석, 슛 기록, 저장한 레슨 영상을 한눈에 확인할 수 있어요."
-            onPress={onOpenDiary}
-          />
-          <HomeMenuButton
-            title="프로 기술 배우기"
-            subtitle="배우고 싶은 농구 기술과 선수 영상을 보고 오늘의 연습 동작을 골라보세요."
-            onPress={onOpenSkill}
-          />
-        </View>
       </View>
 
-      <View style={[styles.panel, styles.homeworkCard, isWide && styles.homeworkCardWide]}>
-        <View style={styles.sideAccent} />
-        <Text style={styles.panelTitle}>오늘의 연습 숙제</Text>
+      {isWide ? (
+        <View style={styles.menuButtonsRow}>
+          {menuButtons.map((button) => (
+            <HomeMenuButton
+              key={button.key}
+              accentColor={button.accentColor}
+              accentSoft={button.accentSoft}
+              artworkType={button.artworkType}
+              label={button.label}
+              title={button.title}
+              subtitle={button.subtitle}
+              onPress={button.onPress}
+              isWide={isWide}
+            />
+          ))}
+        </View>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.menuButtonsScrollContent}
+          style={styles.menuButtonsScroll}
+        >
+          {menuButtons.map((button) => (
+            <HomeMenuButton
+              key={button.key}
+              accentColor={button.accentColor}
+              accentSoft={button.accentSoft}
+              artworkType={button.artworkType}
+              label={button.label}
+              title={button.title}
+              subtitle={button.subtitle}
+              onPress={button.onPress}
+              isWide={isWide}
+            />
+          ))}
+        </ScrollView>
+      )}
+
+      <View style={styles.homeworkCard}>
+        <View style={styles.homeworkTopRow}>
+          <View>
+            <Text style={styles.homeworkTitle}>오늘의 연습 숙제</Text>
+            <Text style={styles.homeworkDescription}>오늘 날짜 기준으로 숙제 진행도를 확인할 수 있어요.</Text>
+          </View>
+          <View style={styles.homeworkBadge}>
+            <Text style={styles.homeworkBadgeText}>Daily</Text>
+          </View>
+        </View>
 
         {isHomeworkVisible ? (
           <View style={styles.homeworkList}>
@@ -100,7 +241,9 @@ export function HomeScreen({
         ) : (
           <View style={styles.homeworkHiddenCard}>
             <Text style={styles.homeworkHiddenTitle}>오늘의 숙제 확인하기</Text>
-            <Text style={styles.homeworkHiddenText}>버튼을 누르면 오늘 해야 할 숙제 내용과 진행도가 나타나고, 앱 안에서는 계속 보입니다.</Text>
+            <Text style={styles.homeworkHiddenText}>
+              버튼을 누르면 오늘 해야 할 숙제 내용과 진행도가 나타나고, 앱 안에서는 계속 보입니다.
+            </Text>
             <Pressable onPress={onRevealHomework} style={({ pressed }) => [styles.homeworkRevealButton, pressed && styles.pressed]}>
               <Text style={styles.homeworkRevealButtonText}>오늘의 숙제 확인하기</Text>
             </Pressable>
@@ -114,7 +257,7 @@ export function HomeScreen({
         <View style={styles.homeTipBox}>
           <Text style={styles.tipTitle}>연습 팁</Text>
           <Text style={styles.tipText}>
-            숙제는 오늘 날짜 기준으로 단계별로 바뀝니다. 기본 숙제를 끝내면 포지션별 다음 숙제가 뜨고, 정면 드리블에서 좌우 차이가 크면 보정 숙제가 추가됩니다.
+            기본 숙제를 끝내면 다음 숙제가 열리고, 드리블 균형 차이가 보이면 보정 숙제가 추가됩니다.
           </Text>
         </View>
       </View>
@@ -124,169 +267,245 @@ export function HomeScreen({
 
 const styles = StyleSheet.create({
   layout: {
-    gap: 18,
+    gap: 16,
   },
-  layoutWide: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-  },
-  panel: {
-    position: 'relative',
-    overflow: 'hidden',
+  heroCard: {
+    backgroundColor: colors.surface,
     borderRadius: 24,
-    padding: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderColor: colors.border,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 16,
   },
-  menuCard: {
-    minHeight: 520,
+  heroTextWrap: {
+    flex: 1,
   },
-  menuCardWide: {
-    flex: 1.3,
-  },
-  homeworkCard: {
-    minHeight: 360,
-  },
-  homeworkCardWide: {
-    flex: 0.9,
-  },
-  panelGlow: {
-    position: 'absolute',
-    top: -30,
-    right: -20,
-    width: 180,
-    height: 180,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,179,71,0.14)',
-  },
-  sideAccent: {
-    position: 'absolute',
-    top: 22,
-    right: 20,
-    width: 74,
-    height: 74,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,159,28,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  panelTitle: {
-    color: colors.textSoft,
-    fontSize: 26,
-    fontWeight: '900',
+  heroTitle: {
+    color: colors.text,
+    fontSize: 24,
+    fontWeight: '800',
     marginBottom: 8,
   },
-  panelDescription: {
+  heroSubtitle: {
     color: colors.textMuted,
-    fontSize: 15,
-    lineHeight: 23,
+    fontSize: 14,
+    lineHeight: 20,
   },
   settingsButton: {
-    alignSelf: 'flex-end',
-    marginTop: 14,
+    alignSelf: 'flex-start',
+    width: 44,
+    height: 44,
     borderRadius: 999,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    backgroundColor: 'rgba(0,0,0,0.28)',
+    backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   settingsButtonText: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 0.4,
+    fontSize: 20,
   },
-  menuButtons: {
-    gap: 18,
-    marginTop: 20,
+  menuButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 12,
+  },
+  menuButtonsScroll: {
+    marginHorizontal: -2,
+  },
+  menuButtonsScrollContent: {
+    gap: 12,
+    paddingHorizontal: 2,
+    paddingRight: 8,
   },
   mainButtonWrap: {
-    borderRadius: 22,
+    width: 232,
+    borderRadius: 24,
+  },
+  mainButtonWrapWide: {
+    flex: 1,
+    width: undefined,
   },
   mainButton: {
-    position: 'relative',
-    minHeight: 130,
-    borderRadius: 22,
-    paddingHorizontal: 24,
-    paddingVertical: 24,
-    justifyContent: 'center',
-    overflow: 'hidden',
-    backgroundColor: colors.primaryStrong,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    shadowColor: '#ff7000',
-    shadowOpacity: 0.28,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 12 },
-  },
-  mainButtonHighlight: {
-    position: 'absolute',
-    top: -18,
-    left: -10,
-    width: '72%',
-    height: '88%',
+    minHeight: 178,
     borderRadius: 24,
-    backgroundColor: 'rgba(255,202,122,0.28)',
+    padding: 18,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  mainButtonWide: {
+    minHeight: 194,
+  },
+  mainButtonWithArtwork: {
+    paddingRight: 22,
+  },
+  mainButtonDiary: {
+    backgroundColor: '#27211d',
+  },
+  mainButtonContent: {
+    position: 'relative',
+    zIndex: 1,
+  },
+  mainButtonContentDiary: {
+    maxWidth: 138,
+  },
+  mainButtonTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 20,
+  },
+  mainButtonTopDiary: {
+    marginBottom: 18,
+  },
+  mainButtonIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mainButtonIconDot: {
+    width: 18,
+    height: 18,
+    borderRadius: 999,
+  },
+  mainButtonLabel: {
+    color: colors.textAccent,
+    fontSize: 12,
+    fontWeight: '700',
   },
   mainButtonTitle: {
     color: colors.text,
-    fontSize: 24,
-    fontWeight: '900',
-    marginBottom: 10,
-  },
-  mainButtonSubtitle: {
-    color: 'rgba(255,255,255,0.92)',
-    fontSize: 14,
-    lineHeight: 21,
-  },
-  homeworkList: {
-    gap: 14,
-    marginTop: 20,
-  },
-  homeworkHiddenCard: {
-    marginTop: 20,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.24)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 18,
-    paddingVertical: 22,
-    alignItems: 'center',
-  },
-  homeworkHiddenTitle: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '900',
+    fontSize: 19,
+    fontWeight: '800',
     marginBottom: 8,
   },
-  homeworkHiddenText: {
+  mainButtonTitleWithArtwork: {
+    maxWidth: 156,
+  },
+  mainButtonTitleDiary: {
+    maxWidth: 132,
+  },
+  mainButtonSubtitle: {
+    color: colors.textSoft,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  mainButtonSubtitleWithArtwork: {
+    maxWidth: 154,
+  },
+  mainButtonSubtitleDiary: {
+    maxWidth: 132,
+  },
+  lessonArtwork: {
+    position: 'absolute',
+    right: -10,
+    bottom: -8,
+    width: 154,
+    height: 154,
+  },
+  lessonArtworkGlow: {
+    position: 'absolute',
+    right: 18,
+    bottom: 16,
+    width: 110,
+    height: 110,
+    borderRadius: 999,
+    backgroundColor: 'rgba(247, 146, 58, 0.16)',
+  },
+  lessonArtworkImage: {
+    position: 'absolute',
+    right: -10,
+    bottom: -2,
+    width: 152,
+    height: 138,
+    opacity: 0.34,
+  },
+  diaryArtwork: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    overflow: 'hidden',
+  },
+  diaryArtworkBackdrop: {
+    position: 'absolute',
+    inset: 0,
+    backgroundColor: 'rgba(122, 181, 255, 0.08)',
+  },
+  diaryArtworkGlow: {
+    position: 'absolute',
+    right: -28,
+    top: -24,
+    width: 168,
+    height: 168,
+    borderRadius: 999,
+    backgroundColor: 'rgba(122, 181, 255, 0.12)',
+  },
+  diaryArtworkImage: {
+    position: 'absolute',
+    right: -34,
+    bottom: -16,
+    width: 236,
+    height: 188,
+    opacity: 0.78,
+  },
+  homeworkCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 20,
+  },
+  homeworkTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  homeworkTitle: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  homeworkDescription: {
     color: colors.textMuted,
     fontSize: 14,
-    lineHeight: 21,
-    textAlign: 'center',
+    lineHeight: 20,
   },
-  homeworkRevealButton: {
-    marginTop: 16,
+  homeworkBadge: {
     borderRadius: 999,
-    backgroundColor: colors.secondary,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    backgroundColor: 'rgba(240, 163, 78, 0.14)',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
-  homeworkRevealButtonText: {
-    color: '#1b130c',
-    fontSize: 14,
-    fontWeight: '900',
+  homeworkBadgeText: {
+    color: colors.textAccent,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  homeworkList: {
+    gap: 12,
+    marginTop: 18,
   },
   homeworkItem: {
-    gap: 12,
-    backgroundColor: 'rgba(255,255,255,0.13)',
-    borderRadius: 16,
-    borderLeftWidth: 5,
-    borderLeftColor: '#ff9f1c',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    gap: 10,
+    backgroundColor: colors.surfaceStrong,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
   },
   homeworkHeader: {
     flexDirection: 'row',
@@ -294,20 +513,20 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   homeworkBullet: {
-    width: 10,
-    height: 10,
+    width: 8,
+    height: 8,
     borderRadius: 999,
-    backgroundColor: '#ffd17d',
+    backgroundColor: '#f09c46',
   },
   homeworkBulletCompleted: {
-    backgroundColor: '#77d970',
+    backgroundColor: '#6eb37c',
   },
   homeworkText: {
     flex: 1,
-    color: colors.textSoft,
+    color: colors.text,
     fontSize: 15,
-    lineHeight: 22,
-    fontWeight: '800',
+    lineHeight: 21,
+    fontWeight: '700',
   },
   homeworkMetaRow: {
     flexDirection: 'row',
@@ -315,50 +534,85 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   homeworkStatus: {
-    color: '#ffe1b5',
+    color: colors.textAccent,
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   homeworkProgress: {
     color: colors.textMuted,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   progressTrack: {
     width: '100%',
-    height: 8,
+    height: 6,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     borderRadius: 999,
-    backgroundColor: '#ffb347',
+    backgroundColor: colors.secondary,
+  },
+  homeworkHiddenCard: {
+    marginTop: 18,
+    borderRadius: 18,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 18,
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  homeworkHiddenTitle: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  homeworkHiddenText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  homeworkRevealButton: {
+    marginTop: 14,
+    borderRadius: 999,
+    backgroundColor: colors.secondary,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  homeworkRevealButtonText: {
+    color: colors.lightButtonText,
+    fontSize: 13,
+    fontWeight: '700',
   },
   rulesButtonWrap: {
-    marginTop: 16,
+    marginTop: 14,
     alignSelf: 'flex-start',
   },
   homeTipBox: {
-    marginTop: 18,
+    marginTop: 16,
     borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.28)',
-    padding: 18,
+    backgroundColor: colors.surfaceStrong,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   tipTitle: {
     color: colors.text,
     fontSize: 16,
-    fontWeight: '900',
-    marginBottom: 8,
+    fontWeight: '800',
+    marginBottom: 6,
   },
   tipText: {
     color: colors.textMuted,
     fontSize: 14,
-    lineHeight: 22,
+    lineHeight: 21,
   },
   pressed: {
-    opacity: 0.9,
-    transform: [{ translateY: -2 }],
+    opacity: 0.92,
   },
 });

@@ -1,6 +1,6 @@
 import { type AVPlaybackStatus, ResizeMode, Video } from 'expo-av';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Animated, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
@@ -317,11 +317,11 @@ export function LessonScreen({
 }: LessonScreenProps) {
   const { width, height } = useWindowDimensions();
   const isWideLayout = width >= 1080;
-  const isMobileCoachingOverlay = !isWideLayout && Platform.OS !== 'web';
+  const isDraggableCoachingOverlay = true;
   const floatingCoachingHeight = isWideLayout ? Math.max(420, Math.min(height - 40, 760)) : Math.max(260, Math.min(height * 0.42, 380));
   const floatingCoachingWidth = isWideLayout ? Math.max(320, Math.min(width * 0.32, 420)) : Math.min(width - 24, 420);
   const coachingDragTranslateY = useRef(new Animated.Value(0)).current;
-  const [isMobileCoachingHidden, setIsMobileCoachingHidden] = useState(false);
+  const [isCoachingHidden, setIsCoachingHidden] = useState(false);
 
   const [showDribbleGuide, setShowDribbleGuide] = useState(false);
   const [dribbleGuideStep, setDribbleGuideStep] = useState(0);
@@ -416,7 +416,7 @@ export function LessonScreen({
         duration: 180,
         useNativeDriver: true,
       }).start(() => {
-        setIsMobileCoachingHidden(true);
+        setIsCoachingHidden(true);
         coachingDragTranslateY.setValue(0);
       }),
     [coachingDragTranslateY]
@@ -424,7 +424,7 @@ export function LessonScreen({
 
   const showMobileCoachingPanel = useMemo(
     () => () => {
-      setIsMobileCoachingHidden(false);
+      setIsCoachingHidden(false);
       coachingDragTranslateY.setValue(MOBILE_COACHING_HIDE_THRESHOLD);
       requestAnimationFrame(() => {
         Animated.spring(coachingDragTranslateY, {
@@ -442,8 +442,8 @@ export function LessonScreen({
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gestureState) =>
-          isMobileCoachingOverlay &&
-          !isMobileCoachingHidden &&
+          isDraggableCoachingOverlay &&
+          !isCoachingHidden &&
           gestureState.dy > 8 &&
           Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
         onPanResponderMove: (_, gestureState) => {
@@ -464,18 +464,18 @@ export function LessonScreen({
     [
       coachingDragTranslateY,
       hideMobileCoachingPanel,
-      isMobileCoachingHidden,
-      isMobileCoachingOverlay,
+      isCoachingHidden,
+      isDraggableCoachingOverlay,
       resetMobileCoachingPosition,
     ]
   );
 
   useEffect(() => {
-    if (!isMobileCoachingOverlay) {
-      setIsMobileCoachingHidden(false);
+    if (!isDraggableCoachingOverlay) {
+      setIsCoachingHidden(false);
       coachingDragTranslateY.setValue(0);
     }
-  }, [coachingDragTranslateY, isMobileCoachingOverlay]);
+  }, [coachingDragTranslateY, isDraggableCoachingOverlay]);
 
   return (
     <View style={styles.screenRoot}>
@@ -558,8 +558,8 @@ export function LessonScreen({
       </ScrollView>
 
       <View pointerEvents="box-none" style={styles.coachingOverlay}>
-        {isMobileCoachingOverlay && isMobileCoachingHidden ? (
-          <View style={styles.coachingRestoreWrap}>
+        {isCoachingHidden ? (
+          <View style={[styles.coachingRestoreWrap, isWideLayout ? styles.coachingRestoreWrapWide : null]}>
             <Pressable onPress={showMobileCoachingPanel} style={({ pressed }) => [styles.coachingRestoreChip, pressed && styles.pressed]}>
               <Text style={styles.coachingRestoreChipText}>실시간 코칭 열기</Text>
             </Pressable>
@@ -570,7 +570,13 @@ export function LessonScreen({
               styles.sideCard,
               styles.sideCardFloating,
               isWideLayout
-                ? { top: 0, right: 0, width: floatingCoachingWidth, maxHeight: floatingCoachingHeight }
+                ? {
+                    top: 0,
+                    right: 0,
+                    width: floatingCoachingWidth,
+                    maxHeight: floatingCoachingHeight,
+                    transform: [{ translateY: coachingDragTranslateY }],
+                  }
                 : {
                     left: 12,
                     right: 12,
@@ -580,7 +586,7 @@ export function LessonScreen({
                   },
             ]}
           >
-            {!isWideLayout ? (
+            {isDraggableCoachingOverlay ? (
               <View {...coachingDragResponder.panHandlers} style={styles.panelDragHandle}>
                 <View style={styles.panelGrip} />
                 <Text style={styles.panelDragHint}>아래로 밀어 숨기기</Text>
@@ -737,11 +743,11 @@ export function LessonScreen({
 }
 
 const sharedPanel = {
-  backgroundColor: 'rgba(255,255,255,0.12)',
+  backgroundColor: colors.surface,
   borderWidth: 1,
-  borderColor: 'rgba(255,255,255,0.18)',
-  borderRadius: 24,
-  padding: 24,
+  borderColor: colors.border,
+  borderRadius: 18,
+  padding: 18,
 } as const;
 
 const styles = StyleSheet.create({
@@ -763,16 +769,11 @@ const styles = StyleSheet.create({
   homeChip: {
     alignSelf: 'flex-start',
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 9,
     borderRadius: 999,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.lightButton,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.72)',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+    borderColor: colors.border,
   },
   homeChipText: {
     color: colors.lightButtonText,
@@ -790,7 +791,7 @@ const styles = StyleSheet.create({
     paddingRight: 12,
   },
   contentGap: {
-    gap: 18,
+    gap: 16,
   },
   heroCard: {
     minHeight: 320,
@@ -798,11 +799,11 @@ const styles = StyleSheet.create({
   leadText: {
     color: colors.textMuted,
     fontSize: 15,
-    lineHeight: 23,
-    marginBottom: 20,
+    lineHeight: 21,
+    marginBottom: 18,
   },
   lessonLayout: {
-    gap: 24,
+    gap: 18,
   },
   lessonLayoutWide: {
     flexDirection: 'row',
@@ -814,19 +815,13 @@ const styles = StyleSheet.create({
   },
   sideCard: {
     ...sharedPanel,
-    backgroundColor: 'rgba(22, 15, 11, 0.96)',
-    borderColor: 'rgba(255, 216, 168, 0.14)',
-    padding: 18,
+    backgroundColor: colors.surfaceStrong,
+    padding: 16,
     overflow: 'hidden',
   },
   sideCardFloating: {
     position: 'absolute',
     zIndex: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.34,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 14 },
-    elevation: 12,
   },
   sideCardSpacer: {
     minHeight: 1,
@@ -844,18 +839,20 @@ const styles = StyleSheet.create({
     bottom: 12,
     alignItems: 'center',
   },
+  coachingRestoreWrapWide: {
+    left: undefined,
+    right: 0,
+    top: 0,
+    bottom: undefined,
+    alignItems: 'flex-end',
+  },
   coachingRestoreChip: {
     borderRadius: 999,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(22, 15, 11, 0.96)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
-    borderColor: 'rgba(255, 216, 168, 0.18)',
-    shadowColor: '#000',
-    shadowOpacity: 0.26,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 10,
+    borderColor: colors.border,
   },
   coachingRestoreChipText: {
     color: colors.text,
@@ -869,10 +866,10 @@ const styles = StyleSheet.create({
   },
   panelGrip: {
     alignSelf: 'center',
-    width: 52,
-    height: 5,
+    width: 48,
+    height: 4,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    backgroundColor: 'rgba(255,255,255,0.18)',
     marginBottom: 8,
   },
   panelDragHint: {
@@ -881,12 +878,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   coachingHero: {
-    marginBottom: 18,
-    padding: 16,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 145, 77, 0.11)',
+    marginBottom: 16,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255, 216, 168, 0.14)',
+    borderColor: colors.border,
   },
   coachingHeroTop: {
     flexDirection: 'row',
@@ -899,12 +896,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: 'rgba(12, 8, 6, 0.34)',
+    backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.border,
   },
   liveDot: {
     width: 8,
@@ -913,18 +910,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.secondary,
   },
   liveBadgeText: {
-    color: '#ffe0bc',
+    color: colors.textAccent,
     fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
   modePill: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.border,
   },
   modePillText: {
     color: colors.textSoft,
@@ -933,22 +930,22 @@ const styles = StyleSheet.create({
   },
   sideTitle: {
     color: colors.textSoft,
-    fontSize: 24,
-    fontWeight: '900',
-    marginBottom: 8,
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 6,
   },
   sideSubtitle: {
     color: colors.textMuted,
     fontSize: 13,
-    lineHeight: 20,
+    lineHeight: 19,
   },
   hiddenSectionWrap: {
-    marginBottom: 16,
-    padding: 14,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    marginBottom: 14,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.border,
   },
   hiddenSectionLabel: {
     color: '#ffe0bc',
@@ -963,12 +960,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   hiddenSectionChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,145,77,0.12)',
+    backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
-    borderColor: 'rgba(255,216,168,0.14)',
+    borderColor: colors.border,
   },
   hiddenSectionChipText: {
     color: colors.textSoft,
@@ -986,18 +983,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sectionLabel: {
-    color: '#ffd8a8',
+    color: colors.textAccent,
     fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
   sectionHideButton: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.border,
   },
   sectionHideButtonText: {
     color: colors.textMuted,
@@ -1008,15 +1005,15 @@ const styles = StyleSheet.create({
     marginTop: 0,
     marginBottom: 14,
     padding: 14,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 14,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: colors.border,
   },
   reviewTitle: {
     color: colors.text,
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '800',
     marginBottom: 10,
   },
   reviewVideo: {
@@ -1033,37 +1030,39 @@ const styles = StyleSheet.create({
   },
   modeButtons: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
+    gap: 10,
+    marginBottom: 14,
   },
   modeButton: {
     flex: 1,
-    borderRadius: 16,
-    paddingVertical: 16,
+    borderRadius: 14,
+    paddingVertical: 14,
     paddingHorizontal: 14,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    borderWidth: 2,
-    borderColor: 'transparent',
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: 'center',
   },
   modeButtonActive: {
-    backgroundColor: colors.secondary,
-    borderColor: '#ffffff',
+    backgroundColor: 'rgba(208,145,85,0.18)',
+    borderColor: 'rgba(208,145,85,0.32)',
   },
   modeButtonDisabled: {
     opacity: 0.5,
   },
   modeButtonText: {
     color: colors.text,
-    fontSize: 17,
-    fontWeight: '900',
+    fontSize: 16,
+    fontWeight: '800',
   },
   modeStatus: {
     marginBottom: 14,
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0, 0, 0, 0.28)',
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   modeStatusText: {
     color: colors.text,
@@ -1074,15 +1073,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
   errorBox: {
     marginBottom: 14,
     padding: 14,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 77, 79, 0.16)',
+    borderRadius: 14,
+    backgroundColor: 'rgba(191, 80, 88, 0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 77, 79, 0.45)',
+    borderColor: 'rgba(191, 80, 88, 0.3)',
   },
   errorText: {
     color: '#ffd5d5',
@@ -1093,10 +1092,10 @@ const styles = StyleSheet.create({
   tipBox: {
     marginTop: 0,
     padding: 16,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.22)',
+    borderRadius: 14,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
+    borderColor: colors.border,
     gap: 8,
   },
   tipTitle: {
@@ -1116,17 +1115,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   modalCard: {
-    borderRadius: 24,
-    backgroundColor: '#1a1511',
+    borderRadius: 18,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    padding: 24,
+    borderColor: colors.border,
+    padding: 20,
   },
   modalTitle: {
     color: colors.text,
-    fontSize: 24,
-    fontWeight: '900',
-    marginBottom: 10,
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 8,
   },
   modalStep: {
     color: '#ffd8a8',
@@ -1137,8 +1136,8 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     color: colors.text,
-    fontSize: 17,
-    lineHeight: 26,
+    fontSize: 16,
+    lineHeight: 24,
     fontWeight: '700',
     marginBottom: 14,
   },
@@ -1150,10 +1149,10 @@ const styles = StyleSheet.create({
   countInput: {
     marginTop: 2,
     marginBottom: 12,
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceStrong,
     color: colors.text,
     fontSize: 22,
     fontWeight: '900',
@@ -1167,15 +1166,15 @@ const styles = StyleSheet.create({
   },
   viewSelectButton: {
     flex: 1,
-    borderRadius: 16,
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: colors.border,
   },
   viewSelectButtonActive: {
-    backgroundColor: 'rgba(255,159,28,0.18)',
+    backgroundColor: 'rgba(208,145,85,0.18)',
     borderColor: colors.secondary,
   },
   viewSelectTitle: {
@@ -1196,10 +1195,12 @@ const styles = StyleSheet.create({
     marginTop: 22,
   },
   modalGhostButton: {
-    borderRadius: 14,
+    borderRadius: 12,
     paddingHorizontal: 18,
     paddingVertical: 12,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   modalGhostButtonText: {
     color: colors.text,
@@ -1207,7 +1208,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   modalPrimaryButton: {
-    borderRadius: 14,
+    borderRadius: 12,
     paddingHorizontal: 18,
     paddingVertical: 12,
     backgroundColor: colors.secondary,
@@ -1221,7 +1222,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   pressed: {
-    opacity: 0.86,
-    transform: [{ scale: 0.99 }],
+    opacity: 0.9,
   },
 });

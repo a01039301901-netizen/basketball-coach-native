@@ -43,34 +43,32 @@ export function SmallButton({ title, onPress, variant = 'orange', disabled = fal
 
 const styles = StyleSheet.create({
   mainButton: {
-    minHeight: 120,
-    borderRadius: 22,
-    padding: 22,
+    minHeight: 108,
+    borderRadius: 16,
+    padding: 18,
     justifyContent: 'center',
     backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   mainButtonTitle: {
     color: colors.text,
-    fontSize: 24,
-    fontWeight: '900',
-    marginBottom: 8,
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 6,
   },
   mainButtonSubtitle: {
-    color: '#fff3ea',
+    color: colors.textSoft,
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 19,
   },
   smallButton: {
-    borderRadius: 14,
+    borderRadius: 12,
     backgroundColor: colors.secondary,
-    paddingHorizontal: 18,
-    paddingVertical: 13,
-    shadowColor: '#ff7a00',
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
+    paddingHorizontal: 16,
+    paddingVertical: 11,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: colors.border,
   },
   redButton: {
     backgroundColor: colors.danger,
@@ -80,14 +78,13 @@ const styles = StyleSheet.create({
   },
   smallButtonText: {
     color: colors.text,
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '700',
   },
   disabled: {
     opacity: 0.45,
   },
   pressed: {
-    opacity: 0.88,
-    transform: [{ scale: 0.99 }],
+    opacity: 0.9,
   },
 });
