@@ -4,11 +4,22 @@ import { colors } from '../../theme/colors';
 interface HeaderProps {
   showBack: boolean;
   onBack: () => void;
+  showProfile?: boolean;
+  profileLabel?: string;
+  onOpenProfile?: () => void;
   variant?: 'dark' | 'light';
 }
 
-export function Header({ showBack, onBack, variant = 'dark' }: HeaderProps) {
+export function Header({
+  showBack,
+  onBack,
+  showProfile = false,
+  profileLabel = '나',
+  onOpenProfile,
+  variant = 'dark',
+}: HeaderProps) {
   const isLight = variant === 'light';
+  const resolvedProfileLabel = profileLabel.trim().charAt(0) || '나';
 
   return (
     <View style={styles.header}>
@@ -16,16 +27,27 @@ export function Header({ showBack, onBack, variant = 'dark' }: HeaderProps) {
         <Text style={[styles.headerEyebrow, isLight && styles.headerEyebrowLight]}>Basketball training app</Text>
         <Text style={[styles.headerTitle, isLight && styles.headerTitleLight]}>AI 농구 코치</Text>
       </View>
-      {showBack ? (
-        <Pressable
-          onPress={onBack}
-          style={({ pressed }) => [styles.backButton, isLight && styles.backButtonLight, pressed && styles.pressed]}
-        >
-          <Text style={[styles.backButtonText, isLight && styles.backButtonTextLight]}>메인으로</Text>
-        </Pressable>
-      ) : (
-        <View style={styles.placeholder} />
-      )}
+      <View style={styles.actionsRow}>
+        {showBack ? (
+          <Pressable
+            onPress={onBack}
+            style={({ pressed }) => [styles.backButton, isLight && styles.backButtonLight, pressed && styles.pressed]}
+          >
+            <Text style={[styles.backButtonText, isLight && styles.backButtonTextLight]}>메인으로</Text>
+          </Pressable>
+        ) : null}
+
+        {showProfile && onOpenProfile ? (
+          <Pressable
+            onPress={onOpenProfile}
+            style={({ pressed }) => [styles.profileButton, isLight && styles.profileButtonLight, pressed && styles.pressed]}
+          >
+            <Text style={[styles.profileButtonText, isLight && styles.profileButtonTextLight]}>{resolvedProfileLabel}</Text>
+          </Pressable>
+        ) : null}
+
+        {!showBack && !showProfile ? <View style={styles.placeholder} /> : null}
+      </View>
     </View>
   );
 }
@@ -40,6 +62,11 @@ const styles = StyleSheet.create({
   },
   headerTextWrap: {
     flex: 1,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   headerEyebrow: {
     color: colors.textAccent,
@@ -78,8 +105,30 @@ const styles = StyleSheet.create({
   backButtonTextLight: {
     color: '#241912',
   },
+  profileButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  profileButtonLight: {
+    backgroundColor: '#ffffff',
+    borderColor: 'rgba(36,25,18,0.08)',
+  },
+  profileButtonText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  profileButtonTextLight: {
+    color: '#241912',
+  },
   placeholder: {
-    width: 82,
+    width: 44,
   },
   pressed: {
     opacity: 0.9,

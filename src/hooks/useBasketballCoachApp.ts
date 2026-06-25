@@ -63,6 +63,7 @@ const COUNTDOWN_CUE_BASE64 =
   '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';
 
 type DribbleLessonPhase = 'stance_setup' | 'countdown' | 'await_dribble' | 'active' | 'cooldown';
+type CameraStopMode = 'review' | 'disconnect' | null;
 type FrontDribbleCriterionNumber = 1 | 2 | 3 | 4;
 
 interface FrontDribbleWeakPoint {
@@ -83,6 +84,19 @@ interface AuthFormValues {
 interface AuthActionResult {
   success: boolean;
   message: string;
+}
+
+interface ProfileUpdateValues {
+  nickname: string;
+  name: string;
+  age: string;
+  gender: AccountGender;
+}
+
+interface PasswordChangeValues {
+  currentPassword: string;
+  nextPassword: string;
+  nextPasswordConfirm: string;
 }
 
 interface TransferCodeResult {
@@ -973,6 +987,7 @@ export function useBasketballCoachApp() {
   const [shootResetToken, setShootResetToken] = useState(0);
   const [recordingStartToken, setRecordingStartToken] = useState(0);
   const [recordingStopToken, setRecordingStopToken] = useState(0);
+  const [cameraStopMode, setCameraStopMode] = useState<CameraStopMode>(null);
   const [fireworks, setFireworks] = useState<FireworkItem[]>([]);
   const [showFireworks, setShowFireworks] = useState(false);
   const [startupStatusText, setStartupStatusText] = useState('앱을 준비하고 있습니다.');
@@ -1133,6 +1148,7 @@ export function useBasketballCoachApp() {
     setShootResetToken(0);
     setRecordingStartToken(0);
     setRecordingStopToken(0);
+    setCameraStopMode(null);
     setFireworks([]);
     setShowFireworks(false);
     setStartupStatusText('앱을 준비하고 있습니다.');
@@ -2353,6 +2369,7 @@ export function useBasketballCoachApp() {
       setDribbleResetToken(0);
       setRecordingStartToken(0);
       setRecordingStopToken(0);
+      setCameraStopMode(null);
       setIsCameraPreviewHidden(false);
       setIsLessonActive(false);
       setIsCameraActive(false);
@@ -2601,6 +2618,146 @@ export function useBasketballCoachApp() {
     };
   }
 
+  async function updateProfile({ nickname, name, age, gender }: ProfileUpdateValues): Promise<AuthActionResult> {
+    if (!currentUserId) {
+      return {
+        success: false,
+        message: '로그인한 계정을 먼저 확인해 주세요.',
+      };
+    }
+
+    const trimmedNickname = nickname.trim();
+    const trimmedName = name.trim();
+    const parsedAge = parseAgeInput(age);
+
+    if (!trimmedNickname || !trimmedName || parsedAge === null) {
+      return {
+        success: false,
+        message: '닉네임, 이름, 나이, 성별을 모두 정확히 입력해 주세요.',
+      };
+    }
+
+    const currentAccount = accounts.find((account) => account.id === currentUserId);
+
+    if (!currentAccount) {
+      return {
+        success: false,
+        message: '현재 계정 정보를 찾지 못했습니다.',
+      };
+    }
+
+    const normalizedNickname = normalizeNickname(trimmedNickname);
+    const duplicatedAccount = accounts.find(
+      (account) => account.id !== currentUserId && normalizeNickname(account.nickname) === normalizedNickname
+    );
+
+    if (duplicatedAccount) {
+      return {
+        success: false,
+        message: '이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해 주세요.',
+      };
+    }
+
+    const hasChanged =
+      currentAccount.nickname !== trimmedNickname ||
+      currentAccount.name !== trimmedName ||
+      currentAccount.age !== parsedAge ||
+      currentAccount.gender !== gender;
+
+    if (!hasChanged) {
+      return {
+        success: true,
+        message: '변경된 정보가 없어 현재 값으로 유지했습니다.',
+      };
+    }
+
+    const nextAccount: UserAccount = {
+      ...currentAccount,
+      nickname: trimmedNickname,
+      name: trimmedName,
+      age: parsedAge,
+      gender,
+    };
+    const nextAccounts = accounts.map((account) => (account.id === currentUserId ? nextAccount : account));
+
+    await AsyncStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(nextAccounts));
+    setAccounts(nextAccounts);
+    setCurrentUser(toAuthUser(nextAccount));
+
+    return {
+      success: true,
+      message: '사용자 정보를 수정했습니다.',
+    };
+  }
+
+  async function changePassword({
+    currentPassword,
+    nextPassword,
+    nextPasswordConfirm,
+  }: PasswordChangeValues): Promise<AuthActionResult> {
+    if (!currentUserId) {
+      return {
+        success: false,
+        message: '로그인한 계정을 먼저 확인해 주세요.',
+      };
+    }
+
+    const trimmedCurrentPassword = currentPassword.trim();
+    const trimmedNextPassword = nextPassword.trim();
+    const trimmedNextPasswordConfirm = nextPasswordConfirm.trim();
+
+    if (!trimmedCurrentPassword || !trimmedNextPassword || !trimmedNextPasswordConfirm) {
+      return {
+        success: false,
+        message: '현재 비밀번호와 새 비밀번호를 모두 입력해 주세요.',
+      };
+    }
+
+    const currentAccount = accounts.find((account) => account.id === currentUserId);
+
+    if (!currentAccount) {
+      return {
+        success: false,
+        message: '현재 계정 정보를 찾지 못했습니다.',
+      };
+    }
+
+    if (currentAccount.password !== trimmedCurrentPassword) {
+      return {
+        success: false,
+        message: '현재 비밀번호가 일치하지 않습니다.',
+      };
+    }
+
+    if (trimmedNextPassword !== trimmedNextPasswordConfirm) {
+      return {
+        success: false,
+        message: '새 비밀번호가 서로 일치하지 않습니다.',
+      };
+    }
+
+    if (trimmedNextPassword === currentAccount.password) {
+      return {
+        success: false,
+        message: '새 비밀번호가 현재 비밀번호와 같습니다. 다른 비밀번호를 입력해 주세요.',
+      };
+    }
+
+    const nextAccount: UserAccount = {
+      ...currentAccount,
+      password: trimmedNextPassword,
+    };
+    const nextAccounts = accounts.map((account) => (account.id === currentUserId ? nextAccount : account));
+
+    await AsyncStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(nextAccounts));
+    setAccounts(nextAccounts);
+
+    return {
+      success: true,
+      message: '비밀번호를 수정했습니다.',
+    };
+  }
+
   async function logout() {
     if (screen === 'lesson' && (isLessonActive || isCameraActive)) {
       await endLesson(true);
@@ -2671,6 +2828,7 @@ export function useBasketballCoachApp() {
     setShootResetToken(0);
     setRecordingStartToken(0);
     setRecordingStopToken(0);
+    setCameraStopMode(null);
     setIsCameraPreviewHidden(false);
     setLessonReview(null);
     setImmediateLessonFeedback(
@@ -2736,6 +2894,7 @@ export function useBasketballCoachApp() {
     setDribbleResetToken(0);
     setShootResetToken(0);
     setRecordingStopToken(0);
+    setCameraStopMode(null);
     setIsCameraPreviewHidden(false);
     setLessonReview(null);
     setIsShootSuccessButtonVisible(false);
@@ -2795,6 +2954,18 @@ export function useBasketballCoachApp() {
   }
 
   async function beginLesson(dribbleTargetCount?: number, dribbleView?: DribbleLessonView) {
+    if (
+      isLessonActive
+      || isCameraActive
+      || pendingStopSaveRef.current
+      || pendingReviewStopRef.current
+      || pendingShootReviewRef.current
+      || pendingShootRecordingStopRef.current
+    ) {
+      setDebugText('이전 레슨을 종료하는 중입니다. 카메라가 완전히 꺼진 뒤 다시 시작해 주세요.');
+      return;
+    }
+
     const granted = await ensurePermissions();
     if (!granted) {
       return;
@@ -2827,6 +2998,7 @@ export function useBasketballCoachApp() {
     setShootResetToken(0);
     setRecordingStartToken(0);
     setRecordingStopToken(0);
+    setCameraStopMode(null);
     setLessonReview(null);
     setIsCameraPreviewHidden(false);
     setIsShootSuccessButtonVisible(false);
@@ -2884,6 +3056,7 @@ export function useBasketballCoachApp() {
       setShootResetToken(0);
       setRecordingStartToken(0);
       setRecordingStopToken(0);
+      setCameraStopMode(null);
       setIsCameraPreviewHidden(false);
       setIsShootSuccessButtonVisible(false);
       setIsCameraActive(false);
@@ -2897,6 +3070,8 @@ export function useBasketballCoachApp() {
     setDebugText('레슨 영상을 저장하는 중입니다.');
     setIsLessonActive(false);
     setIsCameraReady(false);
+    setCameraStopMode('disconnect');
+    setRecordingStopToken(Date.now());
 
     recordingFallbackTimeoutRef.current = setTimeout(() => {
       if (!pendingStopSaveRef.current) {
@@ -2933,6 +3108,7 @@ export function useBasketballCoachApp() {
     setIsLessonActive(false);
     setIsCameraReady(false);
     setIsCameraPreviewHidden(true);
+    setCameraStopMode('disconnect');
     setRecordingStopToken(Date.now());
     setDebugText('목표 드리블 횟수에 도달했습니다. 종료 호루라기를 울리고 카메라 연결을 끄는 중입니다.');
 
@@ -2969,6 +3145,7 @@ export function useBasketballCoachApp() {
       setShootResetToken(0);
       setRecordingStartToken(0);
       setRecordingStopToken(0);
+      setCameraStopMode(null);
       setIsCameraPreviewHidden(false);
       latestFeedbackRef.current = completedFeedback;
       setFeedbackText(completedFeedback);
@@ -3034,6 +3211,7 @@ export function useBasketballCoachApp() {
       setShootResetToken(0);
       setRecordingStartToken(0);
       setRecordingStopToken(0);
+      setCameraStopMode(null);
       setIsCameraPreviewHidden(false);
       latestFeedbackRef.current = completedFeedback;
       setFeedbackText(completedFeedback);
@@ -3093,6 +3271,7 @@ export function useBasketballCoachApp() {
       setShootResetToken(0);
       setRecordingStartToken(0);
       setRecordingStopToken(0);
+      setCameraStopMode(null);
       setIsCameraPreviewHidden(false);
       setIsLessonActive(true);
       setIsCameraActive(true);
@@ -3299,6 +3478,7 @@ export function useBasketballCoachApp() {
           pendingShootRecordingStopRef.current = true;
           shootCooldownUntilRef.current = null;
           setDebugText('슛 촬영을 마무리하고 분석 중입니다.');
+          setCameraStopMode('review');
           setRecordingStopToken(Date.now());
           return;
         }
@@ -3501,6 +3681,7 @@ export function useBasketballCoachApp() {
             setShootResetToken(0);
             setRecordingStartToken(0);
             setRecordingStopToken(0);
+            setCameraStopMode(null);
             setIsCameraPreviewHidden(false);
             setIsLessonActive(false);
             setIsCameraActive(false);
@@ -3523,6 +3704,7 @@ export function useBasketballCoachApp() {
             setRecordingStartToken(0);
             setRecordingStopToken(0);
             setShootResetToken(0);
+            setCameraStopMode(null);
             setIsCameraPreviewHidden(false);
             dribbleLessonPhaseRef.current = 'stance_setup';
             shootLessonStartedRef.current = false;
@@ -3685,6 +3867,7 @@ export function useBasketballCoachApp() {
     shootResetToken,
     recordingStartToken,
     recordingStopToken,
+    cameraStopMode,
     cameraError,
     fireworks,
     showFireworks,
@@ -3693,6 +3876,8 @@ export function useBasketballCoachApp() {
     importAccountTransfer,
     login,
     signup,
+    updateProfile,
+    changePassword,
     logout,
     navigateTo,
     changeLessonMode,

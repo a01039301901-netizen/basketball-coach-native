@@ -1,5 +1,4 @@
-import { Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { SmallButton } from '../components/common/Buttons';
+import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { colors } from '../theme/colors';
 import type { HomeworkProgressItem } from '../types/app';
 
@@ -27,6 +26,9 @@ interface HomeMenuButtonProps {
   subtitle: string;
   onPress: () => void;
   isWide: boolean;
+  isCompact: boolean;
+  isFullWidth?: boolean;
+  isBorderless?: boolean;
 }
 
 function HomeMenuArtwork({ type }: { type: HomeMenuArtworkType }) {
@@ -61,30 +63,54 @@ function HomeMenuButton({
   subtitle,
   onPress,
   isWide,
+  isCompact,
+  isFullWidth = false,
+  isBorderless = false,
 }: HomeMenuButtonProps) {
-  const hasArtwork = artworkType !== 'skill';
-  const isDiaryArtwork = artworkType === 'diary';
+  const hasArtwork = !isCompact && artworkType !== 'skill';
+  const isDiaryArtwork = !isCompact && artworkType === 'diary';
 
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.mainButtonWrap, isWide && styles.mainButtonWrapWide, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.mainButtonWrap,
+        isWide && styles.mainButtonWrapWide,
+        isFullWidth && styles.mainButtonWrapFull,
+        isCompact && styles.mainButtonWrapCompact,
+        isCompact && isFullWidth && styles.mainButtonWrapCompactFull,
+        pressed && styles.pressed,
+      ]}
     >
       <View
         style={[
           styles.mainButton,
           isWide && styles.mainButtonWide,
+          isCompact && styles.mainButtonCompact,
           hasArtwork && styles.mainButtonWithArtwork,
           isDiaryArtwork && styles.mainButtonDiary,
+          isBorderless && styles.mainButtonBorderless,
         ]}
       >
         <HomeMenuArtwork type={artworkType} />
-        <View style={[styles.mainButtonContent, isDiaryArtwork && styles.mainButtonContentDiary]}>
-          <View style={[styles.mainButtonTop, isDiaryArtwork && styles.mainButtonTopDiary]}>
-            <View style={[styles.mainButtonIcon, { backgroundColor: accentSoft }]}>
+        <View
+          style={[
+            styles.mainButtonContent,
+            isDiaryArtwork && styles.mainButtonContentDiary,
+            isCompact && styles.mainButtonContentCompact,
+          ]}
+        >
+          <View
+            style={[
+              styles.mainButtonTop,
+              isDiaryArtwork && styles.mainButtonTopDiary,
+              isCompact && styles.mainButtonTopCompact,
+            ]}
+          >
+            <View style={[styles.mainButtonIcon, isCompact && styles.mainButtonIconCompact, { backgroundColor: accentSoft }]}>
               <View style={[styles.mainButtonIconDot, { backgroundColor: accentColor }]} />
             </View>
-            <Text style={styles.mainButtonLabel}>{label}</Text>
+            <Text style={[styles.mainButtonLabel, isCompact && styles.mainButtonLabelCompact]}>{label}</Text>
           </View>
 
           <Text
@@ -92,6 +118,7 @@ function HomeMenuButton({
               styles.mainButtonTitle,
               hasArtwork && styles.mainButtonTitleWithArtwork,
               isDiaryArtwork && styles.mainButtonTitleDiary,
+              isCompact && styles.mainButtonTitleCompact,
             ]}
           >
             {title}
@@ -101,6 +128,7 @@ function HomeMenuButton({
               styles.mainButtonSubtitle,
               hasArtwork && styles.mainButtonSubtitleWithArtwork,
               isDiaryArtwork && styles.mainButtonSubtitleDiary,
+              isCompact && styles.mainButtonSubtitleCompact,
             ]}
           >
             {subtitle}
@@ -134,6 +162,7 @@ export function HomeScreen({
       title: 'AI에게 레슨 받기',
       subtitle: '카메라로 동작을 분석하고 실시간 코칭을 받을 수 있어요.',
       onPress: onOpenLesson,
+      isBorderless: true,
     },
     {
       key: 'diary',
@@ -162,7 +191,6 @@ export function HomeScreen({
       <View style={styles.heroCard}>
         <View style={styles.heroTextWrap}>
           <Text style={styles.heroTitle}>오늘 어떤 연습을 시작할까요?</Text>
-          <Text style={styles.heroSubtitle}>필요한 기능을 바로 고를 수 있도록 메뉴를 간단하고 밝게 정리했습니다.</Text>
         </View>
 
         <Pressable onPress={onOpenSettings} style={({ pressed }) => [styles.settingsButton, pressed && styles.pressed]}>
@@ -183,16 +211,13 @@ export function HomeScreen({
               subtitle={button.subtitle}
               onPress={button.onPress}
               isWide={isWide}
+              isCompact={false}
+              isBorderless={button.isBorderless}
             />
           ))}
         </View>
       ) : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.menuButtonsScrollContent}
-          style={styles.menuButtonsScroll}
-        >
+        <View style={styles.menuButtonsStack}>
           {menuButtons.map((button) => (
             <HomeMenuButton
               key={button.key}
@@ -204,9 +229,12 @@ export function HomeScreen({
               subtitle={button.subtitle}
               onPress={button.onPress}
               isWide={isWide}
+              isCompact={false}
+              isFullWidth
+              isBorderless={button.isBorderless}
             />
           ))}
-        </ScrollView>
+        </View>
       )}
 
       <View style={styles.homeworkCard}>
@@ -214,9 +242,6 @@ export function HomeScreen({
           <View>
             <Text style={styles.homeworkTitle}>오늘의 연습 숙제</Text>
             <Text style={styles.homeworkDescription}>오늘 날짜 기준으로 숙제 진행도를 확인할 수 있어요.</Text>
-          </View>
-          <View style={styles.homeworkBadge}>
-            <Text style={styles.homeworkBadgeText}>Daily</Text>
           </View>
         </View>
 
@@ -250,15 +275,21 @@ export function HomeScreen({
           </View>
         )}
 
-        <View style={styles.rulesButtonWrap}>
-          <SmallButton title="농구 규칙 가이드" onPress={onOpenRules} variant="dark" />
-        </View>
+      </View>
 
-        <View style={styles.homeTipBox}>
+      <View style={[styles.secondaryCards, isWide && styles.secondaryCardsWide]}>
+        <Pressable
+          onPress={onOpenRules}
+          style={({ pressed }) => [styles.rulesCard, isWide && styles.secondaryCardCompactWide, pressed && styles.pressed]}
+        >
+          <Text style={styles.rulesCardLabel}>Guide</Text>
+          <Text style={styles.rulesCardTitle}>농구 규칙 가이드</Text>
+          <Text style={styles.rulesCardText}>처음 보는 규칙도 빠르게 확인할 수 있도록 기본 내용을 따로 모아뒀어요.</Text>
+        </Pressable>
+
+        <View style={[styles.tipCard, isWide && styles.secondaryCardCompactWide]}>
           <Text style={styles.tipTitle}>연습 팁</Text>
-          <Text style={styles.tipText}>
-            기본 숙제를 끝내면 다음 숙제가 열리고, 드리블 균형 차이가 보이면 보정 숙제가 추가됩니다.
-          </Text>
+          <Text style={styles.tipText}>기본 숙제를 끝내면 다음 숙제가 열리고, 드리블 균형 차이가 보이면 보정 숙제가 추가됩니다.</Text>
         </View>
       </View>
     </View>
@@ -290,11 +321,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 8,
   },
-  heroSubtitle: {
-    color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 20,
-  },
   settingsButton: {
     alignSelf: 'flex-start',
     width: 44,
@@ -314,13 +340,8 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     gap: 12,
   },
-  menuButtonsScroll: {
-    marginHorizontal: -2,
-  },
-  menuButtonsScrollContent: {
+  menuButtonsStack: {
     gap: 12,
-    paddingHorizontal: 2,
-    paddingRight: 8,
   },
   mainButtonWrap: {
     width: 232,
@@ -329,6 +350,15 @@ const styles = StyleSheet.create({
   mainButtonWrapWide: {
     flex: 1,
     width: undefined,
+  },
+  mainButtonWrapFull: {
+    width: '100%',
+  },
+  mainButtonWrapCompact: {
+    width: '48%',
+  },
+  mainButtonWrapCompactFull: {
+    width: '100%',
   },
   mainButton: {
     minHeight: 178,
@@ -340,8 +370,17 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
   },
+  mainButtonBorderless: {
+    borderWidth: 0,
+    borderColor: 'transparent',
+  },
   mainButtonWide: {
     minHeight: 194,
+  },
+  mainButtonCompact: {
+    minHeight: 120,
+    borderRadius: 18,
+    padding: 14,
   },
   mainButtonWithArtwork: {
     paddingRight: 22,
@@ -352,6 +391,9 @@ const styles = StyleSheet.create({
   mainButtonContent: {
     position: 'relative',
     zIndex: 1,
+  },
+  mainButtonContentCompact: {
+    gap: 4,
   },
   mainButtonContentDiary: {
     maxWidth: 138,
@@ -365,12 +407,21 @@ const styles = StyleSheet.create({
   mainButtonTopDiary: {
     marginBottom: 18,
   },
+  mainButtonTopCompact: {
+    marginBottom: 8,
+    gap: 8,
+  },
   mainButtonIcon: {
     width: 44,
     height: 44,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  mainButtonIconCompact: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
   },
   mainButtonIconDot: {
     width: 18,
@@ -382,11 +433,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  mainButtonLabelCompact: {
+    fontSize: 11,
+  },
   mainButtonTitle: {
     color: colors.text,
     fontSize: 19,
     fontWeight: '800',
     marginBottom: 8,
+  },
+  mainButtonTitleCompact: {
+    fontSize: 16,
+    marginBottom: 4,
   },
   mainButtonTitleWithArtwork: {
     maxWidth: 156,
@@ -398,6 +456,10 @@ const styles = StyleSheet.create({
     color: colors.textSoft,
     fontSize: 13,
     lineHeight: 19,
+  },
+  mainButtonSubtitleCompact: {
+    fontSize: 12,
+    lineHeight: 17,
   },
   mainButtonSubtitleWithArtwork: {
     maxWidth: 154,
@@ -457,13 +519,13 @@ const styles = StyleSheet.create({
     bottom: -16,
     width: 236,
     height: 188,
-    opacity: 0.78,
+    opacity: 0.42,
   },
   homeworkCard: {
     backgroundColor: colors.surface,
     borderRadius: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
     padding: 20,
   },
   homeworkTopRow: {
@@ -483,17 +545,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  homeworkBadge: {
-    borderRadius: 999,
-    backgroundColor: 'rgba(240, 163, 78, 0.14)',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-  homeworkBadgeText: {
-    color: colors.textAccent,
-    fontSize: 12,
-    fontWeight: '800',
-  },
   homeworkList: {
     gap: 12,
     marginTop: 18,
@@ -502,8 +553,8 @@ const styles = StyleSheet.create({
     gap: 10,
     backgroundColor: colors.surfaceStrong,
     borderRadius: 18,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
@@ -559,8 +610,8 @@ const styles = StyleSheet.create({
     marginTop: 18,
     borderRadius: 18,
     backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
     paddingHorizontal: 18,
     paddingVertical: 20,
     alignItems: 'center',
@@ -589,28 +640,66 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
-  rulesButtonWrap: {
-    marginTop: 14,
-    alignSelf: 'flex-start',
+  secondaryCards: {
+    gap: 12,
   },
-  homeTipBox: {
-    marginTop: 16,
-    borderRadius: 18,
-    backgroundColor: colors.surfaceStrong,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
+  secondaryCardsWide: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
   },
-  tipTitle: {
+  secondaryCardCompactWide: {
+    flex: 1,
+    width: undefined,
+    minWidth: 0,
+  },
+  rulesCard: {
+    flex: 1,
+    minHeight: 118,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderWidth: 0,
+    borderColor: 'transparent',
+  },
+  rulesCardLabel: {
+    color: colors.textAccent,
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 8,
+    letterSpacing: 0.4,
+  },
+  rulesCardTitle: {
     color: colors.text,
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '800',
     marginBottom: 6,
   },
+  rulesCardText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  tipCard: {
+    flex: 1,
+    minHeight: 118,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderWidth: 0,
+    borderColor: 'transparent',
+  },
+  tipTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
   tipText: {
     color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 13,
+    lineHeight: 19,
   },
   pressed: {
     opacity: 0.92,

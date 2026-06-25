@@ -1,19 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
 import { BALL_BRAND_OPTIONS, BALL_COLOR_OPTIONS, POSITION_OPTIONS } from '../constants/settings';
 import { colors } from '../theme/colors';
-import type { AuthUser, BallBrandOption, BallColorOption, HomeworkTestState, PositionOption } from '../types/app';
-
-interface TransferCodeResult {
-  success: boolean;
-  message: string;
-  code?: string;
-}
+import type { BallBrandOption, BallColorOption, HomeworkTestState, PositionOption } from '../types/app';
 
 interface SettingsScreenProps {
-  currentUser: AuthUser;
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
   selectedPosition: PositionOption;
@@ -22,12 +15,6 @@ interface SettingsScreenProps {
   onToggleBallColor: (color: BallColorOption) => void;
   onSelectPosition: (position: PositionOption) => void;
   onApplyHomeworkTestState: (nextState: HomeworkTestState) => void;
-  onLogout: () => void;
-  onCreateTransferCode: () => Promise<TransferCodeResult>;
-}
-
-function formatGenderLabel(gender: AuthUser['gender']) {
-  return gender === 'male' ? '남성' : '여성';
 }
 
 function getCorrectionDirectionLabel(direction: HomeworkTestState['correctionDirection']) {
@@ -54,7 +41,6 @@ function parseNumberInput(value: string) {
 }
 
 export function SettingsScreen({
-  currentUser,
   selectedBallBrand,
   selectedBallColors,
   selectedPosition,
@@ -63,23 +49,20 @@ export function SettingsScreen({
   onToggleBallColor,
   onSelectPosition,
   onApplyHomeworkTestState,
-  onLogout,
-  onCreateTransferCode,
 }: SettingsScreenProps) {
   const [isPositionOpen, setIsPositionOpen] = useState(false);
   const [isCorrectionOpen, setIsCorrectionOpen] = useState(false);
-  const [transferCode, setTransferCode] = useState('');
-  const [transferMessage, setTransferMessage] = useState('');
-  const [isGeneratingTransferCode, setIsGeneratingTransferCode] = useState(false);
-  const [dribbleCountInput, setDribbleCountInput] = useState('0');
-  const [shootAttemptInput, setShootAttemptInput] = useState('0');
-  const [shotSuccessInput, setShotSuccessInput] = useState('0');
-  const [skillVideoInput, setSkillVideoInput] = useState('0');
-  const [leftHandInput, setLeftHandInput] = useState('0');
-  const [rightHandInput, setRightHandInput] = useState('0');
-  const [correctionProgressInput, setCorrectionProgressInput] = useState('0');
-  const [isStage2Unlocked, setIsStage2Unlocked] = useState(false);
-  const [correctionDirection, setCorrectionDirection] = useState<HomeworkTestState['correctionDirection']>('none');
+  const [dribbleCountInput, setDribbleCountInput] = useState(String(homeworkTestState.dribbleCount));
+  const [shootAttemptInput, setShootAttemptInput] = useState(String(homeworkTestState.shootAttemptCount));
+  const [shotSuccessInput, setShotSuccessInput] = useState(String(homeworkTestState.shotSuccessCount));
+  const [skillVideoInput, setSkillVideoInput] = useState(String(homeworkTestState.skillVideoOpenCount));
+  const [leftHandInput, setLeftHandInput] = useState(String(homeworkTestState.leftHandTotal));
+  const [rightHandInput, setRightHandInput] = useState(String(homeworkTestState.rightHandTotal));
+  const [correctionProgressInput, setCorrectionProgressInput] = useState(String(homeworkTestState.correctionProgress));
+  const [isStage2Unlocked, setIsStage2Unlocked] = useState(homeworkTestState.isStage2Unlocked);
+  const [correctionDirection, setCorrectionDirection] = useState<HomeworkTestState['correctionDirection']>(
+    homeworkTestState.correctionDirection
+  );
 
   const selectedPositionLabel = useMemo(
     () => POSITION_OPTIONS.find((option) => option.key === selectedPosition)?.label ?? '없음',
@@ -89,45 +72,6 @@ export function SettingsScreen({
     () => getCorrectionDirectionLabel(correctionDirection),
     [correctionDirection]
   );
-
-  useEffect(() => {
-    setDribbleCountInput(String(homeworkTestState.dribbleCount));
-    setShootAttemptInput(String(homeworkTestState.shootAttemptCount));
-    setShotSuccessInput(String(homeworkTestState.shotSuccessCount));
-    setSkillVideoInput(String(homeworkTestState.skillVideoOpenCount));
-    setLeftHandInput(String(homeworkTestState.leftHandTotal));
-    setRightHandInput(String(homeworkTestState.rightHandTotal));
-    setCorrectionProgressInput(String(homeworkTestState.correctionProgress));
-    setIsStage2Unlocked(homeworkTestState.isStage2Unlocked);
-    setCorrectionDirection(homeworkTestState.correctionDirection);
-  }, [homeworkTestState]);
-
-  async function handleCreateTransferCode() {
-    if (isGeneratingTransferCode) {
-      return;
-    }
-
-    setIsGeneratingTransferCode(true);
-    const result = await onCreateTransferCode();
-    setTransferMessage(result.message);
-    setTransferCode(result.code ?? '');
-    setIsGeneratingTransferCode(false);
-  }
-
-  async function handleShareTransferCode() {
-    if (!transferCode) {
-      return;
-    }
-
-    try {
-      await Share.share({
-        title: '농구 코치 계정 전송 코드',
-        message: transferCode,
-      });
-    } catch {
-      setTransferMessage('공유 창을 열지 못했습니다. 전송 코드 내용을 직접 복사해 주세요.');
-    }
-  }
 
   function handleApplyHomeworkTestState() {
     onApplyHomeworkTestState({
@@ -155,68 +99,19 @@ export function SettingsScreen({
       correctionDirection: 'none',
       correctionProgress: 0,
     });
+    setDribbleCountInput('0');
+    setShootAttemptInput('0');
+    setShotSuccessInput('0');
+    setSkillVideoInput('0');
+    setLeftHandInput('0');
+    setRightHandInput('0');
+    setCorrectionProgressInput('0');
+    setIsStage2Unlocked(false);
+    setCorrectionDirection('none');
   }
 
   return (
     <View style={styles.contentGap}>
-      <Card title="계정" style={styles.accountCard}>
-        <Text style={styles.lead}>
-          현재 로그인한 계정입니다. 다른 계정으로 바꾸려면 로그아웃 후 다시 로그인해 주세요.
-        </Text>
-
-        <View style={styles.accountInfoWrap}>
-          <View style={styles.accountInfoRow}>
-            <Text style={styles.accountLabel}>닉네임</Text>
-            <Text style={styles.accountValue}>{currentUser.nickname}</Text>
-          </View>
-          <View style={styles.accountInfoRow}>
-            <Text style={styles.accountLabel}>이름</Text>
-            <Text style={styles.accountValue}>{currentUser.name}</Text>
-          </View>
-          <View style={styles.accountInfoRow}>
-            <Text style={styles.accountLabel}>나이</Text>
-            <Text style={styles.accountValue}>{currentUser.age}세</Text>
-          </View>
-          <View style={styles.accountInfoRow}>
-            <Text style={styles.accountLabel}>성별</Text>
-            <Text style={styles.accountValue}>{formatGenderLabel(currentUser.gender)}</Text>
-          </View>
-        </View>
-
-        <View style={styles.accountActionRow}>
-          <SmallButton
-            title={isGeneratingTransferCode ? '코드 생성 중...' : '전송 코드 만들기'}
-            onPress={() => void handleCreateTransferCode()}
-            disabled={isGeneratingTransferCode}
-          />
-          <SmallButton title="로그아웃" onPress={onLogout} variant="red" />
-        </View>
-
-        {transferMessage ? <Text style={styles.transferMessage}>{transferMessage}</Text> : null}
-
-        {transferCode ? (
-          <View style={styles.transferPanel}>
-            <Text style={styles.transferTitle}>계정 전송 코드</Text>
-            <Text style={styles.transferDescription}>
-              이 코드를 다른 로그인 화면의 가져오기 칸에 붙여넣어 주세요. 영상 파일은 옮겨지지 않고 계정, 기록, 설정만 이동합니다.
-            </Text>
-            <TextInput
-              value={transferCode}
-              onChangeText={setTransferCode}
-              style={styles.transferInput}
-              multiline
-              autoCapitalize="none"
-              autoCorrect={false}
-              selectTextOnFocus
-            />
-            <View style={styles.transferActions}>
-              <SmallButton title="공유하기" onPress={() => void handleShareTransferCode()} />
-              <SmallButton title="코드 숨기기" onPress={() => setTransferCode('')} variant="dark" />
-            </View>
-          </View>
-        ) : null}
-      </Card>
-
       <Card title="인식 설정" style={styles.card}>
         <Text style={styles.lead}>
           사용 중인 공과 포지션을 맞춰 두면 분석과 추천 숙제가 조금 더 자연스럽게 동작합니다.
@@ -407,7 +302,7 @@ export function SettingsScreen({
           ) : null}
         </View>
 
-        <View style={styles.accountActionRow}>
+        <View style={styles.actionRow}>
           <SmallButton title="테스트 값 적용" onPress={handleApplyHomeworkTestState} />
           <SmallButton title="오늘 숙제 초기화" onPress={handleResetHomeworkTestState} variant="dark" />
         </View>
@@ -423,87 +318,11 @@ const styles = StyleSheet.create({
   card: {
     minHeight: 320,
   },
-  accountCard: {
-    minHeight: 0,
-  },
   lead: {
     color: colors.textMuted,
     fontSize: 15,
     lineHeight: 21,
     marginBottom: 18,
-  },
-  accountInfoWrap: {
-    gap: 10,
-  },
-  accountInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    borderRadius: 14,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  accountLabel: {
-    color: colors.textMuted,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  accountValue: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  accountActionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 16,
-  },
-  transferMessage: {
-    marginTop: 14,
-    color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  transferPanel: {
-    marginTop: 14,
-    gap: 10,
-    borderRadius: 16,
-    padding: 14,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  transferTitle: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  transferDescription: {
-    color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  transferInput: {
-    minHeight: 120,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: colors.text,
-    fontSize: 14,
-    textAlignVertical: 'top',
-  },
-  transferActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
   },
   sectionTitle: {
     color: colors.textSoft,
@@ -572,6 +391,54 @@ const styles = StyleSheet.create({
   optionList: {
     gap: 10,
   },
+  optionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  optionButtonActive: {
+    backgroundColor: 'rgba(208,145,85,0.18)',
+    borderColor: 'rgba(208,145,85,0.32)',
+  },
+  swatch: {
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    borderWidth: 2,
+  },
+  optionTextWrap: {
+    flex: 1,
+  },
+  optionTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  optionSubtitle: {
+    color: colors.textMuted,
+    fontSize: 13,
+    marginTop: 4,
+  },
+  checkBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: colors.surface,
+  },
+  checkBadgeActive: {
+    backgroundColor: colors.secondary,
+  },
+  checkBadgeText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   testFieldGrid: {
     gap: 10,
   },
@@ -620,53 +487,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
   },
-  optionButton: {
+  actionRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  optionButtonActive: {
-    backgroundColor: 'rgba(208,145,85,0.18)',
-    borderColor: 'rgba(208,145,85,0.32)',
-  },
-  swatch: {
-    width: 28,
-    height: 28,
-    borderRadius: 999,
-    borderWidth: 2,
-  },
-  optionTextWrap: {
-    flex: 1,
-  },
-  optionTitle: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  optionSubtitle: {
-    color: colors.textMuted,
-    fontSize: 13,
-    marginTop: 4,
-  },
-  checkBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: colors.surface,
-  },
-  checkBadgeActive: {
-    backgroundColor: colors.secondary,
-  },
-  checkBadgeText: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '700',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 16,
   },
   pressed: {
     opacity: 0.9,

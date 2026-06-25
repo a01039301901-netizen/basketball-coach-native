@@ -1,9 +1,8 @@
 import { type AVPlaybackStatus, ResizeMode, Video } from 'expo-av';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
 import { SmallButton } from '../components/common/Buttons';
-import { Card } from '../components/common/Card';
 import { InfoBox } from '../components/common/InfoBox';
 import { LessonCamera } from '../components/lesson/LessonCamera';
 import { colors } from '../theme/colors';
@@ -24,6 +23,7 @@ interface LessonScreenProps {
   shootResetToken: number;
   recordingStartToken: number;
   recordingStopToken: number;
+  cameraStopMode: 'review' | 'disconnect' | null;
   debugText: string;
   feedbackText: string;
   lessonReview: LessonReviewClip | null;
@@ -65,9 +65,10 @@ function ModeButton({ title, active, disabled, onPress }: ModeButtonProps) {
 
 interface ReviewClipPlayerProps {
   clip: LessonReviewClip;
+  reserveToggleSpace?: boolean;
 }
 
-function ReviewClipPlayer({ clip }: ReviewClipPlayerProps) {
+function ReviewClipPlayer({ clip, reserveToggleSpace = false }: ReviewClipPlayerProps) {
   const videoRef = useRef<Video | null>(null);
   const [durationMillis, setDurationMillis] = useState(clip.durationMs);
   const loopEndMs = Math.max(clip.startAtMs + 250, Math.min(clip.startAtMs + clip.durationMs, durationMillis));
@@ -99,7 +100,7 @@ function ReviewClipPlayer({ clip }: ReviewClipPlayerProps) {
   }
 
   return (
-    <View style={styles.reviewWrap}>
+    <View style={[styles.reviewWrap, reserveToggleSpace && styles.sectionCardWithToggleSpace]}>
       <Text style={styles.reviewTitle}>{clip.title}</Text>
       <Video
         ref={videoRef}
@@ -130,29 +131,76 @@ type CoachingSectionKey = 'status' | 'dribbleCount' | 'feedback' | 'review' | 'c
 
 interface CoachingSectionProps {
   title: string;
-  hidden: boolean;
-  onHide: () => void;
+  collapsed: boolean;
+  allowCollapse: boolean;
+  onToggle: () => void;
   children: React.ReactNode;
 }
 
-function CoachingSection({ title, hidden, onHide, children }: CoachingSectionProps) {
-  if (hidden) {
-    return null;
-  }
+function CoachingSection({ title, collapsed, allowCollapse, onToggle, children }: CoachingSectionProps) {
+  const contentAnimation = useRef(new Animated.Value(collapsed ? 0 : 1)).current;
+  const [contentHeight, setContentHeight] = useState(0);
+  const effectiveCollapsed = allowCollapse ? collapsed : false;
+
+  useEffect(() => {
+    Animated.timing(contentAnimation, {
+      toValue: effectiveCollapsed ? 0 : 1,
+      duration: effectiveCollapsed ? 220 : 280,
+      easing: effectiveCollapsed ? Easing.bezier(0.35, 0, 0.2, 1) : Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [contentAnimation, effectiveCollapsed]);
+
+  const animatedHeight = contentAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, Math.max(contentHeight, 1)],
+  });
+  const animatedOpacity = contentAnimation.interpolate({
+    inputRange: [0, 0.32, 1],
+    outputRange: [0, 0.14, 1],
+  });
+  const animatedTranslateY = contentAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-10, 0],
+  });
 
   return (
-    <View style={styles.sectionBlock}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionLabel}>{title}</Text>
+    <View style={[styles.sectionBlock, effectiveCollapsed && styles.sectionBlockCollapsed]}>
+      {allowCollapse ? (
         <Pressable
-          accessibilityLabel={`${title} 숨기기`}
-          onPress={onHide}
-          style={({ pressed }) => [styles.sectionHideButton, pressed && styles.pressed]}
+          accessibilityLabel={effectiveCollapsed ? `${title} 펼치기` : `${title} 접기`}
+          onPress={onToggle}
+          style={({ pressed }) => [
+            styles.sectionToggleButton,
+            effectiveCollapsed ? styles.sectionToggleButtonCollapsed : styles.sectionToggleButtonFloating,
+            effectiveCollapsed ? styles.sectionToggleButtonCollapsedChip : styles.sectionToggleButtonRound,
+            pressed && styles.pressed,
+          ]}
         >
-          <Text style={styles.sectionHideButtonText}>X</Text>
+          <Text style={styles.sectionToggleIcon}>{effectiveCollapsed ? '^' : 'v'}</Text>
+          {effectiveCollapsed ? <Text style={styles.sectionToggleLabel}>{title}</Text> : null}
         </Pressable>
-      </View>
-      {children}
+      ) : null}
+      <Animated.View
+        pointerEvents={effectiveCollapsed ? 'none' : 'auto'}
+        style={[
+          styles.sectionContentWrap,
+          {
+            height: animatedHeight,
+            opacity: animatedOpacity,
+            transform: [{ translateY: animatedTranslateY }],
+          },
+        ]}
+      >
+        <View
+          onLayout={(event) => {
+            const nextHeight = Math.max(1, Math.ceil(event.nativeEvent.layout.height));
+            setContentHeight((current) => (current === nextHeight ? current : nextHeight));
+          }}
+        >
+          {children}
+        </View>
+      </Animated.View>
     </View>
   );
 }
@@ -166,6 +214,7 @@ function RealtimeCoachingPanel({
   cameraError,
   isWideLayout,
 }: RealtimeCoachingPanelProps) {
+  const allowSectionCollapse = true;
   const modeLabel = lessonMode === 'shoot' ? '슛 분석' : '드리블 분석';
   const modeSummary =
     lessonMode === 'shoot'
@@ -180,26 +229,10 @@ function RealtimeCoachingPanel({
     tips: false,
   });
 
-  const availableHiddenSectionLabels = [
-    hiddenSections.status ? { key: 'status' as const, label: '현재 흐름' } : null,
-    hiddenSections.dribbleCount && lessonMode === 'dribble' ? { key: 'dribbleCount' as const, label: '드리블 횟수' } : null,
-    hiddenSections.feedback ? { key: 'feedback' as const, label: '핵심 피드백' } : null,
-    hiddenSections.review && lessonReview ? { key: 'review' as const, label: '문제 장면 복기' } : null,
-    hiddenSections.camera && cameraError ? { key: 'camera' as const, label: '카메라 알림' } : null,
-    hiddenSections.tips ? { key: 'tips' as const, label: '촬영 팁' } : null,
-  ].filter((item): item is { key: CoachingSectionKey; label: string } => Boolean(item));
-
-  function hideSection(sectionKey: CoachingSectionKey) {
+  function toggleSection(sectionKey: CoachingSectionKey) {
     setHiddenSections((current) => ({
       ...current,
-      [sectionKey]: true,
-    }));
-  }
-
-  function showSection(sectionKey: CoachingSectionKey) {
-    setHiddenSections((current) => ({
-      ...current,
-      [sectionKey]: false,
+      [sectionKey]: !current[sectionKey],
     }));
   }
 
@@ -220,53 +253,66 @@ function RealtimeCoachingPanel({
         <Text style={styles.sideSubtitle}>{modeSummary}</Text>
       </View>
 
-      {availableHiddenSectionLabels.length > 0 ? (
-        <View style={styles.hiddenSectionWrap}>
-          <Text style={styles.hiddenSectionLabel}>숨긴 창 다시 보기</Text>
-          <View style={styles.hiddenSectionChipRow}>
-            {availableHiddenSectionLabels.map((item) => (
-              <Pressable
-                key={item.key}
-                onPress={() => showSection(item.key)}
-                style={({ pressed }) => [styles.hiddenSectionChip, pressed && styles.pressed]}
-              >
-                <Text style={styles.hiddenSectionChipText}>{item.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      ) : null}
-
-      <CoachingSection title="현재 흐름" hidden={hiddenSections.status} onHide={() => hideSection('status')}>
-        <InfoBox label="진행 상태" text={debugText} />
+      <CoachingSection
+        title="현재 흐름"
+        collapsed={hiddenSections.status}
+        allowCollapse={allowSectionCollapse}
+        onToggle={() => toggleSection('status')}
+      >
+        <InfoBox label="진행 상태" text={debugText} reserveToggleSpace={allowSectionCollapse} />
       </CoachingSection>
 
       {lessonMode === 'dribble' ? (
-        <CoachingSection title="드리블 횟수" hidden={hiddenSections.dribbleCount} onHide={() => hideSection('dribbleCount')}>
-          <InfoBox label="드리블 횟수" text={`${currentDribbleCount}회`} />
+        <CoachingSection
+          title="드리블 횟수"
+          collapsed={hiddenSections.dribbleCount}
+          allowCollapse={allowSectionCollapse}
+          onToggle={() => toggleSection('dribbleCount')}
+        >
+          <InfoBox label="드리블 횟수" text={`${currentDribbleCount}회`} reserveToggleSpace={allowSectionCollapse} />
         </CoachingSection>
       ) : null}
 
-      <CoachingSection title="핵심 피드백" hidden={hiddenSections.feedback} onHide={() => hideSection('feedback')}>
-        <InfoBox label="실시간 피드백" text={feedbackText} />
+      <CoachingSection
+        title="핵심 피드백"
+        collapsed={hiddenSections.feedback}
+        allowCollapse={allowSectionCollapse}
+        onToggle={() => toggleSection('feedback')}
+      >
+        <InfoBox label="실시간 피드백" text={feedbackText} reserveToggleSpace={allowSectionCollapse} />
       </CoachingSection>
 
       {lessonReview ? (
-        <CoachingSection title="문제 장면 복기" hidden={hiddenSections.review} onHide={() => hideSection('review')}>
-          <ReviewClipPlayer clip={lessonReview} />
+        <CoachingSection
+          title="문제 장면 복기"
+          collapsed={hiddenSections.review}
+          allowCollapse={allowSectionCollapse}
+          onToggle={() => toggleSection('review')}
+        >
+          <ReviewClipPlayer clip={lessonReview} reserveToggleSpace={allowSectionCollapse} />
         </CoachingSection>
       ) : null}
 
       {cameraError ? (
-        <CoachingSection title="카메라 알림" hidden={hiddenSections.camera} onHide={() => hideSection('camera')}>
-          <View style={styles.errorBox}>
+        <CoachingSection
+          title="카메라 알림"
+          collapsed={hiddenSections.camera}
+          allowCollapse={allowSectionCollapse}
+          onToggle={() => toggleSection('camera')}
+        >
+          <View style={[styles.errorBox, allowSectionCollapse && styles.sectionCardWithToggleSpace]}>
             <Text style={styles.errorText}>{cameraError}</Text>
           </View>
         </CoachingSection>
       ) : null}
 
-      <CoachingSection title="촬영 팁" hidden={hiddenSections.tips} onHide={() => hideSection('tips')}>
-        <View style={styles.tipBox}>
+      <CoachingSection
+        title="촬영 팁"
+        collapsed={hiddenSections.tips}
+        allowCollapse={allowSectionCollapse}
+        onToggle={() => toggleSection('tips')}
+      >
+        <View style={[styles.tipBox, allowSectionCollapse && styles.sectionCardWithToggleSpace]}>
           <Text style={styles.tipTitle}>촬영 팁</Text>
           <Text style={styles.tipText}>
             몸 전체가 화면 안에 들어오면 어깨, 팔꿈치, 손목, 엉덩이, 무릎, 발을 더 안정적으로 인식합니다.
@@ -283,9 +329,6 @@ function RealtimeCoachingPanel({
   );
 }
 
-const MOBILE_COACHING_DRAG_LIMIT = 120;
-const MOBILE_COACHING_HIDE_THRESHOLD = 72;
-
 export function LessonScreen({
   lessonMode,
   selectedDribbleView,
@@ -301,6 +344,7 @@ export function LessonScreen({
   shootResetToken,
   recordingStartToken,
   recordingStopToken,
+  cameraStopMode,
   debugText,
   feedbackText,
   lessonReview,
@@ -317,17 +361,22 @@ export function LessonScreen({
 }: LessonScreenProps) {
   const { width, height } = useWindowDimensions();
   const isWideLayout = width >= 1080;
-  const isDraggableCoachingOverlay = true;
+  const isLessonSessionBusy = isLessonActive || isCameraActive;
+  const allowPanelDragHide = !isWideLayout;
   const floatingCoachingHeight = isWideLayout ? Math.max(420, Math.min(height - 40, 760)) : Math.max(260, Math.min(height * 0.42, 380));
   const floatingCoachingWidth = isWideLayout ? Math.max(320, Math.min(width * 0.32, 420)) : Math.min(width - 24, 420);
-  const coachingDragTranslateY = useRef(new Animated.Value(0)).current;
-  const [isCoachingHidden, setIsCoachingHidden] = useState(false);
+  const coachingHiddenOffset = floatingCoachingHeight + 48;
+  const coachingHideThreshold = Math.min(120, Math.max(72, floatingCoachingHeight * 0.24));
+  const coachingPanelTranslateY = useRef(new Animated.Value(0)).current;
+  const coachingPanelTranslateYRef = useRef(0);
+  const coachingPanelDragStartRef = useRef(0);
 
   const [showDribbleGuide, setShowDribbleGuide] = useState(false);
   const [dribbleGuideStep, setDribbleGuideStep] = useState(0);
   const [showShootGuide, setShowShootGuide] = useState(false);
   const [shootGuideStep, setShootGuideStep] = useState(0);
   const [dribbleCountInput, setDribbleCountInput] = useState('10');
+  const [isCoachingPanelHidden, setIsCoachingPanelHidden] = useState(false);
 
   const parsedDribbleCount = useMemo(() => {
     const nextValue = Number.parseInt(dribbleCountInput, 10);
@@ -346,7 +395,100 @@ export function LessonScreen({
     }
   }, [isLessonActive, lessonMode]);
 
+  useEffect(() => {
+    const listenerId = coachingPanelTranslateY.addListener(({ value }) => {
+      coachingPanelTranslateYRef.current = value;
+    });
+
+    return () => {
+      coachingPanelTranslateY.removeListener(listenerId);
+    };
+  }, [coachingPanelTranslateY]);
+
+  useEffect(() => {
+    if (!allowPanelDragHide) {
+      setIsCoachingPanelHidden(false);
+      coachingPanelTranslateY.stopAnimation();
+      coachingPanelTranslateY.setValue(0);
+      return;
+    }
+
+    if (isCoachingPanelHidden) {
+      coachingPanelTranslateY.setValue(coachingHiddenOffset);
+    }
+  }, [allowPanelDragHide, coachingHiddenOffset, coachingPanelTranslateY, isCoachingPanelHidden]);
+
+  function restoreCoachingPanel() {
+    setIsCoachingPanelHidden(false);
+    Animated.spring(coachingPanelTranslateY, {
+      toValue: 0,
+      damping: 24,
+      stiffness: 220,
+      mass: 0.9,
+      useNativeDriver: true,
+    }).start();
+  }
+
+  function hideCoachingPanel() {
+    setIsCoachingPanelHidden(true);
+    Animated.timing(coachingPanelTranslateY, {
+      toValue: coachingHiddenOffset,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }
+
+  function finishCoachingPanelDrag(dy: number, vy: number) {
+    const dragDistance = Math.max(0, coachingPanelDragStartRef.current + dy);
+    const shouldHide = dragDistance >= coachingHideThreshold || vy >= 0.9;
+
+    if (shouldHide) {
+      hideCoachingPanel();
+      return;
+    }
+
+    restoreCoachingPanel();
+  }
+
+  const coachingPanelPanResponder = allowPanelDragHide
+    ? PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+          Math.abs(gestureState.dy) > Math.abs(gestureState.dx) && Math.abs(gestureState.dy) > 4,
+        onPanResponderGrant: () => {
+          coachingPanelTranslateY.stopAnimation();
+          coachingPanelDragStartRef.current = coachingPanelTranslateYRef.current;
+        },
+        onPanResponderMove: (_, gestureState) => {
+          const nextValue = Math.max(0, Math.min(coachingHiddenOffset, coachingPanelDragStartRef.current + gestureState.dy));
+          coachingPanelTranslateY.setValue(nextValue);
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          finishCoachingPanelDrag(gestureState.dy, gestureState.vy);
+        },
+        onPanResponderTerminate: (_, gestureState) => {
+          finishCoachingPanelDrag(gestureState.dy, gestureState.vy);
+        },
+      })
+    : null;
+
+  const coachingRestoreOpacity = coachingPanelTranslateY.interpolate({
+    inputRange: [0, coachingHiddenOffset * 0.65, coachingHiddenOffset],
+    outputRange: [0, 0.12, 1],
+    extrapolate: 'clamp',
+  });
+  const coachingRestoreTranslateY = coachingPanelTranslateY.interpolate({
+    inputRange: [0, coachingHiddenOffset],
+    outputRange: [16, 0],
+    extrapolate: 'clamp',
+  });
+
   function openLessonStart() {
+    if (isLessonSessionBusy) {
+      return;
+    }
+
     if (lessonMode === 'dribble') {
       setDribbleGuideStep(0);
       setShowDribbleGuide(true);
@@ -372,6 +514,12 @@ export function LessonScreen({
       return;
     }
 
+    if (isLessonSessionBusy) {
+      setShowDribbleGuide(false);
+      setDribbleGuideStep(0);
+      return;
+    }
+
     setShowDribbleGuide(false);
     setDribbleGuideStep(0);
     onBeginLesson(parsedDribbleCount, selectedDribbleView);
@@ -390,6 +538,12 @@ export function LessonScreen({
       return;
     }
 
+    if (isLessonSessionBusy) {
+      setShowShootGuide(false);
+      setShootGuideStep(0);
+      return;
+    }
+
     setShowShootGuide(false);
     setShootGuideStep(0);
     onBeginLesson();
@@ -397,85 +551,6 @@ export function LessonScreen({
 
   const dribbleConfirmLabel = dribbleGuideStep === 3 ? '레슨 시작' : '확인';
   const shootConfirmLabel = shootGuideStep === 2 ? '레슨 시작' : '확인';
-
-  const resetMobileCoachingPosition = useMemo(
-    () => () =>
-      Animated.spring(coachingDragTranslateY, {
-        toValue: 0,
-        useNativeDriver: true,
-        speed: 18,
-        bounciness: 5,
-      }).start(),
-    [coachingDragTranslateY]
-  );
-
-  const hideMobileCoachingPanel = useMemo(
-    () => () =>
-      Animated.timing(coachingDragTranslateY, {
-        toValue: MOBILE_COACHING_DRAG_LIMIT,
-        duration: 180,
-        useNativeDriver: true,
-      }).start(() => {
-        setIsCoachingHidden(true);
-        coachingDragTranslateY.setValue(0);
-      }),
-    [coachingDragTranslateY]
-  );
-
-  const showMobileCoachingPanel = useMemo(
-    () => () => {
-      setIsCoachingHidden(false);
-      coachingDragTranslateY.setValue(MOBILE_COACHING_HIDE_THRESHOLD);
-      requestAnimationFrame(() => {
-        Animated.spring(coachingDragTranslateY, {
-          toValue: 0,
-          useNativeDriver: true,
-          speed: 16,
-          bounciness: 6,
-        }).start();
-      });
-    },
-    [coachingDragTranslateY]
-  );
-
-  const coachingDragResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gestureState) =>
-          isDraggableCoachingOverlay &&
-          !isCoachingHidden &&
-          gestureState.dy > 8 &&
-          Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
-        onPanResponderMove: (_, gestureState) => {
-          coachingDragTranslateY.setValue(Math.max(0, Math.min(gestureState.dy, MOBILE_COACHING_DRAG_LIMIT)));
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          if (gestureState.dy >= MOBILE_COACHING_HIDE_THRESHOLD || gestureState.vy >= 0.9) {
-            hideMobileCoachingPanel();
-            return;
-          }
-
-          resetMobileCoachingPosition();
-        },
-        onPanResponderTerminate: () => {
-          resetMobileCoachingPosition();
-        },
-      }),
-    [
-      coachingDragTranslateY,
-      hideMobileCoachingPanel,
-      isCoachingHidden,
-      isDraggableCoachingOverlay,
-      resetMobileCoachingPosition,
-    ]
-  );
-
-  useEffect(() => {
-    if (!isDraggableCoachingOverlay) {
-      setIsCoachingHidden(false);
-      coachingDragTranslateY.setValue(0);
-    }
-  }, [coachingDragTranslateY, isDraggableCoachingOverlay]);
 
   return (
     <View style={styles.screenRoot}>
@@ -495,7 +570,8 @@ export function LessonScreen({
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <Card title="AI 레슨 받기" style={styles.heroCard}>
+        <View style={styles.heroCard}>
+          <Text style={styles.heroTitle}>AI 레슨 받기</Text>
           <Text style={styles.leadText}>
             실시간 자세 분석을 통해 드리블과 슛 동작을 확인하고, 지금 움직임에 맞는 코칭 피드백을 바로 볼 수 있습니다.
           </Text>
@@ -506,19 +582,19 @@ export function LessonScreen({
                 <ModeButton
                   title="드리블 분석"
                   active={lessonMode === 'dribble'}
-                  disabled={isLessonActive}
+                  disabled={isLessonSessionBusy}
                   onPress={() => onSelectMode('dribble')}
                 />
                 <ModeButton
                   title="슛 분석"
                   active={lessonMode === 'shoot'}
-                  disabled={isLessonActive}
+                  disabled={isLessonSessionBusy}
                   onPress={() => onSelectMode('shoot')}
                 />
               </View>
 
               <View style={styles.modeStatus}>
-                <Text style={styles.modeStatusText}>현재 모드: {lessonMode === 'shoot' ? '슛 분석' : '드리블 분석'}</Text>
+                <Text style={styles.modeStatusText}>{lessonMode === 'shoot' ? '현재 선택: 슛 분석' : '현재 선택: 드리블 분석'}</Text>
               </View>
 
               <LessonCamera
@@ -526,6 +602,7 @@ export function LessonScreen({
                 lessonMode={lessonMode}
                 selectedBallBrand={selectedBallBrand}
                 selectedBallColors={selectedBallColors}
+                cameraSessionKey={cameraSessionKey}
                 isCameraActive={isCameraActive}
                 isCameraPreviewHidden={isCameraPreviewHidden}
                 isLessonActive={isLessonActive}
@@ -535,11 +612,12 @@ export function LessonScreen({
                 shootResetToken={shootResetToken}
                 recordingStartToken={recordingStartToken}
                 recordingStopToken={recordingStopToken}
+                cameraStopMode={cameraStopMode}
                 onPoseMessage={onPoseMessage}
               />
 
               <View style={styles.cameraControls}>
-                <SmallButton title="레슨 시작" onPress={openLessonStart} disabled={isLessonActive} />
+                <SmallButton title="레슨 시작" onPress={openLessonStart} disabled={isLessonSessionBusy} />
                 {lessonMode === 'shoot' && isShootSuccessButtonVisible ? (
                   <SmallButton title="슛 성공" onPress={onRegisterSuccessfulShot} variant="dark" />
                 ) : null}
@@ -554,57 +632,69 @@ export function LessonScreen({
 
             {isWideLayout ? <View style={[styles.sideCardSpacer, { width: floatingCoachingWidth }]} /> : null}
           </View>
-        </Card>
+        </View>
       </ScrollView>
 
       <View pointerEvents="box-none" style={styles.coachingOverlay}>
-        {isCoachingHidden ? (
-          <View style={[styles.coachingRestoreWrap, isWideLayout ? styles.coachingRestoreWrapWide : null]}>
-            <Pressable onPress={showMobileCoachingPanel} style={({ pressed }) => [styles.coachingRestoreChip, pressed && styles.pressed]}>
-              <Text style={styles.coachingRestoreChipText}>실시간 코칭 열기</Text>
-            </Pressable>
+        <Animated.View
+          pointerEvents={allowPanelDragHide && isCoachingPanelHidden ? 'none' : 'auto'}
+          style={[
+            styles.sideCard,
+            styles.sideCardFloating,
+            isWideLayout
+              ? {
+                  top: 0,
+                  right: 0,
+                  width: floatingCoachingWidth,
+                  maxHeight: floatingCoachingHeight,
+                }
+              : {
+                  left: 12,
+                  right: 12,
+                  bottom: 12,
+                  maxHeight: floatingCoachingHeight,
+                },
+            allowPanelDragHide
+              ? {
+                  transform: [{ translateY: coachingPanelTranslateY }],
+                }
+              : null,
+          ]}
+        >
+          {allowPanelDragHide ? (
+            <View {...coachingPanelPanResponder?.panHandlers} style={styles.panelDragHandle}>
+              <View style={styles.panelGrip} />
+              <Text style={styles.panelDragHint}>아래로 밀어 숨기기</Text>
+            </View>
+          ) : null}
+          <ScrollView contentContainerStyle={styles.sideCardContent} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+            <RealtimeCoachingPanel
+              lessonMode={lessonMode}
+              debugText={debugText}
+              currentDribbleCount={currentDribbleCount}
+              feedbackText={feedbackText}
+              lessonReview={lessonReview}
+              cameraError={cameraError}
+              isWideLayout={isWideLayout}
+            />
+          </ScrollView>
+        </Animated.View>
+
+        {allowPanelDragHide ? (
+          <View pointerEvents="box-none" style={styles.coachingRestoreWrap}>
+            <Animated.View
+              pointerEvents={isCoachingPanelHidden ? 'auto' : 'none'}
+              style={{
+                opacity: coachingRestoreOpacity,
+                transform: [{ translateY: coachingRestoreTranslateY }],
+              }}
+            >
+              <Pressable onPress={restoreCoachingPanel} style={({ pressed }) => [styles.coachingRestoreChip, pressed && styles.pressed]}>
+                <Text style={styles.coachingRestoreChipText}>^ 실시간 코칭</Text>
+              </Pressable>
+            </Animated.View>
           </View>
-        ) : (
-          <Animated.View
-            style={[
-              styles.sideCard,
-              styles.sideCardFloating,
-              isWideLayout
-                ? {
-                    top: 0,
-                    right: 0,
-                    width: floatingCoachingWidth,
-                    maxHeight: floatingCoachingHeight,
-                    transform: [{ translateY: coachingDragTranslateY }],
-                  }
-                : {
-                    left: 12,
-                    right: 12,
-                    bottom: 12,
-                    maxHeight: floatingCoachingHeight,
-                    transform: [{ translateY: coachingDragTranslateY }],
-                  },
-            ]}
-          >
-            {isDraggableCoachingOverlay ? (
-              <View {...coachingDragResponder.panHandlers} style={styles.panelDragHandle}>
-                <View style={styles.panelGrip} />
-                <Text style={styles.panelDragHint}>아래로 밀어 숨기기</Text>
-              </View>
-            ) : null}
-            <ScrollView contentContainerStyle={styles.sideCardContent} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-              <RealtimeCoachingPanel
-                lessonMode={lessonMode}
-                debugText={debugText}
-                currentDribbleCount={currentDribbleCount}
-                feedbackText={feedbackText}
-                lessonReview={lessonReview}
-                cameraError={cameraError}
-                isWideLayout={isWideLayout}
-              />
-            </ScrollView>
-          </Animated.View>
-        )}
+        ) : null}
       </View>
 
       <Modal visible={showDribbleGuide} transparent animationType="fade" onRequestClose={closeDribbleGuide}>
@@ -744,8 +834,8 @@ export function LessonScreen({
 
 const sharedPanel = {
   backgroundColor: colors.surface,
-  borderWidth: 1,
-  borderColor: colors.border,
+  borderWidth: 0,
+  borderColor: 'transparent',
   borderRadius: 18,
   padding: 18,
 } as const;
@@ -794,7 +884,18 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   heroCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 18,
+    padding: 18,
     minHeight: 320,
+    borderWidth: 0,
+    borderColor: 'transparent',
+  },
+  heroTitle: {
+    color: colors.textSoft,
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 10,
   },
   leadText: {
     color: colors.textMuted,
@@ -812,6 +913,7 @@ const styles = StyleSheet.create({
   cameraCard: {
     ...sharedPanel,
     flex: 1.2,
+    padding: 16,
   },
   sideCard: {
     ...sharedPanel,
@@ -882,8 +984,8 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 16,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
   coachingHeroTop: {
     flexDirection: 'row',
@@ -900,8 +1002,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
     backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
   liveDot: {
     width: 8,
@@ -920,8 +1022,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
     backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
   modePillText: {
     color: colors.textSoft,
@@ -939,66 +1041,60 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
   },
-  hiddenSectionWrap: {
-    marginBottom: 14,
-    padding: 12,
-    borderRadius: 14,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  hiddenSectionLabel: {
-    color: '#ffe0bc',
-    fontSize: 12,
-    fontWeight: '800',
-    marginBottom: 10,
-    letterSpacing: 0.8,
-  },
-  hiddenSectionChipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  hiddenSectionChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  hiddenSectionChipText: {
-    color: colors.textSoft,
-    fontSize: 12,
-    fontWeight: '800',
-  },
   sectionBlock: {
-    marginBottom: 2,
+    position: 'relative',
+    marginBottom: 10,
+    paddingBottom: 2,
+    borderBottomWidth: 0,
+    borderBottomColor: 'transparent',
   },
-  sectionHeader: {
+  sectionBlockCollapsed: {
+    paddingBottom: 0,
+    minHeight: 36,
+  },
+  sectionContentWrap: {
+    overflow: 'hidden',
+  },
+  sectionToggleButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 8,
-  },
-  sectionLabel: {
-    color: colors.textAccent,
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  sectionHideButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
+    gap: 6,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    justifyContent: 'center',
   },
-  sectionHideButtonText: {
+  sectionToggleButtonRound: {
+    width: 30,
+    height: 30,
+    borderRadius: 999,
+  },
+  sectionToggleButtonFloating: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 5,
+  },
+  sectionToggleButtonCollapsed: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    zIndex: 5,
+  },
+  sectionToggleButtonCollapsedChip: {
+    minHeight: 30,
+    maxWidth: 180,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+  },
+  sectionToggleIcon: {
+    color: colors.textSoft,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  sectionToggleLabel: {
     color: colors.textMuted,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
   },
   reviewWrap: {
@@ -1007,8 +1103,11 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 14,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
+  },
+  sectionCardWithToggleSpace: {
+    paddingRight: 54,
   },
   reviewTitle: {
     color: colors.text,
@@ -1031,7 +1130,16 @@ const styles = StyleSheet.create({
   modeButtons: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 14,
+  },
+  modeStatus: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    marginTop: 12,
+    marginBottom: 12,
   },
   modeButton: {
     flex: 1,
@@ -1039,8 +1147,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 14,
     backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
     alignItems: 'center',
   },
   modeButtonActive: {
@@ -1055,15 +1163,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
-  modeStatus: {
-    marginBottom: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
   modeStatusText: {
     color: colors.text,
     fontSize: 15,
@@ -1074,14 +1173,15 @@ const styles = StyleSheet.create({
     gap: 10,
     flexWrap: 'wrap',
     justifyContent: 'flex-start',
+    marginTop: 12,
   },
   errorBox: {
     marginBottom: 14,
     padding: 14,
     borderRadius: 14,
     backgroundColor: 'rgba(191, 80, 88, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(191, 80, 88, 0.3)',
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
   errorText: {
     color: '#ffd5d5',
@@ -1094,8 +1194,8 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 14,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
     gap: 8,
   },
   tipTitle: {
@@ -1117,8 +1217,8 @@ const styles = StyleSheet.create({
   modalCard: {
     borderRadius: 18,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
     padding: 20,
   },
   modalTitle: {
@@ -1150,8 +1250,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginBottom: 12,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
     backgroundColor: colors.surfaceStrong,
     color: colors.text,
     fontSize: 22,
@@ -1170,8 +1270,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
     backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
   viewSelectButtonActive: {
     backgroundColor: 'rgba(208,145,85,0.18)',
@@ -1199,8 +1299,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 12,
     backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
   modalGhostButtonText: {
     color: colors.text,

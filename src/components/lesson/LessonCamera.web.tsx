@@ -9,6 +9,7 @@ interface LessonCameraProps {
   lessonMode: LessonMode;
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
+  cameraSessionKey: number;
   isCameraActive: boolean;
   isCameraPreviewHidden: boolean;
   isLessonActive: boolean;
@@ -18,6 +19,7 @@ interface LessonCameraProps {
   shootResetToken: number;
   recordingStartToken: number;
   recordingStopToken: number;
+  cameraStopMode: 'review' | 'disconnect' | null;
   onPoseMessage: (event: WebViewMessageEvent) => void;
 }
 
@@ -25,6 +27,7 @@ export function LessonCamera({
   lessonMode,
   selectedBallBrand,
   selectedBallColors,
+  cameraSessionKey,
   isCameraActive,
   isCameraPreviewHidden,
   isLessonActive,
@@ -34,6 +37,7 @@ export function LessonCamera({
   shootResetToken,
   recordingStartToken,
   recordingStopToken,
+  cameraStopMode,
   onPoseMessage,
 }: LessonCameraProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -110,13 +114,17 @@ export function LessonCamera({
         })
       | undefined;
 
-    if (lessonMode === 'dribble') {
+    if (!cameraStopMode) {
+      return;
+    }
+
+    if (cameraStopMode === 'disconnect') {
       iframeWindow?.__codexStopRecordingAndDisconnectCamera?.();
       return;
     }
 
     iframeWindow?.__codexStopRecordingForReview?.();
-  }, [isCameraActive, lessonMode, recordingStopToken]);
+  }, [cameraStopMode, isCameraActive, lessonMode, recordingStopToken]);
 
   const srcDoc = useMemo(
     () => buildPoseWebHtml(lessonMode, selectedBallBrand, selectedBallColors),
@@ -128,6 +136,7 @@ export function LessonCamera({
       {isCameraActive ? (
         <>
           {createElement('iframe', {
+            key: `${lessonMode}-${cameraSessionKey}`,
             ref: iframeRef,
             srcDoc,
             allow: 'camera; microphone; autoplay',
@@ -169,8 +178,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cameraBg,
     borderRadius: 22,
     overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: colors.secondary,
+    borderWidth: 0,
+    borderColor: 'transparent',
     marginBottom: 16,
     position: 'relative',
   },

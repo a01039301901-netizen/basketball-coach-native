@@ -6,6 +6,7 @@ interface LessonCameraProps {
   lessonMode: LessonMode;
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
+  cameraSessionKey: number;
   isCameraActive: boolean;
   isCameraPreviewHidden: boolean;
   isLessonActive: boolean;
@@ -15,6 +16,7 @@ interface LessonCameraProps {
   shootResetToken: number;
   recordingStartToken: number;
   recordingStopToken: number;
+  cameraStopMode: 'review' | 'disconnect' | null;
   onPoseMessage: (event: WebViewMessageEvent) => void;
 }
 

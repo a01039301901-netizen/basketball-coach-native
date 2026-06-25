@@ -4,11 +4,12 @@ import { colors } from '../../theme/colors';
 interface InfoBoxProps {
   label: string;
   text: string;
+  reserveToggleSpace?: boolean;
 }
 
-export function InfoBox({ label, text }: InfoBoxProps) {
+export function InfoBox({ label, text, reserveToggleSpace = false }: InfoBoxProps) {
   return (
-    <View style={styles.box}>
+    <View style={[styles.box, reserveToggleSpace && styles.boxWithToggleSpace]}>
       <Text style={styles.label}>{label}</Text>
       <Text style={styles.text}>{text}</Text>
     </View>
@@ -21,8 +22,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
+  },
+  boxWithToggleSpace: {
+    paddingRight: 54,
   },
   label: {
     color: colors.textAccent,

@@ -97,6 +97,7 @@ export function DiaryScreen({
 }: DiaryScreenProps) {
   const { width } = useWindowDimensions();
   const isWide = width >= 980;
+  const isCompactMobile = width < 640;
   const [playbackFeedback, setPlaybackFeedback] = useState<Record<string, string>>({});
   const [showAllShotGraph, setShowAllShotGraph] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
@@ -260,14 +261,26 @@ export function DiaryScreen({
 
   return (
     <Card title="기록일지">
-      <View style={styles.dateSelectorRow}>
-        <View style={[styles.dateStatusBadge, selectedDateAttendance.isDefault && styles.dateStatusBadgeDefault]}>
+      <View style={[styles.dateSelectorRow, isCompactMobile && styles.dateSelectorRowCompact]}>
+        <View
+          style={[
+            styles.dateStatusBadge,
+            selectedDateAttendance.isDefault && styles.dateStatusBadgeDefault,
+            isCompactMobile && styles.dateStatusBadgeCompact,
+          ]}
+        >
           <Text style={styles.dateStatusText}>
             {selectedDateAttendance.icon} {selectedDateAttendance.label}
           </Text>
         </View>
 
-        <View style={styles.dateSelectorMain}>
+        {isCompactMobile ? (
+          <View style={styles.dateCalendarButtonWrap}>
+            <SmallButton title="달력" onPress={() => setShowCalendarModal(true)} variant="dark" />
+          </View>
+        ) : null}
+
+        <View style={[styles.dateSelectorMain, isCompactMobile && styles.dateSelectorMainCompact]}>
           <Pressable onPress={() => moveSelectedDate(-1)} style={({ pressed }) => [styles.dateArrowButton, pressed && styles.pressed]}>
             <Text style={styles.dateArrowText}>{'<'}</Text>
           </Pressable>
@@ -277,7 +290,7 @@ export function DiaryScreen({
           </Pressable>
         </View>
 
-        <SmallButton title="달력" onPress={() => setShowCalendarModal(true)} variant="dark" />
+        {!isCompactMobile ? <SmallButton title="달력" onPress={() => setShowCalendarModal(true)} variant="dark" /> : null}
       </View>
 
       <View style={styles.recordsSection}>
@@ -746,6 +759,11 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 16,
   },
+  dateSelectorRowCompact: {
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'stretch',
+  },
   dateSelectorMain: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -759,6 +777,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  dateSelectorMainCompact: {
+    width: '100%',
   },
   dateArrowButton: {
     width: 34,
@@ -783,6 +804,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(208,145,85,0.28)',
   },
+  dateStatusBadgeCompact: {
+    alignSelf: 'flex-start',
+  },
   dateStatusBadgeDefault: {
     backgroundColor: colors.surfaceStrong,
     borderColor: colors.border,
@@ -798,6 +822,10 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textAlign: 'center',
     minWidth: 0,
+    flexShrink: 1,
+  },
+  dateCalendarButtonWrap: {
+    alignSelf: 'flex-end',
   },
   calendarTop: {
     flexDirection: 'row',

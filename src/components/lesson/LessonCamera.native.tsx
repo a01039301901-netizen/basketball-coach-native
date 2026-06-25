@@ -9,6 +9,7 @@ interface LessonCameraProps {
   lessonMode: LessonMode;
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
+  cameraSessionKey: number;
   isCameraActive: boolean;
   isCameraPreviewHidden: boolean;
   isLessonActive: boolean;
@@ -18,6 +19,7 @@ interface LessonCameraProps {
   shootResetToken: number;
   recordingStartToken: number;
   recordingStopToken: number;
+  cameraStopMode: 'review' | 'disconnect' | null;
   onPoseMessage: (event: WebViewMessageEvent) => void;
 }
 
@@ -25,6 +27,7 @@ export function LessonCamera({
   lessonMode,
   selectedBallBrand,
   selectedBallColors,
+  cameraSessionKey,
   isCameraActive,
   isCameraPreviewHidden,
   isLessonActive,
@@ -34,6 +37,7 @@ export function LessonCamera({
   shootResetToken,
   recordingStartToken,
   recordingStopToken,
+  cameraStopMode,
   onPoseMessage,
 }: LessonCameraProps) {
   const webViewRef = useRef<WebView>(null);
@@ -73,24 +77,29 @@ export function LessonCamera({
       return;
     }
 
+    if (!cameraStopMode) {
+      return;
+    }
+
     const stopScript =
-      lessonMode === 'dribble'
+      cameraStopMode === 'disconnect'
         ? "window.__codexStopRecordingAndDisconnectCamera && window.__codexStopRecordingAndDisconnectCamera(); true;"
         : "window.__codexStopRecordingForReview && window.__codexStopRecordingForReview(); true;";
 
     webViewRef.current?.injectJavaScript(
       stopScript
     );
-  }, [isCameraActive, lessonMode, recordingStopToken]);
+  }, [cameraStopMode, isCameraActive, lessonMode, recordingStopToken]);
 
   return (
     <View style={styles.videoWrap}>
       {isCameraActive ? (
         <>
           <WebView
+            key={`${lessonMode}-${cameraSessionKey}`}
             ref={webViewRef}
             originWhitelist={['https://*']}
-            source={{ uri: POSE_WEB_BOOTSTRAP_URL }}
+            source={{ uri: `${POSE_WEB_BOOTSTRAP_URL}?session=${cameraSessionKey}&mode=${lessonMode}` }}
             style={[styles.webview, isCameraPreviewHidden && styles.hiddenCapture]}
             onMessage={onPoseMessage}
             injectedJavaScriptBeforeContentLoaded={buildPoseBootstrapScript(lessonMode, selectedBallBrand, selectedBallColors)}

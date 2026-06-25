@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { Animated, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SmallButton } from './src/components/common/Buttons';
@@ -9,10 +9,13 @@ import { AuthScreen } from './src/screens/AuthScreen';
 import { DiaryScreen } from './src/screens/DiaryScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { LessonScreen } from './src/screens/LessonScreen';
+import { ProfileScreen } from './src/screens/ProfileScreen';
 import { RulesGuideScreen } from './src/screens/RulesGuideScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { SkillScreen } from './src/screens/SkillScreen';
 import { colors } from './src/theme/colors';
+
+type SideDrawerType = 'settings' | 'profile';
 
 export default function App() {
   const app = useBasketballCoachApp();
@@ -20,72 +23,55 @@ export default function App() {
   const showBack = Boolean(app.currentUser && app.screen !== 'home');
   const isLessonScreen = app.isReady && app.currentUser && app.screen === 'lesson';
   const isHomeScreen = app.isReady && app.currentUser && app.screen === 'home';
-  const headerVisibility = useRef(new Animated.Value(1)).current;
-  const settingsDrawerProgress = useRef(new Animated.Value(0)).current;
-  const headerVisibilityTargetRef = useRef<0 | 1>(1);
-  const lastScrollYRef = useRef(0);
+  const headerScrollY = useRef(new Animated.Value(0)).current;
+  const sideDrawerProgress = useRef(new Animated.Value(0)).current;
   const [headerMeasuredHeight, setHeaderMeasuredHeight] = useState(0);
-  const [isSettingsDrawerVisible, setIsSettingsDrawerVisible] = useState(false);
-  const [shouldRenderSettingsDrawer, setShouldRenderSettingsDrawer] = useState(false);
+  const [activeDrawer, setActiveDrawer] = useState<SideDrawerType | null>(null);
+  const [renderedDrawer, setRenderedDrawer] = useState<SideDrawerType>('settings');
+  const [shouldRenderDrawer, setShouldRenderDrawer] = useState(false);
   const effectiveHeaderHeight = Math.max(headerMeasuredHeight, 96);
-  const settingsDrawerWidth =
+  const sideDrawerWidth =
     width >= 960 ? Math.min(width * 0.48, 460) : Math.min(Math.max(width * 0.82, 280), width - 16);
-
-  const animateHeader = useCallback(
-    (nextValue: 0 | 1) => {
-      if (headerVisibilityTargetRef.current === nextValue) {
-        return;
-      }
-
-      headerVisibilityTargetRef.current = nextValue;
-      Animated.timing(headerVisibility, {
-        toValue: nextValue,
-        duration: 220,
-        useNativeDriver: false,
-      }).start();
-    },
-    [headerVisibility]
+  const isDrawerVisible = activeDrawer !== null;
+  const shouldShowDrawer = shouldRenderDrawer && Boolean(app.currentUser) && !isLessonScreen;
+  const visibleDrawer = activeDrawer ?? renderedDrawer;
+  const sideDrawerTitle = visibleDrawer === 'profile' ? '프로필' : '설정';
+  const headerScrollClamp = useMemo(
+    () => Animated.diffClamp(headerScrollY, 0, effectiveHeaderHeight),
+    [effectiveHeaderHeight, headerScrollY]
   );
-
-  const handleScroll = useCallback(
-    (event: { nativeEvent: { contentOffset: { y: number } } }) => {
-      const nextScrollY = Math.max(0, event.nativeEvent.contentOffset.y);
-
-      if (nextScrollY <= 4) {
-        lastScrollYRef.current = 0;
-        animateHeader(1);
-        return;
-      }
-
-      const delta = nextScrollY - lastScrollYRef.current;
-
-      if (delta > 10) {
-        animateHeader(0);
-      } else if (delta < -10) {
-        animateHeader(1);
-      }
-
-      lastScrollYRef.current = nextScrollY;
-    },
-    [animateHeader]
+  const handleHeaderScroll = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { y: headerScrollY } } }], {
+        useNativeDriver: true,
+      }),
+    [headerScrollY]
   );
 
   useEffect(() => {
-    lastScrollYRef.current = 0;
-    headerVisibilityTargetRef.current = 1;
-    headerVisibility.setValue(1);
-  }, [app.currentUser, app.screen, headerVisibility]);
+    headerScrollY.setValue(0);
+  }, [app.currentUser, app.screen, headerScrollY]);
 
   useEffect(() => {
-    if (!isHomeScreen) {
-      setIsSettingsDrawerVisible(false);
+    setActiveDrawer(null);
+  }, [app.screen]);
+
+  useEffect(() => {
+    if (activeDrawer) {
+      setRenderedDrawer(activeDrawer);
     }
-  }, [isHomeScreen]);
+  }, [activeDrawer]);
 
   useEffect(() => {
-    if (isSettingsDrawerVisible) {
-      setShouldRenderSettingsDrawer(true);
-      Animated.spring(settingsDrawerProgress, {
+    if (!app.currentUser || isLessonScreen || (activeDrawer === 'settings' && !isHomeScreen)) {
+      setActiveDrawer(null);
+    }
+  }, [activeDrawer, app.currentUser, isHomeScreen, isLessonScreen]);
+
+  useEffect(() => {
+    if (isDrawerVisible) {
+      setShouldRenderDrawer(true);
+      Animated.spring(sideDrawerProgress, {
         toValue: 1,
         useNativeDriver: true,
         damping: 22,
@@ -95,39 +81,37 @@ export default function App() {
       return;
     }
 
-    if (!shouldRenderSettingsDrawer) {
-      settingsDrawerProgress.setValue(0);
+    if (!shouldRenderDrawer) {
+      sideDrawerProgress.setValue(0);
       return;
     }
 
-    Animated.timing(settingsDrawerProgress, {
+    Animated.timing(sideDrawerProgress, {
       toValue: 0,
       duration: 220,
       useNativeDriver: true,
     }).start(({ finished }) => {
       if (finished) {
-        setShouldRenderSettingsDrawer(false);
+        setShouldRenderDrawer(false);
       }
     });
-  }, [isSettingsDrawerVisible, settingsDrawerProgress, shouldRenderSettingsDrawer]);
+  }, [isDrawerVisible, sideDrawerProgress, shouldRenderDrawer]);
 
-  const animatedHeaderHeight = headerVisibility.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, effectiveHeaderHeight],
+  const animatedHeaderOpacity = headerScrollClamp.interpolate({
+    inputRange: [0, effectiveHeaderHeight * 0.55, effectiveHeaderHeight],
+    outputRange: [1, 0.5, 0.38],
+    extrapolate: 'clamp',
   });
-  const animatedHeaderOpacity = headerVisibility.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
+  const animatedHeaderTranslateY = headerScrollClamp.interpolate({
+    inputRange: [0, effectiveHeaderHeight],
+    outputRange: [0, -Math.max(0, effectiveHeaderHeight - 42)],
+    extrapolate: 'clamp',
   });
-  const animatedHeaderTranslateY = headerVisibility.interpolate({
+  const sideDrawerTranslateX = sideDrawerProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [-Math.round(effectiveHeaderHeight * 0.18), 0],
+    outputRange: [sideDrawerWidth + 24, 0],
   });
-  const settingsDrawerTranslateX = settingsDrawerProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [settingsDrawerWidth + 24, 0],
-  });
-  const settingsBackdropOpacity = settingsDrawerProgress.interpolate({
+  const sideDrawerBackdropOpacity = sideDrawerProgress.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 1],
   });
@@ -142,7 +126,6 @@ export default function App() {
             style={[
               styles.headerAnimatedWrap,
               {
-                height: animatedHeaderHeight,
                 opacity: animatedHeaderOpacity,
                 transform: [{ translateY: animatedHeaderTranslateY }],
               },
@@ -157,7 +140,13 @@ export default function App() {
                 }
               }}
             >
-              <Header showBack={showBack} onBack={() => void app.navigateTo('home')} />
+              <Header
+                showBack={showBack}
+                onBack={() => void app.navigateTo('home')}
+                showProfile={Boolean(app.currentUser)}
+                profileLabel={app.currentUser?.nickname}
+                onOpenProfile={() => setActiveDrawer('profile')}
+              />
             </View>
           </Animated.View>
         ) : null}
@@ -178,6 +167,7 @@ export default function App() {
               shootResetToken={app.shootResetToken}
               recordingStartToken={app.recordingStartToken}
               recordingStopToken={app.recordingStopToken}
+              cameraStopMode={app.cameraStopMode}
               debugText={app.debugText}
               feedbackText={app.feedbackText}
               lessonReview={app.lessonReview}
@@ -194,10 +184,10 @@ export default function App() {
             />
           </View>
         ) : (
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
+          <Animated.ScrollView
+            contentContainerStyle={[styles.scrollContent, { paddingTop: effectiveHeaderHeight }]}
             showsVerticalScrollIndicator={false}
-            onScroll={handleScroll}
+            onScroll={handleHeaderScroll}
             scrollEventThrottle={16}
           >
           {!app.isReady && (
@@ -234,7 +224,7 @@ export default function App() {
               onOpenDiary={() => void app.navigateTo('diary')}
               onOpenSkill={() => void app.navigateTo('skill')}
               onOpenRules={() => void app.navigateTo('rules')}
-              onOpenSettings={() => setIsSettingsDrawerVisible(true)}
+              onOpenSettings={() => setActiveDrawer('settings')}
             />
           )}
 
@@ -263,7 +253,6 @@ export default function App() {
 
           {app.isReady && app.currentUser && app.screen === 'settings' && (
             <SettingsScreen
-              currentUser={app.currentUser}
               selectedBallBrand={app.selectedBallBrand}
               selectedBallColors={app.selectedBallColors}
               selectedPosition={app.selectedPosition}
@@ -272,35 +261,33 @@ export default function App() {
               onToggleBallColor={app.toggleBallColor}
               onSelectPosition={app.selectPosition}
               onApplyHomeworkTestState={app.applyHomeworkTestState}
-              onLogout={() => void app.logout()}
-              onCreateTransferCode={app.createTransferCode}
             />
           )}
 
           {app.isReady && app.currentUser && app.screen === 'rules' && <RulesGuideScreen />}
-          </ScrollView>
+          </Animated.ScrollView>
         )}
-        {shouldRenderSettingsDrawer && isHomeScreen ? (
+        {shouldShowDrawer ? (
           <View pointerEvents="box-none" style={styles.settingsOverlay}>
             <Pressable
-              onPress={() => setIsSettingsDrawerVisible(false)}
+              onPress={() => setActiveDrawer(null)}
               style={styles.settingsBackdropPressable}
             >
-              <Animated.View style={[styles.settingsBackdrop, { opacity: settingsBackdropOpacity }]} />
+              <Animated.View style={[styles.settingsBackdrop, { opacity: sideDrawerBackdropOpacity }]} />
             </Pressable>
             <Animated.View
               style={[
                 styles.settingsDrawer,
                 {
-                  width: settingsDrawerWidth,
-                  transform: [{ translateX: settingsDrawerTranslateX }],
+                  width: sideDrawerWidth,
+                  transform: [{ translateX: sideDrawerTranslateX }],
                 },
               ]}
             >
               <View style={styles.settingsDrawerHeader}>
-                <Text style={styles.settingsDrawerTitle}>⚙️ 설정</Text>
+                <Text style={styles.settingsDrawerTitle}>{sideDrawerTitle}</Text>
                 <Pressable
-                  onPress={() => setIsSettingsDrawerVisible(false)}
+                  onPress={() => setActiveDrawer(null)}
                   style={({ pressed }) => [styles.settingsDrawerCloseButton, pressed && styles.pressed]}
                 >
                   <Text style={styles.settingsDrawerCloseText}>닫기</Text>
@@ -311,22 +298,28 @@ export default function App() {
                 contentContainerStyle={styles.settingsDrawerContent}
                 showsVerticalScrollIndicator={false}
               >
-                <SettingsScreen
-                  currentUser={app.currentUser!}
-                  selectedBallBrand={app.selectedBallBrand}
-                  selectedBallColors={app.selectedBallColors}
-                  selectedPosition={app.selectedPosition}
-                  homeworkTestState={app.homeworkTestState}
-                  onSelectBallBrand={app.selectBallBrand}
-                  onToggleBallColor={app.toggleBallColor}
-                  onSelectPosition={app.selectPosition}
-                  onApplyHomeworkTestState={app.applyHomeworkTestState}
-                  onLogout={() => {
-                    setIsSettingsDrawerVisible(false);
-                    void app.logout();
-                  }}
-                  onCreateTransferCode={app.createTransferCode}
-                />
+                {visibleDrawer === 'profile' ? (
+                  <ProfileScreen
+                    currentUser={app.currentUser!}
+                    onUpdateProfile={app.updateProfile}
+                    onChangePassword={app.changePassword}
+                    onLogout={() => {
+                      setActiveDrawer(null);
+                      void app.logout();
+                    }}
+                  />
+                ) : (
+                  <SettingsScreen
+                    selectedBallBrand={app.selectedBallBrand}
+                    selectedBallColors={app.selectedBallColors}
+                    selectedPosition={app.selectedPosition}
+                    homeworkTestState={app.homeworkTestState}
+                    onSelectBallBrand={app.selectBallBrand}
+                    onToggleBallColor={app.toggleBallColor}
+                    onSelectPosition={app.selectPosition}
+                    onApplyHomeworkTestState={app.applyHomeworkTestState}
+                  />
+                )}
               </ScrollView>
             </Animated.View>
           </View>
@@ -358,7 +351,13 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   headerAnimatedWrap: {
-    overflow: 'hidden',
+    position: 'absolute',
+    top: 12,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 4,
+    zIndex: 20,
+    backgroundColor: colors.background,
   },
   settingsOverlay: {
     ...StyleSheet.absoluteFillObject,
