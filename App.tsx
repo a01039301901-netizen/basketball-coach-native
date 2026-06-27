@@ -16,6 +16,7 @@ import { SkillScreen } from './src/screens/SkillScreen';
 import { colors } from './src/theme/colors';
 
 type SideDrawerType = 'settings' | 'profile';
+const APP_TOP_OFFSET = 12;
 
 export default function App() {
   const app = useBasketballCoachApp();
@@ -99,12 +100,12 @@ export default function App() {
 
   const animatedHeaderOpacity = headerScrollClamp.interpolate({
     inputRange: [0, effectiveHeaderHeight * 0.55, effectiveHeaderHeight],
-    outputRange: [1, 0.5, 0.38],
+    outputRange: [1, 0.35, 0],
     extrapolate: 'clamp',
   });
   const animatedHeaderTranslateY = headerScrollClamp.interpolate({
     inputRange: [0, effectiveHeaderHeight],
-    outputRange: [0, -Math.max(0, effectiveHeaderHeight - 42)],
+    outputRange: [0, -(effectiveHeaderHeight + APP_TOP_OFFSET)],
     extrapolate: 'clamp',
   });
   const sideDrawerTranslateX = sideDrawerProgress.interpolate({
@@ -338,7 +339,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: APP_TOP_OFFSET,
     position: 'relative',
   },
   scrollContent: {
@@ -352,7 +353,7 @@ const styles = StyleSheet.create({
   },
   headerAnimatedWrap: {
     position: 'absolute',
-    top: 12,
+    top: APP_TOP_OFFSET,
     left: 0,
     right: 0,
     paddingHorizontal: 4,

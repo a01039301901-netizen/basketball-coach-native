@@ -119,7 +119,6 @@ function ReviewClipPlayer({ clip, reserveToggleSpace = false }: ReviewClipPlayer
 
 interface RealtimeCoachingPanelProps {
   lessonMode: LessonMode;
-  debugText: string;
   currentDribbleCount: number;
   feedbackText: string;
   lessonReview: LessonReviewClip | null;
@@ -127,7 +126,7 @@ interface RealtimeCoachingPanelProps {
   isWideLayout: boolean;
 }
 
-type CoachingSectionKey = 'status' | 'dribbleCount' | 'feedback' | 'review' | 'camera' | 'tips';
+type CoachingSectionKey = 'dribbleCount' | 'feedback' | 'review' | 'camera' | 'tips';
 
 interface CoachingSectionProps {
   title: string;
@@ -207,7 +206,6 @@ function CoachingSection({ title, collapsed, allowCollapse, onToggle, children }
 
 function RealtimeCoachingPanel({
   lessonMode,
-  debugText,
   currentDribbleCount,
   feedbackText,
   lessonReview,
@@ -221,7 +219,6 @@ function RealtimeCoachingPanel({
       ? '준비자세와 발사 흐름을 보면서 바로 고치면 좋은 점을 알려드려요.'
       : '드리블 리듬과 자세를 따라가며 지금 바로 바꾸면 좋은 점을 알려드려요.';
   const [hiddenSections, setHiddenSections] = useState<Record<CoachingSectionKey, boolean>>({
-    status: false,
     dribbleCount: false,
     feedback: false,
     review: false,
@@ -252,16 +249,6 @@ function RealtimeCoachingPanel({
         <Text style={styles.sideTitle}>실시간 코칭</Text>
         <Text style={styles.sideSubtitle}>{modeSummary}</Text>
       </View>
-
-      <CoachingSection
-        title="현재 흐름"
-        collapsed={hiddenSections.status}
-        allowCollapse={allowSectionCollapse}
-        onToggle={() => toggleSection('status')}
-      >
-        <InfoBox label="진행 상태" text={debugText} reserveToggleSpace={allowSectionCollapse} />
-      </CoachingSection>
-
       {lessonMode === 'dribble' ? (
         <CoachingSection
           title="드리블 횟수"
@@ -361,13 +348,19 @@ export function LessonScreen({
 }: LessonScreenProps) {
   const { width, height } = useWindowDimensions();
   const isWideLayout = width >= 1080;
+  const isLandscapeMobileLayout = !isWideLayout && width > height;
+  const isSideDockedCoaching = isWideLayout || isLandscapeMobileLayout;
   const isLessonSessionBusy = isLessonActive || isCameraActive;
-  const allowPanelDragHide = !isWideLayout;
-  const floatingCoachingHeight = isWideLayout ? Math.max(420, Math.min(height - 40, 760)) : Math.max(260, Math.min(height * 0.42, 380));
-  const floatingCoachingWidth = isWideLayout ? Math.max(320, Math.min(width * 0.32, 420)) : Math.min(width - 24, 420);
+  const allowPanelDragHide = !isSideDockedCoaching;
+  const floatingCoachingHeight = isSideDockedCoaching ? Math.max(320, Math.min(height - 24, 760)) : Math.max(260, Math.min(height * 0.42, 380));
+  const floatingCoachingWidth = isWideLayout
+    ? Math.max(320, Math.min(width * 0.32, 420))
+    : isLandscapeMobileLayout
+      ? Math.max(280, Math.min(width * 0.34, 360))
+      : Math.min(width - 24, 420);
   const coachingHiddenOffset = floatingCoachingHeight + 48;
   const coachingHideThreshold = Math.min(120, Math.max(72, floatingCoachingHeight * 0.24));
-  const coachingPanelTranslateY = useRef(new Animated.Value(0)).current;
+  const coachingPanelTranslateY = useRef(new Animated.Value(allowPanelDragHide ? coachingHiddenOffset : 0)).current;
   const coachingPanelTranslateYRef = useRef(0);
   const coachingPanelDragStartRef = useRef(0);
 
@@ -376,7 +369,7 @@ export function LessonScreen({
   const [showShootGuide, setShowShootGuide] = useState(false);
   const [shootGuideStep, setShootGuideStep] = useState(0);
   const [dribbleCountInput, setDribbleCountInput] = useState('10');
-  const [isCoachingPanelHidden, setIsCoachingPanelHidden] = useState(false);
+  const [isCoachingPanelHidden, setIsCoachingPanelHidden] = useState(allowPanelDragHide);
 
   const parsedDribbleCount = useMemo(() => {
     const nextValue = Number.parseInt(dribbleCountInput, 10);
@@ -451,6 +444,19 @@ export function LessonScreen({
     restoreCoachingPanel();
   }
 
+  function finishCoachingPanelRestoreDrag(dy: number, vy: number) {
+    const dragDistance = Math.max(0, Math.min(coachingHiddenOffset, coachingPanelDragStartRef.current + dy));
+    const restoredDistance = coachingHiddenOffset - dragDistance;
+    const shouldRestore = restoredDistance >= coachingHideThreshold || vy <= -0.9;
+
+    if (shouldRestore) {
+      restoreCoachingPanel();
+      return;
+    }
+
+    hideCoachingPanel();
+  }
+
   const coachingPanelPanResponder = allowPanelDragHide
     ? PanResponder.create({
         onStartShouldSetPanResponder: () => true,
@@ -469,6 +475,27 @@ export function LessonScreen({
         },
         onPanResponderTerminate: (_, gestureState) => {
           finishCoachingPanelDrag(gestureState.dy, gestureState.vy);
+        },
+      })
+    : null;
+  const coachingRestorePanResponder = allowPanelDragHide
+    ? PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+          Math.abs(gestureState.dy) > Math.abs(gestureState.dx) && Math.abs(gestureState.dy) > 4,
+        onPanResponderGrant: () => {
+          coachingPanelTranslateY.stopAnimation();
+          coachingPanelDragStartRef.current = coachingPanelTranslateYRef.current;
+        },
+        onPanResponderMove: (_, gestureState) => {
+          const nextValue = Math.max(0, Math.min(coachingHiddenOffset, coachingPanelDragStartRef.current + gestureState.dy));
+          coachingPanelTranslateY.setValue(nextValue);
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          finishCoachingPanelRestoreDrag(gestureState.dy, gestureState.vy);
+        },
+        onPanResponderTerminate: (_, gestureState) => {
+          finishCoachingPanelRestoreDrag(gestureState.dy, gestureState.vy);
         },
       })
     : null;
@@ -560,100 +587,110 @@ export function LessonScreen({
         </Pressable>
       </View>
 
-      <ScrollView
-        style={styles.screenScroll}
-        contentContainerStyle={[
-          styles.contentGap,
-          styles.screenScrollContent,
-          isWideLayout ? styles.screenScrollContentWide : null,
-          !isWideLayout ? { paddingBottom: floatingCoachingHeight + 36 } : null,
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.heroCard}>
-          <Text style={styles.heroTitle}>AI 레슨 받기</Text>
-          <Text style={styles.leadText}>
-            실시간 자세 분석을 통해 드리블과 슛 동작을 확인하고, 지금 움직임에 맞는 코칭 피드백을 바로 볼 수 있습니다.
-          </Text>
+      <View style={[styles.lessonViewport, isSideDockedCoaching ? styles.lessonViewportDocked : null]}>
+        <ScrollView
+          style={[styles.screenScroll, isSideDockedCoaching ? styles.screenScrollDocked : null]}
+          contentContainerStyle={[
+            styles.contentGap,
+            styles.screenScrollContent,
+            !isSideDockedCoaching ? { paddingBottom: floatingCoachingHeight + 36 } : null,
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.heroCard}>
+            <Text style={styles.heroTitle}>AI 레슨 받기</Text>
+            <Text style={styles.leadText}>
+              실시간 자세 분석을 통해 드리블과 슛 동작을 확인하고, 지금 움직임에 맞는 코칭 피드백을 바로 볼 수 있습니다.
+            </Text>
 
-          <View style={[styles.lessonLayout, isWideLayout && styles.lessonLayoutWide]}>
-            <View style={styles.cameraCard}>
-              <View style={styles.modeButtons}>
-                <ModeButton
-                  title="드리블 분석"
-                  active={lessonMode === 'dribble'}
-                  disabled={isLessonSessionBusy}
-                  onPress={() => onSelectMode('dribble')}
+            <View style={styles.lessonLayout}>
+              <View style={styles.cameraCard}>
+                <View style={styles.modeButtons}>
+                  <ModeButton
+                    title="드리블 분석"
+                    active={lessonMode === 'dribble'}
+                    disabled={isLessonSessionBusy}
+                    onPress={() => onSelectMode('dribble')}
+                  />
+                  <ModeButton
+                    title="슛 분석"
+                    active={lessonMode === 'shoot'}
+                    disabled={isLessonSessionBusy}
+                    onPress={() => onSelectMode('shoot')}
+                  />
+                </View>
+
+                <View style={styles.modeStatus}>
+                  <Text style={styles.modeStatusText}>{lessonMode === 'shoot' ? '현재 선택: 슛 분석' : '현재 선택: 드리블 분석'}</Text>
+                </View>
+
+                <LessonCamera
+                  key={cameraSessionKey}
+                  lessonMode={lessonMode}
+                  selectedBallBrand={selectedBallBrand}
+                  selectedBallColors={selectedBallColors}
+                  cameraSessionKey={cameraSessionKey}
+                  isCameraActive={isCameraActive}
+                  isCameraPreviewHidden={isCameraPreviewHidden}
+                  isLessonActive={isLessonActive}
+                  isCameraReady={isCameraReady}
+                  countdownValue={countdownValue}
+                  dribbleResetToken={dribbleResetToken}
+                  shootResetToken={shootResetToken}
+                  recordingStartToken={recordingStartToken}
+                  recordingStopToken={recordingStopToken}
+                  cameraStopMode={cameraStopMode}
+                  onPoseMessage={onPoseMessage}
                 />
-                <ModeButton
-                  title="슛 분석"
-                  active={lessonMode === 'shoot'}
-                  disabled={isLessonSessionBusy}
-                  onPress={() => onSelectMode('shoot')}
-                />
-              </View>
 
-              <View style={styles.modeStatus}>
-                <Text style={styles.modeStatusText}>{lessonMode === 'shoot' ? '현재 선택: 슛 분석' : '현재 선택: 드리블 분석'}</Text>
-              </View>
-
-              <LessonCamera
-                key={cameraSessionKey}
-                lessonMode={lessonMode}
-                selectedBallBrand={selectedBallBrand}
-                selectedBallColors={selectedBallColors}
-                cameraSessionKey={cameraSessionKey}
-                isCameraActive={isCameraActive}
-                isCameraPreviewHidden={isCameraPreviewHidden}
-                isLessonActive={isLessonActive}
-                isCameraReady={isCameraReady}
-                countdownValue={countdownValue}
-                dribbleResetToken={dribbleResetToken}
-                shootResetToken={shootResetToken}
-                recordingStartToken={recordingStartToken}
-                recordingStopToken={recordingStopToken}
-                cameraStopMode={cameraStopMode}
-                onPoseMessage={onPoseMessage}
-              />
-
-              <View style={styles.cameraControls}>
-                <SmallButton title="레슨 시작" onPress={openLessonStart} disabled={isLessonSessionBusy} />
-                {lessonMode === 'shoot' && isShootSuccessButtonVisible ? (
-                  <SmallButton title="슛 성공" onPress={onRegisterSuccessfulShot} variant="dark" />
-                ) : null}
-                <SmallButton
-                  title="레슨 끝내기"
-                  onPress={onEndLesson}
-                  variant="red"
-                  disabled={!isLessonActive && !isCameraActive}
-                />
+                <View style={styles.cameraControls}>
+                  <SmallButton title="레슨 시작" onPress={openLessonStart} disabled={isLessonSessionBusy} />
+                  {lessonMode === 'shoot' && isShootSuccessButtonVisible ? (
+                    <SmallButton title="슛 성공" onPress={onRegisterSuccessfulShot} variant="dark" />
+                  ) : null}
+                  <SmallButton
+                    title="레슨 끝내기"
+                    onPress={onEndLesson}
+                    variant="red"
+                    disabled={!isLessonActive && !isCameraActive}
+                  />
+                </View>
               </View>
             </View>
-
-            {isWideLayout ? <View style={[styles.sideCardSpacer, { width: floatingCoachingWidth }]} /> : null}
           </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
 
+        {isSideDockedCoaching ? (
+          <View style={[styles.sideRail, { width: floatingCoachingWidth, paddingTop: 44, paddingBottom: 32 }]}>
+            <View style={[styles.sideCard, styles.sideCardDocked, { maxHeight: floatingCoachingHeight }]}>
+              <ScrollView contentContainerStyle={styles.sideCardContent} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+                <RealtimeCoachingPanel
+                  lessonMode={lessonMode}
+                  currentDribbleCount={currentDribbleCount}
+                  feedbackText={feedbackText}
+                  lessonReview={lessonReview}
+                  cameraError={cameraError}
+                  isWideLayout={isWideLayout}
+                />
+              </ScrollView>
+            </View>
+          </View>
+        ) : null}
+      </View>
+
+      {!isSideDockedCoaching ? (
       <View pointerEvents="box-none" style={styles.coachingOverlay}>
         <Animated.View
           pointerEvents={allowPanelDragHide && isCoachingPanelHidden ? 'none' : 'auto'}
           style={[
             styles.sideCard,
             styles.sideCardFloating,
-            isWideLayout
-              ? {
-                  top: 0,
-                  right: 0,
-                  width: floatingCoachingWidth,
-                  maxHeight: floatingCoachingHeight,
-                }
-              : {
-                  left: 12,
-                  right: 12,
-                  bottom: 12,
-                  maxHeight: floatingCoachingHeight,
-                },
+            {
+              left: 12,
+              right: 12,
+              bottom: 12,
+              maxHeight: floatingCoachingHeight,
+            },
             allowPanelDragHide
               ? {
                   transform: [{ translateY: coachingPanelTranslateY }],
@@ -670,7 +707,6 @@ export function LessonScreen({
           <ScrollView contentContainerStyle={styles.sideCardContent} showsVerticalScrollIndicator={false} nestedScrollEnabled>
             <RealtimeCoachingPanel
               lessonMode={lessonMode}
-              debugText={debugText}
               currentDribbleCount={currentDribbleCount}
               feedbackText={feedbackText}
               lessonReview={lessonReview}
@@ -681,9 +717,13 @@ export function LessonScreen({
         </Animated.View>
 
         {allowPanelDragHide ? (
-          <View pointerEvents="box-none" style={styles.coachingRestoreWrap}>
+          <View
+            pointerEvents="box-none"
+            style={[styles.coachingRestoreWrap, isLandscapeMobileLayout ? styles.coachingRestoreWrapWide : null]}
+          >
             <Animated.View
               pointerEvents={isCoachingPanelHidden ? 'auto' : 'none'}
+              {...coachingRestorePanResponder?.panHandlers}
               style={{
                 opacity: coachingRestoreOpacity,
                 transform: [{ translateY: coachingRestoreTranslateY }],
@@ -696,6 +736,7 @@ export function LessonScreen({
           </View>
         ) : null}
       </View>
+      ) : null}
 
       <Modal visible={showDribbleGuide} transparent animationType="fade" onRequestClose={closeDribbleGuide}>
         <View style={styles.modalBackdrop}>
@@ -873,15 +914,24 @@ const styles = StyleSheet.create({
   screenScroll: {
     flex: 1,
   },
+  screenScrollDocked: {
+    flex: 1,
+    minWidth: 0,
+  },
   screenScrollContent: {
     paddingTop: 44,
     paddingBottom: 32,
   },
-  screenScrollContentWide: {
-    paddingRight: 12,
-  },
   contentGap: {
     gap: 16,
+  },
+  lessonViewport: {
+    flex: 1,
+  },
+  lessonViewportDocked: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 18,
   },
   heroCard: {
     backgroundColor: colors.surface,
@@ -890,6 +940,8 @@ const styles = StyleSheet.create({
     minHeight: 320,
     borderWidth: 0,
     borderColor: 'transparent',
+    width: '100%',
+    alignSelf: 'stretch',
   },
   heroTitle: {
     color: colors.textSoft,
@@ -905,15 +957,14 @@ const styles = StyleSheet.create({
   },
   lessonLayout: {
     gap: 18,
-  },
-  lessonLayoutWide: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    width: '100%',
   },
   cameraCard: {
     ...sharedPanel,
-    flex: 1.2,
+    flex: 1,
+    flexShrink: 1,
     padding: 16,
+    minWidth: 0,
   },
   sideCard: {
     ...sharedPanel,
@@ -921,12 +972,16 @@ const styles = StyleSheet.create({
     padding: 16,
     overflow: 'hidden',
   },
+  sideCardDocked: {
+    flex: 1,
+    alignSelf: 'stretch',
+  },
+  sideRail: {
+    flexShrink: 0,
+  },
   sideCardFloating: {
     position: 'absolute',
     zIndex: 10,
-  },
-  sideCardSpacer: {
-    minHeight: 1,
   },
   sideCardContent: {
     paddingBottom: 8,
