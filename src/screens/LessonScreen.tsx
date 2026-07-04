@@ -358,6 +358,7 @@ export function LessonScreen({
     : isLandscapeMobileLayout
       ? Math.max(280, Math.min(width * 0.34, 360))
       : Math.min(width - 24, 420);
+  const mobileCameraHeight = Math.max(620, height - 96);
   const coachingHiddenOffset = floatingCoachingHeight + 48;
   const coachingHideThreshold = Math.min(120, Math.max(72, floatingCoachingHeight * 0.24));
   const coachingPanelTranslateY = useRef(new Animated.Value(allowPanelDragHide ? coachingHiddenOffset : 0)).current;
@@ -375,6 +376,27 @@ export function LessonScreen({
     const nextValue = Number.parseInt(dribbleCountInput, 10);
     return Number.isFinite(nextValue) && nextValue > 0 ? nextValue : 0;
   }, [dribbleCountInput]);
+  const lessonCameraContent = (
+    <LessonCamera
+      key={cameraSessionKey}
+      lessonMode={lessonMode}
+      selectedBallBrand={selectedBallBrand}
+      selectedBallColors={selectedBallColors}
+      cameraSessionKey={cameraSessionKey}
+      isCameraActive={isCameraActive}
+      isCameraPreviewHidden={isCameraPreviewHidden}
+      isLessonActive={isLessonActive}
+      isCameraReady={isCameraReady}
+      countdownValue={countdownValue}
+      dribbleResetToken={dribbleResetToken}
+      shootResetToken={shootResetToken}
+      recordingStartToken={recordingStartToken}
+      recordingStopToken={recordingStopToken}
+      cameraStopMode={cameraStopMode}
+      containerStyle={!isSideDockedCoaching ? { height: mobileCameraHeight, marginBottom: 0 } : undefined}
+      onPoseMessage={onPoseMessage}
+    />
+  );
 
   useEffect(() => {
     if (lessonMode !== 'dribble' || isLessonActive) {
@@ -597,6 +619,8 @@ export function LessonScreen({
           ]}
           showsVerticalScrollIndicator={false}
         >
+          {!isSideDockedCoaching ? <View style={styles.mobileCameraStage}>{lessonCameraContent}</View> : null}
+
           <View style={styles.heroCard}>
             <Text style={styles.heroTitle}>AI 레슨 받기</Text>
             <Text style={styles.leadText}>
@@ -624,24 +648,7 @@ export function LessonScreen({
                   <Text style={styles.modeStatusText}>{lessonMode === 'shoot' ? '현재 선택: 슛 분석' : '현재 선택: 드리블 분석'}</Text>
                 </View>
 
-                <LessonCamera
-                  key={cameraSessionKey}
-                  lessonMode={lessonMode}
-                  selectedBallBrand={selectedBallBrand}
-                  selectedBallColors={selectedBallColors}
-                  cameraSessionKey={cameraSessionKey}
-                  isCameraActive={isCameraActive}
-                  isCameraPreviewHidden={isCameraPreviewHidden}
-                  isLessonActive={isLessonActive}
-                  isCameraReady={isCameraReady}
-                  countdownValue={countdownValue}
-                  dribbleResetToken={dribbleResetToken}
-                  shootResetToken={shootResetToken}
-                  recordingStartToken={recordingStartToken}
-                  recordingStopToken={recordingStopToken}
-                  cameraStopMode={cameraStopMode}
-                  onPoseMessage={onPoseMessage}
-                />
+                {isSideDockedCoaching ? lessonCameraContent : null}
 
                 <View style={styles.cameraControls}>
                   <SmallButton title="레슨 시작" onPress={openLessonStart} disabled={isLessonSessionBusy} />
@@ -932,6 +939,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'stretch',
     gap: 18,
+  },
+  mobileCameraStage: {
+    marginHorizontal: -16,
+    marginBottom: 16,
   },
   heroCard: {
     backgroundColor: colors.surface,

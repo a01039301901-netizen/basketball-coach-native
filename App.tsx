@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { StatusBar } from 'expo-status-bar';
-import { Animated, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SmallButton } from './src/components/common/Buttons';
 import { FireworkBurst } from './src/components/common/FireworkBurst';
 import { Header } from './src/components/common/Header';
@@ -52,6 +53,14 @@ export default function App() {
   useEffect(() => {
     headerScrollY.setValue(0);
   }, [app.currentUser, app.screen, headerScrollY]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      return;
+    }
+
+    void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+  }, []);
 
   useEffect(() => {
     setActiveDrawer(null);

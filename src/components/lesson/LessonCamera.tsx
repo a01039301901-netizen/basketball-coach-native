@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
 import type { BallBrandOption, BallColorOption, LessonMode } from '../../types/app';
 
@@ -17,6 +18,7 @@ interface LessonCameraProps {
   recordingStartToken: number;
   recordingStopToken: number;
   cameraStopMode: 'review' | 'disconnect' | null;
+  containerStyle?: StyleProp<ViewStyle>;
   onPoseMessage: (event: WebViewMessageEvent) => void;
 }
 

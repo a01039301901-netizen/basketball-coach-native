@@ -1,0 +1,27 @@
+
+> start
+> npm --prefix basketball-coach-native run start --
+
+
+> basketball-coach-native@1.0.0 start
+> expo start --tunnel --clear
+
+Starting project at C:\basketball-coach\basketball-coach-native
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Tunnel connected.
+Tunnel ready.
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Tunnel connected.
+Tunnel connected.
+Tunnel connected.
+Web .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 81.7% (47/52)
+Web .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (400/400)
+Web Bundled 7513ms index.js (402 modules)
+ LOG  [web] Logs will appear in the browser console
+Web .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 107ms index.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Tunnel connected.

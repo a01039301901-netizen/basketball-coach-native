@@ -1,5 +1,6 @@
 import { createElement, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
 import { colors } from '../../theme/colors';
 import type { BallBrandOption, BallColorOption, LessonMode } from '../../types/app';
@@ -20,6 +21,7 @@ interface LessonCameraProps {
   recordingStartToken: number;
   recordingStopToken: number;
   cameraStopMode: 'review' | 'disconnect' | null;
+  containerStyle?: StyleProp<ViewStyle>;
   onPoseMessage: (event: WebViewMessageEvent) => void;
 }
 
@@ -38,6 +40,7 @@ export function LessonCamera({
   recordingStartToken,
   recordingStopToken,
   cameraStopMode,
+  containerStyle,
   onPoseMessage,
 }: LessonCameraProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -132,7 +135,7 @@ export function LessonCamera({
   );
 
   return (
-    <View style={styles.videoWrap}>
+    <View style={[styles.videoWrap, containerStyle]}>
       {isCameraActive ? (
         <>
           {createElement('iframe', {

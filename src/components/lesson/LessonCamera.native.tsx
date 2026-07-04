@@ -1,4 +1,5 @@
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
 import { useEffect, useRef } from 'react';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { colors } from '../../theme/colors';
@@ -20,6 +21,7 @@ interface LessonCameraProps {
   recordingStartToken: number;
   recordingStopToken: number;
   cameraStopMode: 'review' | 'disconnect' | null;
+  containerStyle?: StyleProp<ViewStyle>;
   onPoseMessage: (event: WebViewMessageEvent) => void;
 }
 
@@ -38,6 +40,7 @@ export function LessonCamera({
   recordingStartToken,
   recordingStopToken,
   cameraStopMode,
+  containerStyle,
   onPoseMessage,
 }: LessonCameraProps) {
   const webViewRef = useRef<WebView>(null);
@@ -92,7 +95,7 @@ export function LessonCamera({
   }, [cameraStopMode, isCameraActive, lessonMode, recordingStopToken]);
 
   return (
-    <View style={styles.videoWrap}>
+    <View style={[styles.videoWrap, containerStyle]}>
       {isCameraActive ? (
         <>
           <WebView

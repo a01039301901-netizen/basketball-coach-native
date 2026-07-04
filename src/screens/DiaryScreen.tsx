@@ -324,6 +324,50 @@ export function DiaryScreen({
                   <View style={styles.graphSingleWrap}>
                     <Text style={styles.graphRateLarge}>성공률 {selectedShotGraph.successRate}%</Text>
                     <View style={styles.barAreaLarge}>
+                      <View style={styles.barStatsRow}>
+                        <View style={[styles.barStatCard, styles.barStatCardAttempt]}>
+                          <Text style={styles.barStatLabel}>시도</Text>
+                          <Text style={styles.barValue}>{selectedShotGraph.attempts}</Text>
+                        </View>
+
+                        <View style={[styles.barStatCard, styles.barStatCardSuccess]}>
+                          <Text style={styles.barStatLabel}>성공</Text>
+                          <Text style={styles.barValue}>{selectedShotGraph.successes}</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.overlapBarWrap}>
+                        <View style={styles.overlapBarTrack}>
+                          <View
+                            style={[
+                              styles.barLarge,
+                              styles.attemptBar,
+                              styles.overlapAttemptBar,
+                              {
+                                height:
+                                  selectedShotGraph.attempts > 0
+                                    ? Math.max(18, (selectedShotGraph.attempts / graphMaxValue) * 220)
+                                    : 10,
+                              },
+                            ]}
+                          />
+                          <View
+                            style={[
+                              styles.barLarge,
+                              styles.successBar,
+                              styles.overlapSuccessBar,
+                              {
+                                height:
+                                  selectedShotGraph.successes > 0
+                                    ? Math.max(18, (selectedShotGraph.successes / graphMaxValue) * 220)
+                                    : 10,
+                              },
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.barLabel}>시도 대비 성공</Text>
+                      </View>
+
                       <View style={styles.barColumn}>
                         <Text style={styles.barValue}>{selectedShotGraph.attempts}</Text>
                         <View
@@ -431,7 +475,7 @@ export function DiaryScreen({
                     <View style={styles.recordCard}>
                       <Text style={styles.recordText}>
                         {recordFilter === 'all'
-                          ? '???????????? ??? ???????????.'
+                          ? '이 날짜에 저장된 레슨 영상이 없습니다.'
                           : `이 날짜에 저장된 ${getRecordFilterLabel(recordFilter)} 기록이 없습니다.`}
                       </Text>
                     </View>
@@ -510,7 +554,7 @@ export function DiaryScreen({
                   <View style={styles.recordCard}>
                     <Text style={styles.recordText}>
                       {recordFilter === 'all'
-                        ? '???????????? ??? ???????????.'
+                        ? '이 날짜에 저장된 레슨 영상이 없습니다.'
                         : `이 날짜에 저장된 ${getRecordFilterLabel(recordFilter)} 기록이 없습니다.`}
                     </Text>
                   </View>
@@ -1097,17 +1141,54 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     paddingHorizontal: 24,
     paddingVertical: 18,
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    alignItems: 'flex-end',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  barColumn: {
+  barStatsRow: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  barStatCard: {
     flex: 1,
-    maxWidth: 110,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+  },
+  barStatCardAttempt: {
+    backgroundColor: 'rgba(208,145,85,0.12)',
+    borderColor: 'rgba(208,145,85,0.28)',
+  },
+  barStatCardSuccess: {
+    backgroundColor: 'rgba(50,205,50,0.12)',
+    borderColor: 'rgba(50,205,50,0.28)',
+  },
+  barStatLabel: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  overlapBarWrap: {
+    flex: 1,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'flex-end',
+    minHeight: 190,
+  },
+  overlapBarTrack: {
+    width: 108,
+    height: 220,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  barColumn: {
+    display: 'none',
   },
   barLarge: {
     width: 64,
@@ -1130,6 +1211,18 @@ const styles = StyleSheet.create({
   },
   successBar: {
     backgroundColor: '#32cd32',
+  },
+  overlapAttemptBar: {
+    position: 'absolute',
+    bottom: 0,
+    width: 88,
+    opacity: 0.55,
+  },
+  overlapSuccessBar: {
+    position: 'absolute',
+    bottom: 0,
+    width: 52,
+    zIndex: 1,
   },
   graphDateLarge: {
     color: colors.text,

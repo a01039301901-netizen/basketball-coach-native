@@ -128,7 +128,7 @@ export function ProfileScreen({ currentUser, onUpdateProfile, onChangePassword, 
   return (
     <View style={styles.contentGap}>
       <Card title="사용자 정보" style={styles.card}>
-        <Text style={styles.lead}>프로필에서 닉네임, 이름, 나이, 성별을 바로 수정할 수 있습니다.</Text>
+        <Text style={styles.lead}>프로필에서 닉네임, 이름, 나이, 성별을 수정할 수 있습니다.</Text>
 
         <View style={styles.form}>
           <View style={styles.fieldGroup}>
@@ -190,7 +190,7 @@ export function ProfileScreen({ currentUser, onUpdateProfile, onChangePassword, 
 
         <View style={styles.actionRow}>
           <SmallButton
-            title={isSavingProfile ? '저장 중' : '정보 저장'}
+            title={isSavingProfile ? '저장 중...' : '정보 저장'}
             onPress={() => void handleSaveProfile()}
             disabled={isSavingProfile}
           />
@@ -280,7 +280,7 @@ export function ProfileScreen({ currentUser, onUpdateProfile, onChangePassword, 
 
         <View style={styles.actionRow}>
           <SmallButton
-            title={isChangingPassword ? '변경 중' : '비밀번호 변경'}
+            title={isChangingPassword ? '변경 중...' : '비밀번호 변경'}
             onPress={() => void handleChangePassword()}
             disabled={isChangingPassword}
           />
@@ -294,9 +294,7 @@ export function ProfileScreen({ currentUser, onUpdateProfile, onChangePassword, 
       </Card>
 
       <Card title="로그아웃" style={styles.card}>
-        <Text style={styles.lead}>로그아웃하면 로그인 화면으로 이동합니다.</Text>
-
-        <View style={styles.actionRow}>
+        <View style={styles.logoutActionRow}>
           <SmallButton title="로그아웃" onPress={onLogout} variant="red" />
         </View>
       </Card>
@@ -419,6 +417,11 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
     marginTop: 16,
+  },
+  logoutActionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
   statusText: {
     marginTop: 14,

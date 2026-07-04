@@ -1,8 +1,8 @@
-﻿import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Linking from 'expo-linking';
 import { Audio } from 'expo-av';
 import { useCameraPermissions } from 'expo-camera';
+import AppStorage from '../utils/appStorage';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
@@ -1189,18 +1189,18 @@ export function useBasketballCoachApp() {
   const persistSession = useCallback(async (userId: string, keepSignedIn: boolean) => {
     if (keepSignedIn) {
       const nextSession: AuthSession = { userId };
-      await AsyncStorage.setItem(STORAGE_KEYS.session, JSON.stringify(nextSession));
+      await AppStorage.setItem(STORAGE_KEYS.session, JSON.stringify(nextSession));
       return;
     }
 
-    await AsyncStorage.removeItem(STORAGE_KEYS.session);
+    await AppStorage.removeItem(STORAGE_KEYS.session);
   }, []);
 
   const recoverStartupToLogin = useCallback(async () => {
     startupRecoveryTriggeredRef.current = true;
 
     try {
-      await AsyncStorage.removeItem(STORAGE_KEYS.session);
+      await AppStorage.removeItem(STORAGE_KEYS.session);
     } catch {
       // Ignore session cleanup failures and continue to the login screen.
     }
@@ -1250,7 +1250,7 @@ export function useBasketballCoachApp() {
           setStartupStatusText('로그인 정보를 확인하고 있습니다.');
         }
         const entries = await withTimeout(
-          AsyncStorage.multiGet([STORAGE_KEYS.accounts, STORAGE_KEYS.session]),
+          AppStorage.multiGet([STORAGE_KEYS.accounts, STORAGE_KEYS.session]),
           STORAGE_LOAD_TIMEOUT_MS,
           [
             [STORAGE_KEYS.accounts, null],
@@ -1274,7 +1274,7 @@ export function useBasketballCoachApp() {
         }
 
         setStartupStatusText(parsedSession?.userId ? '저장된 계정을 불러오고 있습니다.' : '로그인 화면을 준비하고 있습니다.');
-        await AsyncStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(parsedAccounts));
+        await AppStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(parsedAccounts));
 
         if (parsedSession?.userId) {
           const sessionAccount = parsedAccounts.find((account) => account.id === parsedSession.userId);
@@ -1282,7 +1282,7 @@ export function useBasketballCoachApp() {
           if (sessionAccount) {
             setCurrentUser(toAuthUser(sessionAccount));
           } else {
-            await AsyncStorage.removeItem(STORAGE_KEYS.session);
+            await AppStorage.removeItem(STORAGE_KEYS.session);
           }
         }
       } catch {
@@ -1326,7 +1326,7 @@ export function useBasketballCoachApp() {
         }
         const scopedKeys = getAccountStorageKeys(currentUserId);
         const entries = await withTimeout(
-          AsyncStorage.multiGet([
+          AppStorage.multiGet([
             scopedKeys.attendance,
             scopedKeys.homework,
             scopedKeys.lessonRecords,
@@ -1400,7 +1400,7 @@ export function useBasketballCoachApp() {
         setSelectedDateKey(nextTodayKey);
         setCurrentDate(new Date());
 
-        await AsyncStorage.setItem(scopedKeys.attendance, JSON.stringify(parsedAttendance));
+        await AppStorage.setItem(scopedKeys.attendance, JSON.stringify(parsedAttendance));
       } catch {
         if (isMounted) {
           setStartupStatusText('계정 데이터를 읽지 못해 기본 화면으로 이동합니다.');
@@ -1447,7 +1447,7 @@ export function useBasketballCoachApp() {
       return;
     }
 
-    void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).attendance, JSON.stringify(attendance));
+    void AppStorage.setItem(getAccountStorageKeys(currentUserId).attendance, JSON.stringify(attendance));
   }, [attendance, currentUserId, isAccountDataReady]);
 
   useEffect(() => {
@@ -1455,7 +1455,7 @@ export function useBasketballCoachApp() {
       return;
     }
 
-    void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).homework, JSON.stringify(homeworkState));
+    void AppStorage.setItem(getAccountStorageKeys(currentUserId).homework, JSON.stringify(homeworkState));
   }, [currentUserId, homeworkState, isAccountDataReady]);
 
   useEffect(() => {
@@ -1463,7 +1463,7 @@ export function useBasketballCoachApp() {
       return;
     }
 
-    void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).lessonRecords, JSON.stringify(lessonRecords));
+    void AppStorage.setItem(getAccountStorageKeys(currentUserId).lessonRecords, JSON.stringify(lessonRecords));
   }, [currentUserId, isAccountDataReady, lessonRecords]);
 
   useEffect(() => {
@@ -1471,7 +1471,7 @@ export function useBasketballCoachApp() {
       return;
     }
 
-    void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).dribbleCounts, JSON.stringify(dailyDribbleRecords));
+    void AppStorage.setItem(getAccountStorageKeys(currentUserId).dribbleCounts, JSON.stringify(dailyDribbleRecords));
   }, [currentUserId, dailyDribbleRecords, isAccountDataReady]);
 
   useEffect(() => {
@@ -1479,7 +1479,7 @@ export function useBasketballCoachApp() {
       return;
     }
 
-    void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).shotAttempts, JSON.stringify(shotAttemptRecords));
+    void AppStorage.setItem(getAccountStorageKeys(currentUserId).shotAttempts, JSON.stringify(shotAttemptRecords));
   }, [currentUserId, isAccountDataReady, shotAttemptRecords]);
 
   useEffect(() => {
@@ -1487,7 +1487,7 @@ export function useBasketballCoachApp() {
       return;
     }
 
-    void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).shotSuccess, JSON.stringify(shotSuccessRecords));
+    void AppStorage.setItem(getAccountStorageKeys(currentUserId).shotSuccess, JSON.stringify(shotSuccessRecords));
   }, [currentUserId, isAccountDataReady, shotSuccessRecords]);
 
   useEffect(() => {
@@ -1495,7 +1495,7 @@ export function useBasketballCoachApp() {
       return;
     }
 
-    void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).ballColors, JSON.stringify(selectedBallColors));
+    void AppStorage.setItem(getAccountStorageKeys(currentUserId).ballColors, JSON.stringify(selectedBallColors));
   }, [currentUserId, isAccountDataReady, selectedBallColors]);
 
   useEffect(() => {
@@ -1503,7 +1503,7 @@ export function useBasketballCoachApp() {
       return;
     }
 
-    void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).ballBrand, JSON.stringify(selectedBallBrand));
+    void AppStorage.setItem(getAccountStorageKeys(currentUserId).ballBrand, JSON.stringify(selectedBallBrand));
   }, [currentUserId, isAccountDataReady, selectedBallBrand]);
 
   useEffect(() => {
@@ -1511,7 +1511,7 @@ export function useBasketballCoachApp() {
       return;
     }
 
-    void AsyncStorage.setItem(getAccountStorageKeys(currentUserId).position, JSON.stringify(selectedPosition));
+    void AppStorage.setItem(getAccountStorageKeys(currentUserId).position, JSON.stringify(selectedPosition));
   }, [currentUserId, isAccountDataReady, selectedPosition]);
 
   useEffect(() => {
@@ -2490,7 +2490,7 @@ export function useBasketballCoachApp() {
       nextAccount,
     ];
 
-    await AsyncStorage.multiSet([
+    await AppStorage.multiSet([
       [STORAGE_KEYS.accounts, JSON.stringify(nextAccounts)],
       [scopedKeys.attendance, JSON.stringify(payload.data.attendance)],
       [scopedKeys.lessonRecords, JSON.stringify(payload.data.lessonRecords)],
@@ -2606,7 +2606,7 @@ export function useBasketballCoachApp() {
     };
     const nextAccounts = [...accounts, nextAccount];
 
-    await AsyncStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(nextAccounts));
+    await AppStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(nextAccounts));
     await persistSession(nextAccount.id, keepSignedIn);
     setAccounts(nextAccounts);
     setCurrentUser(toAuthUser(nextAccount));
@@ -2680,7 +2680,7 @@ export function useBasketballCoachApp() {
     };
     const nextAccounts = accounts.map((account) => (account.id === currentUserId ? nextAccount : account));
 
-    await AsyncStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(nextAccounts));
+    await AppStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(nextAccounts));
     setAccounts(nextAccounts);
     setCurrentUser(toAuthUser(nextAccount));
 
@@ -2749,7 +2749,7 @@ export function useBasketballCoachApp() {
     };
     const nextAccounts = accounts.map((account) => (account.id === currentUserId ? nextAccount : account));
 
-    await AsyncStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(nextAccounts));
+    await AppStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(nextAccounts));
     setAccounts(nextAccounts);
 
     return {
@@ -2763,7 +2763,7 @@ export function useBasketballCoachApp() {
       await endLesson(true);
     }
 
-    await AsyncStorage.removeItem(STORAGE_KEYS.session);
+    await AppStorage.removeItem(STORAGE_KEYS.session);
     setCurrentUser(null);
     setAuthMode(accounts.length > 0 ? 'login' : 'signup');
   }
