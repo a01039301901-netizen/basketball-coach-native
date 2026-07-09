@@ -44,7 +44,7 @@ export function SmallButton({ title, onPress, variant = 'orange', disabled = fal
 const styles = StyleSheet.create({
   mainButton: {
     minHeight: 108,
-    borderRadius: 16,
+    borderRadius: 0,
     padding: 18,
     justifyContent: 'center',
     backgroundColor: colors.primary,
@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
   smallButton: {
-    borderRadius: 12,
+    borderRadius: 0,
     backgroundColor: colors.secondary,
     paddingHorizontal: 16,
     paddingVertical: 11,

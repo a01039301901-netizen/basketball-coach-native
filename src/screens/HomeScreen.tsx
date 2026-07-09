@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
   },
   mainButtonWrap: {
     width: 232,
-    borderRadius: 24,
+    borderRadius: 0,
   },
   mainButtonWrapWide: {
     flex: 1,
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   },
   mainButton: {
     minHeight: 178,
-    borderRadius: 24,
+    borderRadius: 0,
     padding: 18,
     backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
   },
   mainButtonCompact: {
     minHeight: 120,
-    borderRadius: 18,
+    borderRadius: 0,
     padding: 14,
   },
   mainButtonWithArtwork: {
@@ -630,7 +630,7 @@ const styles = StyleSheet.create({
   },
   homeworkRevealButton: {
     marginTop: 14,
-    borderRadius: 999,
+    borderRadius: 0,
     backgroundColor: colors.secondary,
     paddingHorizontal: 18,
     paddingVertical: 10,

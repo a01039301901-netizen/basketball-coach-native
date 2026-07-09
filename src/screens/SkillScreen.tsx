@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
   },
   skillButton: {
     width: '48%',
-    borderRadius: 14,
+    borderRadius: 0,
     padding: 16,
     backgroundColor: colors.surfaceStrong,
     borderWidth: 1,

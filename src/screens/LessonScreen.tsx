@@ -1015,7 +1015,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   coachingRestoreChip: {
-    borderRadius: 999,
+    borderRadius: 0,
     paddingHorizontal: 16,
     paddingVertical: 10,
     backgroundColor: colors.surfaceStrong,
@@ -1133,7 +1133,7 @@ const styles = StyleSheet.create({
   sectionToggleButtonRound: {
     width: 30,
     height: 30,
-    borderRadius: 999,
+    borderRadius: 0,
   },
   sectionToggleButtonFloating: {
     position: 'absolute',
@@ -1150,7 +1150,7 @@ const styles = StyleSheet.create({
   sectionToggleButtonCollapsedChip: {
     minHeight: 30,
     maxWidth: 180,
-    borderRadius: 999,
+    borderRadius: 0,
     paddingHorizontal: 10,
   },
   sectionToggleIcon: {
@@ -1209,7 +1209,7 @@ const styles = StyleSheet.create({
   },
   modeButton: {
     flex: 1,
-    borderRadius: 14,
+    borderRadius: 0,
     paddingVertical: 14,
     paddingHorizontal: 14,
     backgroundColor: colors.surfaceStrong,
@@ -1332,7 +1332,7 @@ const styles = StyleSheet.create({
   },
   viewSelectButton: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: 0,
     paddingHorizontal: 14,
     paddingVertical: 14,
     backgroundColor: colors.surfaceStrong,
@@ -1361,7 +1361,7 @@ const styles = StyleSheet.create({
     marginTop: 22,
   },
   modalGhostButton: {
-    borderRadius: 12,
+    borderRadius: 0,
     paddingHorizontal: 18,
     paddingVertical: 12,
     backgroundColor: colors.surfaceStrong,
@@ -1374,7 +1374,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   modalPrimaryButton: {
-    borderRadius: 12,
+    borderRadius: 0,
     paddingHorizontal: 18,
     paddingVertical: 12,
     backgroundColor: colors.secondary,

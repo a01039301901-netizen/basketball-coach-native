@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
   },
   genderButton: {
     flex: 1,
-    borderRadius: 14,
+    borderRadius: 0,
     paddingHorizontal: 14,
     paddingVertical: 12,
     alignItems: 'center',
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   passwordToggle: {
     width: 48,
     height: 48,
-    borderRadius: 12,
+    borderRadius: 0,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surfaceStrong,

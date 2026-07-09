@@ -83,6 +83,17 @@ function getSyncedFeedback(timeline: FeedbackMoment[], fallback: string, positio
   return activeText || fallback;
 }
 
+function DateArrowIcon({ direction }: { direction: 'left' | 'right' }) {
+  return (
+    <View
+      style={[
+        styles.dateArrowIcon,
+        direction === 'left' ? styles.dateArrowIconLeft : styles.dateArrowIconRight,
+      ]}
+    />
+  );
+}
+
 export function DiaryScreen({
   currentDate,
   calendarCells,
@@ -282,11 +293,11 @@ export function DiaryScreen({
 
         <View style={[styles.dateSelectorMain, isCompactMobile && styles.dateSelectorMainCompact]}>
           <Pressable onPress={() => moveSelectedDate(-1)} style={({ pressed }) => [styles.dateArrowButton, pressed && styles.pressed]}>
-            <Text style={styles.dateArrowText}>{'<'}</Text>
+            <DateArrowIcon direction="left" />
           </Pressable>
           <Text style={styles.dateSelectorText}>{selectedDateKey || formatDateKey(selectedDate)}</Text>
           <Pressable onPress={() => moveSelectedDate(1)} style={({ pressed }) => [styles.dateArrowButton, pressed && styles.pressed]}>
-            <Text style={styles.dateArrowText}>{'>'}</Text>
+            <DateArrowIcon direction="right" />
           </Pressable>
         </View>
 
@@ -827,8 +838,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   dateArrowButton: {
-    width: 34,
-    height: 34,
+    width: 38,
+    height: 38,
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
@@ -836,10 +847,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  dateArrowText: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '900',
+  dateArrowIcon: {
+    width: 11,
+    height: 11,
+    borderLeftWidth: 2.5,
+    borderBottomWidth: 2.5,
+    borderColor: colors.text,
+  },
+  dateArrowIconLeft: {
+    transform: [{ rotate: '45deg' }],
+  },
+  dateArrowIconRight: {
+    transform: [{ rotate: '-135deg' }],
   },
   dateStatusBadge: {
     borderRadius: 999,
@@ -908,7 +927,7 @@ const styles = StyleSheet.create({
   dayCell: {
     width: '14.2857%',
     minHeight: 78,
-    borderRadius: 14,
+    borderRadius: 0,
     backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1031,7 +1050,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   recordFilterDropdown: {
-    borderRadius: 12,
+    borderRadius: 0,
     paddingHorizontal: 14,
     paddingVertical: 9,
     backgroundColor: colors.surfaceStrong,
@@ -1065,7 +1084,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   recordFilterMenuItem: {
-    borderRadius: 12,
+    borderRadius: 0,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
@@ -1284,7 +1303,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   modalCloseButton: {
-    borderRadius: 999,
+    borderRadius: 0,
     paddingHorizontal: 14,
     paddingVertical: 8,
     backgroundColor: colors.surfaceStrong,
@@ -1461,7 +1480,7 @@ const styles = StyleSheet.create({
   },
   shotOutcomeToggle: {
     minWidth: 86,
-    borderRadius: 14,
+    borderRadius: 0,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
