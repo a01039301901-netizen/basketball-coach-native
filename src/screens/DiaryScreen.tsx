@@ -301,7 +301,7 @@ export function DiaryScreen({
         <View style={[styles.contentRow, isWide && styles.contentRowWide]}>
           <View style={[styles.graphColumn, isWide && styles.graphColumnWide]}>
             <View style={styles.graphCard}>
-              <Text style={styles.graphTitle}>{selectedDateKey ? `${selectedDateKey} 슛 성공도` : '슛 성공도 그래프'}</Text>
+              <Text style={styles.graphTitle}>슛 성공도</Text>
               <Text style={styles.graphDescription}>
                 {selectedDateKey
                   ? '선택한 날짜의 슛 시도 수와 성공 수를 바로 확인할 수 있습니다.'
@@ -402,7 +402,6 @@ export function DiaryScreen({
                         <Text style={styles.barLabel}>슛 성공</Text>
                       </View>
                     </View>
-                    <Text style={styles.graphDateLarge}>{selectedShotGraph.dateKey.slice(5)}</Text>
                     <Text style={styles.graphCount}>
                       슛 성공 {selectedShotGraph.successes}개 / 시도 {selectedShotGraph.attempts}개
                     </Text>
@@ -415,6 +414,8 @@ export function DiaryScreen({
                 <Text style={styles.graphEmpty}>날짜를 선택하면 그래프가 표시됩니다.</Text>
               )}
 
+            </View>
+            <View style={styles.allGraphButtonStandalone}>
               <View style={styles.allGraphButtonRow}>
                 <SmallButton title="모든 슛 성공도 보기" onPress={() => setShowAllShotGraph(true)} variant="dark" />
               </View>
@@ -1010,6 +1011,7 @@ const styles = StyleSheet.create({
   },
   graphColumn: {
     width: '100%',
+    gap: 12,
   },
   graphColumnWide: {
     width: 340,
@@ -1124,8 +1126,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     minHeight: 290,
   },
+  allGraphButtonStandalone: {
+    paddingTop: 2,
+  },
   allGraphButtonRow: {
-    marginTop: 12,
     alignItems: 'stretch',
   },
   graphRateLarge: {
