@@ -1244,6 +1244,7 @@ function buildDiarySkillInsight(
   selectedDateKey: string,
   shotGraphData: ShotGraphDatum[],
   dailyDribbleRecords: Record<string, number>,
+  homeworkState: HomeworkStateRecord,
   lessonRecords: LessonRecord[]
 ): DiarySkillInsight {
   const selectedShotGraph = shotGraphData.find((item) => item.dateKey === selectedDateKey) ?? null;
@@ -1251,17 +1252,30 @@ function buildDiarySkillInsight(
   const selectedShotSuccesses = selectedShotGraph?.successes ?? 0;
   const selectedShotSuccessRate = selectedShotGraph?.successRate ?? 0;
   const selectedDribbleCount = selectedDateKey ? dailyDribbleRecords[selectedDateKey] || 0 : 0;
+  const todayDateKey = formatDateKey(new Date());
+  const selectedHomeworkState = selectedDateKey ? homeworkState[selectedDateKey] ?? null : null;
   const selectedDateDribbleRecords = lessonRecords.filter(
     (record) => record.dateKey === selectedDateKey && record.mode === 'dribble'
   );
-  const leftDribbleCount = selectedDateDribbleRecords.reduce(
+  const recordedLeftDribbleCount = selectedDateDribbleRecords.reduce(
     (sum, record) => sum + Math.max(0, record.leftHandDribbleCount ?? 0),
     0
   );
-  const rightDribbleCount = selectedDateDribbleRecords.reduce(
+  const recordedRightDribbleCount = selectedDateDribbleRecords.reduce(
     (sum, record) => sum + Math.max(0, record.rightHandDribbleCount ?? 0),
     0
   );
+  const shouldUseHomeworkHandTotals =
+    selectedHomeworkState !== null &&
+    (selectedDateKey === todayDateKey
+      || selectedHomeworkState.handDribbleTotals.left > 0
+      || selectedHomeworkState.handDribbleTotals.right > 0);
+  const leftDribbleCount = shouldUseHomeworkHandTotals
+    ? Math.max(0, selectedHomeworkState.handDribbleTotals.left)
+    : recordedLeftDribbleCount;
+  const rightDribbleCount = shouldUseHomeworkHandTotals
+    ? Math.max(0, selectedHomeworkState.handDribbleTotals.right)
+    : recordedRightDribbleCount;
   const dribbleBalanceGap = Math.abs(leftDribbleCount - rightDribbleCount);
   const dribbleTotal = leftDribbleCount + rightDribbleCount;
   const dribbleBalance =
@@ -1812,8 +1826,8 @@ export function useBasketballCoachApp() {
     });
   }, [shotAttemptRecords, shotSuccessRecords]);
   const diarySkillInsight = useMemo(
-    () => buildDiarySkillInsight(selectedDateKey, shotGraphData, dailyDribbleRecords, lessonRecords),
-    [dailyDribbleRecords, lessonRecords, selectedDateKey, shotGraphData]
+    () => buildDiarySkillInsight(selectedDateKey, shotGraphData, dailyDribbleRecords, homeworkState, lessonRecords),
+    [dailyDribbleRecords, homeworkState, lessonRecords, selectedDateKey, shotGraphData]
   );
 
   const resetAccountState = useCallback(() => {

@@ -6,6 +6,20 @@ import { BALL_BRAND_OPTIONS, BALL_COLOR_OPTIONS, POSITION_OPTIONS } from '../con
 import { colors } from '../theme/colors';
 import type { BallBrandOption, BallColorOption, HomeworkTestState, PositionOption } from '../types/app';
 
+const BALL_COLOR_ROWS: BallColorOption[][] = [
+  ['yellow', 'orange', 'brown', 'red'],
+  ['white', 'gray', 'black'],
+];
+
+const CORRECTION_OPTIONS: Array<{
+  key: HomeworkTestState['correctionDirection'];
+  label: string;
+}> = [
+  { key: 'none', label: '없음' },
+  { key: 'left', label: '왼쪽 드리블 10회' },
+  { key: 'right', label: '오른쪽 드리블 10회' },
+];
+
 interface SettingsScreenProps {
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
@@ -18,15 +32,7 @@ interface SettingsScreenProps {
 }
 
 function getCorrectionDirectionLabel(direction: HomeworkTestState['correctionDirection']) {
-  if (direction === 'left') {
-    return '왼쪽 드리블';
-  }
-
-  if (direction === 'right') {
-    return '오른쪽 드리블';
-  }
-
-  return '없음';
+  return CORRECTION_OPTIONS.find((option) => option.key === direction)?.label ?? '없음';
 }
 
 function parseNumberInput(value: string) {
@@ -72,6 +78,10 @@ export function SettingsScreen({
     () => getCorrectionDirectionLabel(correctionDirection),
     [correctionDirection]
   );
+  const ballColorOptionsByKey = useMemo(
+    () => new Map<BallColorOption, (typeof BALL_COLOR_OPTIONS)[number]>(BALL_COLOR_OPTIONS.map((option) => [option.key, option])),
+    []
+  );
 
   function handleApplyHomeworkTestState() {
     onApplyHomeworkTestState({
@@ -112,12 +122,7 @@ export function SettingsScreen({
 
   return (
     <View style={styles.contentGap}>
-      <Card title="인식 설정" style={styles.card}>
-        <Text style={styles.lead}>
-          사용 중인 공과 포지션을 맞춰 두면 분석과 추천 숙제가 조금 더 자연스럽게 동작합니다.
-        </Text>
-
-        <Text style={styles.sectionTitle}>사용자 포지션</Text>
+      <Card title="사용자 포지션" style={styles.compactCard}>
         <View style={styles.positionWrap}>
           <Pressable
             onPress={() => setIsPositionOpen((current) => !current)}
@@ -153,8 +158,12 @@ export function SettingsScreen({
             </View>
           ) : null}
         </View>
+      </Card>
 
-        <Text style={[styles.sectionTitle, styles.sectionSpacing]}>농구공 브랜드</Text>
+      <Card title="인식 설정" style={styles.compactCard}>
+        <Text style={styles.lead}>사용 중인 공 브랜드와 공 색상을 맞추면 분석과 추천 숙제가 더 자연스럽게 동작합니다.</Text>
+
+        <Text style={styles.sectionTitle}>농구공 브랜드</Text>
         <View style={styles.optionList}>
           {BALL_BRAND_OPTIONS.map((option) => {
             const active = selectedBallBrand === option.key;
@@ -178,41 +187,50 @@ export function SettingsScreen({
         </View>
 
         <Text style={[styles.sectionTitle, styles.sectionSpacing]}>공 색상 조정</Text>
-        <View style={styles.optionList}>
-          {BALL_COLOR_OPTIONS.map((option) => {
-            const active = selectedBallColors.includes(option.key);
+        <View style={styles.colorSection}>
+          {BALL_COLOR_ROWS.map((row, rowIndex) => (
+            <View key={`row-${rowIndex}`} style={styles.colorRow}>
+              {row.map((colorKey) => {
+                const option = ballColorOptionsByKey.get(colorKey);
 
-            return (
-              <Pressable
-                key={option.key}
-                onPress={() => onToggleBallColor(option.key)}
-                style={({ pressed }) => [styles.optionButton, active && styles.optionButtonActive, pressed && styles.pressed]}
-              >
-                <View
-                  style={[
-                    styles.swatch,
-                    {
-                      backgroundColor: option.accent,
-                      borderColor: active ? '#ffffff' : 'rgba(255,255,255,0.15)',
-                    },
-                  ]}
-                />
-                <View style={styles.optionTextWrap}>
-                  <Text style={styles.optionTitle}>{option.label}</Text>
-                  <Text style={styles.optionSubtitle}>{active ? '현재 인식 대상에 포함됨' : '이 색상을 인식 목록에 추가'}</Text>
-                </View>
-                <View style={[styles.checkBadge, active && styles.checkBadgeActive]}>
-                  <Text style={styles.checkBadgeText}>{active ? 'ON' : 'OFF'}</Text>
-                </View>
-              </Pressable>
-            );
-          })}
+                if (!option) {
+                  return null;
+                }
+
+                const active = selectedBallColors.includes(option.key);
+
+                return (
+                  <Pressable
+                    key={option.key}
+                    onPress={() => onToggleBallColor(option.key)}
+                    style={({ pressed }) => [
+                      styles.colorOptionButton,
+                      active && styles.colorOptionButtonActive,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.swatch,
+                        styles.colorOptionSwatch,
+                        {
+                          backgroundColor: option.accent,
+                          borderColor: option.key === 'white' ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.12)',
+                        },
+                      ]}
+                    />
+                    <Text style={[styles.colorOptionLabel, active && styles.colorOptionLabelActive]}>{option.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ))}
         </View>
       </Card>
 
       <Card title="숙제 테스트 조절" style={styles.card}>
         <Text style={styles.lead}>
-          오늘 숙제 진행도를 테스트용으로 직접 바꿀 수 있습니다. 값을 입력한 뒤 적용하면 메인 숙제 창에 바로 반영됩니다.
+          오늘 숙제 진행도를 테스트용으로 직접 바꿀 수 있습니다. 값을 입력하고 적용하면 메인 숙제 창에 바로 반영됩니다.
         </Text>
 
         <View style={styles.testFieldGrid}>
@@ -274,11 +292,7 @@ export function SettingsScreen({
 
           {isCorrectionOpen ? (
             <View style={styles.positionDropdown}>
-              {[
-                { key: 'none' as const, label: '없음' },
-                { key: 'left' as const, label: '왼쪽 드리블 10회 더' },
-                { key: 'right' as const, label: '오른쪽 드리블 10회 더' },
-              ].map((option) => {
+              {CORRECTION_OPTIONS.map((option) => {
                 const active = correctionDirection === option.key;
 
                 return (
@@ -317,6 +331,9 @@ const styles = StyleSheet.create({
   },
   card: {
     minHeight: 320,
+  },
+  compactCard: {
+    minHeight: 0,
   },
   lead: {
     color: colors.textMuted,
@@ -411,6 +428,42 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 999,
     borderWidth: 2,
+  },
+  colorSection: {
+    gap: 10,
+  },
+  colorRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  colorOptionButton: {
+    flex: 1,
+    minHeight: 84,
+    borderRadius: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  colorOptionButtonActive: {
+    backgroundColor: 'rgba(208,145,85,0.18)',
+    borderColor: 'rgba(208,145,85,0.32)',
+  },
+  colorOptionSwatch: {
+    width: 34,
+    height: 34,
+  },
+  colorOptionLabel: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  colorOptionLabelActive: {
+    color: colors.text,
   },
   optionTextWrap: {
     flex: 1,

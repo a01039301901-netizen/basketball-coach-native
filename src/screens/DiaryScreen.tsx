@@ -484,7 +484,7 @@ export function DiaryScreen({
 
 
   return (
-    <Card title="기록일지">
+    <Card title="기록일지" style={styles.diaryCard}>
       <View style={[styles.dateSelectorRow, isCompactMobile && styles.dateSelectorRowCompact]}>
         <View
           style={[
@@ -542,12 +542,93 @@ export function DiaryScreen({
                   </Text>
 
                   <View style={styles.skillInsightStats}>
-                    <View style={styles.skillInsightStatCard}>
-                      <Text style={styles.skillInsightStatLabel}>오늘 성공률</Text>
-                      <Text style={styles.skillInsightStatValue}>{diarySkillInsight.selectedShotSuccessRate}%</Text>
-                      <Text style={styles.skillInsightStatHelper}>
-                        성공 {diarySkillInsight.selectedShotSuccesses} / 시도 {diarySkillInsight.selectedShotAttempts}
-                      </Text>
+                    <View style={[styles.skillInsightStatCard, styles.skillInsightShotCard]}>
+                      <View style={styles.skillInsightShotHeader}>
+                        <View style={styles.skillInsightShotTitleWrap}>
+                          <Text style={styles.skillInsightStatLabel}>오늘 성공률</Text>
+                          <Text style={styles.skillInsightStatHelper}>
+                            {selectedShotGraph
+                              ? `성공 ${diarySkillInsight.selectedShotSuccesses} / 시도 ${diarySkillInsight.selectedShotAttempts}`
+                              : selectedDateKey
+                                ? '선택한 날짜의 슛 기록이 아직 없습니다.'
+                                : '날짜를 선택하면 성공률 그래프를 볼 수 있습니다.'}
+                          </Text>
+                        </View>
+
+                        <SmallButton title="모든 슛 성공도 보기" onPress={() => setShowAllShotGraph(true)} variant="dark" />
+                      </View>
+
+                      {selectedDateKey && selectedShotGraph ? (
+                        <View style={styles.skillInsightShotBody}>
+                          <View style={styles.graphTopRow}>
+                            <View style={styles.graphLegend}>
+                              <View style={styles.legendItem}>
+                                <View style={[styles.dot, styles.dotAttempt]} />
+                                <Text style={styles.legendText}>슛 시도</Text>
+                              </View>
+                              <View style={styles.legendItem}>
+                                <View style={[styles.dot, styles.dotSuccess]} />
+                                <Text style={styles.legendText}>슛 성공</Text>
+                              </View>
+                            </View>
+                          </View>
+
+                          <View style={styles.barAreaLarge}>
+                            <View style={styles.graphMetricRow}>
+                              <View style={styles.graphMetric}>
+                                <Text style={styles.graphMetricLabel}>시도</Text>
+                                <Text style={styles.graphMetricValue}>{selectedShotGraph.attempts}</Text>
+                              </View>
+                              <View style={styles.graphMetric}>
+                                <Text style={styles.graphMetricLabel}>성공</Text>
+                                <Text style={styles.graphMetricValue}>{selectedShotGraph.successes}</Text>
+                              </View>
+                            </View>
+
+                            <View style={styles.graphBarRateRow}>
+                              <View style={styles.overlapBarWrap}>
+                                <View style={styles.overlapBarTrack}>
+                                  <View
+                                    style={[
+                                      styles.barLarge,
+                                      styles.attemptBar,
+                                      styles.overlapAttemptBar,
+                                      {
+                                        height:
+                                          selectedShotGraph.attempts > 0
+                                            ? Math.max(20, (selectedShotGraph.attempts / graphMaxValue) * 260)
+                                            : 10,
+                                      },
+                                    ]}
+                                  />
+                                  <View
+                                    style={[
+                                      styles.barLarge,
+                                      styles.successBar,
+                                      styles.overlapSuccessBar,
+                                      {
+                                        height:
+                                          selectedShotGraph.successes > 0
+                                            ? Math.max(20, (selectedShotGraph.successes / graphMaxValue) * 260)
+                                            : 10,
+                                      },
+                                    ]}
+                                  />
+                                </View>
+                              </View>
+
+                              <View style={styles.graphRateSide}>
+                                <Text style={styles.graphRateSideLabel}>성공률</Text>
+                                <Text style={styles.graphRateSideValue}>{selectedShotGraph.successRate}%</Text>
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+                      ) : (
+                        <Text style={styles.graphEmpty}>
+                          {selectedDateKey ? '선택한 날짜에는 아직 슛 기록이 없습니다.' : '날짜를 선택하면 그래프가 표시됩니다.'}
+                        </Text>
+                      )}
                     </View>
 
                     <View style={styles.skillInsightStatCard}>
@@ -575,132 +656,13 @@ export function DiaryScreen({
                               ? '오른손 우세'
                               : '-'}
                       </Text>
-                      <Text style={styles.skillInsightStatHelper}>{getDribbleBalanceLabel(diarySkillInsight)}</Text>
+                      <Text style={styles.skillInsightStatHelper}>
+                        {`${getDribbleBalanceLabel(diarySkillInsight)}\n해당 날짜 드리블 횟수: ${selectedDateDribbleCount}회`}
+                      </Text>
                     </View>
                   </View>
                 </>
               )}
-            </View>
-
-            <View style={styles.graphCard}>
-              <Text style={styles.graphTitle}>슛 성공도</Text>
-              <Text style={styles.graphDescription}>
-                {selectedDateKey
-                  ? '선택한 날짜의 슛 시도 수와 성공 수를 바로 확인할 수 있습니다.'
-                  : '날짜를 선택하면 해당 날짜의 슛 성공도 그래프가 여기에 표시됩니다.'}
-              </Text>
-
-              {selectedDateKey && selectedShotGraph ? (
-                <>
-                  <View style={styles.graphLegend}>
-                    <View style={styles.legendItem}>
-                      <View style={[styles.dot, styles.dotAttempt]} />
-                      <Text style={styles.legendText}>슛 시도</Text>
-                    </View>
-                    <View style={styles.legendItem}>
-                      <View style={[styles.dot, styles.dotSuccess]} />
-                      <Text style={styles.legendText}>슛 성공</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.graphSingleWrap}>
-                    <Text style={styles.graphRateLarge}>성공률 {selectedShotGraph.successRate}%</Text>
-                    <View style={styles.barAreaLarge}>
-                      <View style={styles.barStatsRow}>
-                        <View style={[styles.barStatCard, styles.barStatCardAttempt]}>
-                          <Text style={styles.barStatLabel}>시도</Text>
-                          <Text style={styles.barValue}>{selectedShotGraph.attempts}</Text>
-                        </View>
-
-                        <View style={[styles.barStatCard, styles.barStatCardSuccess]}>
-                          <Text style={styles.barStatLabel}>성공</Text>
-                          <Text style={styles.barValue}>{selectedShotGraph.successes}</Text>
-                        </View>
-                      </View>
-
-                      <View style={styles.overlapBarWrap}>
-                        <View style={styles.overlapBarTrack}>
-                          <View
-                            style={[
-                              styles.barLarge,
-                              styles.attemptBar,
-                              styles.overlapAttemptBar,
-                              {
-                                height:
-                                  selectedShotGraph.attempts > 0
-                                    ? Math.max(18, (selectedShotGraph.attempts / graphMaxValue) * 220)
-                                    : 10,
-                              },
-                            ]}
-                          />
-                          <View
-                            style={[
-                              styles.barLarge,
-                              styles.successBar,
-                              styles.overlapSuccessBar,
-                              {
-                                height:
-                                  selectedShotGraph.successes > 0
-                                    ? Math.max(18, (selectedShotGraph.successes / graphMaxValue) * 220)
-                                    : 10,
-                              },
-                            ]}
-                          />
-                        </View>
-                        <Text style={styles.barLabel}>시도 대비 성공</Text>
-                      </View>
-
-                      <View style={styles.barColumn}>
-                        <Text style={styles.barValue}>{selectedShotGraph.attempts}</Text>
-                        <View
-                          style={[
-                            styles.barLarge,
-                            styles.attemptBar,
-                            {
-                              height:
-                                selectedShotGraph.attempts > 0
-                                  ? Math.max(18, (selectedShotGraph.attempts / graphMaxValue) * 220)
-                                  : 10,
-                            },
-                          ]}
-                        />
-                        <Text style={styles.barLabel}>슛 시도</Text>
-                      </View>
-
-                      <View style={styles.barColumn}>
-                        <Text style={styles.barValue}>{selectedShotGraph.successes}</Text>
-                        <View
-                          style={[
-                            styles.barLarge,
-                            styles.successBar,
-                            {
-                              height:
-                                selectedShotGraph.successes > 0
-                                  ? Math.max(18, (selectedShotGraph.successes / graphMaxValue) * 220)
-                                  : 10,
-                            },
-                          ]}
-                        />
-                        <Text style={styles.barLabel}>슛 성공</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.graphCount}>
-                      슛 성공 {selectedShotGraph.successes}개 / 시도 {selectedShotGraph.attempts}개
-                    </Text>
-                    <Text style={styles.graphHelper}>해당 날짜 드리블 횟수: {selectedDateDribbleCount}회</Text>
-                  </View>
-                </>
-              ) : selectedDateKey ? (
-                <Text style={styles.graphEmpty}>선택한 날짜에는 아직 슛 기록이 없습니다.</Text>
-              ) : (
-                <Text style={styles.graphEmpty}>날짜를 선택하면 그래프가 표시됩니다.</Text>
-              )}
-
-            </View>
-            <View style={styles.allGraphButtonStandalone}>
-              <View style={styles.allGraphButtonRow}>
-                <SmallButton title="모든 슛 성공도 보기" onPress={() => setShowAllShotGraph(true)} variant="dark" />
-              </View>
             </View>
           </View>
 
@@ -951,6 +913,12 @@ export function DiaryScreen({
 }
 
 const styles = StyleSheet.create({
+  diaryCard: {
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    padding: 0,
+    overflow: 'visible',
+  },
   dateSelectorRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -974,8 +942,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   dateSelectorMainCompact: {
     width: '100%',
@@ -1183,8 +1149,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceStrong,
     borderRadius: 16,
     padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
     gap: 12,
   },
   skillInsightTitle: {
@@ -1206,6 +1170,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  skillInsightShotCard: {
+    gap: 12,
+  },
+  skillInsightShotHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  skillInsightShotTitleWrap: {
+    flex: 1,
+    minWidth: 180,
+  },
+  skillInsightShotBody: {
+    gap: 12,
   },
   skillInsightStatLabel: {
     color: colors.textSoft,
@@ -1302,98 +1283,72 @@ const styles = StyleSheet.create({
     gap: 14,
     padding: 12,
   },
-  graphCard: {
-    backgroundColor: colors.surfaceStrong,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    minHeight: 430,
-  },
-  graphTitle: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '900',
-    marginBottom: 8,
-  },
-  graphDescription: {
-    color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 22,
-    marginBottom: 12,
-  },
   graphLegend: {
     flexDirection: 'row',
     gap: 14,
-    marginBottom: 12,
+    flexWrap: 'wrap',
   },
-  graphSingleWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 290,
-  },
-  allGraphButtonStandalone: {
-    paddingTop: 2,
-  },
-  allGraphButtonRow: {
-    alignItems: 'stretch',
-  },
-  graphRateLarge: {
-    color: colors.textAccent,
-    fontSize: 22,
-    fontWeight: '900',
-    marginBottom: 8,
+  graphTopRow: {
+    alignItems: 'flex-end',
   },
   barAreaLarge: {
     width: '100%',
-    minHeight: 280,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 24,
-    paddingVertical: 18,
-    alignItems: 'center',
+    minHeight: 320,
     justifyContent: 'space-between',
     gap: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
-  barStatsRow: {
+  graphMetricRow: {
     width: '100%',
     flexDirection: 'row',
     gap: 12,
   },
-  barStatCard: {
+  graphMetric: {
     flex: 1,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
+    alignItems: 'center',
   },
-  barStatCardAttempt: {
-    backgroundColor: 'rgba(208,145,85,0.12)',
-    borderColor: 'rgba(208,145,85,0.28)',
-  },
-  barStatCardSuccess: {
-    backgroundColor: 'rgba(50,205,50,0.12)',
-    borderColor: 'rgba(50,205,50,0.28)',
-  },
-  barStatLabel: {
+  graphMetricLabel: {
     color: colors.textSoft,
     fontSize: 12,
     fontWeight: '800',
     marginBottom: 4,
   },
+  graphMetricValue: {
+    color: colors.text,
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  graphBarRateRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
   overlapBarWrap: {
     flex: 1,
-    width: '100%',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    minHeight: 190,
+    justifyContent: 'center',
+    minHeight: 260,
+  },
+  graphRateSide: {
+    width: 84,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  graphRateSideLabel: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  graphRateSideValue: {
+    color: colors.textAccent,
+    fontSize: 30,
+    fontWeight: '900',
   },
   overlapBarTrack: {
-    width: 108,
-    height: 220,
+    width: '100%',
+    maxWidth: 180,
+    height: 260,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'flex-end',
@@ -1426,32 +1381,14 @@ const styles = StyleSheet.create({
   overlapAttemptBar: {
     position: 'absolute',
     bottom: 0,
-    width: 88,
+    width: 120,
     opacity: 0.55,
   },
   overlapSuccessBar: {
     position: 'absolute',
     bottom: 0,
-    width: 52,
+    width: 120,
     zIndex: 1,
-  },
-  graphDateLarge: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '900',
-    marginTop: 14,
-  },
-  graphCount: {
-    color: colors.textMuted,
-    fontSize: 14,
-    marginTop: 4,
-  },
-  graphHelper: {
-    color: colors.textSoft,
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 8,
-    textAlign: 'center',
   },
   graphEmpty: {
     color: colors.textMuted,
@@ -1629,8 +1566,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceStrong,
     borderRadius: 16,
     padding: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   recordCardShoot: {
     borderColor: 'rgba(208,145,85,0.28)',
