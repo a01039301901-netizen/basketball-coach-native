@@ -18,6 +18,7 @@ import type {
   BallBrandOption,
   BallColorOption,
   CorrectionHomeworkState,
+  DiarySkillInsight,
   DailyHomeworkState,
   DribbleAnalysis,
   DribbleLessonView,
@@ -27,6 +28,10 @@ import type {
   HomeworkProgressItem,
   HomeworkStateRecord,
   HomeworkTestState,
+  LessonRecordCriterion,
+  LessonRecordEvaluation,
+  LessonRecordHighlight,
+  LessonRecordLevel,
   LessonMode,
   LessonRecord,
   LessonReviewClip,
@@ -70,6 +75,16 @@ interface FrontDribbleWeakPoint {
   criterionNumber: FrontDribbleCriterionNumber;
   feedbackText: string;
   count: number;
+}
+
+interface TimedShootAnalysis {
+  atMs: number;
+  analysis: ShootAnalysis;
+}
+
+interface TimedDribbleAnalysis {
+  atMs: number;
+  analysis: DribbleAnalysis;
 }
 
 interface AuthFormValues {
@@ -437,6 +452,7 @@ function sanitizeLessonRecords(value: unknown): LessonRecord[] {
       const shotOutcome =
         entry.shotOutcome === 'success' ? 'success' : entry.shotOutcome === 'failure' ? 'failure' : undefined;
       const feedback = typeof entry.feedback === 'string' ? entry.feedback : '';
+      const videoUri = typeof entry.videoUri === 'string' ? entry.videoUri : '';
       const createdAt = typeof entry.createdAt === 'string' ? entry.createdAt : new Date().toISOString();
       const reviewFeedback = typeof entry.reviewFeedback === 'string' ? entry.reviewFeedback : undefined;
       const reviewStartAtMs =
@@ -455,6 +471,7 @@ function sanitizeLessonRecords(value: unknown): LessonRecord[] {
       const representativeFeedbackCategory = isHomeworkFeedbackCategory(entry.representativeFeedbackCategory)
         ? entry.representativeFeedbackCategory
         : undefined;
+      const evaluation = normalizeLessonRecordEvaluation(entry.evaluation);
 
       const nextRecord: LessonRecord = normalizeLessonRecord({
         id,
@@ -465,7 +482,7 @@ function sanitizeLessonRecords(value: unknown): LessonRecord[] {
         feedbackTimeline: Array.isArray(entry.feedbackTimeline)
           ? (entry.feedbackTimeline as FeedbackMoment[] | string[])
           : undefined,
-        videoUri: '',
+        videoUri,
         createdAt,
         reviewFeedback,
         reviewStartAtMs,
@@ -474,6 +491,7 @@ function sanitizeLessonRecords(value: unknown): LessonRecord[] {
         leftHandDribbleCount,
         rightHandDribbleCount,
         representativeFeedbackCategory,
+        evaluation,
       });
 
       return nextRecord;
@@ -609,6 +627,76 @@ function normalizeFeedbackTimeline(
   return fallbackFeedback ? [{ atMs: 0, text: fallbackFeedback }] : [];
 }
 
+function normalizeLessonRecordCriteria(value: unknown): LessonRecordCriterion[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.reduce<LessonRecordCriterion[]>((accumulator, entry) => {
+    if (!isRecordObject(entry) || typeof entry.key !== 'string' || typeof entry.label !== 'string' || typeof entry.detail !== 'string') {
+      return accumulator;
+    }
+
+    accumulator.push({
+      key: entry.key,
+      label: entry.label,
+      isStable: Boolean(entry.isStable),
+      stableRatio:
+        typeof entry.stableRatio === 'number' && Number.isFinite(entry.stableRatio)
+          ? Math.max(0, Math.min(1, entry.stableRatio))
+          : undefined,
+      detail: entry.detail,
+    });
+
+    return accumulator;
+  }, []);
+}
+
+function normalizeLessonRecordHighlights(value: unknown): LessonRecordHighlight[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      if (!isRecordObject(entry) || typeof entry.label !== 'string' || typeof entry.detail !== 'string') {
+        return null;
+      }
+
+      return {
+        label: entry.label,
+        detail: entry.detail,
+        startAtMs:
+          typeof entry.startAtMs === 'number' && Number.isFinite(entry.startAtMs) ? Math.max(0, entry.startAtMs) : 0,
+        durationMs:
+          typeof entry.durationMs === 'number' && Number.isFinite(entry.durationMs)
+            ? clampHighlightDuration(entry.durationMs)
+            : 2000,
+      } satisfies LessonRecordHighlight;
+    })
+    .filter((entry): entry is LessonRecordHighlight => Boolean(entry));
+}
+
+function normalizeLessonRecordEvaluation(value: unknown): LessonRecordEvaluation | undefined {
+  if (!isRecordObject(value) || typeof value.summary !== 'string') {
+    return undefined;
+  }
+
+  const level: LessonRecordLevel =
+    value.level === 'good' || value.level === 'average' || value.level === 'bad' ? value.level : 'bad';
+  const criteria = normalizeLessonRecordCriteria(value.criteria);
+  const strengths = normalizeLessonRecordHighlights(value.strengths);
+  const improvements = normalizeLessonRecordHighlights(value.improvements);
+
+  return {
+    level,
+    summary: value.summary,
+    criteria,
+    strengths,
+    improvements,
+  };
+}
+
 function normalizeLessonRecord(
   record: LessonRecord | (Omit<LessonRecord, 'feedbackTimeline'> & { feedbackTimeline?: FeedbackMoment[] | string[] })
 ): LessonRecord {
@@ -625,6 +713,7 @@ function normalizeLessonRecord(
     ...record,
     shotOutcome: normalizedShotOutcome,
     feedbackTimeline: normalizedFeedbackTimeline,
+    evaluation: normalizeLessonRecordEvaluation(record.evaluation),
   } as LessonRecord;
   const representativeFeedbackCategory =
     nextRecord.representativeFeedbackCategory ?? getRepresentativeHomeworkFeedbackCategory(nextRecord) ?? undefined;
@@ -696,6 +785,613 @@ function deriveShotSuccessCounts(records: LessonRecord[]) {
     accumulator[record.dateKey] = (accumulator[record.dateKey] || 0) + 1;
     return accumulator;
   }, {});
+}
+
+function parseDateKeyToTime(dateKey: string) {
+  const [yearText, monthText, dayText] = dateKey.split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return 0;
+  }
+
+  return new Date(year, month - 1, day).getTime();
+}
+
+function buildLessonRecordLevel(stableCount: number, totalCount: number): LessonRecordLevel {
+  if (stableCount >= totalCount) {
+    return 'good';
+  }
+
+  if (stableCount >= Math.max(1, totalCount - 1)) {
+    return 'average';
+  }
+
+  return 'bad';
+}
+
+function getLessonRecordLevelLabel(level: LessonRecordLevel) {
+  if (level === 'good') {
+    return '좋음';
+  }
+
+  if (level === 'average') {
+    return '보통';
+  }
+
+  return '나쁨';
+}
+
+function buildLessonRecordSummary(level: LessonRecordLevel, stableCount: number, totalCount: number) {
+  return `${totalCount}가지 기준 중 ${stableCount}가지가 안정적이라 ${getLessonRecordLevelLabel(level)} 기록입니다.`;
+}
+
+function clampHighlightDuration(durationMs: number) {
+  return Math.max(1500, Math.min(3200, Math.round(durationMs)));
+}
+
+function buildRecordHighlight(
+  label: string,
+  detail: string,
+  startAtMs: number,
+  durationMs: number
+): LessonRecordHighlight {
+  return {
+    label,
+    detail,
+    startAtMs: Math.max(0, Math.round(startAtMs)),
+    durationMs: clampHighlightDuration(durationMs),
+  };
+}
+
+function findLongestHighlightWindow<T>(
+  frames: Array<{ atMs: number; analysis: T }>,
+  predicate: (analysis: T) => boolean
+) {
+  let bestStartIndex = -1;
+  let bestEndIndex = -1;
+  let currentStartIndex = -1;
+
+  frames.forEach((frame, index) => {
+    if (predicate(frame.analysis)) {
+      if (currentStartIndex === -1) {
+        currentStartIndex = index;
+      }
+
+      return;
+    }
+
+    if (currentStartIndex === -1) {
+      return;
+    }
+
+    if (
+      bestStartIndex === -1 ||
+      index - currentStartIndex > bestEndIndex - bestStartIndex + 1
+    ) {
+      bestStartIndex = currentStartIndex;
+      bestEndIndex = index - 1;
+    }
+
+    currentStartIndex = -1;
+  });
+
+  if (currentStartIndex !== -1) {
+    if (
+      bestStartIndex === -1 ||
+      frames.length - currentStartIndex > bestEndIndex - bestStartIndex + 1
+    ) {
+      bestStartIndex = currentStartIndex;
+      bestEndIndex = frames.length - 1;
+    }
+  }
+
+  if (bestStartIndex === -1 || bestEndIndex === -1) {
+    return null;
+  }
+
+  const startAtMs = Math.max(0, frames[bestStartIndex].atMs - 450);
+  const endAtMs = frames[bestEndIndex].atMs + 900;
+
+  return {
+    startAtMs,
+    durationMs: clampHighlightDuration(endAtMs - startAtMs),
+  };
+}
+
+function buildShootOutcomeHighlight(
+  shotOutcome: LessonRecord['shotOutcome'],
+  frames: TimedShootAnalysis[],
+  fallbackStartAtMs = 0
+) {
+  const releaseFrame = frames.find((frame) => frame.analysis.releaseDetected) ?? frames[frames.length - 1];
+  const label = shotOutcome === 'success' ? '슛 성공 장면' : '슛 결과 보완';
+  const detail =
+    shotOutcome === 'success'
+      ? '슛이 성공한 시점을 다시 볼 수 있습니다.'
+      : '슛이 아쉽게 마무리된 시점부터 다시 볼 수 있습니다.';
+  const startAtMs = Math.max(0, (releaseFrame?.atMs ?? fallbackStartAtMs) - 1200);
+
+  return buildRecordHighlight(label, detail, startAtMs, 2600);
+}
+
+function buildShootLegAngleDetail(analysis: ShootAnalysis | null, isStable: boolean) {
+  if (!analysis) {
+    return isStable ? '무릎 각도가 안정적이었습니다.' : '무릎 각도를 더 안정적으로 맞출 필요가 있습니다.';
+  }
+
+  if (isStable) {
+    return '무릎 각도가 안정적으로 유지됐습니다.';
+  }
+
+  if (analysis.legAngleState === 'low') {
+    return '무릎이 충분히 굽혀지지 않아 준비 자세를 조금 더 낮출 필요가 있습니다.';
+  }
+
+  if (analysis.legAngleState === 'high') {
+    return '무릎이 너무 많이 접혀 상체와 하체 균형을 다시 맞출 필요가 있습니다.';
+  }
+
+  return '무릎 각도를 더 일정하게 유지해 보세요.';
+}
+
+function buildShootTimingDetail(analysis: ShootAnalysis | null, isStable: boolean) {
+  if (!analysis) {
+    return isStable ? '슛 타이밍이 안정적이었습니다.' : '슛 타이밍을 조금 더 일정하게 맞출 필요가 있습니다.';
+  }
+
+  if (isStable) {
+    return '슛 타이밍이 안정적으로 맞춰졌습니다.';
+  }
+
+  if (analysis.releaseTiming === 'early') {
+    return '공이 충분히 올라오기 전에 슛이 나가 타이밍이 조금 빨랐습니다.';
+  }
+
+  if (analysis.releaseTiming === 'late') {
+    return '공이 가장 높아진 뒤에 슛이 나가 타이밍이 조금 늦었습니다.';
+  }
+
+  return '슛 타이밍을 조금 더 일정하게 맞춰 보세요.';
+}
+
+function buildShootRecordEvaluation(
+  analysis: ShootAnalysis | null,
+  frames: TimedShootAnalysis[],
+  shotOutcome: LessonRecord['shotOutcome']
+): LessonRecordEvaluation {
+  const legAngleStable = analysis?.legAngleState === 'balanced';
+  const releaseTimingStable = analysis?.releaseTiming === 'balanced';
+  const shotSucceeded = shotOutcome === 'success';
+  const stableCount = [legAngleStable, releaseTimingStable, shotSucceeded].filter(Boolean).length;
+  const level = buildLessonRecordLevel(stableCount, 3);
+  const criteria: LessonRecordCriterion[] = [
+    {
+      key: 'shoot-leg-angle',
+      label: '무릎 각도',
+      isStable: legAngleStable,
+      detail: buildShootLegAngleDetail(analysis, legAngleStable),
+    },
+    {
+      key: 'shoot-release-timing',
+      label: '슛 타이밍',
+      isStable: releaseTimingStable,
+      detail: buildShootTimingDetail(analysis, releaseTimingStable),
+    },
+    {
+      key: 'shoot-result',
+      label: '슛 성공',
+      isStable: shotSucceeded,
+      detail: shotSucceeded ? '슛이 성공했습니다.' : '슛 성공까지 이어지지 않았습니다.',
+    },
+  ];
+  const strengths: LessonRecordHighlight[] = [];
+  const improvements: LessonRecordHighlight[] = [];
+
+  if (legAngleStable) {
+    const window = findLongestHighlightWindow(frames, (item) => item.legAngleState === 'balanced');
+    strengths.push(
+      buildRecordHighlight(
+        '무릎 각도 안정',
+        buildShootLegAngleDetail(analysis, true),
+        window?.startAtMs ?? 0,
+        window?.durationMs ?? 2200
+      )
+    );
+  } else {
+    const window = findLongestHighlightWindow(
+      frames,
+      (item) => item.legAngleState === 'low' || item.legAngleState === 'high'
+    );
+    improvements.push(
+      buildRecordHighlight(
+        '무릎 각도 보완',
+        buildShootLegAngleDetail(analysis, false),
+        window?.startAtMs ?? 0,
+        window?.durationMs ?? 2200
+      )
+    );
+  }
+
+  if (releaseTimingStable) {
+    const window = findLongestHighlightWindow(frames, (item) => item.releaseTiming === 'balanced');
+    strengths.push(
+      buildRecordHighlight(
+        '슛 타이밍 안정',
+        buildShootTimingDetail(analysis, true),
+        window?.startAtMs ?? 0,
+        window?.durationMs ?? 2200
+      )
+    );
+  } else {
+    const window = findLongestHighlightWindow(
+      frames,
+      (item) => item.releaseTiming === 'early' || item.releaseTiming === 'late'
+    );
+    improvements.push(
+      buildRecordHighlight(
+        '슛 타이밍 보완',
+        buildShootTimingDetail(analysis, false),
+        window?.startAtMs ?? 0,
+        window?.durationMs ?? 2200
+      )
+    );
+  }
+
+  if (shotSucceeded) {
+    strengths.push(buildShootOutcomeHighlight(shotOutcome, frames));
+  } else {
+    improvements.push(buildShootOutcomeHighlight(shotOutcome, frames));
+  }
+
+  return {
+    level,
+    summary: buildLessonRecordSummary(level, stableCount, 3),
+    criteria,
+    strengths: strengths.slice(0, 2),
+    improvements: improvements.slice(0, 2),
+  };
+}
+
+function updateShootRecordEvaluationForOutcome(
+  record: LessonRecord,
+  nextShotOutcome: 'success' | 'failure'
+): LessonRecordEvaluation | undefined {
+  if (!record.evaluation) {
+    return undefined;
+  }
+
+  const nextCriteria = record.evaluation.criteria.map((criterion) =>
+    criterion.key === 'shoot-result'
+      ? {
+          ...criterion,
+          isStable: nextShotOutcome === 'success',
+          detail: nextShotOutcome === 'success' ? '슛이 성공했습니다.' : '슛 성공까지 이어지지 않았습니다.',
+        }
+      : criterion
+  );
+  const stableCount = nextCriteria.filter((criterion) => criterion.isStable).length;
+  const level = buildLessonRecordLevel(stableCount, nextCriteria.length || 3);
+  const outcomeHighlight = buildRecordHighlight(
+    nextShotOutcome === 'success' ? '슛 성공 장면' : '슛 결과 보완',
+    nextShotOutcome === 'success'
+      ? '슛이 성공한 시점을 다시 볼 수 있습니다.'
+      : '슛이 아쉽게 마무리된 시점부터 다시 볼 수 있습니다.',
+    record.reviewStartAtMs ?? 0,
+    record.reviewDurationMs ?? 2600
+  );
+  const strengths = record.evaluation.strengths.filter((item) => item.label !== '슛 성공 장면');
+  const improvements = record.evaluation.improvements.filter((item) => item.label !== '슛 결과 보완');
+
+  if (nextShotOutcome === 'success') {
+    strengths.push(outcomeHighlight);
+  } else {
+    improvements.push(outcomeHighlight);
+  }
+
+  return {
+    ...record.evaluation,
+    level,
+    summary: buildLessonRecordSummary(level, stableCount, nextCriteria.length || 3),
+    criteria: nextCriteria,
+    strengths: strengths.slice(0, 2),
+    improvements: improvements.slice(0, 2),
+  };
+}
+
+function calculateStableRatio<T>(
+  frames: Array<{ atMs: number; analysis: T }>,
+  predicate: (analysis: T) => boolean
+) {
+  if (frames.length === 0) {
+    return 0;
+  }
+
+  const stableCount = frames.filter((frame) => predicate(frame.analysis)).length;
+  return stableCount / frames.length;
+}
+
+function formatStableRatioText(ratio: number) {
+  return `${Math.round(ratio * 100)}%`;
+}
+
+function buildDribbleRecordEvaluation(frames: TimedDribbleAnalysis[]): LessonRecordEvaluation {
+  const activeFrames = frames.filter((frame) => frame.analysis.dribbleStarted);
+  const torsoStableRatio = calculateStableRatio(activeFrames, (analysis) => analysis.torsoPosture === 'balanced');
+  const heightStableRatio = calculateStableRatio(activeFrames, (analysis) => analysis.dribbleHeight === 'balanced');
+  const eyeStableRatio = calculateStableRatio(activeFrames, (analysis) => analysis.eyeFocus === 'forward');
+  const torsoStable = torsoStableRatio >= 0.5;
+  const heightStable = heightStableRatio >= 0.5;
+  const eyeStable = eyeStableRatio >= 0.5;
+  const stableCount = [torsoStable, heightStable, eyeStable].filter(Boolean).length;
+  const level = buildLessonRecordLevel(stableCount, 3);
+  const criteria: LessonRecordCriterion[] = [
+    {
+      key: 'dribble-torso-posture',
+      label: '상체 기울기',
+      isStable: torsoStable,
+      stableRatio: torsoStableRatio,
+      detail: torsoStable
+        ? `상체 기울기가 ${formatStableRatioText(torsoStableRatio)} 구간에서 안정적이었습니다.`
+        : `상체 기울기가 안정적이었던 구간이 ${formatStableRatioText(torsoStableRatio)}라 조금 더 일정하게 유지할 필요가 있습니다.`,
+    },
+    {
+      key: 'dribble-height',
+      label: '드리블 높이',
+      isStable: heightStable,
+      stableRatio: heightStableRatio,
+      detail: heightStable
+        ? `드리블 높이가 ${formatStableRatioText(heightStableRatio)} 구간에서 안정적이었습니다.`
+        : `드리블 높이가 안정적이었던 구간이 ${formatStableRatioText(heightStableRatio)}라 리듬을 더 일정하게 유지할 필요가 있습니다.`,
+    },
+    {
+      key: 'dribble-eye-focus',
+      label: '시선 처리',
+      isStable: eyeStable,
+      stableRatio: eyeStableRatio,
+      detail: eyeStable
+        ? `시선이 ${formatStableRatioText(eyeStableRatio)} 구간에서 앞을 유지했습니다.`
+        : `시선이 앞을 본 구간이 ${formatStableRatioText(eyeStableRatio)}라 공보다 앞을 보는 시간을 늘릴 필요가 있습니다.`,
+    },
+  ];
+  const strengths: LessonRecordHighlight[] = [];
+  const improvements: LessonRecordHighlight[] = [];
+
+  if (torsoStable) {
+    const window = findLongestHighlightWindow(activeFrames, (analysis) => analysis.torsoPosture === 'balanced');
+    strengths.push(
+      buildRecordHighlight(
+        '상체 기울기 안정',
+        criteria[0].detail,
+        window?.startAtMs ?? 0,
+        window?.durationMs ?? 2200
+      )
+    );
+  } else {
+    const window = findLongestHighlightWindow(
+      activeFrames,
+      (analysis) => analysis.torsoPosture === 'high' || analysis.torsoPosture === 'low'
+    );
+    improvements.push(
+      buildRecordHighlight(
+        '상체 기울기 보완',
+        criteria[0].detail,
+        window?.startAtMs ?? 0,
+        window?.durationMs ?? 2200
+      )
+    );
+  }
+
+  if (heightStable) {
+    const window = findLongestHighlightWindow(activeFrames, (analysis) => analysis.dribbleHeight === 'balanced');
+    strengths.push(
+      buildRecordHighlight(
+        '드리블 높이 안정',
+        criteria[1].detail,
+        window?.startAtMs ?? 0,
+        window?.durationMs ?? 2200
+      )
+    );
+  } else {
+    const window = findLongestHighlightWindow(
+      activeFrames,
+      (analysis) => analysis.dribbleHeight === 'high' || analysis.dribbleHeight === 'low'
+    );
+    improvements.push(
+      buildRecordHighlight(
+        '드리블 높이 보완',
+        criteria[1].detail,
+        window?.startAtMs ?? 0,
+        window?.durationMs ?? 2200
+      )
+    );
+  }
+
+  if (eyeStable) {
+    const window = findLongestHighlightWindow(activeFrames, (analysis) => analysis.eyeFocus === 'forward');
+    strengths.push(
+      buildRecordHighlight(
+        '시선 처리 안정',
+        criteria[2].detail,
+        window?.startAtMs ?? 0,
+        window?.durationMs ?? 2200
+      )
+    );
+  } else {
+    const window = findLongestHighlightWindow(activeFrames, (analysis) => analysis.eyeFocus === 'ball');
+    improvements.push(
+      buildRecordHighlight(
+        '시선 처리 보완',
+        criteria[2].detail,
+        window?.startAtMs ?? 0,
+        window?.durationMs ?? 2200
+      )
+    );
+  }
+
+  return {
+    level,
+    summary: buildLessonRecordSummary(level, stableCount, 3),
+    criteria,
+    strengths: strengths.slice(0, 2),
+    improvements: improvements.slice(0, 2),
+  };
+}
+
+function buildDiarySkillInsight(
+  selectedDateKey: string,
+  shotGraphData: ShotGraphDatum[],
+  dailyDribbleRecords: Record<string, number>,
+  lessonRecords: LessonRecord[]
+): DiarySkillInsight {
+  const selectedShotGraph = shotGraphData.find((item) => item.dateKey === selectedDateKey) ?? null;
+  const selectedShotAttempts = selectedShotGraph?.attempts ?? 0;
+  const selectedShotSuccesses = selectedShotGraph?.successes ?? 0;
+  const selectedShotSuccessRate = selectedShotGraph?.successRate ?? 0;
+  const selectedDribbleCount = selectedDateKey ? dailyDribbleRecords[selectedDateKey] || 0 : 0;
+  const selectedDateDribbleRecords = lessonRecords.filter(
+    (record) => record.dateKey === selectedDateKey && record.mode === 'dribble'
+  );
+  const leftDribbleCount = selectedDateDribbleRecords.reduce(
+    (sum, record) => sum + Math.max(0, record.leftHandDribbleCount ?? 0),
+    0
+  );
+  const rightDribbleCount = selectedDateDribbleRecords.reduce(
+    (sum, record) => sum + Math.max(0, record.rightHandDribbleCount ?? 0),
+    0
+  );
+  const dribbleBalanceGap = Math.abs(leftDribbleCount - rightDribbleCount);
+  const dribbleTotal = leftDribbleCount + rightDribbleCount;
+  const dribbleBalance =
+    dribbleTotal === 0
+      ? 'none'
+      : dribbleBalanceGap <= 2
+        ? 'balanced'
+        : leftDribbleCount > rightDribbleCount
+          ? 'left'
+          : 'right';
+  const isPracticeThresholdMet =
+    selectedDribbleCount >= DAILY_DRIBBLE_TARGET && selectedShotAttempts >= DAILY_SHOOT_TARGET;
+
+  if (!selectedDateKey) {
+    return {
+      practiceThresholds: {
+        dribbleCount: DAILY_DRIBBLE_TARGET,
+        shootAttemptCount: DAILY_SHOOT_TARGET,
+      },
+      isPracticeThresholdMet: false,
+      selectedShotAttempts,
+      selectedShotSuccesses,
+      selectedShotSuccessRate,
+      recentAverageShotAttempts: null,
+      recentAverageDribbleCount: null,
+      recentAverageShotSuccessRate: null,
+      shotTrend: 'below_threshold',
+      shotTrendDelta: null,
+      leftDribbleCount,
+      rightDribbleCount,
+      dribbleBalance,
+      dribbleBalanceGap,
+    };
+  }
+
+  const sortedQualifiedDates = shotGraphData
+    .filter((item) => item.attempts >= DAILY_SHOOT_TARGET && (dailyDribbleRecords[item.dateKey] || 0) >= DAILY_DRIBBLE_TARGET)
+    .slice()
+    .sort((left, right) => parseDateKeyToTime(left.dateKey) - parseDateKeyToTime(right.dateKey));
+  const selectedDateTime = parseDateKeyToTime(selectedDateKey);
+  const recentComparisonDates = sortedQualifiedDates
+    .filter((item) => parseDateKeyToTime(item.dateKey) < selectedDateTime)
+    .slice(-3);
+
+  if (!isPracticeThresholdMet) {
+    return {
+      practiceThresholds: {
+        dribbleCount: DAILY_DRIBBLE_TARGET,
+        shootAttemptCount: DAILY_SHOOT_TARGET,
+      },
+      isPracticeThresholdMet,
+      selectedShotAttempts,
+      selectedShotSuccesses,
+      selectedShotSuccessRate,
+      recentAverageShotAttempts: recentComparisonDates.length
+        ? Math.round(recentComparisonDates.reduce((sum, item) => sum + item.attempts, 0) / recentComparisonDates.length)
+        : null,
+      recentAverageDribbleCount: recentComparisonDates.length
+        ? Math.round(
+            recentComparisonDates.reduce((sum, item) => sum + (dailyDribbleRecords[item.dateKey] || 0), 0) /
+              recentComparisonDates.length
+          )
+        : null,
+      recentAverageShotSuccessRate: recentComparisonDates.length
+        ? Math.round(recentComparisonDates.reduce((sum, item) => sum + item.successRate, 0) / recentComparisonDates.length)
+        : null,
+      shotTrend: 'below_threshold',
+      shotTrendDelta: null,
+      leftDribbleCount,
+      rightDribbleCount,
+      dribbleBalance,
+      dribbleBalanceGap,
+    };
+  }
+
+  if (recentComparisonDates.length === 0) {
+    return {
+      practiceThresholds: {
+        dribbleCount: DAILY_DRIBBLE_TARGET,
+        shootAttemptCount: DAILY_SHOOT_TARGET,
+      },
+      isPracticeThresholdMet,
+      selectedShotAttempts,
+      selectedShotSuccesses,
+      selectedShotSuccessRate,
+      recentAverageShotAttempts: null,
+      recentAverageDribbleCount: null,
+      recentAverageShotSuccessRate: null,
+      shotTrend: 'insufficient_history',
+      shotTrendDelta: null,
+      leftDribbleCount,
+      rightDribbleCount,
+      dribbleBalance,
+      dribbleBalanceGap,
+    };
+  }
+
+  const recentAverageShotAttempts = Math.round(
+    recentComparisonDates.reduce((sum, item) => sum + item.attempts, 0) / recentComparisonDates.length
+  );
+  const recentAverageDribbleCount = Math.round(
+    recentComparisonDates.reduce((sum, item) => sum + (dailyDribbleRecords[item.dateKey] || 0), 0) /
+      recentComparisonDates.length
+  );
+  const recentAverageShotSuccessRate = Math.round(
+    recentComparisonDates.reduce((sum, item) => sum + item.successRate, 0) / recentComparisonDates.length
+  );
+  const shotTrendDelta = selectedShotSuccessRate - recentAverageShotSuccessRate;
+  const shotTrend =
+    shotTrendDelta >= 5 ? 'up' : shotTrendDelta <= -5 ? 'down' : 'flat';
+
+  return {
+    practiceThresholds: {
+      dribbleCount: DAILY_DRIBBLE_TARGET,
+      shootAttemptCount: DAILY_SHOOT_TARGET,
+    },
+    isPracticeThresholdMet,
+    selectedShotAttempts,
+    selectedShotSuccesses,
+    selectedShotSuccessRate,
+    recentAverageShotAttempts,
+    recentAverageDribbleCount,
+    recentAverageShotSuccessRate,
+    shotTrend,
+    shotTrendDelta,
+    leftDribbleCount,
+    rightDribbleCount,
+    dribbleBalance,
+    dribbleBalanceGap,
+  };
 }
 
 
@@ -1020,10 +1716,12 @@ export function useBasketballCoachApp() {
   const webStartCueContextRef = useRef<any>(null);
   const latestDribbleAnalysisRef = useRef<DribbleAnalysis | null>(null);
   const latestShootAnalysisRef = useRef<ShootAnalysis | null>(null);
+  const dribbleAnalysisFramesRef = useRef<TimedDribbleAnalysis[]>([]);
   const dailyDribbleRecordsRef = useRef<Record<string, number>>({});
   const homeworkStateRef = useRef<HomeworkStateRecord>({});
   const shotAttemptRecordsRef = useRef<Record<string, number>>({});
   const shootAnalysisHistoryRef = useRef<ShootAnalysis[]>([]);
+  const shootAnalysisFramesRef = useRef<TimedShootAnalysis[]>([]);
   const shootFeedbackLockedRef = useRef(false);
   const frontDribbleCriterionCountsRef = useRef<Record<FrontDribbleCriterionNumber, number>>(createFrontDribbleCriterionCounter());
   const frontDribbleWeakPointRef = useRef<FrontDribbleWeakPoint | null>(null);
@@ -1098,7 +1796,7 @@ export function useBasketballCoachApp() {
   const shotGraphData = useMemo<ShotGraphDatum[]>(() => {
     const allDateKeys = Array.from(
       new Set([...Object.keys(shotAttemptRecords), ...Object.keys(shotSuccessRecords)])
-    ).sort();
+    ).sort((left, right) => parseDateKeyToTime(left) - parseDateKeyToTime(right));
 
     return allDateKeys.map((dateKey) => {
       const attempts = shotAttemptRecords[dateKey] || 0;
@@ -1113,6 +1811,10 @@ export function useBasketballCoachApp() {
       };
     });
   }, [shotAttemptRecords, shotSuccessRecords]);
+  const diarySkillInsight = useMemo(
+    () => buildDiarySkillInsight(selectedDateKey, shotGraphData, dailyDribbleRecords, lessonRecords),
+    [dailyDribbleRecords, lessonRecords, selectedDateKey, shotGraphData]
+  );
 
   const resetAccountState = useCallback(() => {
     const resetDate = new Date();
@@ -1173,12 +1875,14 @@ export function useBasketballCoachApp() {
     pendingShootRecordingStopRef.current = false;
     latestDribbleAnalysisRef.current = null;
     latestShootAnalysisRef.current = null;
+    dribbleAnalysisFramesRef.current = [];
     dailyDribbleRecordsRef.current = {};
     homeworkStateRef.current = {};
     shotAttemptRecordsRef.current = {};
     shotSuccessRecordsRef.current = {};
     shootSuccessRecordedForCurrentAttemptRef.current = false;
     shootAnalysisHistoryRef.current = [];
+    shootAnalysisFramesRef.current = [];
     shootFeedbackLockedRef.current = false;
     frontDribbleCriterionCountsRef.current = createFrontDribbleCriterionCounter();
     frontDribbleWeakPointRef.current = null;
@@ -1743,6 +2447,7 @@ export function useBasketballCoachApp() {
     pendingShootRecordingStopRef.current = false;
     latestShootAnalysisRef.current = null;
     shootAnalysisHistoryRef.current = [];
+    shootAnalysisFramesRef.current = [];
     shootCooldownUntilRef.current = null;
     shootRecordingStartedRef.current = false;
     shootFeedbackLockedRef.current = false;
@@ -1750,6 +2455,7 @@ export function useBasketballCoachApp() {
 
   const resetFrontDribbleTrackingSummary = useCallback(() => {
     latestDribbleAnalysisRef.current = null;
+    dribbleAnalysisFramesRef.current = [];
     frontDribbleCriterionCountsRef.current = createFrontDribbleCriterionCounter();
     frontDribbleWeakPointRef.current = null;
     frontDribbleSummaryShownRef.current = false;
@@ -2301,11 +3007,16 @@ export function useBasketballCoachApp() {
     const dateKey = formatDateKey(new Date());
     const mode = lessonModeRef.current;
     const latestDribbleAnalysis = latestDribbleAnalysisRef.current;
+    const shotOutcome = mode === 'shoot' ? (shootSuccessRecordedForCurrentAttemptRef.current ? 'success' : 'failure') : undefined;
+    const evaluation =
+      mode === 'shoot'
+        ? buildShootRecordEvaluation(latestShootAnalysisRef.current, [...shootAnalysisFramesRef.current], shotOutcome)
+        : buildDribbleRecordEvaluation([...dribbleAnalysisFramesRef.current]);
     const nextRecord = normalizeLessonRecord({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       dateKey,
       mode,
-      shotOutcome: mode === 'shoot' ? (shootSuccessRecordedForCurrentAttemptRef.current ? 'success' : 'failure') : undefined,
+      shotOutcome,
       feedback: latestFeedbackRef.current,
       feedbackTimeline: [...feedbackTimelineRef.current],
       videoUri,
@@ -2323,6 +3034,7 @@ export function useBasketballCoachApp() {
           ? Math.max(0, latestDribbleAnalysis?.rightHandDribbleCount ?? 0)
           : undefined,
       representativeFeedbackCategory: undefined,
+      evaluation,
     });
 
     setLessonRecords((current) => [...current, nextRecord]);
@@ -3305,6 +4017,7 @@ export function useBasketballCoachApp() {
     stanceCountdownStartedAtRef.current = null;
     setCountdownValue(null);
     setCurrentDribbleCount(0);
+    dribbleAnalysisFramesRef.current = [];
     setDribbleResetToken(Date.now());
     playStartCue();
     setRecordingStartToken(Date.now());
@@ -3329,6 +4042,7 @@ export function useBasketballCoachApp() {
     pendingShootRecordingStopRef.current = false;
     latestShootAnalysisRef.current = null;
     shootAnalysisHistoryRef.current = [];
+    shootAnalysisFramesRef.current = [];
     shootSuccessRecordedForCurrentAttemptRef.current = false;
     setIsShootSuccessButtonVisible(false);
     setShootResetToken(Date.now());
@@ -3361,6 +4075,14 @@ export function useBasketballCoachApp() {
                 dribbleStarted: true,
               }
             : analysis;
+        const startedAt = lessonStartedAtRef.current;
+
+        if (startedAt !== null) {
+          dribbleAnalysisFramesRef.current.push({
+            atMs: Math.max(0, Date.now() - startedAt),
+            analysis: effectiveAnalysis,
+          });
+        }
 
         stanceCountdownStartedAtRef.current = null;
         setCountdownValue(null);
@@ -3491,6 +4213,14 @@ export function useBasketballCoachApp() {
         setCountdownValue(null);
         if (shootRecordingStartedRef.current) {
           shootAnalysisHistoryRef.current.push(analysis);
+          const startedAt = lessonStartedAtRef.current;
+
+          if (startedAt !== null) {
+            shootAnalysisFramesRef.current.push({
+              atMs: Math.max(0, Date.now() - startedAt),
+              analysis,
+            });
+          }
         }
 
         if (analysis.releaseDetected) {
@@ -3586,8 +4316,10 @@ export function useBasketballCoachApp() {
           lessonStartedAtRef.current = Date.now();
           feedbackTimelineRef.current = [];
           setCurrentDribbleCount(0);
+          dribbleAnalysisFramesRef.current = [];
           latestShootAnalysisRef.current = null;
           shootAnalysisHistoryRef.current = [];
+          shootAnalysisFramesRef.current = [];
           if (latestFeedbackRef.current.trim()) {
             feedbackTimelineRef.current.push({
               atMs: 0,
@@ -3784,6 +4516,7 @@ export function useBasketballCoachApp() {
           ? normalizeLessonRecord({
               ...item,
               shotOutcome: nextShotOutcome,
+              evaluation: updateShootRecordEvaluationForOutcome(item, nextShotOutcome),
             })
           : item
       )
@@ -3842,6 +4575,7 @@ export function useBasketballCoachApp() {
     selectedDateKey,
     selectedDateRecords,
     selectedDateDribbleCount,
+    diarySkillInsight,
     shotGraphData,
     calendarCells,
     selectedSkillKey,

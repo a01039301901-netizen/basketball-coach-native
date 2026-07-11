@@ -85,6 +85,7 @@ export interface LessonRecord {
   leftHandDribbleCount?: number;
   rightHandDribbleCount?: number;
   representativeFeedbackCategory?: HomeworkFeedbackCategory;
+  evaluation?: LessonRecordEvaluation;
 }
 
 export interface LessonReviewClip {
@@ -93,6 +94,31 @@ export interface LessonReviewClip {
   startAtMs: number;
   durationMs: number;
   title: string;
+}
+
+export type LessonRecordLevel = 'good' | 'average' | 'bad';
+
+export interface LessonRecordCriterion {
+  key: string;
+  label: string;
+  isStable: boolean;
+  stableRatio?: number;
+  detail: string;
+}
+
+export interface LessonRecordHighlight {
+  label: string;
+  detail: string;
+  startAtMs: number;
+  durationMs: number;
+}
+
+export interface LessonRecordEvaluation {
+  level: LessonRecordLevel;
+  summary: string;
+  criteria: LessonRecordCriterion[];
+  strengths: LessonRecordHighlight[];
+  improvements: LessonRecordHighlight[];
 }
 
 export interface FireworkItem {
@@ -107,6 +133,26 @@ export interface ShotGraphDatum {
   attempts: number;
   successes: number;
   successRate: number;
+}
+
+export interface DiarySkillInsight {
+  practiceThresholds: {
+    dribbleCount: number;
+    shootAttemptCount: number;
+  };
+  isPracticeThresholdMet: boolean;
+  selectedShotAttempts: number;
+  selectedShotSuccesses: number;
+  selectedShotSuccessRate: number;
+  recentAverageShotAttempts: number | null;
+  recentAverageDribbleCount: number | null;
+  recentAverageShotSuccessRate: number | null;
+  shotTrend: 'up' | 'flat' | 'down' | 'insufficient_history' | 'below_threshold';
+  shotTrendDelta: number | null;
+  leftDribbleCount: number;
+  rightDribbleCount: number;
+  dribbleBalance: 'balanced' | 'left' | 'right' | 'none';
+  dribbleBalanceGap: number;
 }
 
 export interface HomeworkProgressItem {

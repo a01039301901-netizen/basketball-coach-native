@@ -253,6 +253,7 @@ export default function App() {
               selectedDateKey={app.selectedDateKey}
               selectedDateRecords={app.selectedDateRecords}
               selectedDateDribbleCount={app.selectedDateDribbleCount}
+              diarySkillInsight={app.diarySkillInsight}
               shotGraphData={app.shotGraphData}
               onChangeMonth={app.changeMonth}
               onOpenDate={app.openDiaryDate}

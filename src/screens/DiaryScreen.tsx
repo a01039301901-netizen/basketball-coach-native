@@ -5,7 +5,7 @@ import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
 import { DAY_NAMES } from '../constants/content';
 import { colors } from '../theme/colors';
-import type { CalendarCell, FeedbackMoment, LessonRecord, ShotGraphDatum } from '../types/app';
+import type { CalendarCell, DiarySkillInsight, FeedbackMoment, LessonRecord, ShotGraphDatum } from '../types/app';
 import { formatDateKey, formatMonthTitle } from '../utils/date';
 
 interface DiaryScreenProps {
@@ -14,6 +14,7 @@ interface DiaryScreenProps {
   selectedDateKey: string;
   selectedDateRecords: LessonRecord[];
   selectedDateDribbleCount: number;
+  diarySkillInsight: DiarySkillInsight;
   shotGraphData: ShotGraphDatum[];
   onChangeMonth: (delta: number) => void;
   onOpenDate: (dateKey: string) => void;
@@ -94,12 +95,59 @@ function DateArrowIcon({ direction }: { direction: 'left' | 'right' }) {
   );
 }
 
+function getRecordLevelLabel(level: NonNullable<LessonRecord['evaluation']>['level']) {
+  if (level === 'good') {
+    return '좋음';
+  }
+
+  if (level === 'average') {
+    return '보통';
+  }
+
+  return '나쁨';
+}
+
+function getShotTrendLabel(trend: DiarySkillInsight['shotTrend'], delta: number | null) {
+  if (trend === 'up') {
+    return `최근 평균보다 ${Math.abs(delta ?? 0)}% 상승`;
+  }
+
+  if (trend === 'down') {
+    return `최근 평균보다 ${Math.abs(delta ?? 0)}% 하락`;
+  }
+
+  if (trend === 'flat') {
+    return '최근 평균과 비슷함';
+  }
+
+  if (trend === 'insufficient_history') {
+    return '비교할 이전 기록이 더 필요함';
+  }
+
+  return '연습 기준을 채우면 해석 가능';
+}
+
+function getDribbleBalanceLabel(insight: DiarySkillInsight) {
+  if (insight.dribbleBalance === 'none') {
+    return '좌우 드리블 기록 없음';
+  }
+
+  if (insight.dribbleBalance === 'balanced') {
+    return `좌우 균형 좋음 (차이 ${insight.dribbleBalanceGap}회)`;
+  }
+
+  return insight.dribbleBalance === 'left'
+    ? `왼손 드리블이 ${insight.dribbleBalanceGap}회 더 많음`
+    : `오른손 드리블이 ${insight.dribbleBalanceGap}회 더 많음`;
+}
+
 export function DiaryScreen({
   currentDate,
   calendarCells,
   selectedDateKey,
   selectedDateRecords,
   selectedDateDribbleCount,
+  diarySkillInsight,
   shotGraphData,
   onChangeMonth,
   onOpenDate,
@@ -120,11 +168,15 @@ export function DiaryScreen({
     () => shotGraphData.find((item) => item.dateKey === selectedDateKey) ?? null,
     [selectedDateKey, shotGraphData]
   );
+  const practiceShootThreshold = diarySkillInsight.practiceThresholds.shootAttemptCount;
   const graphMaxValue = useMemo(
     () => Math.max(1, selectedShotGraph?.attempts ?? 0, selectedShotGraph?.successes ?? 0),
     [selectedShotGraph]
   );
-  const allShotGraphData = useMemo(() => shotGraphData.filter((item) => item.attempts >= 10), [shotGraphData]);
+  const allShotGraphData = useMemo(
+    () => shotGraphData.filter((item) => item.attempts >= practiceShootThreshold),
+    [practiceShootThreshold, shotGraphData]
+  );
   const allGraphChartWidth = useMemo(() => Math.max(320, allShotGraphData.length * 86 + 48), [allShotGraphData.length]);
   const selectedDate = useMemo(() => (selectedDateKey ? parseDateKeyToDate(selectedDateKey) : new Date()), [selectedDateKey]);
   const selectedDateAttendance = useMemo(() => {
@@ -269,6 +321,167 @@ export function DiaryScreen({
     }
   }
 
+  const jumpToHighlight = useCallback(
+    async (record: LessonRecord, startAtMs: number) => {
+      const video = videoRefs.current[record.id];
+
+      if (!video) {
+        return;
+      }
+
+      syncFeedbackFromPosition(record, startAtMs);
+      await video.playFromPositionAsync(Math.max(0, startAtMs));
+      startPlaybackPolling(record);
+    },
+    [startPlaybackPolling, syncFeedbackFromPosition]
+  );
+
+  function renderRecordCard(record: LessonRecord) {
+    const syncedFeedback = playbackFeedback[record.id] || record.feedback;
+    const evaluation = record.evaluation;
+
+    return (
+      <View
+        key={record.id}
+        style={[
+          styles.recordCard,
+          record.mode === 'shoot' ? styles.recordCardShoot : styles.recordCardDribble,
+        ]}
+      >
+        <View style={styles.recordHeader}>
+          <View style={styles.recordHeaderBadges}>
+            <View
+              style={[
+                styles.recordBadge,
+                record.mode === 'shoot' ? styles.recordBadgeShoot : styles.recordBadgeDribble,
+              ]}
+            >
+              <Text style={styles.recordBadgeText}>{getRecordModeLabel(record.mode)}</Text>
+            </View>
+
+            {evaluation ? (
+              <View
+                style={[
+                  styles.recordLevelBadge,
+                  evaluation.level === 'good'
+                    ? styles.recordLevelBadgeGood
+                    : evaluation.level === 'average'
+                      ? styles.recordLevelBadgeAverage
+                      : styles.recordLevelBadgeBad,
+                ]}
+              >
+                <Text style={styles.recordLevelBadgeText}>{getRecordLevelLabel(evaluation.level)}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {record.mode === 'shoot' ? (
+            <Pressable
+              onPress={() => onToggleShotOutcome(record.id)}
+              style={({ pressed }) => [
+                styles.shotOutcomeToggle,
+                record.shotOutcome === 'success'
+                  ? styles.shotOutcomeToggleSuccess
+                  : styles.shotOutcomeToggleFailure,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.shotOutcomeToggleLabel}>슛 결과</Text>
+              <Text style={styles.shotOutcomeToggleValue}>{getShotOutcomeLabel(record.shotOutcome)}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+        <Text style={styles.recordTitle}>{getRecordTitle(record.mode)}</Text>
+        <Text style={styles.recordMeta}>{record.createdAt}</Text>
+
+        {record.videoUri ? (
+          <Video
+            ref={(instance) => {
+              videoRefs.current[record.id] = instance;
+            }}
+            source={{ uri: record.videoUri }}
+            useNativeControls
+            shouldPlay={false}
+            isLooping={false}
+            progressUpdateIntervalMillis={200}
+            resizeMode={ResizeMode.COVER}
+            style={styles.recordVideo}
+            onPlaybackStatusUpdate={(status) => handlePlaybackStatus(record, status)}
+          />
+        ) : null}
+
+        {evaluation ? (
+          <View style={styles.evaluationBox}>
+            <Text style={styles.evaluationTitle}>기록 평가</Text>
+            <Text style={styles.evaluationSummary}>{evaluation.summary}</Text>
+
+            <View style={styles.criteriaRow}>
+              {evaluation.criteria.map((criterion) => (
+                <View
+                  key={`${record.id}-${criterion.key}`}
+                  style={[
+                    styles.criterionChip,
+                    criterion.isStable ? styles.criterionChipStable : styles.criterionChipUnstable,
+                  ]}
+                >
+                  <Text style={styles.criterionChipLabel}>{criterion.label}</Text>
+                  <Text style={styles.criterionChipValue}>{criterion.isStable ? '안정' : '보완'}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={styles.highlightGroup}>
+              <Text style={styles.highlightGroupTitle}>잘한 점 다시보기</Text>
+              {evaluation.strengths.length > 0 ? (
+                evaluation.strengths.map((highlight, index) => (
+                  <Pressable
+                    key={`${record.id}-strength-${index}`}
+                    onPress={() => void jumpToHighlight(record, highlight.startAtMs)}
+                    style={({ pressed }) => [styles.highlightButton, styles.highlightButtonGood, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.highlightButtonLabel}>{highlight.label}</Text>
+                    <Text style={styles.highlightButtonDetail}>{highlight.detail}</Text>
+                  </Pressable>
+                ))
+              ) : (
+                <Text style={styles.highlightEmptyText}>아직 표시할 안정 장면이 없습니다.</Text>
+              )}
+            </View>
+
+            <View style={styles.highlightGroup}>
+              <Text style={styles.highlightGroupTitle}>보완할 점 다시보기</Text>
+              {evaluation.improvements.length > 0 ? (
+                evaluation.improvements.map((highlight, index) => (
+                  <Pressable
+                    key={`${record.id}-improvement-${index}`}
+                    onPress={() => void jumpToHighlight(record, highlight.startAtMs)}
+                    style={({ pressed }) => [styles.highlightButton, styles.highlightButtonBad, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.highlightButtonLabel}>{highlight.label}</Text>
+                    <Text style={styles.highlightButtonDetail}>{highlight.detail}</Text>
+                  </Pressable>
+                ))
+              ) : (
+                <Text style={styles.highlightEmptyText}>지금은 추가 보완 장면이 없습니다.</Text>
+              )}
+            </View>
+          </View>
+        ) : (
+          <View style={styles.evaluationEmptyBox}>
+            <Text style={styles.evaluationEmptyText}>자세 평가 정보는 새로 저장한 기록부터 함께 표시됩니다.</Text>
+          </View>
+        )}
+
+        <View style={styles.liveFeedbackBox}>
+          <Text style={styles.liveFeedbackLabel}>영상과 함께 보는 실시간 피드백</Text>
+          <Text style={styles.liveFeedbackText}>{syncedFeedback}</Text>
+        </View>
+
+        <SmallButton title="기록 삭제" onPress={() => onDeleteRecord(record.id)} variant="red" />
+      </View>
+    );
+  }
+
 
   return (
     <Card title="기록일지">
@@ -311,6 +524,64 @@ export function DiaryScreen({
 
         <View style={[styles.contentRow, isWide && styles.contentRowWide]}>
           <View style={[styles.graphColumn, isWide && styles.graphColumnWide]}>
+            <View style={styles.skillInsightCard}>
+              <Text style={styles.skillInsightTitle}>실력 해석</Text>
+              {!selectedDateKey ? (
+                <Text style={styles.skillInsightText}>날짜를 선택하면 최근 평균과 비교한 실력 해석을 볼 수 있습니다.</Text>
+              ) : (
+                <>
+                  <Text style={styles.skillInsightText}>
+                    {!diarySkillInsight.isPracticeThresholdMet
+                      ? `이 날짜는 드리블 ${selectedDateDribbleCount}회, 슛 ${diarySkillInsight.selectedShotAttempts}회로 비교 기준인 드리블 ${diarySkillInsight.practiceThresholds.dribbleCount}회와 슛 ${diarySkillInsight.practiceThresholds.shootAttemptCount}회를 아직 채우지 못했습니다.`
+                      : diarySkillInsight.shotTrend === 'insufficient_history'
+                        ? '연습 기준은 충족했지만 비교할 이전 기준 기록이 더 필요합니다.'
+                        : `슛 성공률이 ${getShotTrendLabel(
+                            diarySkillInsight.shotTrend,
+                            diarySkillInsight.shotTrendDelta
+                          )} 상태입니다.`}
+                  </Text>
+
+                  <View style={styles.skillInsightStats}>
+                    <View style={styles.skillInsightStatCard}>
+                      <Text style={styles.skillInsightStatLabel}>오늘 성공률</Text>
+                      <Text style={styles.skillInsightStatValue}>{diarySkillInsight.selectedShotSuccessRate}%</Text>
+                      <Text style={styles.skillInsightStatHelper}>
+                        성공 {diarySkillInsight.selectedShotSuccesses} / 시도 {diarySkillInsight.selectedShotAttempts}
+                      </Text>
+                    </View>
+
+                    <View style={styles.skillInsightStatCard}>
+                      <Text style={styles.skillInsightStatLabel}>최근 평균</Text>
+                      <Text style={styles.skillInsightStatValue}>
+                        {diarySkillInsight.recentAverageShotSuccessRate === null
+                          ? '-'
+                          : `${diarySkillInsight.recentAverageShotSuccessRate}%`}
+                      </Text>
+                      <Text style={styles.skillInsightStatHelper}>
+                        {diarySkillInsight.recentAverageShotAttempts === null
+                          ? '이전 기준 기록 없음'
+                          : `슛 ${diarySkillInsight.recentAverageShotAttempts}회 / 드리블 ${diarySkillInsight.recentAverageDribbleCount ?? 0}회`}
+                      </Text>
+                    </View>
+
+                    <View style={styles.skillInsightStatCard}>
+                      <Text style={styles.skillInsightStatLabel}>드리블 균형</Text>
+                      <Text style={styles.skillInsightStatValue}>
+                        {diarySkillInsight.dribbleBalance === 'balanced'
+                          ? '균형'
+                          : diarySkillInsight.dribbleBalance === 'left'
+                            ? '왼손 우세'
+                            : diarySkillInsight.dribbleBalance === 'right'
+                              ? '오른손 우세'
+                              : '-'}
+                      </Text>
+                      <Text style={styles.skillInsightStatHelper}>{getDribbleBalanceLabel(diarySkillInsight)}</Text>
+                    </View>
+                  </View>
+                </>
+              )}
+            </View>
+
             <View style={styles.graphCard}>
               <Text style={styles.graphTitle}>슛 성공도</Text>
               <Text style={styles.graphDescription}>
@@ -447,7 +718,7 @@ export function DiaryScreen({
               </Pressable>
 
               {showRecordFilterMenu ? (
-                <View style={styles.recordFilterMenu}>
+                  <View style={styles.recordFilterMenu}>
                   {(['all', 'dribble', 'shoot', 'shootSuccess'] as RecordFilter[]).map((filterOption) => (
                     <Pressable
                       key={filterOption}
@@ -493,71 +764,7 @@ export function DiaryScreen({
                     </View>
                   ) : null}
 
-                  {filteredDateRecords.map((record) => {
-                    const syncedFeedback = playbackFeedback[record.id] || record.feedback;
-
-                    return (
-                      <View
-                        key={record.id}
-                        style={[
-                          styles.recordCard,
-                          record.mode === 'shoot' ? styles.recordCardShoot : styles.recordCardDribble,
-                        ]}
-                      >
-                        <View style={styles.recordHeader}>
-                          <View
-                            style={[
-                              styles.recordBadge,
-                              record.mode === 'shoot' ? styles.recordBadgeShoot : styles.recordBadgeDribble,
-                            ]}
-                          >
-                            <Text style={styles.recordBadgeText}>{getRecordModeLabel(record.mode)}</Text>
-                          </View>
-
-                          {record.mode === 'shoot' ? (
-                            <Pressable
-                              onPress={() => onToggleShotOutcome(record.id)}
-                              style={({ pressed }) => [
-                                styles.shotOutcomeToggle,
-                                record.shotOutcome === 'success'
-                                  ? styles.shotOutcomeToggleSuccess
-                                  : styles.shotOutcomeToggleFailure,
-                                pressed && styles.pressed,
-                              ]}
-                            >
-                              <Text style={styles.shotOutcomeToggleLabel}>슛 결과</Text>
-                              <Text style={styles.shotOutcomeToggleValue}>{getShotOutcomeLabel(record.shotOutcome)}</Text>
-                            </Pressable>
-                          ) : null}
-                        </View>
-                        <Text style={styles.recordTitle}>{getRecordTitle(record.mode)}</Text>
-                        <Text style={styles.recordMeta}>{record.createdAt}</Text>
-
-                        {record.videoUri ? (
-                          <Video
-                            ref={(instance) => {
-                              videoRefs.current[record.id] = instance;
-                            }}
-                            source={{ uri: record.videoUri }}
-                            useNativeControls
-                            shouldPlay={false}
-                            isLooping={false}
-                            progressUpdateIntervalMillis={200}
-                            resizeMode={ResizeMode.COVER}
-                            style={styles.recordVideo}
-                            onPlaybackStatusUpdate={(status) => handlePlaybackStatus(record, status)}
-                          />
-                        ) : null}
-
-                        <View style={styles.liveFeedbackBox}>
-                          <Text style={styles.liveFeedbackLabel}>영상과 함께 보는 실시간 피드백</Text>
-                          <Text style={styles.liveFeedbackText}>{syncedFeedback}</Text>
-                        </View>
-
-                        <SmallButton title="기록 삭제" onPress={() => onDeleteRecord(record.id)} variant="red" />
-                      </View>
-                    );
-                  })}
+                  {filteredDateRecords.map(renderRecordCard)}
                 </ScrollView>
               </View>
             ) : (
@@ -572,71 +779,7 @@ export function DiaryScreen({
                   </View>
                 ) : null}
 
-                {filteredDateRecords.map((record) => {
-                  const syncedFeedback = playbackFeedback[record.id] || record.feedback;
-
-                  return (
-                    <View
-                      key={record.id}
-                      style={[
-                        styles.recordCard,
-                        record.mode === 'shoot' ? styles.recordCardShoot : styles.recordCardDribble,
-                      ]}
-                    >
-                      <View style={styles.recordHeader}>
-                        <View
-                          style={[
-                            styles.recordBadge,
-                            record.mode === 'shoot' ? styles.recordBadgeShoot : styles.recordBadgeDribble,
-                          ]}
-                        >
-                          <Text style={styles.recordBadgeText}>{getRecordModeLabel(record.mode)}</Text>
-                        </View>
-
-                        {record.mode === 'shoot' ? (
-                          <Pressable
-                            onPress={() => onToggleShotOutcome(record.id)}
-                            style={({ pressed }) => [
-                              styles.shotOutcomeToggle,
-                              record.shotOutcome === 'success'
-                                ? styles.shotOutcomeToggleSuccess
-                                : styles.shotOutcomeToggleFailure,
-                              pressed && styles.pressed,
-                            ]}
-                          >
-                            <Text style={styles.shotOutcomeToggleLabel}>슛 결과</Text>
-                            <Text style={styles.shotOutcomeToggleValue}>{getShotOutcomeLabel(record.shotOutcome)}</Text>
-                          </Pressable>
-                        ) : null}
-                      </View>
-                      <Text style={styles.recordTitle}>{getRecordTitle(record.mode)}</Text>
-                      <Text style={styles.recordMeta}>{record.createdAt}</Text>
-
-                      {record.videoUri ? (
-                        <Video
-                          ref={(instance) => {
-                            videoRefs.current[record.id] = instance;
-                          }}
-                          source={{ uri: record.videoUri }}
-                          useNativeControls
-                          shouldPlay={false}
-                          isLooping={false}
-                          progressUpdateIntervalMillis={200}
-                          resizeMode={ResizeMode.COVER}
-                          style={styles.recordVideo}
-                          onPlaybackStatusUpdate={(status) => handlePlaybackStatus(record, status)}
-                        />
-                      ) : null}
-
-                      <View style={styles.liveFeedbackBox}>
-                        <Text style={styles.liveFeedbackLabel}>영상과 함께 보는 실시간 피드백</Text>
-                        <Text style={styles.liveFeedbackText}>{syncedFeedback}</Text>
-                      </View>
-
-                      <SmallButton title="기록 삭제" onPress={() => onDeleteRecord(record.id)} variant="red" />
-                    </View>
-                  );
-                })}
+                {filteredDateRecords.map(renderRecordCard)}
               </>
             )}
           </View>
@@ -752,7 +895,7 @@ export function DiaryScreen({
             </Text>
 
             {allShotGraphData.length === 0 ? (
-              <Text style={styles.graphEmpty}>슛 시도 횟수가 10회 이상인 날짜만 그래프에 표시됩니다.</Text>
+              <Text style={styles.graphEmpty}>슛 시도 횟수가 {practiceShootThreshold}회 이상인 날짜만 그래프에 표시됩니다.</Text>
             ) : (
               <>
                 <View style={styles.modalGuideLegend}>
@@ -1035,6 +1178,51 @@ const styles = StyleSheet.create({
   graphColumnWide: {
     width: 340,
     flexShrink: 0,
+  },
+  skillInsightCard: {
+    backgroundColor: colors.surfaceStrong,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 12,
+  },
+  skillInsightTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  skillInsightText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  skillInsightStats: {
+    gap: 10,
+  },
+  skillInsightStatCard: {
+    borderRadius: 14,
+    padding: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  skillInsightStatLabel: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  skillInsightStatValue: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '900',
+  },
+  skillInsightStatHelper: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 6,
   },
   recordsColumn: {
     gap: 14,
@@ -1459,6 +1647,13 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 10,
   },
+  recordHeaderBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+    flex: 1,
+  },
   recordBadge: {
     borderRadius: 999,
     paddingHorizontal: 12,
@@ -1474,6 +1669,29 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(80,180,255,0.38)',
   },
   recordBadgeText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  recordLevelBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+  },
+  recordLevelBadgeGood: {
+    backgroundColor: 'rgba(50,205,50,0.14)',
+    borderColor: 'rgba(50,205,50,0.42)',
+  },
+  recordLevelBadgeAverage: {
+    backgroundColor: 'rgba(217,161,110,0.14)',
+    borderColor: 'rgba(217,161,110,0.42)',
+  },
+  recordLevelBadgeBad: {
+    backgroundColor: 'rgba(191,80,88,0.14)',
+    borderColor: 'rgba(191,80,88,0.42)',
+  },
+  recordLevelBadgeText: {
     color: colors.text,
     fontSize: 12,
     fontWeight: '900',
@@ -1516,6 +1734,107 @@ const styles = StyleSheet.create({
     color: '#ffd3ad',
     fontSize: 13,
     marginBottom: 10,
+  },
+  evaluationBox: {
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 12,
+  },
+  evaluationTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  evaluationSummary: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  evaluationEmptyBox: {
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  evaluationEmptyText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  criteriaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  criterionChip: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    minWidth: 88,
+  },
+  criterionChipStable: {
+    backgroundColor: 'rgba(50,205,50,0.12)',
+    borderColor: 'rgba(50,205,50,0.34)',
+  },
+  criterionChipUnstable: {
+    backgroundColor: 'rgba(191,80,88,0.12)',
+    borderColor: 'rgba(191,80,88,0.34)',
+  },
+  criterionChipLabel: {
+    color: colors.textSoft,
+    fontSize: 11,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  criterionChipValue: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  highlightGroup: {
+    gap: 8,
+  },
+  highlightGroupTitle: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  highlightButton: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    gap: 4,
+  },
+  highlightButtonGood: {
+    backgroundColor: 'rgba(50,205,50,0.1)',
+    borderColor: 'rgba(50,205,50,0.28)',
+  },
+  highlightButtonBad: {
+    backgroundColor: 'rgba(191,80,88,0.1)',
+    borderColor: 'rgba(191,80,88,0.28)',
+  },
+  highlightButtonLabel: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  highlightButtonDetail: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  highlightEmptyText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
   },
   recordVideo: {
     width: '100%',

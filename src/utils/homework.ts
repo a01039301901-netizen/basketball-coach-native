@@ -12,9 +12,9 @@ import type {
 } from '../types/app';
 
 export const DAILY_DRIBBLE_HOMEWORK_TITLE = '드리블 50회 튀기기';
-export const DAILY_SHOOT_HOMEWORK_TITLE = '슛 발사 10회 도전';
+export const DAILY_SHOOT_HOMEWORK_TITLE = '슛 발사 20회 도전';
 export const DAILY_DRIBBLE_TARGET = 50;
-export const DAILY_SHOOT_TARGET = 10;
+export const DAILY_SHOOT_TARGET = 20;
 export const POSITION_DRIBBLE_TARGET = 50;
 export const POSITION_SHOOT_SUCCESS_TARGET = 10;
 export const POSITION_SKILL_VIDEO_TARGET = 1;
