@@ -127,18 +127,38 @@ function getShotTrendLabel(trend: DiarySkillInsight['shotTrend'], delta: number 
   return '연습 기준을 채우면 해석 가능';
 }
 
-function getDribbleBalanceLabel(insight: DiarySkillInsight) {
-  if (insight.dribbleBalance === 'none') {
-    return '좌우 드리블 기록 없음';
+function getDribbleBalanceNarration(insight: DiarySkillInsight, totalCount: number) {
+  const trackedCount = insight.leftDribbleCount + insight.rightDribbleCount;
+
+  if (totalCount === 0) {
+    return '오늘은 아직 드리블 균형을 해석할 기록이 없어요.';
+  }
+
+  if (trackedCount === 0) {
+    return `오늘 드리블은 ${totalCount}회 기록됐지만, 좌우 균형을 해석할 정보는 아직 부족해요.`;
   }
 
   if (insight.dribbleBalance === 'balanced') {
-    return `좌우 균형 좋음 (차이 ${insight.dribbleBalanceGap}회)`;
+    return `오늘은 왼손과 오른손 드리블을 고르게 연습하셨군요. 좌우 차이가 ${insight.dribbleBalanceGap}회로 균형이 좋습니다.`;
   }
 
   return insight.dribbleBalance === 'left'
-    ? `왼손 드리블이 ${insight.dribbleBalanceGap}회 더 많음`
-    : `오른손 드리블이 ${insight.dribbleBalanceGap}회 더 많음`;
+    ? `오늘은 왼손 드리블을 더 많이 연습하셨군요. 오른손보다 ${insight.dribbleBalanceGap}회 더 많았습니다.`
+    : `오늘은 오른손 드리블을 더 많이 연습하셨군요. 왼손보다 ${insight.dribbleBalanceGap}회 더 많았습니다.`;
+}
+
+function getDribbleBalanceSummary(insight: DiarySkillInsight, totalCount: number) {
+  const trackedCount = insight.leftDribbleCount + insight.rightDribbleCount;
+
+  if (trackedCount === 0) {
+    return `해당 날짜 드리블 횟수: ${totalCount}회`;
+  }
+
+  if (trackedCount < totalCount) {
+    return `전체 ${totalCount}회 중 왼손 ${insight.leftDribbleCount}회, 오른손 ${insight.rightDribbleCount}회가 구분되어 기록됐습니다.`;
+  }
+
+  return `전체 ${totalCount}회 중 왼손 ${insight.leftDribbleCount}회, 오른손 ${insight.rightDribbleCount}회입니다.`;
 }
 
 export function DiaryScreen({
@@ -168,6 +188,18 @@ export function DiaryScreen({
     () => shotGraphData.find((item) => item.dateKey === selectedDateKey) ?? null,
     [selectedDateKey, shotGraphData]
   );
+  const dribbleGraphTotal = Math.max(
+    selectedDateDribbleCount,
+    diarySkillInsight.leftDribbleCount + diarySkillInsight.rightDribbleCount
+  );
+  const isLeftDribbleDominant = diarySkillInsight.leftDribbleCount > diarySkillInsight.rightDribbleCount;
+  const isRightDribbleDominant = diarySkillInsight.rightDribbleCount > diarySkillInsight.leftDribbleCount;
+  const leftDribbleGraphWidth: `${number}%` = dribbleGraphTotal > 0
+    ? `${(diarySkillInsight.leftDribbleCount / dribbleGraphTotal) * 100}%`
+    : '0%';
+  const rightDribbleGraphWidth: `${number}%` = dribbleGraphTotal > 0
+    ? `${(diarySkillInsight.rightDribbleCount / dribbleGraphTotal) * 100}%`
+    : '0%';
   const practiceShootThreshold = diarySkillInsight.practiceThresholds.shootAttemptCount;
   const graphMaxValue = useMemo(
     () => Math.max(1, selectedShotGraph?.attempts ?? 0, selectedShotGraph?.successes ?? 0),
@@ -554,8 +586,6 @@ export function DiaryScreen({
                                 : '날짜를 선택하면 성공률 그래프를 볼 수 있습니다.'}
                           </Text>
                         </View>
-
-                        <SmallButton title="모든 슛 성공도 보기" onPress={() => setShowAllShotGraph(true)} variant="dark" />
                       </View>
 
                       {selectedDateKey && selectedShotGraph ? (
@@ -630,6 +660,9 @@ export function DiaryScreen({
                         </Text>
                       )}
                     </View>
+                    <View style={styles.skillInsightShotButtonRow}>
+                      <SmallButton title="모든 슛 성공도 보기" onPress={() => setShowAllShotGraph(true)} variant="dark" />
+                    </View>
 
                     <View style={styles.skillInsightStatCard}>
                       <Text style={styles.skillInsightStatLabel}>최근 평균</Text>
@@ -647,17 +680,67 @@ export function DiaryScreen({
 
                     <View style={styles.skillInsightStatCard}>
                       <Text style={styles.skillInsightStatLabel}>드리블 균형</Text>
-                      <Text style={styles.skillInsightStatValue}>
-                        {diarySkillInsight.dribbleBalance === 'balanced'
-                          ? '균형'
-                          : diarySkillInsight.dribbleBalance === 'left'
-                            ? '왼손 우세'
-                            : diarySkillInsight.dribbleBalance === 'right'
-                              ? '오른손 우세'
-                              : '-'}
+                      <Text style={styles.skillInsightNarration}>
+                        {getDribbleBalanceNarration(diarySkillInsight, dribbleGraphTotal)}
                       </Text>
+                      <View style={styles.dribbleBalanceLegendRow}>
+                        <View style={styles.dribbleBalanceLegendItem}>
+                          <View
+                            style={[
+                              styles.dribbleBalanceLegendDot,
+                              isLeftDribbleDominant
+                                ? styles.dribbleBalanceLegendDotDominant
+                                : styles.dribbleBalanceLegendDotSubtle,
+                            ]}
+                          />
+                          <Text style={styles.dribbleBalanceLegendText}>
+                            왼손 {diarySkillInsight.leftDribbleCount}회
+                          </Text>
+                        </View>
+                        <View style={styles.dribbleBalanceLegendItem}>
+                          <View
+                            style={[
+                              styles.dribbleBalanceLegendDot,
+                              isRightDribbleDominant
+                                ? styles.dribbleBalanceLegendDotDominant
+                                : styles.dribbleBalanceLegendDotSubtle,
+                            ]}
+                          />
+                          <Text style={styles.dribbleBalanceLegendText}>
+                            오른손 {diarySkillInsight.rightDribbleCount}회
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.dribbleBalanceTrack}>
+                        {diarySkillInsight.leftDribbleCount > 0 ? (
+                          <View
+                            style={[
+                              styles.dribbleBalanceFill,
+                              isLeftDribbleDominant
+                                ? styles.dribbleBalanceFillDominant
+                                : styles.dribbleBalanceFillSubtle,
+                              styles.dribbleBalanceFillLeftEdge,
+                              { width: leftDribbleGraphWidth },
+                              diarySkillInsight.rightDribbleCount === 0 && styles.dribbleBalanceFillSolo,
+                            ]}
+                          />
+                        ) : null}
+                        {diarySkillInsight.rightDribbleCount > 0 ? (
+                          <View
+                            style={[
+                              styles.dribbleBalanceFill,
+                              isRightDribbleDominant
+                                ? styles.dribbleBalanceFillDominant
+                                : styles.dribbleBalanceFillSubtle,
+                              styles.dribbleBalanceFillRightEdge,
+                              { width: rightDribbleGraphWidth },
+                              diarySkillInsight.leftDribbleCount === 0 && styles.dribbleBalanceFillSolo,
+                            ]}
+                          />
+                        ) : null}
+                      </View>
                       <Text style={styles.skillInsightStatHelper}>
-                        {`${getDribbleBalanceLabel(diarySkillInsight)}\n해당 날짜 드리블 횟수: ${selectedDateDribbleCount}회`}
+                        {getDribbleBalanceSummary(diarySkillInsight, dribbleGraphTotal)}
                       </Text>
                     </View>
                   </View>
@@ -1185,6 +1268,9 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 180,
   },
+  skillInsightShotButtonRow: {
+    alignItems: 'stretch',
+  },
   skillInsightShotBody: {
     gap: 12,
   },
@@ -1198,6 +1284,71 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 20,
     fontWeight: '900',
+  },
+  skillInsightNarration: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  dribbleBalanceLegendRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 10,
+    flexWrap: 'wrap',
+  },
+  dribbleBalanceLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dribbleBalanceLegendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+  },
+  dribbleBalanceLegendDotDominant: {
+    backgroundColor: colors.secondary,
+  },
+  dribbleBalanceLegendDotSubtle: {
+    backgroundColor: 'rgba(127,156,191,0.72)',
+  },
+  dribbleBalanceLegendText: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  dribbleBalanceTrack: {
+    width: '100%',
+    height: 22,
+    marginTop: 10,
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    flexDirection: 'row',
+  },
+  dribbleBalanceFill: {
+    height: '100%',
+  },
+  dribbleBalanceFillDominant: {
+    backgroundColor: colors.secondary,
+  },
+  dribbleBalanceFillSubtle: {
+    backgroundColor: 'rgba(127,156,191,0.72)',
+  },
+  dribbleBalanceFillLeftEdge: {
+    borderTopLeftRadius: 999,
+    borderBottomLeftRadius: 999,
+  },
+  dribbleBalanceFillRightEdge: {
+    borderTopRightRadius: 999,
+    borderBottomRightRadius: 999,
+  },
+  dribbleBalanceFillSolo: {
+    borderRadius: 999,
   },
   skillInsightStatHelper: {
     color: colors.textMuted,
