@@ -7,6 +7,7 @@ import { DAY_NAMES } from '../constants/content';
 import { colors } from '../theme/colors';
 import type { CalendarCell, DiarySkillInsight, FeedbackMoment, LessonRecord, ShotGraphDatum } from '../types/app';
 import { formatDateKey, formatMonthTitle } from '../utils/date';
+import { getDesktopMobileFrameWidth, shouldUseDesktopMobileLayout } from '../utils/layout';
 
 interface DiaryScreenProps {
   currentDate: Date;
@@ -413,8 +414,9 @@ export function DiaryScreen({
   onDeleteRecord,
 }: DiaryScreenProps) {
   const { width } = useWindowDimensions();
-  const isWide = width >= 980;
-  const isCompactMobile = width < 640;
+  const layoutWidth = shouldUseDesktopMobileLayout(width) ? getDesktopMobileFrameWidth(width) : width;
+  const isWide = layoutWidth >= 980;
+  const isCompactMobile = layoutWidth < 640;
   const [playbackFeedback, setPlaybackFeedback] = useState<Record<string, string>>({});
   const [visibleRecordEvaluations, setVisibleRecordEvaluations] = useState<Record<string, boolean>>({});
   const [showAllShotGraph, setShowAllShotGraph] = useState(false);

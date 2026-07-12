@@ -15,6 +15,7 @@ import { RulesGuideScreen } from './src/screens/RulesGuideScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { SkillScreen } from './src/screens/SkillScreen';
 import { colors } from './src/theme/colors';
+import { getDesktopMobileFrameWidth, shouldUseDesktopMobileLayout } from './src/utils/layout';
 
 type SideDrawerType = 'settings' | 'profile';
 const APP_TOP_OFFSET = 12;
@@ -22,6 +23,8 @@ const APP_TOP_OFFSET = 12;
 export default function App() {
   const app = useBasketballCoachApp();
   const { width } = useWindowDimensions();
+  const isDesktopMobileMode = shouldUseDesktopMobileLayout(width);
+  const appFrameWidth = isDesktopMobileMode ? getDesktopMobileFrameWidth(width) : width;
   const showBack = Boolean(app.currentUser && app.screen !== 'home');
   const isLessonScreen = app.isReady && app.currentUser && app.screen === 'lesson';
   const isHomeScreen = app.isReady && app.currentUser && app.screen === 'home';
@@ -33,7 +36,11 @@ export default function App() {
   const [shouldRenderDrawer, setShouldRenderDrawer] = useState(false);
   const effectiveHeaderHeight = Math.max(headerMeasuredHeight, 96);
   const sideDrawerWidth =
-    width >= 960 ? Math.min(width * 0.48, 460) : Math.min(Math.max(width * 0.82, 280), width - 16);
+    isDesktopMobileMode
+      ? Math.min(Math.max(appFrameWidth - 12, 300), appFrameWidth)
+      : width >= 960
+        ? Math.min(width * 0.48, 460)
+        : Math.min(Math.max(width * 0.82, 280), width - 16);
   const isDrawerVisible = activeDrawer !== null;
   const shouldShowDrawer = shouldRenderDrawer && Boolean(app.currentUser) && !isLessonScreen;
   const visibleDrawer = activeDrawer ?? renderedDrawer;
@@ -129,7 +136,14 @@ export default function App() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
-      <View style={styles.appShell}>
+      <View style={[styles.appViewport, isDesktopMobileMode && styles.appViewportDesktop]}>
+      <View
+        style={[
+          styles.appShell,
+          isDesktopMobileMode && styles.appShellDesktop,
+          isDesktopMobileMode ? { width: appFrameWidth } : null,
+        ]}
+      >
         <FireworkBurst visible={app.showFireworks} items={app.fireworks} />
         {!isLessonScreen ? (
           <Animated.View
@@ -232,7 +246,6 @@ export default function App() {
               onRevealHomework={app.revealHomework}
               onOpenLesson={() => void app.navigateTo('lesson')}
               onOpenDiary={() => void app.navigateTo('diary')}
-              onOpenSkill={() => void app.navigateTo('skill')}
               onOpenRules={() => void app.navigateTo('rules')}
               onOpenSettings={() => setActiveDrawer('settings')}
             />
@@ -336,6 +349,7 @@ export default function App() {
           </View>
         ) : null}
       </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -345,12 +359,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  appViewport: {
+    flex: 1,
+  },
+  appViewportDesktop: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+  },
   appShell: {
     flex: 1,
     backgroundColor: colors.background,
     paddingHorizontal: 16,
     paddingTop: APP_TOP_OFFSET,
     position: 'relative',
+  },
+  appShellDesktop: {
+    alignSelf: 'center',
+    maxWidth: '100%',
+    borderRadius: 28,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.28,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 16 },
+    elevation: 20,
   },
   scrollContent: {
     paddingBottom: 32,

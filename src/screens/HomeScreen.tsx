@@ -1,8 +1,9 @@
 import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { colors } from '../theme/colors';
 import type { HomeworkProgressItem } from '../types/app';
+import { getDesktopMobileFrameWidth, shouldUseDesktopMobileLayout } from '../utils/layout';
 
-type HomeMenuArtworkType = 'lesson' | 'diary' | 'skill';
+type HomeMenuArtworkType = 'lesson' | 'diary';
 const lessonPlayerSilhouette = require('../../assets/lesson-player-silhouette.png');
 const diaryCalendarArt = require('../../assets/diary-calendar-art.png');
 
@@ -12,7 +13,6 @@ interface HomeScreenProps {
   onRevealHomework: () => void;
   onOpenLesson: () => void;
   onOpenDiary: () => void;
-  onOpenSkill: () => void;
   onOpenRules: () => void;
   onOpenSettings: () => void;
 }
@@ -41,17 +41,13 @@ function HomeMenuArtwork({ type }: { type: HomeMenuArtworkType }) {
     );
   }
 
-  if (type === 'diary') {
-    return (
-      <View pointerEvents="none" style={styles.diaryArtwork}>
-        <View style={styles.diaryArtworkBackdrop} />
-        <View style={styles.diaryArtworkGlow} />
-        <Image source={diaryCalendarArt} resizeMode="contain" style={styles.diaryArtworkImage} />
-      </View>
-    );
-  }
-
-  return null;
+  return (
+    <View pointerEvents="none" style={styles.diaryArtwork}>
+      <View style={styles.diaryArtworkBackdrop} />
+      <View style={styles.diaryArtworkGlow} />
+      <Image source={diaryCalendarArt} resizeMode="contain" style={styles.diaryArtworkImage} />
+    </View>
+  );
 }
 
 function HomeMenuButton({
@@ -67,7 +63,7 @@ function HomeMenuButton({
   isFullWidth = false,
   isBorderless = false,
 }: HomeMenuButtonProps) {
-  const hasArtwork = !isCompact && artworkType !== 'skill';
+  const hasArtwork = !isCompact;
   const isDiaryArtwork = !isCompact && artworkType === 'diary';
 
   return (
@@ -145,12 +141,12 @@ export function HomeScreen({
   onRevealHomework,
   onOpenLesson,
   onOpenDiary,
-  onOpenSkill,
   onOpenRules,
   onOpenSettings,
 }: HomeScreenProps) {
   const { width } = useWindowDimensions();
-  const isWide = width >= 860;
+  const layoutWidth = shouldUseDesktopMobileLayout(width) ? getDesktopMobileFrameWidth(width) : width;
+  const isWide = layoutWidth >= 860;
 
   const menuButtons = [
     {
@@ -171,18 +167,8 @@ export function HomeScreen({
       artworkType: 'diary' as const,
       label: '기록 확인',
       title: '기록일지',
-      subtitle: '출석, 연습 기록, 저장한 레슨 영상을 날짜별로 확인할 수 있어요.',
+      subtitle: '출석, 연습 기록, 다양한 레슨 영상을 날짜별로 확인할 수 있어요.',
       onPress: onOpenDiary,
-    },
-    {
-      key: 'skill',
-      accentColor: '#90c95c',
-      accentSoft: '#e4f3cf',
-      artworkType: 'skill' as const,
-      label: '동작 학습',
-      title: '프로 레슨 배우기',
-      subtitle: '원하는 기술과 선수 영상을 보고 오늘 연습할 동작을 고를 수 있어요.',
-      onPress: onOpenSkill,
     },
   ];
 
@@ -190,7 +176,7 @@ export function HomeScreen({
     <View style={styles.layout}>
       <View style={styles.heroCard}>
         <View style={styles.heroTextWrap}>
-          <Text style={styles.heroTitle}>오늘 어떤 연습을 시작할까요?</Text>
+          <Text style={styles.heroTitle}>오늘 어떤 연습부터 시작할까요?</Text>
         </View>
 
         <Pressable onPress={onOpenSettings} style={({ pressed }) => [styles.settingsButton, pressed && styles.pressed]}>
@@ -267,14 +253,13 @@ export function HomeScreen({
           <View style={styles.homeworkHiddenCard}>
             <Text style={styles.homeworkHiddenTitle}>오늘의 숙제 확인하기</Text>
             <Text style={styles.homeworkHiddenText}>
-              버튼을 누르면 오늘 해야 할 숙제 내용과 진행도가 나타나고, 앱 안에서는 계속 보입니다.
+              버튼을 누르면 오늘 해야 할 숙제 내용과 진행도가 보이고, 그 뒤에는 계속 표시됩니다.
             </Text>
             <Pressable onPress={onRevealHomework} style={({ pressed }) => [styles.homeworkRevealButton, pressed && styles.pressed]}>
               <Text style={styles.homeworkRevealButtonText}>오늘의 숙제 확인하기</Text>
             </Pressable>
           </View>
         )}
-
       </View>
 
       <View style={[styles.secondaryCards, isWide && styles.secondaryCardsWide]}>
@@ -284,12 +269,12 @@ export function HomeScreen({
         >
           <Text style={styles.rulesCardLabel}>Guide</Text>
           <Text style={styles.rulesCardTitle}>농구 규칙 가이드</Text>
-          <Text style={styles.rulesCardText}>처음 보는 규칙도 빠르게 확인할 수 있도록 기본 내용을 따로 모아뒀어요.</Text>
+          <Text style={styles.rulesCardText}>처음 보는 규칙도 빠르게 확인할 수 있도록 기본 내용만 모아 두었어요.</Text>
         </Pressable>
 
         <View style={[styles.tipCard, isWide && styles.secondaryCardCompactWide]}>
           <Text style={styles.tipTitle}>연습 팁</Text>
-          <Text style={styles.tipText}>기본 숙제를 끝내면 다음 숙제가 열리고, 드리블 균형 차이가 보이면 보정 숙제가 추가됩니다.</Text>
+          <Text style={styles.tipText}>기본 숙제를 끝내면 다음 숙제가 열리고, 좌우 차이가 크면 보정 숙제도 추가됩니다.</Text>
         </View>
       </View>
     </View>

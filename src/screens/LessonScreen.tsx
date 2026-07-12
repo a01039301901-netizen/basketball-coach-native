@@ -7,6 +7,7 @@ import { InfoBox } from '../components/common/InfoBox';
 import { LessonCamera } from '../components/lesson/LessonCamera';
 import { colors } from '../theme/colors';
 import type { BallBrandOption, BallColorOption, DribbleLessonView, LessonMode, LessonReviewClip } from '../types/app';
+import { getDesktopMobileFrameWidth, shouldUseDesktopMobileLayout } from '../utils/layout';
 
 interface LessonScreenProps {
   lessonMode: LessonMode;
@@ -347,17 +348,19 @@ export function LessonScreen({
   onPoseMessage,
 }: LessonScreenProps) {
   const { width, height } = useWindowDimensions();
-  const isWideLayout = width >= 1080;
-  const isLandscapeMobileLayout = !isWideLayout && width > height;
+  const isDesktopMobileMode = shouldUseDesktopMobileLayout(width);
+  const layoutWidth = isDesktopMobileMode ? getDesktopMobileFrameWidth(width) : width;
+  const isWideLayout = !isDesktopMobileMode && layoutWidth >= 1080;
+  const isLandscapeMobileLayout = !isDesktopMobileMode && !isWideLayout && width > height;
   const isSideDockedCoaching = isWideLayout || isLandscapeMobileLayout;
   const isLessonSessionBusy = isLessonActive || isCameraActive;
   const allowPanelDragHide = !isSideDockedCoaching;
   const floatingCoachingHeight = isSideDockedCoaching ? Math.max(320, Math.min(height - 24, 760)) : Math.max(260, Math.min(height * 0.42, 380));
   const floatingCoachingWidth = isWideLayout
-    ? Math.max(320, Math.min(width * 0.32, 420))
+    ? Math.max(320, Math.min(layoutWidth * 0.32, 420))
     : isLandscapeMobileLayout
-      ? Math.max(280, Math.min(width * 0.34, 360))
-      : Math.min(width - 24, 420);
+      ? Math.max(280, Math.min(layoutWidth * 0.34, 360))
+      : Math.min(layoutWidth - 24, 420);
   const mobileCameraHeight = Math.max(620, height - 96);
   const coachingHiddenOffset = floatingCoachingHeight + 48;
   const coachingHideThreshold = Math.min(120, Math.max(72, floatingCoachingHeight * 0.24));
@@ -610,7 +613,7 @@ export function LessonScreen({
       </View>
       <View pointerEvents="box-none" style={styles.topActionOverlay}>
         <Pressable onPress={onGoHome} style={({ pressed }) => [styles.homeChip, pressed && styles.pressed]}>
-          <Text style={styles.homeChipText}>메인으로</Text>
+          <Text style={styles.homeChipText}>{'<'}</Text>
         </Pressable>
       </View>
 
@@ -946,17 +949,22 @@ const styles = StyleSheet.create({
   },
   homeChip: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    minWidth: 48,
+    minHeight: 44,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: colors.lightButton,
     borderWidth: 1,
     borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   homeChipText: {
     color: colors.lightButtonText,
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 24,
+    fontWeight: '900',
+    lineHeight: 24,
   },
   screenScroll: {
     flex: 1,

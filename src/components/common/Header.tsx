@@ -33,7 +33,7 @@ export function Header({
             onPress={onBack}
             style={({ pressed }) => [styles.backButton, isLight && styles.backButtonLight, pressed && styles.pressed]}
           >
-            <Text style={[styles.backButtonText, isLight && styles.backButtonTextLight]}>메인으로</Text>
+            <Text style={[styles.backButtonText, isLight && styles.backButtonTextLight]}>{'<'}</Text>
           </Pressable>
         ) : null}
 
@@ -57,6 +57,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingTop: 8,
     marginBottom: 16,
     gap: 12,
   },
@@ -88,10 +89,14 @@ const styles = StyleSheet.create({
   backButton: {
     backgroundColor: colors.lightButton,
     borderRadius: 999,
+    minWidth: 48,
+    minHeight: 44,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderWidth: 1,
     borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   backButtonLight: {
     backgroundColor: '#ffffff',
@@ -99,8 +104,9 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     color: colors.lightButtonText,
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: '900',
+    lineHeight: 24,
   },
   backButtonTextLight: {
     color: '#241912',
