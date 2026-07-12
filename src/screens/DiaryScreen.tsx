@@ -1,6 +1,6 @@
 import { type AVPlaybackStatus, ResizeMode, Video } from 'expo-av';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
 import { DAY_NAMES } from '../constants/content';
@@ -95,6 +95,244 @@ function DateArrowIcon({ direction }: { direction: 'left' | 'right' }) {
   );
 }
 
+/* interface RecordEvaluationDropdownProps {
+  isMenuOpen: boolean;
+  isEvaluationVisible: boolean;
+  onToggleMenu: () => void;
+  onSelectVisibility: (isVisible: boolean) => void;
+  title?: string;
+  onPress?: () => void;
+  variant?: string;
+} */
+
+/* function RecordEvaluationDropdown({
+  isMenuOpen,
+  isEvaluationVisible,
+  onToggleMenu,
+  onSelectVisibility,
+}: RecordEvaluationDropdownProps) {
+  const slideAnimation = useRef(new Animated.Value(isMenuOpen ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(slideAnimation, {
+      toValue: isMenuOpen ? 1 : 0,
+      duration: isMenuOpen ? 220 : 180,
+      easing: isMenuOpen ? Easing.out(Easing.cubic) : Easing.inOut(Easing.quad),
+      useNativeDriver: false,
+    }).start();
+  }, [isMenuOpen, slideAnimation]);
+
+  const animatedHeight = slideAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 96],
+  });
+  const animatedOpacity = slideAnimation.interpolate({
+    inputRange: [0, 0.35, 1],
+    outputRange: [0, 0.2, 1],
+  });
+  const animatedTranslateY = slideAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-8, 0],
+  });
+
+  return (
+    <View style={styles.evaluationDropdownWrap}>
+      <Pressable
+        onPress={onToggleMenu}
+        style={({ pressed }) => [styles.recordFilterDropdown, styles.evaluationDropdownButton, pressed && styles.pressed]}
+      >
+        <Text style={styles.recordFilterDropdownText}>{`기록 평가: ${isEvaluationVisible ? '보기' : '숨김'}`}</Text>
+        <Text style={styles.recordFilterDropdownIcon}>{isMenuOpen ? '▲' : '▼'}</Text>
+      </Pressable>
+
+      <Animated.View
+        pointerEvents={isMenuOpen ? 'auto' : 'none'}
+        style={[
+          styles.evaluationDropdownMenuWrap,
+          {
+            height: animatedHeight,
+            opacity: animatedOpacity,
+            transform: [{ translateY: animatedTranslateY }],
+          },
+        ]}
+      >
+        <View style={styles.evaluationDropdownMenu}>
+          {([
+            { label: '보기', value: true },
+            { label: '숨기기', value: false },
+          ] as const).map((option) => (
+            <Pressable
+              key={option.label}
+              onPress={() => onSelectVisibility(option.value)}
+              style={({ pressed }) => [
+                styles.evaluationDropdownMenuItem,
+                isEvaluationVisible === option.value && styles.evaluationDropdownMenuItemActive,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.evaluationDropdownMenuText,
+                  isEvaluationVisible === option.value && styles.evaluationDropdownMenuTextActive,
+                ]}
+              >
+                {option.label}
+              </Text>
+            </Pressable>
+          ))}
+      </Animated.View>
+    </View>
+  );
+} */
+
+interface CollapsibleRecordSectionProps {
+  title: string;
+  expanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}
+
+/* function CollapsibleRecordSection({
+  title,
+  expanded,
+  onToggle,
+  children,
+}: CollapsibleRecordSectionProps) {
+  const contentAnimation = useRef(new Animated.Value(expanded ? 1 : 0)).current;
+  const [contentHeight, setContentHeight] = useState(0);
+  const sectionTitle = '기록 평가';
+
+  useEffect(() => {
+    Animated.timing(contentAnimation, {
+      toValue: expanded ? 1 : 0,
+      duration: expanded ? 280 : 220,
+      easing: expanded ? Easing.out(Easing.cubic) : Easing.bezier(0.35, 0, 0.2, 1),
+      useNativeDriver: false,
+    }).start();
+  }, [contentAnimation, expanded]);
+
+  const animatedHeight = contentAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, Math.max(contentHeight, 1)],
+  });
+  const animatedOpacity = contentAnimation.interpolate({
+    inputRange: [0, 0.32, 1],
+    outputRange: [0, 0.14, 1],
+  });
+  const animatedTranslateY = contentAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-10, 0],
+  });
+
+  return (
+    <View style={[styles.evaluationSection, !expanded && styles.evaluationSectionCollapsed]}>
+      <Pressable
+        accessibilityLabel={expanded ? `${sectionTitle} 숨기기` : `${sectionTitle} 펼치기`}
+        onPress={onToggle}
+        style={({ pressed }) => [
+          styles.evaluationSectionToggle,
+          expanded ? styles.evaluationSectionToggleFloating : styles.evaluationSectionToggleCollapsed,
+          expanded ? styles.evaluationSectionToggleRound : styles.evaluationSectionToggleChip,
+          pressed && styles.pressed,
+        ]}
+      >
+        <Text style={styles.evaluationSectionToggleIcon}>{expanded ? 'v' : '^'}</Text>
+        {!expanded ? <Text style={styles.evaluationSectionToggleLabel}>{sectionTitle}</Text> : null}
+      </Pressable>
+      <Animated.View
+        pointerEvents={expanded ? 'auto' : 'none'}
+        style={[
+          styles.evaluationSectionContentWrap,
+          {
+            height: animatedHeight,
+            opacity: animatedOpacity,
+            transform: [{ translateY: animatedTranslateY }],
+          },
+        ]}
+      >
+        <View
+          onLayout={(event) => {
+            const nextHeight = Math.max(1, Math.ceil(event.nativeEvent.layout.height));
+            setContentHeight((current) => (current === nextHeight ? current : nextHeight));
+          }}
+        >
+          {children}
+      </Animated.View>
+    </View>
+  );
+} */
+
+function CollapsibleRecordSection({
+  title,
+  expanded,
+  onToggle,
+  children,
+}: CollapsibleRecordSectionProps) {
+  const contentAnimation = useRef(new Animated.Value(expanded ? 1 : 0)).current;
+  const [contentHeight, setContentHeight] = useState(0);
+  const sectionTitle = title || '기록 평가';
+
+  useEffect(() => {
+    Animated.timing(contentAnimation, {
+      toValue: expanded ? 1 : 0,
+      duration: expanded ? 280 : 220,
+      easing: expanded ? Easing.out(Easing.cubic) : Easing.bezier(0.35, 0, 0.2, 1),
+      useNativeDriver: false,
+    }).start();
+  }, [contentAnimation, expanded]);
+
+  const animatedHeight = contentAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, Math.max(contentHeight, 1)],
+  });
+  const animatedOpacity = contentAnimation.interpolate({
+    inputRange: [0, 0.32, 1],
+    outputRange: [0, 0.14, 1],
+  });
+  const animatedTranslateY = contentAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-10, 0],
+  });
+
+  return (
+    <View style={[styles.evaluationSection, !expanded && styles.evaluationSectionCollapsed]}>
+      <Pressable
+        accessibilityLabel={expanded ? `${sectionTitle} 숨기기` : `${sectionTitle} 펼치기`}
+        onPress={onToggle}
+        style={({ pressed }) => [
+          styles.evaluationSectionToggle,
+          expanded ? styles.evaluationSectionToggleFloating : styles.evaluationSectionToggleCollapsed,
+          expanded ? styles.evaluationSectionToggleRound : styles.evaluationSectionToggleChip,
+          pressed && styles.pressed,
+        ]}
+      >
+        <Text style={styles.evaluationSectionToggleIcon}>{expanded ? 'v' : '^'}</Text>
+        {!expanded ? <Text style={styles.evaluationSectionToggleLabel}>{sectionTitle}</Text> : null}
+      </Pressable>
+      <Animated.View
+        pointerEvents={expanded ? 'auto' : 'none'}
+        style={[
+          styles.evaluationSectionContentWrap,
+          {
+            height: animatedHeight,
+            opacity: animatedOpacity,
+            transform: [{ translateY: animatedTranslateY }],
+          },
+        ]}
+      >
+        <View
+          onLayout={(event) => {
+            const nextHeight = Math.max(1, Math.ceil(event.nativeEvent.layout.height));
+            setContentHeight((current) => (current === nextHeight ? current : nextHeight));
+          }}
+        >
+          {children}
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
 function getRecordLevelLabel(level: NonNullable<LessonRecord['evaluation']>['level']) {
   if (level === 'good') {
     return '좋음';
@@ -178,6 +416,7 @@ export function DiaryScreen({
   const isWide = width >= 980;
   const isCompactMobile = width < 640;
   const [playbackFeedback, setPlaybackFeedback] = useState<Record<string, string>>({});
+  const [visibleRecordEvaluations, setVisibleRecordEvaluations] = useState<Record<string, boolean>>({});
   const [showAllShotGraph, setShowAllShotGraph] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [recordFilter, setRecordFilter] = useState<RecordFilter>('all');
@@ -265,6 +504,25 @@ export function DiaryScreen({
       }
 
       return next;
+    });
+  }, [selectedDateRecords]);
+
+  useEffect(() => {
+    setVisibleRecordEvaluations((current) => {
+      const visibleRecordIds = new Set(selectedDateRecords.map((record) => record.id));
+      let hasChanged = false;
+      const next: Record<string, boolean> = {};
+
+      for (const [recordId, isVisible] of Object.entries(current)) {
+        if (isVisible && visibleRecordIds.has(recordId)) {
+          next[recordId] = true;
+          continue;
+        }
+
+        hasChanged = true;
+      }
+
+      return hasChanged ? next : current;
     });
   }, [selectedDateRecords]);
 
@@ -368,9 +626,183 @@ export function DiaryScreen({
     [startPlaybackPolling, syncFeedbackFromPosition]
   );
 
+  const toggleRecordEvaluation = useCallback((recordId: string) => {
+    setVisibleRecordEvaluations((current) => {
+      const next = { ...current };
+
+      if (next[recordId]) {
+        delete next[recordId];
+      } else {
+        next[recordId] = true;
+      }
+
+      return next;
+    });
+  }, []);
+
+  /* function renderRecordCard(record: LessonRecord) {
+    const syncedFeedback = playbackFeedback[record.id] || record.feedback;
+    const evaluation = record.evaluation;
+    const isEvaluationVisible = Boolean(visibleRecordEvaluations[record.id]);
+
+    return (
+      <View
+        key={record.id}
+        style={[
+          styles.recordCard,
+          record.mode === 'shoot' ? styles.recordCardShoot : styles.recordCardDribble,
+        ]}
+      >
+        <View style={styles.recordHeader}>
+          <View style={styles.recordHeaderBadges}>
+            <View
+              style={[
+                styles.recordBadge,
+                record.mode === 'shoot' ? styles.recordBadgeShoot : styles.recordBadgeDribble,
+              ]}
+            >
+              <Text style={styles.recordBadgeText}>{getRecordModeLabel(record.mode)}</Text>
+            </View>
+
+            {evaluation ? (
+              <View
+                style={[
+                  styles.recordLevelBadge,
+                  evaluation.level === 'good'
+                    ? styles.recordLevelBadgeGood
+                    : evaluation.level === 'average'
+                      ? styles.recordLevelBadgeAverage
+                      : styles.recordLevelBadgeBad,
+                ]}
+              >
+                <Text style={styles.recordLevelBadgeText}>{getRecordLevelLabel(evaluation.level)}</Text>
+              </View>
+          )}
+          </CollapsibleRecordSection>
+        </View>
+          </CollapsibleRecordSection>
+        </View>
+
+          {record.mode === 'shoot' ? (
+            <Pressable
+              onPress={() => onToggleShotOutcome(record.id)}
+              style={({ pressed }) => [
+                styles.shotOutcomeToggle,
+                record.shotOutcome === 'success'
+                  ? styles.shotOutcomeToggleSuccess
+                  : styles.shotOutcomeToggleFailure,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.shotOutcomeToggleLabel}>슛 결과</Text>
+              <Text style={styles.shotOutcomeToggleValue}>{getShotOutcomeLabel(record.shotOutcome)}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+        <Text style={styles.recordTitle}>{getRecordTitle(record.mode)}</Text>
+        <Text style={styles.recordMeta}>{record.createdAt}</Text>
+
+        {record.videoUri ? (
+          <Video
+            ref={(instance) => {
+              videoRefs.current[record.id] = instance;
+            }}
+            source={{ uri: record.videoUri }}
+            useNativeControls
+            shouldPlay={false}
+            isLooping={false}
+            progressUpdateIntervalMillis={200}
+            resizeMode={ResizeMode.COVER}
+            style={styles.recordVideo}
+            onPlaybackStatusUpdate={(status) => handlePlaybackStatus(record, status)}
+          />
+        ) : null}
+
+        <View style={styles.evaluationToggleRow}>
+          <CollapsibleRecordSection
+            expanded={isEvaluationVisible}
+            onToggle={() => toggleRecordEvaluation(record.id)}
+            title={isEvaluationVisible ? '기록 평가 숨기기' : '기록 평가 보기'}
+          >
+
+            {evaluation ? (
+            <View style={styles.evaluationBox}>
+              <Text style={styles.evaluationTitle}>기록 평가</Text>
+              <Text style={styles.evaluationSummary}>{evaluation.summary}</Text>
+
+              <View style={styles.criteriaRow}>
+                {evaluation.criteria.map((criterion) => (
+                  <View
+                    key={`${record.id}-${criterion.key}`}
+                    style={[
+                      styles.criterionChip,
+                      criterion.isStable ? styles.criterionChipStable : styles.criterionChipUnstable,
+                    ]}
+                  >
+                    <Text style={styles.criterionChipLabel}>{criterion.label}</Text>
+                    <Text style={styles.criterionChipValue}>{criterion.isStable ? '안정' : '보완'}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={styles.highlightGroup}>
+                <Text style={styles.highlightGroupTitle}>잘한 점 다시보기</Text>
+                {evaluation.strengths.length > 0 ? (
+                  evaluation.strengths.map((highlight, index) => (
+                    <Pressable
+                      key={`${record.id}-strength-${index}`}
+                      onPress={() => void jumpToHighlight(record, highlight.startAtMs)}
+                      style={({ pressed }) => [styles.highlightButton, styles.highlightButtonGood, pressed && styles.pressed]}
+                    >
+                      <Text style={styles.highlightButtonLabel}>{highlight.label}</Text>
+                      <Text style={styles.highlightButtonDetail}>{highlight.detail}</Text>
+                    </Pressable>
+                  ))
+                ) : (
+                  <Text style={styles.highlightEmptyText}>아직 표시할 안정 장면이 없습니다.</Text>
+                )}
+              </View>
+
+              <View style={styles.highlightGroup}>
+                <Text style={styles.highlightGroupTitle}>보완할 점 다시보기</Text>
+                {evaluation.improvements.length > 0 ? (
+                  evaluation.improvements.map((highlight, index) => (
+                    <Pressable
+                      key={`${record.id}-improvement-${index}`}
+                      onPress={() => void jumpToHighlight(record, highlight.startAtMs)}
+                      style={({ pressed }) => [styles.highlightButton, styles.highlightButtonBad, pressed && styles.pressed]}
+                    >
+                      <Text style={styles.highlightButtonLabel}>{highlight.label}</Text>
+                      <Text style={styles.highlightButtonDetail}>{highlight.detail}</Text>
+                    </Pressable>
+                  ))
+                ) : (
+                  <Text style={styles.highlightEmptyText}>지금은 추가 보완 장면이 없습니다.</Text>
+                )}
+              </View>
+            </View>
+          ) : (
+            <View style={styles.evaluationEmptyBox}>
+              <Text style={styles.evaluationEmptyText}>자세 평가 정보는 새로 저장한 기록부터 함께 표시됩니다.</Text>
+            </View>
+            )}
+          </CollapsibleRecordSection>
+        </View>
+
+        <View style={styles.liveFeedbackBox}>
+          <Text style={styles.liveFeedbackLabel}>영상과 함께 보는 실시간 피드백</Text>
+          <Text style={styles.liveFeedbackText}>{syncedFeedback}</Text>
+        </View>
+
+        <SmallButton title="기록 삭제" onPress={() => onDeleteRecord(record.id)} variant="red" />
+      </View>
+    );
+  } */
+
   function renderRecordCard(record: LessonRecord) {
     const syncedFeedback = playbackFeedback[record.id] || record.feedback;
     const evaluation = record.evaluation;
+    const isEvaluationVisible = Boolean(visibleRecordEvaluations[record.id]);
 
     return (
       <View
@@ -423,6 +855,7 @@ export function DiaryScreen({
             </Pressable>
           ) : null}
         </View>
+
         <Text style={styles.recordTitle}>{getRecordTitle(record.mode)}</Text>
         <Text style={styles.recordMeta}>{record.createdAt}</Text>
 
@@ -442,67 +875,71 @@ export function DiaryScreen({
           />
         ) : null}
 
-        {evaluation ? (
-          <View style={styles.evaluationBox}>
-            <Text style={styles.evaluationTitle}>기록 평가</Text>
-            <Text style={styles.evaluationSummary}>{evaluation.summary}</Text>
+        <View style={styles.evaluationToggleRow}>
+          <CollapsibleRecordSection title="기록 평가" expanded={isEvaluationVisible} onToggle={() => toggleRecordEvaluation(record.id)}>
+            {evaluation ? (
+              <View style={styles.evaluationBox}>
+                <Text style={styles.evaluationTitle}>기록 평가</Text>
+                <Text style={styles.evaluationSummary}>{evaluation.summary}</Text>
 
-            <View style={styles.criteriaRow}>
-              {evaluation.criteria.map((criterion) => (
-                <View
-                  key={`${record.id}-${criterion.key}`}
-                  style={[
-                    styles.criterionChip,
-                    criterion.isStable ? styles.criterionChipStable : styles.criterionChipUnstable,
-                  ]}
-                >
-                  <Text style={styles.criterionChipLabel}>{criterion.label}</Text>
-                  <Text style={styles.criterionChipValue}>{criterion.isStable ? '안정' : '보완'}</Text>
+                <View style={styles.criteriaRow}>
+                  {evaluation.criteria.map((criterion) => (
+                    <View
+                      key={`${record.id}-${criterion.key}`}
+                      style={[
+                        styles.criterionChip,
+                        criterion.isStable ? styles.criterionChipStable : styles.criterionChipUnstable,
+                      ]}
+                    >
+                      <Text style={styles.criterionChipLabel}>{criterion.label}</Text>
+                      <Text style={styles.criterionChipValue}>{criterion.isStable ? '안정' : '보완'}</Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
 
-            <View style={styles.highlightGroup}>
-              <Text style={styles.highlightGroupTitle}>잘한 점 다시보기</Text>
-              {evaluation.strengths.length > 0 ? (
-                evaluation.strengths.map((highlight, index) => (
-                  <Pressable
-                    key={`${record.id}-strength-${index}`}
-                    onPress={() => void jumpToHighlight(record, highlight.startAtMs)}
-                    style={({ pressed }) => [styles.highlightButton, styles.highlightButtonGood, pressed && styles.pressed]}
-                  >
-                    <Text style={styles.highlightButtonLabel}>{highlight.label}</Text>
-                    <Text style={styles.highlightButtonDetail}>{highlight.detail}</Text>
-                  </Pressable>
-                ))
-              ) : (
-                <Text style={styles.highlightEmptyText}>아직 표시할 안정 장면이 없습니다.</Text>
-              )}
-            </View>
+                <View style={styles.highlightGroup}>
+                  <Text style={styles.highlightGroupTitle}>잘한 장면 다시보기</Text>
+                  {evaluation.strengths.length > 0 ? (
+                    evaluation.strengths.map((highlight, index) => (
+                      <Pressable
+                        key={`${record.id}-strength-${index}`}
+                        onPress={() => void jumpToHighlight(record, highlight.startAtMs)}
+                        style={({ pressed }) => [styles.highlightButton, styles.highlightButtonGood, pressed && styles.pressed]}
+                      >
+                        <Text style={styles.highlightButtonLabel}>{highlight.label}</Text>
+                        <Text style={styles.highlightButtonDetail}>{highlight.detail}</Text>
+                      </Pressable>
+                    ))
+                  ) : (
+                    <Text style={styles.highlightEmptyText}>아직 표시할 안정 장면이 없습니다.</Text>
+                  )}
+                </View>
 
-            <View style={styles.highlightGroup}>
-              <Text style={styles.highlightGroupTitle}>보완할 점 다시보기</Text>
-              {evaluation.improvements.length > 0 ? (
-                evaluation.improvements.map((highlight, index) => (
-                  <Pressable
-                    key={`${record.id}-improvement-${index}`}
-                    onPress={() => void jumpToHighlight(record, highlight.startAtMs)}
-                    style={({ pressed }) => [styles.highlightButton, styles.highlightButtonBad, pressed && styles.pressed]}
-                  >
-                    <Text style={styles.highlightButtonLabel}>{highlight.label}</Text>
-                    <Text style={styles.highlightButtonDetail}>{highlight.detail}</Text>
-                  </Pressable>
-                ))
-              ) : (
-                <Text style={styles.highlightEmptyText}>지금은 추가 보완 장면이 없습니다.</Text>
-              )}
-            </View>
-          </View>
-        ) : (
-          <View style={styles.evaluationEmptyBox}>
-            <Text style={styles.evaluationEmptyText}>자세 평가 정보는 새로 저장한 기록부터 함께 표시됩니다.</Text>
-          </View>
-        )}
+                <View style={styles.highlightGroup}>
+                  <Text style={styles.highlightGroupTitle}>보완 장면 다시보기</Text>
+                  {evaluation.improvements.length > 0 ? (
+                    evaluation.improvements.map((highlight, index) => (
+                      <Pressable
+                        key={`${record.id}-improvement-${index}`}
+                        onPress={() => void jumpToHighlight(record, highlight.startAtMs)}
+                        style={({ pressed }) => [styles.highlightButton, styles.highlightButtonBad, pressed && styles.pressed]}
+                      >
+                        <Text style={styles.highlightButtonLabel}>{highlight.label}</Text>
+                        <Text style={styles.highlightButtonDetail}>{highlight.detail}</Text>
+                      </Pressable>
+                    ))
+                  ) : (
+                    <Text style={styles.highlightEmptyText}>지금은 추가로 보여줄 보완 장면이 없습니다.</Text>
+                  )}
+                </View>
+              </View>
+            ) : (
+              <View style={styles.evaluationEmptyBox}>
+                <Text style={styles.evaluationEmptyText}>자세 평가 정보는 새로 저장한 기록부터 함께 표시됩니다.</Text>
+              </View>
+            )}
+          </CollapsibleRecordSection>
+        </View>
 
         <View style={styles.liveFeedbackBox}>
           <Text style={styles.liveFeedbackLabel}>영상과 함께 보는 실시간 피드백</Text>
@@ -513,7 +950,6 @@ export function DiaryScreen({
       </View>
     );
   }
-
 
   return (
     <Card title="기록일지" style={styles.diaryCard}>
@@ -1821,11 +2257,105 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 10,
   },
+  evaluationToggleRow: {
+    position: 'relative',
+    alignItems: 'stretch',
+    marginBottom: 12,
+    zIndex: 2,
+  },
+  evaluationSection: {
+    position: 'relative',
+    paddingBottom: 2,
+  },
+  evaluationSectionCollapsed: {
+    paddingBottom: 0,
+    minHeight: 36,
+  },
+  evaluationSectionContentWrap: {
+    overflow: 'hidden',
+  },
+  evaluationSectionToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.surface,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    justifyContent: 'center',
+  },
+  evaluationSectionToggleRound: {
+    width: 30,
+    height: 30,
+    borderRadius: 0,
+  },
+  evaluationSectionToggleFloating: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 5,
+  },
+  evaluationSectionToggleCollapsed: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    zIndex: 5,
+  },
+  evaluationSectionToggleChip: {
+    minHeight: 30,
+    maxWidth: 180,
+    borderRadius: 0,
+    paddingHorizontal: 10,
+  },
+  evaluationSectionToggleIcon: {
+    color: colors.textSoft,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  evaluationSectionToggleLabel: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  evaluationDropdownWrap: {
+    width: '100%',
+    gap: 8,
+  },
+  evaluationDropdownButton: {
+    width: '100%',
+    alignSelf: 'stretch',
+  },
+  evaluationDropdownMenuWrap: {
+    overflow: 'hidden',
+  },
+  evaluationDropdownMenu: {
+    borderRadius: 14,
+    padding: 6,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 4,
+  },
+  evaluationDropdownMenuItem: {
+    borderRadius: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  evaluationDropdownMenuItemActive: {
+    backgroundColor: 'rgba(208,145,85,0.18)',
+  },
+  evaluationDropdownMenuText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  evaluationDropdownMenuTextActive: {
+    color: colors.text,
+  },
   evaluationBox: {
     backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 14,
-    marginBottom: 12,
+    marginBottom: 0,
     borderWidth: 1,
     borderColor: colors.border,
     gap: 12,
@@ -1844,7 +2374,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 14,
-    marginBottom: 12,
+    marginBottom: 0,
     borderWidth: 1,
     borderColor: colors.border,
   },

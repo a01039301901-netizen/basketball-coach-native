@@ -4,6 +4,7 @@ export const STORAGE_KEYS = {
   attendance: 'basketballAttendance',
   homework: 'basketballHomework',
   lessonRecords: 'basketballLessonRecords',
+  lessonRecordVideos: 'basketballLessonRecordVideos',
   dribbleCounts: 'basketballDribbleCountRecords',
   shotAttempts: 'shotAttemptRecords',
   shotSuccess: 'shotSuccessRecords',

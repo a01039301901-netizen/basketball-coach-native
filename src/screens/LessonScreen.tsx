@@ -603,6 +603,11 @@ export function LessonScreen({
 
   return (
     <View style={styles.screenRoot}>
+      <View pointerEvents="none" style={styles.screenBackdrop}>
+        <View style={styles.screenBackdropBase} />
+        <View style={styles.screenBackdropGlowPrimary} />
+        <View style={styles.screenBackdropGlowSecondary} />
+      </View>
       <View pointerEvents="box-none" style={styles.topActionOverlay}>
         <Pressable onPress={onGoHome} style={({ pressed }) => [styles.homeChip, pressed && styles.pressed]}>
           <Text style={styles.homeChipText}>메인으로</Text>
@@ -622,10 +627,18 @@ export function LessonScreen({
           {!isSideDockedCoaching ? <View style={styles.mobileCameraStage}>{lessonCameraContent}</View> : null}
 
           <View style={styles.heroCard}>
+            <View pointerEvents="none" style={styles.heroBackdrop}>
+              <View style={styles.heroBackdropGlowPrimary} />
+              <View style={styles.heroBackdropGlowSecondary} />
+              <View style={styles.heroBackdropSheen} />
+            </View>
+            <View style={styles.heroIntro}>
             <Text style={styles.heroTitle}>AI 레슨 받기</Text>
             <Text style={styles.leadText}>
               실시간 자세 분석을 통해 드리블과 슛 동작을 확인하고, 지금 움직임에 맞는 코칭 피드백을 바로 볼 수 있습니다.
             </Text>
+
+            </View>
 
             <View style={styles.lessonLayout}>
               <View style={styles.cameraCard}>
@@ -893,6 +906,33 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 0,
     position: 'relative',
+    backgroundColor: colors.background,
+  },
+  screenBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  screenBackdropBase: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.background,
+  },
+  screenBackdropGlowPrimary: {
+    position: 'absolute',
+    width: 420,
+    height: 420,
+    borderRadius: 999,
+    backgroundColor: 'rgba(217,161,110,0.12)',
+    top: -180,
+    right: -120,
+  },
+  screenBackdropGlowSecondary: {
+    position: 'absolute',
+    width: 360,
+    height: 360,
+    borderRadius: 999,
+    backgroundColor: 'rgba(122,181,255,0.09)',
+    bottom: -180,
+    left: -120,
   },
   topActionOverlay: {
     position: 'absolute',
@@ -945,37 +985,79 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   heroCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 18,
-    padding: 18,
+    position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
+    borderRadius: 28,
+    padding: 22,
     minHeight: 320,
-    borderWidth: 0,
-    borderColor: 'transparent',
     width: '100%',
     alignSelf: 'stretch',
   },
+  heroBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 28,
+    backgroundColor: 'rgba(33,26,21,0.58)',
+  },
+  heroBackdropGlowPrimary: {
+    position: 'absolute',
+    width: 320,
+    height: 320,
+    borderRadius: 999,
+    backgroundColor: 'rgba(208,145,85,0.16)',
+    top: -110,
+    right: -60,
+  },
+  heroBackdropGlowSecondary: {
+    position: 'absolute',
+    width: 260,
+    height: 260,
+    borderRadius: 999,
+    backgroundColor: 'rgba(247,242,236,0.05)',
+    bottom: -120,
+    left: -60,
+  },
+  heroBackdropSheen: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    top: 18,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  heroIntro: {
+    marginBottom: 20,
+    maxWidth: 620,
+  },
   heroTitle: {
-    color: colors.textSoft,
-    fontSize: 20,
+    color: '#f8ecdd',
+    fontSize: 24,
     fontWeight: '800',
-    marginBottom: 10,
+    marginBottom: 12,
+    letterSpacing: 0.2,
   },
   leadText: {
-    color: colors.textMuted,
+    color: '#dcc8b6',
     fontSize: 15,
-    lineHeight: 21,
-    marginBottom: 18,
+    lineHeight: 23,
   },
   lessonLayout: {
-    gap: 18,
+    gap: 20,
     width: '100%',
   },
   cameraCard: {
     ...sharedPanel,
     flex: 1,
     flexShrink: 1,
-    padding: 16,
+    padding: 18,
     minWidth: 0,
+    borderRadius: 24,
+    backgroundColor: 'rgba(24,19,15,0.92)',
+    shadowColor: '#000',
+    shadowOpacity: 0.24,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8,
   },
   sideCard: {
     ...sharedPanel,

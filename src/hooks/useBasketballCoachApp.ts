@@ -186,6 +186,7 @@ function getAccountStorageKeys(userId: string) {
     attendance: buildAccountStorageKey(STORAGE_KEYS.attendance, userId),
     homework: buildAccountStorageKey(STORAGE_KEYS.homework, userId),
     lessonRecords: buildAccountStorageKey(STORAGE_KEYS.lessonRecords, userId),
+    lessonRecordVideos: buildAccountStorageKey(STORAGE_KEYS.lessonRecordVideos, userId),
     dribbleCounts: buildAccountStorageKey(STORAGE_KEYS.dribbleCounts, userId),
     shotAttempts: buildAccountStorageKey(STORAGE_KEYS.shotAttempts, userId),
     shotSuccess: buildAccountStorageKey(STORAGE_KEYS.shotSuccess, userId),
@@ -726,6 +727,54 @@ function normalizeLessonRecord(
     ...nextRecord,
     representativeFeedbackCategory,
   };
+}
+
+function normalizeLessonRecordVideoMap(value: unknown) {
+  if (!isRecordObject(value)) {
+    return {} as Record<string, string>;
+  }
+
+  return Object.entries(value).reduce<Record<string, string>>((accumulator, [recordId, videoUri]) => {
+    if (typeof videoUri !== 'string' || !videoUri) {
+      return accumulator;
+    }
+
+    accumulator[recordId] = videoUri;
+    return accumulator;
+  }, {});
+}
+
+function buildLessonRecordVideoMap(records: LessonRecord[]) {
+  return records.reduce<Record<string, string>>((accumulator, record) => {
+    if (!record.videoUri) {
+      return accumulator;
+    }
+
+    accumulator[record.id] = record.videoUri;
+    return accumulator;
+  }, {});
+}
+
+function stripLessonRecordVideos(records: LessonRecord[]) {
+  return records.map((record) =>
+    record.videoUri
+      ? {
+          ...record,
+          videoUri: '',
+        }
+      : record
+  );
+}
+
+function hydrateLessonRecordVideos(records: LessonRecord[], videoMap: Record<string, string>) {
+  return records.map((record) =>
+    videoMap[record.id]
+      ? normalizeLessonRecord({
+          ...record,
+          videoUri: videoMap[record.id],
+        })
+      : record
+  );
 }
 
 function hydrateLegacyShotOutcomes(
@@ -1733,6 +1782,7 @@ export function useBasketballCoachApp() {
   const dribbleAnalysisFramesRef = useRef<TimedDribbleAnalysis[]>([]);
   const dailyDribbleRecordsRef = useRef<Record<string, number>>({});
   const homeworkStateRef = useRef<HomeworkStateRecord>({});
+  const lessonRecordsRef = useRef<LessonRecord[]>([]);
   const shotAttemptRecordsRef = useRef<Record<string, number>>({});
   const shootAnalysisHistoryRef = useRef<ShootAnalysis[]>([]);
   const shootAnalysisFramesRef = useRef<TimedShootAnalysis[]>([]);
@@ -1830,6 +1880,36 @@ export function useBasketballCoachApp() {
     [dailyDribbleRecords, homeworkState, lessonRecords, selectedDateKey, shotGraphData]
   );
 
+  const persistScopedAccountValue = useCallback(
+    (scopedKey: keyof ReturnType<typeof getAccountStorageKeys>, value: unknown) => {
+      if (!currentUserId || !isAccountDataReady) {
+        return;
+      }
+
+      const scopedKeys = getAccountStorageKeys(currentUserId);
+      void AppStorage.setItem(scopedKeys[scopedKey], JSON.stringify(value));
+    },
+    [currentUserId, isAccountDataReady]
+  );
+
+  const persistLessonRecords = useCallback(
+    (records: LessonRecord[]) => {
+      if (!currentUserId || !isAccountDataReady) {
+        return;
+      }
+
+      const scopedKeys = getAccountStorageKeys(currentUserId);
+      const metadataRecords = stripLessonRecordVideos(records);
+      const recordVideos = buildLessonRecordVideoMap(records);
+
+      void AppStorage.multiSet([
+        [scopedKeys.lessonRecords, JSON.stringify(metadataRecords)],
+        [scopedKeys.lessonRecordVideos, JSON.stringify(recordVideos)],
+      ]);
+    },
+    [currentUserId, isAccountDataReady]
+  );
+
   const resetAccountState = useCallback(() => {
     const resetDate = new Date();
     const resetDateKey = formatDateKey(resetDate);
@@ -1892,6 +1972,7 @@ export function useBasketballCoachApp() {
     dribbleAnalysisFramesRef.current = [];
     dailyDribbleRecordsRef.current = {};
     homeworkStateRef.current = {};
+    lessonRecordsRef.current = [];
     shotAttemptRecordsRef.current = {};
     shotSuccessRecordsRef.current = {};
     shootSuccessRecordedForCurrentAttemptRef.current = false;
@@ -1942,6 +2023,10 @@ export function useBasketballCoachApp() {
   useEffect(() => {
     homeworkStateRef.current = homeworkState;
   }, [homeworkState]);
+
+  useEffect(() => {
+    lessonRecordsRef.current = lessonRecords;
+  }, [lessonRecords]);
 
   useEffect(() => {
     shotAttemptRecordsRef.current = shotAttemptRecords;
@@ -2048,6 +2133,7 @@ export function useBasketballCoachApp() {
             scopedKeys.attendance,
             scopedKeys.homework,
             scopedKeys.lessonRecords,
+            scopedKeys.lessonRecordVideos,
             scopedKeys.dribbleCounts,
             scopedKeys.shotAttempts,
             scopedKeys.shotSuccess,
@@ -2060,6 +2146,7 @@ export function useBasketballCoachApp() {
             [scopedKeys.attendance, null],
             [scopedKeys.homework, null],
             [scopedKeys.lessonRecords, null],
+            [scopedKeys.lessonRecordVideos, null],
             [scopedKeys.dribbleCounts, null],
             [scopedKeys.shotAttempts, null],
             [scopedKeys.shotSuccess, null],
@@ -2079,11 +2166,16 @@ export function useBasketballCoachApp() {
         const parsedLessonRecords = parseStoredJson<
           Array<LessonRecord | (Omit<LessonRecord, 'feedbackTimeline'> & { feedbackTimeline?: FeedbackMoment[] | string[] })>
         >(stored[scopedKeys.lessonRecords], []).map((record) => normalizeLessonRecord(record));
+        const parsedLessonRecordVideos = normalizeLessonRecordVideoMap(
+          parseStoredJson<unknown>(stored[scopedKeys.lessonRecordVideos], {})
+        );
         const parsedDribbleCounts = parseStoredJson<Record<string, number>>(stored[scopedKeys.dribbleCounts], {});
         const parsedShotAttempts = parseStoredJson<Record<string, number>>(stored[scopedKeys.shotAttempts], {});
         const parsedShotSuccess = parseStoredJson<Record<string, number>>(stored[scopedKeys.shotSuccess], {});
-        const hydratedLessonRecords = hydrateLegacyShotOutcomes(parsedLessonRecords, parsedShotSuccess);
+        const lessonRecordsWithVideos = hydrateLessonRecordVideos(parsedLessonRecords, parsedLessonRecordVideos);
+        const hydratedLessonRecords = hydrateLegacyShotOutcomes(lessonRecordsWithVideos, parsedShotSuccess);
         const derivedShotSuccess = deriveShotSuccessCounts(hydratedLessonRecords);
+        const mergedShotSuccess = { ...parsedShotSuccess };
         const parsedBallBrand = parseStoredJson<BallBrandOption>(stored[scopedKeys.ballBrand], DEFAULT_BALL_BRAND);
         const parsedBallColors = parseStoredJson<BallColorOption[]>(stored[scopedKeys.ballColors], DEFAULT_BALL_COLORS);
         const parsedPosition = parseStoredJson<PositionOption>(stored[scopedKeys.position], DEFAULT_POSITION);
@@ -2101,15 +2193,24 @@ export function useBasketballCoachApp() {
           parsedShotAttempts[dateKey] = Math.max(parsedShotAttempts[dateKey] || 0, count);
         }
 
+        for (const [dateKey, count] of Object.entries(derivedShotSuccess)) {
+          mergedShotSuccess[dateKey] = Math.max(mergedShotSuccess[dateKey] || 0, count);
+        }
+
         const nextTodayKey = formatDateKey(new Date());
         parsedAttendance[nextTodayKey] = 'attended';
 
+        dailyDribbleRecordsRef.current = parsedDribbleCounts;
+        homeworkStateRef.current = parsedHomework;
+        lessonRecordsRef.current = hydratedLessonRecords;
+        shotAttemptRecordsRef.current = parsedShotAttempts;
+        shotSuccessRecordsRef.current = mergedShotSuccess;
         setAttendance(parsedAttendance);
         setDailyDribbleRecords(parsedDribbleCounts);
         setHomeworkState(parsedHomework);
         setLessonRecords(hydratedLessonRecords);
         setShotAttemptRecords(parsedShotAttempts);
-        setShotSuccessRecords(derivedShotSuccess);
+        setShotSuccessRecords(mergedShotSuccess);
         setSelectedBallBrand(parsedBallBrand);
         setSelectedBallColors(
           parsedBallColors.length > 0 ? parsedBallColors : BALL_BRAND_PRESETS[parsedBallBrand] ?? DEFAULT_BALL_COLORS
@@ -2181,8 +2282,8 @@ export function useBasketballCoachApp() {
       return;
     }
 
-    void AppStorage.setItem(getAccountStorageKeys(currentUserId).lessonRecords, JSON.stringify(lessonRecords));
-  }, [currentUserId, isAccountDataReady, lessonRecords]);
+    persistLessonRecords(lessonRecords);
+  }, [currentUserId, isAccountDataReady, lessonRecords, persistLessonRecords]);
 
   useEffect(() => {
     if (!currentUserId || !isAccountDataReady) {
@@ -2466,6 +2567,13 @@ export function useBasketballCoachApp() {
     shootRecordingStartedRef.current = false;
     shootFeedbackLockedRef.current = false;
   }, []);
+
+  const hasCompletedShootAttempt = useCallback(
+    () =>
+      shootAnalysisHistoryRef.current.some((item) => item.releaseDetected)
+      || latestShootAnalysisRef.current?.releaseDetected === true,
+    []
+  );
 
   const resetFrontDribbleTrackingSummary = useCallback(() => {
     latestDribbleAnalysisRef.current = null;
@@ -2887,18 +2995,21 @@ export function useBasketballCoachApp() {
         [dateKey]: safeDribbleCount,
       };
       setDailyDribbleRecords(dailyDribbleRecordsRef.current);
+      persistScopedAccountValue('dribbleCounts', dailyDribbleRecordsRef.current);
 
       shotAttemptRecordsRef.current = {
         ...shotAttemptRecordsRef.current,
         [dateKey]: safeShootAttemptCount,
       };
       setShotAttemptRecords(shotAttemptRecordsRef.current);
+      persistScopedAccountValue('shotAttempts', shotAttemptRecordsRef.current);
 
       shotSuccessRecordsRef.current = {
         ...shotSuccessRecordsRef.current,
         [dateKey]: safeShotSuccessCount,
       };
       setShotSuccessRecords(shotSuccessRecordsRef.current);
+      persistScopedAccountValue('shotSuccess', shotSuccessRecordsRef.current);
 
       updateHomeworkStateForDate(dateKey, (current) => ({
         ...current,
@@ -2911,7 +3022,7 @@ export function useBasketballCoachApp() {
         correctionTask,
       }));
     },
-    [selectedPosition, todayHomeworkState.stage2Unlock, todayLessonCount, updateHomeworkStateForDate]
+    [persistScopedAccountValue, selectedPosition, todayHomeworkState.stage2Unlock, todayLessonCount, updateHomeworkStateForDate]
   );
 
   const recordDailyDribbleProgress = useCallback(
@@ -2954,8 +3065,9 @@ export function useBasketballCoachApp() {
 
     shotAttemptRecordsRef.current = nextRecords;
     setShotAttemptRecords(nextRecords);
+    persistScopedAccountValue('shotAttempts', nextRecords);
     return nextCount;
-  }, []);
+  }, [persistScopedAccountValue]);
 
   const updateShotSuccessCount = useCallback((dateKey: string, delta: number) => {
     if (delta === 0) {
@@ -2979,8 +3091,9 @@ export function useBasketballCoachApp() {
 
     shotSuccessRecordsRef.current = nextRecords;
     setShotSuccessRecords(nextRecords);
+    persistScopedAccountValue('shotSuccess', nextRecords);
     return nextCount;
-  }, []);
+  }, [persistScopedAccountValue]);
 
   const recordDailyShootAttempt = useCallback(() => {
     const dateKey = formatDateKey(new Date());
@@ -3051,10 +3164,13 @@ export function useBasketballCoachApp() {
       evaluation,
     });
 
-    setLessonRecords((current) => [...current, nextRecord]);
+    const nextLessonRecords = [...lessonRecordsRef.current, nextRecord];
+    lessonRecordsRef.current = nextLessonRecords;
+    setLessonRecords(nextLessonRecords);
+    persistLessonRecords(nextLessonRecords);
 
     setSelectedDateKey(dateKey);
-  }, []);
+  }, [persistLessonRecords]);
 
   const finalizeLessonSession = useCallback(
     async (shouldSaveRecord: boolean, videoUri: string) => {
@@ -3069,7 +3185,10 @@ export function useBasketballCoachApp() {
       void stopStartCue();
       void unloadStartCue();
 
-      if (shouldSaveRecord) {
+      const shouldPersistShootRecord =
+        lessonModeRef.current !== 'shoot' || hasCompletedShootAttempt();
+
+      if (shouldSaveRecord && shouldPersistShootRecord) {
         if (lessonModeRef.current === 'shoot') {
           const completedShootHomework = recordDailyShootAttempt();
           if (completedShootHomework) {
@@ -3108,6 +3227,7 @@ export function useBasketballCoachApp() {
       celebrateHomeworkCompletion,
       clearRecordingWait,
       clearShootAutoEnd,
+      hasCompletedShootAttempt,
       recordDailyShootAttempt,
       resetFrontDribbleTrackingSummary,
       resetShootAnalysisTracking,
@@ -3876,6 +3996,7 @@ export function useBasketballCoachApp() {
       latestFeedbackRef.current = completedFeedback;
       setFeedbackText(completedFeedback);
       setLessonReview(null);
+      playStartCue();
       setIsLessonActive(false);
       setIsCameraActive(false);
       setIsCameraReady(false);
@@ -3890,6 +4011,7 @@ export function useBasketballCoachApp() {
     clearRecordingWait,
     clearShootAutoEnd,
     finalizeFrontDribbleWeakPoint,
+    playStartCue,
     recordDailyDribbleProgress,
     recordFrontDribbleHomeworkData,
     resetShootAnalysisTracking,
@@ -3942,6 +4064,7 @@ export function useBasketballCoachApp() {
       latestFeedbackRef.current = completedFeedback;
       setFeedbackText(completedFeedback);
       setLessonReview(finalReviewClip);
+      playStartCue();
       setIsLessonActive(false);
       setIsCameraActive(false);
       setIsCameraReady(false);
@@ -3955,6 +4078,7 @@ export function useBasketballCoachApp() {
       celebrateHomeworkCompletion,
       clearRecordingWait,
       finalizeFrontDribbleWeakPoint,
+      playStartCue,
       recordDailyDribbleProgress,
       recordFrontDribbleHomeworkData,
       resetShootAnalysisTracking,
@@ -4107,7 +4231,6 @@ export function useBasketballCoachApp() {
         const targetCount = dribbleTargetCountRef.current;
         if (targetCount && effectiveAnalysis.dribbleCount >= targetCount && !dribbleAutoEndingRef.current) {
           dribbleAutoEndingRef.current = true;
-          playStartCue();
           setImmediateLessonFeedback(nextFeedback);
           setDebugText(`목표 드리블 ${targetCount}회에 도달해 레슨을 마무리합니다.`);
           finishDribbleRecordingForReview();
@@ -4429,6 +4552,7 @@ export function useBasketballCoachApp() {
             setRecordingStopToken(0);
             setCameraStopMode(null);
             setIsCameraPreviewHidden(false);
+            playStartCue();
             setIsLessonActive(false);
             setIsCameraActive(false);
             setIsCameraReady(false);
@@ -4485,6 +4609,7 @@ export function useBasketballCoachApp() {
       finalizeLessonSession,
       isCameraActive,
       isLessonActive,
+      playStartCue,
       recordSuccessfulShot,
       resetShootAnalysisTracking,
       setImmediateLessonFeedback,
@@ -4515,7 +4640,7 @@ export function useBasketballCoachApp() {
   }
 
   function toggleLessonRecordShotOutcome(recordId: string) {
-    const record = lessonRecords.find((item) => item.id === recordId);
+    const record = lessonRecordsRef.current.find((item) => item.id === recordId);
 
     if (!record || record.mode !== 'shoot') {
       return;
@@ -4523,18 +4648,19 @@ export function useBasketballCoachApp() {
 
     const nextShotOutcome = record.shotOutcome === 'success' ? 'failure' : 'success';
     const delta = nextShotOutcome === 'success' ? 1 : -1;
-
-    setLessonRecords((current) =>
-      current.map((item) =>
-        item.id === recordId
-          ? normalizeLessonRecord({
-              ...item,
-              shotOutcome: nextShotOutcome,
-              evaluation: updateShootRecordEvaluationForOutcome(item, nextShotOutcome),
-            })
-          : item
-      )
+    const nextLessonRecords = lessonRecordsRef.current.map((item) =>
+      item.id === recordId
+        ? normalizeLessonRecord({
+            ...item,
+            shotOutcome: nextShotOutcome,
+            evaluation: updateShootRecordEvaluationForOutcome(item, nextShotOutcome),
+          })
+        : item
     );
+
+    lessonRecordsRef.current = nextLessonRecords;
+    setLessonRecords(nextLessonRecords);
+    persistLessonRecords(nextLessonRecords);
     updateShotSuccessCount(record.dateKey, delta);
   }
 
@@ -4556,7 +4682,7 @@ export function useBasketballCoachApp() {
   }
 
   async function deleteLessonRecord(recordId: string) {
-    const record = lessonRecords.find((item) => item.id === recordId);
+    const record = lessonRecordsRef.current.find((item) => item.id === recordId);
 
     if (record?.videoUri && !record.videoUri.startsWith('data:')) {
       try {
@@ -4574,7 +4700,10 @@ export function useBasketballCoachApp() {
       }
     }
 
-    setLessonRecords((current) => current.filter((item) => item.id !== recordId));
+    const nextLessonRecords = lessonRecordsRef.current.filter((item) => item.id !== recordId);
+    lessonRecordsRef.current = nextLessonRecords;
+    setLessonRecords(nextLessonRecords);
+    persistLessonRecords(nextLessonRecords);
   }
 
   return {
