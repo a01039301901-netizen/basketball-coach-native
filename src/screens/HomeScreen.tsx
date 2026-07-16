@@ -14,7 +14,6 @@ interface HomeScreenProps {
   onOpenLesson: () => void;
   onOpenDiary: () => void;
   onOpenRules: () => void;
-  onOpenSettings: () => void;
 }
 
 interface HomeMenuButtonProps {
@@ -142,7 +141,6 @@ export function HomeScreen({
   onOpenLesson,
   onOpenDiary,
   onOpenRules,
-  onOpenSettings,
 }: HomeScreenProps) {
   const { width } = useWindowDimensions();
   const layoutWidth = shouldUseDesktopMobileLayout(width) ? getDesktopMobileFrameWidth(width) : width;
@@ -178,10 +176,6 @@ export function HomeScreen({
         <View style={styles.heroTextWrap}>
           <Text style={styles.heroTitle}>오늘 어떤 연습부터 시작할까요?</Text>
         </View>
-
-        <Pressable onPress={onOpenSettings} style={({ pressed }) => [styles.settingsButton, pressed && styles.pressed]}>
-          <Text style={styles.settingsButtonText}>⚙️</Text>
-        </Pressable>
       </View>
 
       {isWide ? (
@@ -265,11 +259,16 @@ export function HomeScreen({
       <View style={[styles.secondaryCards, isWide && styles.secondaryCardsWide]}>
         <Pressable
           onPress={onOpenRules}
-          style={({ pressed }) => [styles.rulesCard, isWide && styles.secondaryCardCompactWide, pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.rulesCardButton,
+            isWide && styles.secondaryCardCompactWide,
+            pressed && styles.pressed,
+          ]}
         >
-          <Text style={styles.rulesCardLabel}>Guide</Text>
-          <Text style={styles.rulesCardTitle}>농구 규칙 가이드</Text>
-          <Text style={styles.rulesCardText}>처음 보는 규칙도 빠르게 확인할 수 있도록 기본 내용만 모아 두었어요.</Text>
+          <View style={styles.rulesCard}>
+            <Text style={styles.rulesTitle}>농구 규칙 가이드</Text>
+            <Text style={styles.rulesText}>기본 규칙과 경기 흐름을 빠르게 확인하고 레슨 전에 필요한 내용을 다시 볼 수 있어요.</Text>
+          </View>
         </Pressable>
 
         <View style={[styles.tipCard, isWide && styles.secondaryCardCompactWide]}>
@@ -305,20 +304,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '800',
     marginBottom: 8,
-  },
-  settingsButton: {
-    alignSelf: 'flex-start',
-    width: 44,
-    height: 44,
-    borderRadius: 999,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  settingsButtonText: {
-    fontSize: 20,
   },
   menuButtonsRow: {
     flexDirection: 'row',
@@ -637,6 +622,9 @@ const styles = StyleSheet.create({
     width: undefined,
     minWidth: 0,
   },
+  rulesCardButton: {
+    flex: 1,
+  },
   rulesCard: {
     flex: 1,
     minHeight: 118,
@@ -647,20 +635,13 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     borderColor: 'transparent',
   },
-  rulesCardLabel: {
-    color: colors.textAccent,
-    fontSize: 11,
-    fontWeight: '700',
-    marginBottom: 8,
-    letterSpacing: 0.4,
-  },
-  rulesCardTitle: {
+  rulesTitle: {
     color: colors.text,
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '800',
-    marginBottom: 6,
+    marginBottom: 4,
   },
-  rulesCardText: {
+  rulesText: {
     color: colors.textMuted,
     fontSize: 13,
     lineHeight: 19,

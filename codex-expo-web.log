@@ -1,0 +1,15 @@
+Starting project at C:\basketball-coach\basketball-coach-native
+Starting Metro Bundler
+Waiting on http://localhost:8083
+Logs for your project will appear below.
+Web .\index.js ▓▓▓▓▓▓░░░░░░░░░░ 41.0% (16/25)
+Web .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 84.6% ( 94/129)
+Web .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 84.6% (279/324)
+Web Bundled 12005ms index.js (405 modules)
+ LOG  [web] Logs will appear in the browser console
+Web .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 36ms index.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 45ms index.js (1 module)
+ LOG  [web] Logs will appear in the browser console

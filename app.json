@@ -14,6 +14,14 @@
     },
     "plugins": [
       [
+        "expo-navigation-bar",
+        {
+          "hidden": true,
+          "style": "dark",
+          "enforceContrast": false
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "Allow Basketball Coach AI to use the camera for dribble and shooting analysis.",
@@ -24,9 +32,13 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
+        "UIStatusBarHidden": true,
         "NSCameraUsageDescription": "Allow Basketball Coach AI to use the camera for dribble and shooting analysis.",
         "NSMicrophoneUsageDescription": "Allow Basketball Coach AI to use the microphone while recording lesson videos."
       }
+    },
+    "androidStatusBar": {
+      "hidden": true
     },
     "android": {
       "adaptiveIcon": {

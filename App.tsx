@@ -19,6 +19,8 @@ import { getDesktopMobileFrameWidth, shouldUseDesktopMobileLayout } from './src/
 
 type SideDrawerType = 'settings' | 'profile';
 const APP_TOP_OFFSET = 12;
+const HOME_UTILITY_BAR_HEIGHT = 84;
+const HOME_UTILITY_BAR_HIDE_DISTANCE = 120;
 
 export default function App() {
   const app = useBasketballCoachApp();
@@ -28,6 +30,8 @@ export default function App() {
   const showBack = Boolean(app.currentUser && app.screen !== 'home');
   const isLessonScreen = app.isReady && app.currentUser && app.screen === 'lesson';
   const isHomeScreen = app.isReady && app.currentUser && app.screen === 'home';
+  const shouldShowHomeUtilityBar = Boolean(app.isReady && app.currentUser && app.screen === 'home');
+  const shouldShowHeader = !isLessonScreen && !isHomeScreen;
   const headerScrollY = useRef(new Animated.Value(0)).current;
   const sideDrawerProgress = useRef(new Animated.Value(0)).current;
   const [headerMeasuredHeight, setHeaderMeasuredHeight] = useState(0);
@@ -49,6 +53,10 @@ export default function App() {
     () => Animated.diffClamp(headerScrollY, 0, effectiveHeaderHeight),
     [effectiveHeaderHeight, headerScrollY]
   );
+  const homeUtilityBarScrollClamp = useMemo(
+    () => Animated.diffClamp(headerScrollY, 0, HOME_UTILITY_BAR_HIDE_DISTANCE),
+    [headerScrollY]
+  );
   const handleHeaderScroll = useMemo(
     () =>
       Animated.event([{ nativeEvent: { contentOffset: { y: headerScrollY } } }], {
@@ -68,6 +76,34 @@ export default function App() {
 
     void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const hideNavigationBar = async () => {
+      try {
+        const NavigationBar = await import('expo-navigation-bar');
+
+        if (isCancelled) {
+          return;
+        }
+
+        await NavigationBar.setVisibilityAsync('hidden');
+      } catch (error) {
+        console.warn('Failed to hide Android navigation bar.', error);
+      }
+    };
+
+    void hideNavigationBar();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [app.currentUser, app.screen]);
 
   useEffect(() => {
     setActiveDrawer(null);
@@ -124,6 +160,16 @@ export default function App() {
     outputRange: [0, -(effectiveHeaderHeight + APP_TOP_OFFSET)],
     extrapolate: 'clamp',
   });
+  const homeUtilityBarTranslateY = homeUtilityBarScrollClamp.interpolate({
+    inputRange: [0, HOME_UTILITY_BAR_HIDE_DISTANCE],
+    outputRange: [0, HOME_UTILITY_BAR_HIDE_DISTANCE],
+    extrapolate: 'clamp',
+  });
+  const homeUtilityBarOpacity = homeUtilityBarScrollClamp.interpolate({
+    inputRange: [0, HOME_UTILITY_BAR_HIDE_DISTANCE],
+    outputRange: [1, 0.72],
+    extrapolate: 'clamp',
+  });
   const sideDrawerTranslateX = sideDrawerProgress.interpolate({
     inputRange: [0, 1],
     outputRange: [sideDrawerWidth + 24, 0],
@@ -135,7 +181,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" />
+      <StatusBar hidden style="light" />
       <View style={[styles.appViewport, isDesktopMobileMode && styles.appViewportDesktop]}>
       <View
         style={[
@@ -145,7 +191,7 @@ export default function App() {
         ]}
       >
         <FireworkBurst visible={app.showFireworks} items={app.fireworks} />
-        {!isLessonScreen ? (
+        {shouldShowHeader ? (
           <Animated.View
             style={[
               styles.headerAnimatedWrap,
@@ -209,7 +255,13 @@ export default function App() {
           </View>
         ) : (
           <Animated.ScrollView
-            contentContainerStyle={[styles.scrollContent, { paddingTop: effectiveHeaderHeight }]}
+            contentContainerStyle={[
+              styles.scrollContent,
+              {
+                paddingTop: shouldShowHeader ? effectiveHeaderHeight : 0,
+                paddingBottom: shouldShowHomeUtilityBar ? 120 : 32,
+              },
+            ]}
             showsVerticalScrollIndicator={false}
             onScroll={handleHeaderScroll}
             scrollEventThrottle={16}
@@ -247,7 +299,6 @@ export default function App() {
               onOpenLesson={() => void app.navigateTo('lesson')}
               onOpenDiary={() => void app.navigateTo('diary')}
               onOpenRules={() => void app.navigateTo('rules')}
-              onOpenSettings={() => setActiveDrawer('settings')}
             />
           )}
 
@@ -291,6 +342,43 @@ export default function App() {
           {app.isReady && app.currentUser && app.screen === 'rules' && <RulesGuideScreen />}
           </Animated.ScrollView>
         )}
+        {shouldShowHomeUtilityBar ? (
+          <View pointerEvents="box-none" style={styles.homeUtilityBarOverlay}>
+            <Animated.View
+              style={[
+                styles.homeUtilityBar,
+                {
+                  opacity: homeUtilityBarOpacity,
+                  transform: [{ translateY: homeUtilityBarTranslateY }],
+                },
+              ]}
+            >
+              <Pressable
+                onPress={() => {
+                  setActiveDrawer(null);
+                  void app.navigateTo('home');
+                }}
+                style={({ pressed }) => [styles.homeUtilityAction, styles.homeUtilityHomeButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.homeUtilityIconText}>⌂</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setActiveDrawer('profile')}
+                style={({ pressed }) => [styles.homeUtilityAction, styles.homeUtilityProfileButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.homeUtilityActionText}>프로필</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setActiveDrawer('settings')}
+                style={({ pressed }) => [styles.homeUtilityAction, styles.homeUtilitySettingsButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.homeUtilityIconText}>⚙</Text>
+              </Pressable>
+            </Animated.View>
+          </View>
+        ) : null}
         {shouldShowDrawer ? (
           <View pointerEvents="box-none" style={styles.settingsOverlay}>
             <Pressable
@@ -310,12 +398,6 @@ export default function App() {
             >
               <View style={styles.settingsDrawerHeader}>
                 <Text style={styles.settingsDrawerTitle}>{sideDrawerTitle}</Text>
-                <Pressable
-                  onPress={() => setActiveDrawer(null)}
-                  style={({ pressed }) => [styles.settingsDrawerCloseButton, pressed && styles.pressed]}
-                >
-                  <Text style={styles.settingsDrawerCloseText}>닫기</Text>
-                </Pressable>
               </View>
               <ScrollView
                 style={styles.settingsDrawerScroll}
@@ -392,6 +474,62 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     gap: 16,
   },
+  homeUtilityBarOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 24,
+  },
+  homeUtilityBar: {
+    minHeight: HOME_UTILITY_BAR_HEIGHT,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  homeUtilityAction: {
+    minHeight: 46,
+    borderRadius: 18,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  homeUtilityHomeButton: {
+    width: 54,
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+    paddingHorizontal: 0,
+  },
+  homeUtilityProfileButton: {
+    flex: 1,
+    minWidth: 86,
+  },
+  homeUtilitySettingsButton: {
+    width: 54,
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+    paddingHorizontal: 0,
+  },
+  homeUtilityActionText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  homeUtilityIconText: {
+    color: '#ffffff',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 22,
+  },
   lessonScreenWrap: {
     flex: 1,
     minHeight: 0,
@@ -408,6 +546,7 @@ const styles = StyleSheet.create({
   },
   settingsOverlay: {
     ...StyleSheet.absoluteFillObject,
+    bottom: HOME_UTILITY_BAR_HEIGHT,
     zIndex: 30,
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
@@ -433,7 +572,7 @@ const styles = StyleSheet.create({
   settingsDrawerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     gap: 12,
     paddingHorizontal: 18,
     paddingTop: 18,
@@ -445,19 +584,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 22,
     fontWeight: '800',
-  },
-  settingsDrawerCloseButton: {
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  settingsDrawerCloseText: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '700',
   },
   settingsDrawerScroll: {
     flex: 1,
