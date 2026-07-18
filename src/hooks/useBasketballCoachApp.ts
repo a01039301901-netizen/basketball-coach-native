@@ -10,7 +10,6 @@ import { SKILLS } from '../constants/content';
 import { BALL_BRAND_PRESETS, DEFAULT_BALL_BRAND, DEFAULT_BALL_COLORS, DEFAULT_POSITION } from '../constants/settings';
 import { STORAGE_KEYS } from '../constants/storage';
 import type {
-  AccountGender,
   AppScreen,
   AuthMode,
   AuthSession,
@@ -89,9 +88,6 @@ interface TimedDribbleAnalysis {
 
 interface AuthFormValues {
   nickname: string;
-  name: string;
-  age: string;
-  gender: AccountGender;
   password: string;
   keepSignedIn: boolean;
 }
@@ -103,9 +99,6 @@ interface AuthActionResult {
 
 interface ProfileUpdateValues {
   nickname: string;
-  name: string;
-  age: string;
-  gender: AccountGender;
 }
 
 interface PasswordChangeValues {
@@ -154,10 +147,6 @@ function createFireworks(): FireworkItem[] {
   }));
 }
 
-function normalizeAccountName(name: string) {
-  return name.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
-}
-
 function normalizeNickname(nickname: string) {
   return nickname.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
 }
@@ -200,20 +189,7 @@ function toAuthUser(account: UserAccount): AuthUser {
   return {
     id: account.id,
     nickname: account.nickname,
-    name: account.name,
-    age: account.age,
-    gender: account.gender,
   };
-}
-
-function parseAgeInput(value: string) {
-  const numericAge = Number(value.trim());
-
-  if (!Number.isInteger(numericAge) || numericAge <= 0 || numericAge > 120) {
-    return null;
-  }
-
-  return numericAge;
 }
 
 function parseStoredJson<T>(value: string | null, fallback: T): T {
@@ -241,10 +217,6 @@ function isRecordObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isAccountGender(value: unknown): value is AccountGender {
-  return value === 'male' || value === 'female';
-}
-
 function sanitizeStoredAccounts(value: unknown): UserAccount[] {
   if (!Array.isArray(value)) {
     return [];
@@ -260,10 +232,6 @@ function sanitizeStoredAccounts(value: unknown): UserAccount[] {
 
       if (
         typeof entry.id !== 'string' ||
-        typeof entry.name !== 'string' ||
-        typeof entry.age !== 'number' ||
-        !Number.isFinite(entry.age) ||
-        !isAccountGender(entry.gender) ||
         typeof entry.password !== 'string' ||
         typeof entry.createdAt !== 'string'
       ) {
@@ -271,15 +239,17 @@ function sanitizeStoredAccounts(value: unknown): UserAccount[] {
       }
 
       const fallbackSeed = entry.id || String(index + 1);
-      const rawNickname = typeof entry.nickname === 'string' ? entry.nickname : entry.name;
+      const rawNickname =
+        typeof entry.nickname === 'string'
+          ? entry.nickname
+          : typeof entry.name === 'string'
+            ? entry.name
+            : `user-${fallbackSeed.slice(-4)}`;
       const nickname = buildUniqueNickname(rawNickname, usedNicknames, fallbackSeed);
 
       return {
         id: entry.id,
         nickname,
-        name: entry.name.trim(),
-        age: Math.trunc(entry.age),
-        gender: entry.gender,
         password: entry.password,
         createdAt: entry.createdAt,
       };
@@ -515,10 +485,6 @@ function sanitizeTransferPayload(value: unknown): AccountTransferPayload | null 
   if (
     typeof accountValue.id !== 'string' ||
     (typeof accountValue.nickname !== 'string' && typeof accountValue.name !== 'string') ||
-    typeof accountValue.name !== 'string' ||
-    typeof accountValue.age !== 'number' ||
-    !Number.isFinite(accountValue.age) ||
-    !isAccountGender(accountValue.gender) ||
     typeof accountValue.password !== 'string' ||
     typeof accountValue.createdAt !== 'string'
   ) {
@@ -536,10 +502,12 @@ function sanitizeTransferPayload(value: unknown): AccountTransferPayload | null 
     exportedAt: typeof value.exportedAt === 'string' ? value.exportedAt : new Date().toISOString(),
     account: {
       id: accountValue.id,
-      nickname: typeof accountValue.nickname === 'string' ? accountValue.nickname : accountValue.name,
-      name: accountValue.name,
-      age: Math.trunc(accountValue.age),
-      gender: accountValue.gender,
+      nickname:
+        typeof accountValue.nickname === 'string'
+          ? accountValue.nickname
+          : typeof accountValue.name === 'string'
+            ? accountValue.name
+            : `user-${accountValue.id.slice(-4)}`,
       password: accountValue.password,
       createdAt: accountValue.createdAt,
     },
@@ -3360,23 +3328,21 @@ export function useBasketballCoachApp() {
     };
   }
 
-  async function login({ nickname, name, age, gender, password, keepSignedIn }: AuthFormValues): Promise<AuthActionResult> {
+  async function login({ nickname, password, keepSignedIn }: AuthFormValues): Promise<AuthActionResult> {
     const trimmedNickname = nickname.trim();
-    const trimmedName = name.trim();
     const trimmedPassword = password.trim();
-    const parsedAge = parseAgeInput(age);
 
-    if (!trimmedNickname || !trimmedName || parsedAge === null || !trimmedPassword) {
+    if (!trimmedNickname || !trimmedPassword) {
       return {
         success: false,
-        message: '닉네임, 이름, 나이, 성별, 비밀번호를 모두 정확히 입력해 주세요.',
+        message: '닉네임과 비밀번호를 모두 입력해 주세요.',
       };
     }
 
     if (accounts.length === 0) {
       return {
         success: false,
-        message: '이 기기에는 아직 등록된 계정이 없습니다. 컴퓨터에서 만든 계정은 아래 전송 코드로 가져오거나 회원가입으로 새로 만들어 주세요.',
+        message: '이 기기에는 아직 등록된 계정이 없습니다. 회원가입으로 새 계정을 만들어 주세요.',
       };
     }
 
@@ -3387,17 +3353,6 @@ export function useBasketballCoachApp() {
       return {
         success: false,
         message: '입력한 닉네임과 일치하는 계정을 찾지 못했습니다.',
-      };
-    }
-
-    if (
-      normalizeAccountName(matchedAccount.name) !== normalizeAccountName(trimmedName) ||
-      matchedAccount.age !== parsedAge ||
-      matchedAccount.gender !== gender
-    ) {
-      return {
-        success: false,
-        message: '닉네임은 맞지만 이름, 나이 또는 성별 정보가 계정과 일치하지 않습니다.',
       };
     }
 
@@ -3418,16 +3373,14 @@ export function useBasketballCoachApp() {
     };
   }
 
-  async function signup({ nickname, name, age, gender, password, keepSignedIn }: AuthFormValues): Promise<AuthActionResult> {
+  async function signup({ nickname, password, keepSignedIn }: AuthFormValues): Promise<AuthActionResult> {
     const trimmedNickname = nickname.trim();
-    const trimmedName = name.trim();
     const trimmedPassword = password.trim();
-    const parsedAge = parseAgeInput(age);
 
-    if (!trimmedNickname || !trimmedName || parsedAge === null || !trimmedPassword) {
+    if (!trimmedNickname || !trimmedPassword) {
       return {
         success: false,
-        message: '닉네임, 이름, 나이, 성별, 비밀번호를 모두 정확히 입력해 주세요.',
+        message: '닉네임과 비밀번호를 모두 입력해 주세요.',
       };
     }
 
@@ -3444,9 +3397,6 @@ export function useBasketballCoachApp() {
     const nextAccount: UserAccount = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       nickname: trimmedNickname,
-      name: trimmedName,
-      age: parsedAge,
-      gender,
       password: trimmedPassword,
       createdAt: new Date().toISOString(),
     };
@@ -3464,7 +3414,7 @@ export function useBasketballCoachApp() {
     };
   }
 
-  async function updateProfile({ nickname, name, age, gender }: ProfileUpdateValues): Promise<AuthActionResult> {
+  async function updateProfile({ nickname }: ProfileUpdateValues): Promise<AuthActionResult> {
     if (!currentUserId) {
       return {
         success: false,
@@ -3473,13 +3423,11 @@ export function useBasketballCoachApp() {
     }
 
     const trimmedNickname = nickname.trim();
-    const trimmedName = name.trim();
-    const parsedAge = parseAgeInput(age);
 
-    if (!trimmedNickname || !trimmedName || parsedAge === null) {
+    if (!trimmedNickname) {
       return {
         success: false,
-        message: '닉네임, 이름, 나이, 성별을 모두 정확히 입력해 주세요.',
+        message: '닉네임을 입력해 주세요.',
       };
     }
 
@@ -3504,13 +3452,7 @@ export function useBasketballCoachApp() {
       };
     }
 
-    const hasChanged =
-      currentAccount.nickname !== trimmedNickname ||
-      currentAccount.name !== trimmedName ||
-      currentAccount.age !== parsedAge ||
-      currentAccount.gender !== gender;
-
-    if (!hasChanged) {
+    if (currentAccount.nickname === trimmedNickname) {
       return {
         success: true,
         message: '변경된 정보가 없어 현재 값으로 유지했습니다.',
@@ -3520,9 +3462,6 @@ export function useBasketballCoachApp() {
     const nextAccount: UserAccount = {
       ...currentAccount,
       nickname: trimmedNickname,
-      name: trimmedName,
-      age: parsedAge,
-      gender,
     };
     const nextAccounts = accounts.map((account) => (account.id === currentUserId ? nextAccount : account));
 
@@ -3532,7 +3471,7 @@ export function useBasketballCoachApp() {
 
     return {
       success: true,
-      message: '사용자 정보를 수정했습니다.',
+      message: '닉네임을 수정했습니다.',
     };
   }
 

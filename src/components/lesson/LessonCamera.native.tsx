@@ -137,9 +137,6 @@ export function LessonCamera({
                 </View>
               </View>
             ) : null}
-            <Text style={styles.hint}>
-              모바일에서는 WebView 안에서 inner.html 방식으로 MediaPipe를 실행합니다.
-            </Text>
           </View>
           {isCameraPreviewHidden ? (
             <View style={styles.placeholderOverlay}>
@@ -160,13 +157,11 @@ export function LessonCamera({
 
 const styles = StyleSheet.create({
   videoWrap: {
-    height: 560,
+    flex: 1,
+    width: '100%',
+    minHeight: 0,
     backgroundColor: colors.cameraBg,
-    borderRadius: 22,
     overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: colors.secondary,
-    marginBottom: 16,
     position: 'relative',
   },
   webview: {
@@ -244,14 +239,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 2,
     marginTop: 2,
-  },
-  hint: {
-    color: colors.text,
-    fontSize: 14,
-    lineHeight: 20,
-    backgroundColor: 'rgba(0,0,0,0.38)',
-    borderRadius: 14,
-    padding: 12,
   },
   placeholder: {
     flex: 1,

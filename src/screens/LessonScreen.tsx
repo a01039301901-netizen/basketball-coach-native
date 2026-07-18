@@ -2,7 +2,6 @@ import { type AVPlaybackStatus, ResizeMode, Video } from 'expo-av';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
-import { SmallButton } from '../components/common/Buttons';
 import { InfoBox } from '../components/common/InfoBox';
 import { LessonCamera } from '../components/lesson/LessonCamera';
 import { colors } from '../theme/colors';
@@ -59,7 +58,53 @@ function ModeButton({ title, active, disabled, onPress }: ModeButtonProps) {
         pressed && styles.pressed,
       ]}
     >
-      <Text style={styles.modeButtonText}>{title}</Text>
+      <Text style={[styles.modeButtonText, active && styles.modeButtonTextActive]}>{title}</Text>
+    </Pressable>
+  );
+}
+
+interface OverlayUtilityButtonProps {
+  title: string;
+  onPress: () => void;
+  variant?: 'neutral' | 'accent' | 'danger';
+}
+
+function OverlayUtilityButton({ title, onPress, variant = 'neutral' }: OverlayUtilityButtonProps) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.overlayUtilityButton,
+        variant === 'accent' && styles.overlayUtilityButtonAccent,
+        variant === 'danger' && styles.overlayUtilityButtonDanger,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text style={styles.overlayUtilityButtonText}>{title}</Text>
+    </Pressable>
+  );
+}
+
+interface CameraShutterButtonProps {
+  busy: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}
+
+function CameraShutterButton({ busy, disabled, onPress }: CameraShutterButtonProps) {
+  return (
+    <Pressable
+      accessibilityLabel={busy ? '레슨 진행 중' : '레슨 시작'}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.shutterButton,
+        busy && styles.shutterButtonBusy,
+        disabled && styles.shutterButtonDisabled,
+        pressed && !disabled && styles.pressed,
+      ]}
+    >
+      <View style={[styles.shutterButtonInner, busy && styles.shutterButtonInnerBusy]} />
     </Pressable>
   );
 }
@@ -355,13 +400,15 @@ export function LessonScreen({
   const isSideDockedCoaching = isWideLayout || isLandscapeMobileLayout;
   const isLessonSessionBusy = isLessonActive || isCameraActive;
   const allowPanelDragHide = !isSideDockedCoaching;
-  const floatingCoachingHeight = isSideDockedCoaching ? Math.max(320, Math.min(height - 24, 760)) : Math.max(260, Math.min(height * 0.42, 380));
+  const bottomControlsInset = 170;
+  const floatingCoachingHeight = isSideDockedCoaching
+    ? Math.max(320, Math.min(height - bottomControlsInset - 24, 760))
+    : Math.max(240, Math.min(height * 0.36, 320));
   const floatingCoachingWidth = isWideLayout
     ? Math.max(320, Math.min(layoutWidth * 0.32, 420))
     : isLandscapeMobileLayout
       ? Math.max(280, Math.min(layoutWidth * 0.34, 360))
       : Math.min(layoutWidth - 24, 420);
-  const mobileCameraHeight = Math.max(620, height - 96);
   const coachingHiddenOffset = floatingCoachingHeight + 48;
   const coachingHideThreshold = Math.min(120, Math.max(72, floatingCoachingHeight * 0.24));
   const coachingPanelTranslateY = useRef(new Animated.Value(allowPanelDragHide ? coachingHiddenOffset : 0)).current;
@@ -396,7 +443,7 @@ export function LessonScreen({
       recordingStartToken={recordingStartToken}
       recordingStopToken={recordingStopToken}
       cameraStopMode={cameraStopMode}
-      containerStyle={!isSideDockedCoaching ? { height: mobileCameraHeight, marginBottom: 0 } : undefined}
+      containerStyle={styles.fullscreenCamera}
       onPoseMessage={onPoseMessage}
     />
   );
@@ -606,160 +653,143 @@ export function LessonScreen({
 
   return (
     <View style={styles.screenRoot}>
-      <View pointerEvents="none" style={styles.screenBackdrop}>
-        <View style={styles.screenBackdropBase} />
-        <View style={styles.screenBackdropGlowPrimary} />
-        <View style={styles.screenBackdropGlowSecondary} />
+      <View style={styles.cameraViewport}>
+        {lessonCameraContent}
       </View>
+      <View pointerEvents="none" style={styles.cameraChromeTop} />
+      <View pointerEvents="none" style={styles.cameraChromeBottom} />
       <View pointerEvents="box-none" style={styles.topActionOverlay}>
         <Pressable onPress={onGoHome} style={({ pressed }) => [styles.homeChip, pressed && styles.pressed]}>
           <Text style={styles.homeChipText}>{'<'}</Text>
         </Pressable>
       </View>
 
-      <View style={[styles.lessonViewport, isSideDockedCoaching ? styles.lessonViewportDocked : null]}>
-        <ScrollView
-          style={[styles.screenScroll, isSideDockedCoaching ? styles.screenScrollDocked : null]}
-          contentContainerStyle={[
-            styles.contentGap,
-            styles.screenScrollContent,
-            !isSideDockedCoaching ? { paddingBottom: floatingCoachingHeight + 36 } : null,
-          ]}
-          showsVerticalScrollIndicator={false}
-        >
-          {!isSideDockedCoaching ? <View style={styles.mobileCameraStage}>{lessonCameraContent}</View> : null}
-
-          <View style={styles.heroCard}>
-            <View pointerEvents="none" style={styles.heroBackdrop}>
-              <View style={styles.heroBackdropGlowPrimary} />
-              <View style={styles.heroBackdropGlowSecondary} />
-              <View style={styles.heroBackdropSheen} />
-            </View>
-            <View style={styles.heroIntro}>
-            <Text style={styles.heroTitle}>AI 레슨 받기</Text>
-            <Text style={styles.leadText}>
-              실시간 자세 분석을 통해 드리블과 슛 동작을 확인하고, 지금 움직임에 맞는 코칭 피드백을 바로 볼 수 있습니다.
-            </Text>
-
-            </View>
-
-            <View style={styles.lessonLayout}>
-              <View style={styles.cameraCard}>
-                <View style={styles.modeButtons}>
-                  <ModeButton
-                    title="드리블 분석"
-                    active={lessonMode === 'dribble'}
-                    disabled={isLessonSessionBusy}
-                    onPress={() => onSelectMode('dribble')}
-                  />
-                  <ModeButton
-                    title="슛 분석"
-                    active={lessonMode === 'shoot'}
-                    disabled={isLessonSessionBusy}
-                    onPress={() => onSelectMode('shoot')}
-                  />
-                </View>
-
-                <View style={styles.modeStatus}>
-                  <Text style={styles.modeStatusText}>{lessonMode === 'shoot' ? '현재 선택: 슛 분석' : '현재 선택: 드리블 분석'}</Text>
-                </View>
-
-                {isSideDockedCoaching ? lessonCameraContent : null}
-
-                <View style={styles.cameraControls}>
-                  <SmallButton title="레슨 시작" onPress={openLessonStart} disabled={isLessonSessionBusy} />
-                  {lessonMode === 'shoot' && isShootSuccessButtonVisible ? (
-                    <SmallButton title="슛 성공" onPress={onRegisterSuccessfulShot} variant="dark" />
-                  ) : null}
-                  <SmallButton
-                    title="레슨 끝내기"
-                    onPress={onEndLesson}
-                    variant="red"
-                    disabled={!isLessonActive && !isCameraActive}
-                  />
-                </View>
-              </View>
-            </View>
+      {isSideDockedCoaching ? (
+        <View pointerEvents="box-none" style={styles.sideRailOverlay}>
+          <View style={[styles.sideCard, styles.sideCardDockedOverlay, { width: floatingCoachingWidth, maxHeight: floatingCoachingHeight }]}>
+            <ScrollView contentContainerStyle={styles.sideCardContent} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+              <RealtimeCoachingPanel
+                lessonMode={lessonMode}
+                currentDribbleCount={currentDribbleCount}
+                feedbackText={feedbackText}
+                lessonReview={lessonReview}
+                cameraError={cameraError}
+                isWideLayout={isWideLayout}
+              />
+            </ScrollView>
           </View>
-        </ScrollView>
-
-        {isSideDockedCoaching ? (
-          <View style={[styles.sideRail, { width: floatingCoachingWidth, paddingTop: 44, paddingBottom: 32 }]}>
-            <View style={[styles.sideCard, styles.sideCardDocked, { maxHeight: floatingCoachingHeight }]}>
-              <ScrollView contentContainerStyle={styles.sideCardContent} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-                <RealtimeCoachingPanel
-                  lessonMode={lessonMode}
-                  currentDribbleCount={currentDribbleCount}
-                  feedbackText={feedbackText}
-                  lessonReview={lessonReview}
-                  cameraError={cameraError}
-                  isWideLayout={isWideLayout}
-                />
-              </ScrollView>
-            </View>
-          </View>
-        ) : null}
-      </View>
+        </View>
+      ) : null}
 
       {!isSideDockedCoaching ? (
-      <View pointerEvents="box-none" style={styles.coachingOverlay}>
-        <Animated.View
-          pointerEvents={allowPanelDragHide && isCoachingPanelHidden ? 'none' : 'auto'}
-          style={[
-            styles.sideCard,
-            styles.sideCardFloating,
-            {
-              left: 12,
-              right: 12,
-              bottom: 12,
-              maxHeight: floatingCoachingHeight,
-            },
-            allowPanelDragHide
-              ? {
-                  transform: [{ translateY: coachingPanelTranslateY }],
-                }
-              : null,
-          ]}
-        >
+        <View pointerEvents="box-none" style={styles.coachingOverlay}>
+          <Animated.View
+            pointerEvents={allowPanelDragHide && isCoachingPanelHidden ? 'none' : 'auto'}
+            style={[
+              styles.sideCard,
+              styles.sideCardFloating,
+              {
+                left: 12,
+                right: 12,
+                bottom: bottomControlsInset,
+                maxHeight: floatingCoachingHeight,
+              },
+              allowPanelDragHide
+                ? {
+                    transform: [{ translateY: coachingPanelTranslateY }],
+                  }
+                : null,
+            ]}
+          >
+            {allowPanelDragHide ? (
+              <View {...coachingPanelPanResponder?.panHandlers} style={styles.panelDragHandle}>
+                <View style={styles.panelGrip} />
+                <Text style={styles.panelDragHint}>숨기기</Text>
+              </View>
+            ) : null}
+            <ScrollView contentContainerStyle={styles.sideCardContent} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+              <RealtimeCoachingPanel
+                lessonMode={lessonMode}
+                currentDribbleCount={currentDribbleCount}
+                feedbackText={feedbackText}
+                lessonReview={lessonReview}
+                cameraError={cameraError}
+                isWideLayout={isWideLayout}
+              />
+            </ScrollView>
+          </Animated.View>
+
           {allowPanelDragHide ? (
-            <View {...coachingPanelPanResponder?.panHandlers} style={styles.panelDragHandle}>
-              <View style={styles.panelGrip} />
-              <Text style={styles.panelDragHint}>아래로 밀어 숨기기</Text>
+            <View
+              pointerEvents="box-none"
+              style={[
+                styles.coachingRestoreWrap,
+                { bottom: bottomControlsInset },
+                isLandscapeMobileLayout ? styles.coachingRestoreWrapWide : null,
+              ]}
+            >
+              <Animated.View
+                pointerEvents={isCoachingPanelHidden ? 'auto' : 'none'}
+                {...coachingRestorePanResponder?.panHandlers}
+                style={{
+                  opacity: coachingRestoreOpacity,
+                  transform: [{ translateY: coachingRestoreTranslateY }],
+                }}
+              >
+                <Pressable onPress={restoreCoachingPanel} style={({ pressed }) => [styles.coachingRestoreChip, pressed && styles.pressed]}>
+                  <Text style={styles.coachingRestoreChipText}>^ 실시간 코칭</Text>
+                </Pressable>
+              </Animated.View>
             </View>
           ) : null}
-          <ScrollView contentContainerStyle={styles.sideCardContent} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-            <RealtimeCoachingPanel
-              lessonMode={lessonMode}
-              currentDribbleCount={currentDribbleCount}
-              feedbackText={feedbackText}
-              lessonReview={lessonReview}
-              cameraError={cameraError}
-              isWideLayout={isWideLayout}
-            />
-          </ScrollView>
-        </Animated.View>
-
-        {allowPanelDragHide ? (
-          <View
-            pointerEvents="box-none"
-            style={[styles.coachingRestoreWrap, isLandscapeMobileLayout ? styles.coachingRestoreWrapWide : null]}
-          >
-            <Animated.View
-              pointerEvents={isCoachingPanelHidden ? 'auto' : 'none'}
-              {...coachingRestorePanResponder?.panHandlers}
-              style={{
-                opacity: coachingRestoreOpacity,
-                transform: [{ translateY: coachingRestoreTranslateY }],
-              }}
-            >
-              <Pressable onPress={restoreCoachingPanel} style={({ pressed }) => [styles.coachingRestoreChip, pressed && styles.pressed]}>
-                <Text style={styles.coachingRestoreChipText}>^ 실시간 코칭</Text>
-              </Pressable>
-            </Animated.View>
-          </View>
-        ) : null}
-      </View>
+        </View>
       ) : null}
+
+      <View pointerEvents="box-none" style={styles.bottomControlsOverlay}>
+        <View style={[styles.bottomControlsStack, isWideLayout ? styles.bottomControlsStackWide : null]}>
+          <View style={styles.modeButtons}>
+            <ModeButton
+              title="드리블 분석"
+              active={lessonMode === 'dribble'}
+              disabled={isLessonSessionBusy}
+              onPress={() => onSelectMode('dribble')}
+            />
+            <ModeButton
+              title="슛 분석"
+              active={lessonMode === 'shoot'}
+              disabled={isLessonSessionBusy}
+              onPress={() => onSelectMode('shoot')}
+            />
+          </View>
+
+          <View style={styles.captureModeChip}>
+            <Text style={styles.captureModeChipText}>{lessonMode === 'shoot' ? '슛 분석' : dribbleViewLabel}</Text>
+          </View>
+
+          <View style={styles.captureControlsRow}>
+            <View style={styles.captureSideSlot}>
+              {isLessonActive || isCameraActive ? (
+                <OverlayUtilityButton title="레슨 종료" onPress={onEndLesson} variant="danger" />
+              ) : (
+                <View style={styles.captureSidePlaceholder} />
+              )}
+            </View>
+
+            <View style={styles.captureButtonStack}>
+              <CameraShutterButton busy={isLessonSessionBusy} disabled={isLessonSessionBusy} onPress={openLessonStart} />
+              <Text style={styles.captureButtonLabel}>{isLessonSessionBusy ? '레슨 진행 중' : '레슨 시작'}</Text>
+            </View>
+
+            <View style={styles.captureSideSlot}>
+              {lessonMode === 'shoot' && isShootSuccessButtonVisible ? (
+                <OverlayUtilityButton title="슛 성공" onPress={onRegisterSuccessfulShot} variant="accent" />
+              ) : (
+                <View style={styles.captureSidePlaceholder} />
+              )}
+            </View>
+          </View>
+        </View>
+      </View>
 
       <Modal visible={showDribbleGuide} transparent animationType="fade" onRequestClose={closeDribbleGuide}>
         <View style={styles.modalBackdrop}>
@@ -909,7 +939,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 0,
     position: 'relative',
-    backgroundColor: colors.background,
+    backgroundColor: '#020202',
   },
   screenBackdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -942,9 +972,9 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 20,
-    paddingTop: 2,
-    paddingHorizontal: 4,
+    zIndex: 30,
+    paddingTop: 18,
+    paddingHorizontal: 16,
     pointerEvents: 'box-none',
   },
   homeChip: {
@@ -952,19 +982,48 @@ const styles = StyleSheet.create({
     minWidth: 48,
     minHeight: 44,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: colors.lightButton,
+    backgroundColor: 'rgba(10,10,10,0.52)',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   homeChipText: {
-    color: colors.lightButtonText,
-    fontSize: 24,
+    color: '#fffaf4',
+    fontSize: 22,
     fontWeight: '900',
     lineHeight: 24,
+  },
+  cameraViewport: {
+    flex: 1,
+  },
+  fullscreenCamera: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    marginBottom: 0,
+    borderRadius: 0,
+    borderWidth: 0,
+  },
+  cameraChromeTop: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 132,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    pointerEvents: 'none',
+  },
+  cameraChromeBottom: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 240,
+    backgroundColor: 'rgba(0,0,0,0.24)',
+    pointerEvents: 'none',
   },
   screenScroll: {
     flex: 1,
@@ -1080,9 +1139,22 @@ const styles = StyleSheet.create({
   sideRail: {
     flexShrink: 0,
   },
+  sideRailOverlay: {
+    position: 'absolute',
+    top: 84,
+    right: 16,
+    bottom: 190,
+    zIndex: 18,
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    pointerEvents: 'box-none',
+  },
   sideCardFloating: {
     position: 'absolute',
     zIndex: 10,
+  },
+  sideCardDockedOverlay: {
+    alignSelf: 'flex-end',
   },
   sideCardContent: {
     paddingBottom: 8,
@@ -1286,6 +1358,12 @@ const styles = StyleSheet.create({
   modeButtons: {
     flexDirection: 'row',
     gap: 10,
+    alignSelf: 'center',
+    padding: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(8,8,8,0.42)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   modeStatus: {
     paddingHorizontal: 14,
@@ -1298,26 +1376,29 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   modeButton: {
-    flex: 1,
-    borderRadius: 0,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 0,
-    borderColor: 'transparent',
+    minWidth: 118,
+    borderRadius: 999,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
   },
   modeButtonActive: {
-    backgroundColor: 'rgba(208,145,85,0.18)',
-    borderColor: 'rgba(208,145,85,0.32)',
+    backgroundColor: 'rgba(255,159,28,0.92)',
+    borderColor: 'rgba(255,246,232,0.72)',
   },
   modeButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.48,
   },
   modeButtonText: {
-    color: colors.text,
-    fontSize: 16,
+    color: '#fff8f0',
+    fontSize: 14,
     fontWeight: '800',
+  },
+  modeButtonTextActive: {
+    color: '#27170a',
   },
   modeStatusText: {
     color: colors.text,
@@ -1330,6 +1411,126 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'flex-start',
     marginTop: 12,
+  },
+  bottomControlsOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 24,
+    paddingHorizontal: 16,
+    paddingBottom: 26,
+    pointerEvents: 'box-none',
+  },
+  bottomControlsStack: {
+    width: '100%',
+    alignSelf: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+  bottomControlsStackWide: {
+    maxWidth: 760,
+  },
+  captureModeChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(10,10,10,0.46)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  captureModeChipText: {
+    color: '#f7efe7',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  captureControlsRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  captureSideSlot: {
+    flex: 1,
+    minWidth: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  captureSidePlaceholder: {
+    width: 88,
+    height: 40,
+  },
+  captureButtonStack: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  captureButtonLabel: {
+    marginTop: 10,
+    color: '#fff6ed',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
+  shutterButton: {
+    width: 92,
+    height: 92,
+    borderRadius: 999,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.82)',
+    backgroundColor: 'rgba(10,10,10,0.34)',
+    padding: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  shutterButtonBusy: {
+    borderColor: 'rgba(255,159,28,0.92)',
+  },
+  shutterButtonDisabled: {
+    opacity: 0.78,
+  },
+  shutterButtonInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#fff6ed',
+  },
+  shutterButtonInnerBusy: {
+    borderRadius: 24,
+    backgroundColor: '#ff9f1c',
+  },
+  overlayUtilityButton: {
+    minWidth: 88,
+    minHeight: 40,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: 'rgba(10,10,10,0.5)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  overlayUtilityButtonAccent: {
+    backgroundColor: 'rgba(255,159,28,0.9)',
+    borderColor: 'rgba(255,246,232,0.72)',
+  },
+  overlayUtilityButtonDanger: {
+    backgroundColor: 'rgba(209,77,77,0.9)',
+    borderColor: 'rgba(255,233,233,0.52)',
+  },
+  overlayUtilityButtonText: {
+    color: '#fff9f2',
+    fontSize: 13,
+    fontWeight: '800',
   },
   errorBox: {
     marginBottom: 14,

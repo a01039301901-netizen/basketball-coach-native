@@ -3,14 +3,14 @@ import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-na
 import { colors } from '../../theme/colors';
 
 interface CardProps extends PropsWithChildren {
-  title: string;
+  title?: string;
   style?: StyleProp<ViewStyle>;
 }
 
 export function Card({ title, children, style }: CardProps) {
   return (
     <View style={[styles.card, style]}>
-      <Text style={styles.title}>{title}</Text>
+      {title ? <Text style={styles.title}>{title}</Text> : null}
       {children}
     </View>
   );

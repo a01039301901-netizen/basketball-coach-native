@@ -122,47 +122,49 @@ export function SettingsScreen({
 
   return (
     <View style={styles.contentGap}>
-      <Card title="사용자 포지션" style={styles.compactCard}>
-        <View style={styles.positionWrap}>
-          <Pressable
-            onPress={() => setIsPositionOpen((current) => !current)}
-            style={({ pressed }) => [styles.positionTrigger, pressed && styles.pressed]}
-          >
-            <Text style={styles.positionTriggerLabel}>현재 선택</Text>
-            <Text style={styles.positionTriggerValue}>{selectedPositionLabel}</Text>
-            <Text style={styles.positionTriggerArrow}>{isPositionOpen ? '닫기' : '열기'}</Text>
-          </Pressable>
+      <View style={styles.sectionBlock}>
+        <Text style={styles.sectionHeader}>사용자 포지션</Text>
+        <Card style={[styles.compactCard, styles.borderlessCard]}>
+          <View style={styles.positionWrap}>
+            <Pressable
+              onPress={() => setIsPositionOpen((current) => !current)}
+              style={({ pressed }) => [styles.positionTrigger, pressed && styles.pressed]}
+            >
+              <Text style={styles.positionTriggerValue}>{selectedPositionLabel}</Text>
+              <Text style={styles.positionTriggerArrow}>{isPositionOpen ? '▴' : '▾'}</Text>
+            </Pressable>
 
-          {isPositionOpen ? (
-            <View style={styles.positionDropdown}>
-              {POSITION_OPTIONS.map((option) => {
-                const active = selectedPosition === option.key;
+            {isPositionOpen ? (
+              <View style={styles.positionDropdown}>
+                {POSITION_OPTIONS.map((option) => {
+                  const active = selectedPosition === option.key;
 
-                return (
-                  <Pressable
-                    key={option.key}
-                    onPress={() => {
-                      onSelectPosition(option.key);
-                      setIsPositionOpen(false);
-                    }}
-                    style={({ pressed }) => [
-                      styles.positionOption,
-                      active && styles.positionOptionActive,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Text style={[styles.positionOptionText, active && styles.positionOptionTextActive]}>{option.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : null}
-        </View>
-      </Card>
+                  return (
+                    <Pressable
+                      key={option.key}
+                      onPress={() => {
+                        onSelectPosition(option.key);
+                        setIsPositionOpen(false);
+                      }}
+                      style={({ pressed }) => [
+                        styles.positionOption,
+                        active && styles.positionOptionActive,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={[styles.positionOptionText, active && styles.positionOptionTextActive]}>{option.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
+          </View>
+        </Card>
+      </View>
 
-      <Card title="인식 설정" style={styles.compactCard}>
-        <Text style={styles.lead}>사용 중인 공 브랜드와 공 색상을 맞추면 분석과 추천 숙제가 더 자연스럽게 동작합니다.</Text>
-
+      <View style={styles.sectionBlock}>
+        <Text style={styles.sectionHeader}>인식 설정</Text>
+        <Card style={[styles.compactCard, styles.borderlessCard]}>
         <Text style={styles.sectionTitle}>농구공 브랜드</Text>
         <View style={styles.optionList}>
           {BALL_BRAND_OPTIONS.map((option) => {
@@ -226,7 +228,8 @@ export function SettingsScreen({
             </View>
           ))}
         </View>
-      </Card>
+        </Card>
+      </View>
 
       <Card title="숙제 테스트 조절" style={styles.card}>
         <Text style={styles.lead}>
@@ -335,6 +338,19 @@ const styles = StyleSheet.create({
   compactCard: {
     minHeight: 0,
   },
+  sectionBlock: {
+    gap: 10,
+  },
+  sectionHeader: {
+    color: colors.textSoft,
+    fontSize: 20,
+    fontWeight: '800',
+    paddingHorizontal: 18,
+  },
+  borderlessCard: {
+    borderWidth: 0,
+    borderColor: 'transparent',
+  },
   lead: {
     color: colors.textMuted,
     fontSize: 15,
@@ -356,7 +372,7 @@ const styles = StyleSheet.create({
   positionTrigger: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'space-between',
     borderRadius: 0,
     paddingHorizontal: 14,
     paddingVertical: 12,

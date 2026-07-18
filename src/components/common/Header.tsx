@@ -20,13 +20,11 @@ export function Header({
 }: HeaderProps) {
   const isLight = variant === 'light';
   const resolvedProfileLabel = profileLabel.trim().charAt(0) || '나';
+  const shouldShowActions = showBack || showProfile;
 
   return (
     <View style={styles.header}>
-      <View style={styles.headerTextWrap}>
-        <Text style={[styles.headerEyebrow, isLight && styles.headerEyebrowLight]}>Basketball training app</Text>
-        <Text style={[styles.headerTitle, isLight && styles.headerTitleLight]}>AI 농구 코치</Text>
-      </View>
+      {!shouldShowActions ? <View style={styles.placeholder} /> : null}
       <View style={styles.actionsRow}>
         {showBack ? (
           <Pressable
@@ -57,34 +55,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 8,
-    marginBottom: 16,
+    paddingTop: 4,
+    marginBottom: 8,
     gap: 12,
-  },
-  headerTextWrap: {
-    flex: 1,
   },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-  },
-  headerEyebrow: {
-    color: colors.textAccent,
-    fontSize: 11,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  headerEyebrowLight: {
-    color: '#8d7a68',
-  },
-  headerTitle: {
-    color: colors.text,
-    fontSize: 28,
-    fontWeight: '800',
-  },
-  headerTitleLight: {
-    color: '#1f1712',
   },
   backButton: {
     backgroundColor: colors.lightButton,
@@ -134,7 +112,7 @@ const styles = StyleSheet.create({
     color: '#241912',
   },
   placeholder: {
-    width: 44,
+    flex: 1,
   },
   pressed: {
     opacity: 0.9,

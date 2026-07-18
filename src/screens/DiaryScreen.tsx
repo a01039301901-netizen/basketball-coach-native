@@ -19,6 +19,7 @@ interface DiaryScreenProps {
   shotGraphData: ShotGraphDatum[];
   onChangeMonth: (delta: number) => void;
   onOpenDate: (dateKey: string) => void;
+  onGoBack: () => void;
   onToggleShotOutcome: (recordId: string) => void;
   onDeleteRecord: (recordId: string) => void;
 }
@@ -410,6 +411,7 @@ export function DiaryScreen({
   shotGraphData,
   onChangeMonth,
   onOpenDate,
+  onGoBack,
   onToggleShotOutcome,
   onDeleteRecord,
 }: DiaryScreenProps) {
@@ -456,18 +458,18 @@ export function DiaryScreen({
     const selectedCell = calendarCells.find((cell) => cell.type === 'day' && cell.dateKey === selectedDateKey);
 
     if (!selectedCell || selectedCell.type !== 'day') {
-      return { icon: '•', label: '미체크', isDefault: true };
+      return { status: 'default' as const };
     }
 
     if (selectedCell.variant === 'attended') {
-      return { icon: '✅', label: '출석', isDefault: false };
+      return { status: 'attended' as const };
     }
 
     if (selectedCell.variant === 'absent') {
-      return { icon: '❌', label: '결석', isDefault: false };
+      return { status: 'absent' as const };
     }
 
-    return { icon: '•', label: '미체크', isDefault: true };
+    return { status: 'default' as const };
   }, [calendarCells, selectedDateKey]);
   const filteredDateRecords = useMemo(() => {
     if (recordFilter === 'all') {
@@ -954,37 +956,35 @@ export function DiaryScreen({
   }
 
   return (
-    <Card title="기록일지" style={styles.diaryCard}>
+    <Card style={styles.diaryCard}>
+      <View style={styles.diaryTopBar}>
+        <Pressable onPress={onGoBack} style={({ pressed }) => [styles.diaryBackButton, pressed && styles.pressed]}>
+          <Text style={styles.diaryBackButtonText}>{'<'}</Text>
+        </Pressable>
+        <View pointerEvents="none" style={styles.diaryTopBarTitleWrap}>
+          <Text style={styles.diaryScreenTitle}>기록일지</Text>
+        </View>
+      </View>
       <View style={[styles.dateSelectorRow, isCompactMobile && styles.dateSelectorRowCompact]}>
-        <View
+        <Pressable
+          onPress={() => setShowCalendarModal(true)}
           style={[
-            styles.dateStatusBadge,
-            selectedDateAttendance.isDefault && styles.dateStatusBadgeDefault,
-            isCompactMobile && styles.dateStatusBadgeCompact,
+            styles.dateSelectorMain,
+            selectedDateAttendance.status === 'attended' && styles.dateSelectorMainAttended,
+            selectedDateAttendance.status === 'absent' && styles.dateSelectorMainAbsent,
+            isCompactMobile && styles.dateSelectorMainCompact,
           ]}
         >
-          <Text style={styles.dateStatusText}>
-            {selectedDateAttendance.icon} {selectedDateAttendance.label}
-          </Text>
-        </View>
-
-        {isCompactMobile ? (
-          <View style={styles.dateCalendarButtonWrap}>
-            <SmallButton title="달력" onPress={() => setShowCalendarModal(true)} variant="dark" />
+          <View style={styles.dateSelectorCenter}>
+            <Pressable onPress={() => moveSelectedDate(-1)} style={({ pressed }) => [styles.dateArrowButton, pressed && styles.pressed]}>
+              <DateArrowIcon direction="left" />
+            </Pressable>
+            <Text style={styles.dateSelectorText}>{selectedDateKey || formatDateKey(selectedDate)}</Text>
+            <Pressable onPress={() => moveSelectedDate(1)} style={({ pressed }) => [styles.dateArrowButton, pressed && styles.pressed]}>
+              <DateArrowIcon direction="right" />
+            </Pressable>
           </View>
-        ) : null}
-
-        <View style={[styles.dateSelectorMain, isCompactMobile && styles.dateSelectorMainCompact]}>
-          <Pressable onPress={() => moveSelectedDate(-1)} style={({ pressed }) => [styles.dateArrowButton, pressed && styles.pressed]}>
-            <DateArrowIcon direction="left" />
-          </Pressable>
-          <Text style={styles.dateSelectorText}>{selectedDateKey || formatDateKey(selectedDate)}</Text>
-          <Pressable onPress={() => moveSelectedDate(1)} style={({ pressed }) => [styles.dateArrowButton, pressed && styles.pressed]}>
-            <DateArrowIcon direction="right" />
-          </Pressable>
-        </View>
-
-        {!isCompactMobile ? <SmallButton title="달력" onPress={() => setShowCalendarModal(true)} variant="dark" /> : null}
+        </Pressable>
       </View>
 
       <View style={styles.recordsSection}>
@@ -995,21 +995,20 @@ export function DiaryScreen({
         <View style={[styles.contentRow, isWide && styles.contentRowWide]}>
           <View style={[styles.graphColumn, isWide && styles.graphColumnWide]}>
             <View style={styles.skillInsightCard}>
-              <Text style={styles.skillInsightTitle}>실력 해석</Text>
               {!selectedDateKey ? (
                 <Text style={styles.skillInsightText}>날짜를 선택하면 최근 평균과 비교한 실력 해석을 볼 수 있습니다.</Text>
               ) : (
                 <>
-                  <Text style={styles.skillInsightText}>
-                    {!diarySkillInsight.isPracticeThresholdMet
-                      ? `이 날짜는 드리블 ${selectedDateDribbleCount}회, 슛 ${diarySkillInsight.selectedShotAttempts}회로 비교 기준인 드리블 ${diarySkillInsight.practiceThresholds.dribbleCount}회와 슛 ${diarySkillInsight.practiceThresholds.shootAttemptCount}회를 아직 채우지 못했습니다.`
-                      : diarySkillInsight.shotTrend === 'insufficient_history'
+                  {diarySkillInsight.isPracticeThresholdMet ? (
+                    <Text style={styles.skillInsightText}>
+                      {diarySkillInsight.shotTrend === 'insufficient_history'
                         ? '연습 기준은 충족했지만 비교할 이전 기준 기록이 더 필요합니다.'
                         : `슛 성공률이 ${getShotTrendLabel(
                             diarySkillInsight.shotTrend,
                             diarySkillInsight.shotTrendDelta
                           )} 상태입니다.`}
-                  </Text>
+                    </Text>
+                  ) : null}
 
                   <View style={styles.skillInsightStats}>
                     <View style={[styles.skillInsightStatCard, styles.skillInsightShotCard]}>
@@ -1440,6 +1439,48 @@ const styles = StyleSheet.create({
     padding: 0,
     overflow: 'visible',
   },
+  diaryTopBar: {
+    position: 'relative',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    minHeight: 44,
+    marginTop: 8,
+    marginBottom: 14,
+  },
+  diaryTopBarTitleWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 64,
+  },
+  diaryBackButton: {
+    minWidth: 48,
+    minHeight: 44,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.lightButton,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  diaryBackButtonText: {
+    color: colors.lightButtonText,
+    fontSize: 24,
+    fontWeight: '900',
+    lineHeight: 24,
+  },
+  diaryScreenTitle: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginTop: 0,
+    marginBottom: 0,
+  },
   dateSelectorRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1455,17 +1496,35 @@ const styles = StyleSheet.create({
   dateSelectorMain: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    width: 320,
-    maxWidth: '100%',
+    justifyContent: 'space-between',
+    gap: 8,
+    width: '100%',
+    maxWidth: 560,
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: colors.surfaceStrong,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  dateSelectorMainAttended: {
+    backgroundColor: colors.green,
+    borderColor: 'rgba(111,191,129,0.55)',
+  },
+  dateSelectorMainAbsent: {
+    backgroundColor: colors.red,
+    borderColor: 'rgba(225,121,130,0.5)',
   },
   dateSelectorMainCompact: {
     width: '100%',
+  },
+  dateSelectorCenter: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    minWidth: 0,
   },
   dateArrowButton: {
     width: 38,
@@ -1490,26 +1549,6 @@ const styles = StyleSheet.create({
   dateArrowIconRight: {
     transform: [{ rotate: '-135deg' }],
   },
-  dateStatusBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: 'rgba(208,145,85,0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(208,145,85,0.28)',
-  },
-  dateStatusBadgeCompact: {
-    alignSelf: 'flex-start',
-  },
-  dateStatusBadgeDefault: {
-    backgroundColor: colors.surfaceStrong,
-    borderColor: colors.border,
-  },
-  dateStatusText: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '900',
-  },
   dateSelectorText: {
     color: colors.text,
     fontSize: 20,
@@ -1517,9 +1556,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     minWidth: 0,
     flexShrink: 1,
-  },
-  dateCalendarButtonWrap: {
-    alignSelf: 'flex-end',
   },
   calendarTop: {
     flexDirection: 'row',
@@ -1671,11 +1707,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     gap: 12,
-  },
-  skillInsightTitle: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '900',
   },
   skillInsightText: {
     color: colors.textMuted,

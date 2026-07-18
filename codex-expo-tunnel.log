@@ -11,3 +11,213 @@ Android .\index.js ░░░░░░░░░░░░░░░░  1.0% (1/1)
 Android .\index.js ▓▓▓▓▓░░░░░░░░░░░ 35.0% (220/372)
 Android .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 87.0% (623/668)
 Android Bundled 14451ms index.js (771 modules)
+ WARN  [expo-av]: Expo AV has been deprecated and will be removed in SDK 54. Use the `expo-audio` and `expo-video` packages to replace the required functionality.
+ WARN  🚨 React Native's New Architecture is always enabled in Expo Go, but it is explicitly disabled in your project's app config. This may lead to unexpected behavior when creating a production or development build. Remove "newArchEnabled": false from your app.json.
+Learn more: https://docs.expo.dev/guides/new-architecture/
+ WARN  SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/th3rdwave/react-native-safe-area-context
+Android Bundled 516ms node_modules\expo-navigation-bar\src\index.ts (590 modules)
+Android node_modules\expo-navigation-bar\src\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 21ms node_modules\expo-navigation-bar\src\index.ts (1 module)
+Android .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 35ms index.js (1 module)
+Android node_modules\expo-navigation-bar\src\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 21ms node_modules\expo-navigation-bar\src\index.ts (1 module)
+ WARN  [expo-av]: Expo AV has been deprecated and will be removed in SDK 54. Use the `expo-audio` and `expo-video` packages to replace the required functionality.
+ WARN  🚨 React Native's New Architecture is always enabled in Expo Go, but it is explicitly disabled in your project's app config. This may lead to unexpected behavior when creating a production or development build. Remove "newArchEnabled": false from your app.json.
+Learn more: https://docs.expo.dev/guides/new-architecture/
+ WARN  SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/th3rdwave/react-native-safe-area-context
+Android node_modules\expo-navigation-bar\src\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 3ms node_modules\expo-navigation-bar\src\index.ts (1 module)
+Android .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 127ms index.js (1 module)
+Android node_modules\expo-navigation-bar\src\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 30ms node_modules\expo-navigation-bar\src\index.ts (1 module)
+ WARN  [expo-av]: Expo AV has been deprecated and will be removed in SDK 54. Use the `expo-audio` and `expo-video` packages to replace the required functionality.
+ WARN  🚨 React Native's New Architecture is always enabled in Expo Go, but it is explicitly disabled in your project's app config. This may lead to unexpected behavior when creating a production or development build. Remove "newArchEnabled": false from your app.json.
+Learn more: https://docs.expo.dev/guides/new-architecture/
+ WARN  SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/th3rdwave/react-native-safe-area-context
+Android Bundled 2ms node_modules\expo-navigation-bar\src\index.ts (1 module)
+Android .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 63ms index.js (1 module)
+Android node_modules\expo-navigation-bar\src\index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundled 49ms node_modules\expo-navigation-bar\src\index.ts (1 module)
+ WARN  [expo-av]: Expo AV has been deprecated and will be removed in SDK 54. Use the `expo-audio` and `expo-video` packages to replace the required functionality.
+ WARN  🚨 React Native's New Architecture is always enabled in Expo Go, but it is explicitly disabled in your project's app config. This may lead to unexpected behavior when creating a production or development build. Remove "newArchEnabled": false from your app.json.
+Learn more: https://docs.expo.dev/guides/new-architecture/
+ WARN  SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/th3rdwave/react-native-safe-area-context
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+ ERROR  [Error: UnableToResolveError Unable to resolve module expo from C:\basketball-coach\basketball-coach-native\index.js: expo could not be found within the project or in these directories:
+  node_modules
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m]
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+ ERROR  [Error: UnableToResolveError Unable to resolve module expo from C:\basketball-coach\basketball-coach-native\index.js: expo could not be found within the project or in these directories:
+  node_modules
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m]
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+ ERROR  [Error: UnableToResolveError Unable to resolve module expo from C:\basketball-coach\basketball-coach-native\index.js: expo could not be found within the project or in these directories:
+  node_modules
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m]
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+ ERROR  [Error: UnableToResolveError Unable to resolve module expo from C:\basketball-coach\basketball-coach-native\index.js: expo could not be found within the project or in these directories:
+  node_modules
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m]
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+ ERROR  [Error: UnableToResolveError Unable to resolve module expo from C:\basketball-coach\basketball-coach-native\index.js: expo could not be found within the project or in these directories:
+  node_modules
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m]
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+Android .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundling failed 4436ms index.js (1 module)
+Android .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+Android .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android Bundling failed 58417ms index.js (1 module)
+Android .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+

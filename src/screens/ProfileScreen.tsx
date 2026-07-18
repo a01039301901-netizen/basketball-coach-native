@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
 import { colors } from '../theme/colors';
-import type { AccountGender, AuthUser } from '../types/app';
+import type { AuthUser } from '../types/app';
 
 interface ProfileActionResult {
   success: boolean;
@@ -14,9 +14,6 @@ interface ProfileScreenProps {
   currentUser: AuthUser;
   onUpdateProfile: (values: {
     nickname: string;
-    name: string;
-    age: string;
-    gender: AccountGender;
   }) => Promise<ProfileActionResult>;
   onChangePassword: (values: {
     currentPassword: string;
@@ -31,11 +28,6 @@ interface StatusMessage {
   text: string;
 }
 
-const GENDER_OPTIONS: Array<{ key: AccountGender; label: string }> = [
-  { key: 'male', label: '남성' },
-  { key: 'female', label: '여성' },
-];
-
 function EyeIcon({ visible }: { visible: boolean }) {
   return (
     <View style={styles.eyeIconWrap}>
@@ -47,11 +39,12 @@ function EyeIcon({ visible }: { visible: boolean }) {
   );
 }
 
+function ResetIcon() {
+  return <Text style={styles.resetIconGlyph}>↺</Text>;
+}
+
 export function ProfileScreen({ currentUser, onUpdateProfile, onChangePassword, onLogout }: ProfileScreenProps) {
   const [nickname, setNickname] = useState(currentUser.nickname);
-  const [name, setName] = useState(currentUser.name);
-  const [age, setAge] = useState(String(currentUser.age));
-  const [gender, setGender] = useState<AccountGender>(currentUser.gender);
   const [currentPassword, setCurrentPassword] = useState('');
   const [nextPassword, setNextPassword] = useState('');
   const [nextPasswordConfirm, setNextPasswordConfirm] = useState('');
@@ -65,9 +58,6 @@ export function ProfileScreen({ currentUser, onUpdateProfile, onChangePassword, 
 
   useEffect(() => {
     setNickname(currentUser.nickname);
-    setName(currentUser.name);
-    setAge(String(currentUser.age));
-    setGender(currentUser.gender);
   }, [currentUser]);
 
   async function handleSaveProfile() {
@@ -78,9 +68,6 @@ export function ProfileScreen({ currentUser, onUpdateProfile, onChangePassword, 
     setIsSavingProfile(true);
     const result = await onUpdateProfile({
       nickname,
-      name,
-      age,
-      gender,
     });
     setProfileStatus({
       tone: result.success ? 'success' : 'error',
@@ -119,185 +106,148 @@ export function ProfileScreen({ currentUser, onUpdateProfile, onChangePassword, 
 
   function handleResetProfileForm() {
     setNickname(currentUser.nickname);
-    setName(currentUser.name);
-    setAge(String(currentUser.age));
-    setGender(currentUser.gender);
     setProfileStatus(null);
   }
 
   return (
     <View style={styles.contentGap}>
-      <Card title="사용자 정보" style={styles.card}>
-        <Text style={styles.lead}>프로필에서 닉네임, 이름, 나이, 성별을 수정할 수 있습니다.</Text>
+      <View style={styles.sectionBlock}>
+        <Text style={styles.sectionHeader}>사용자 정보</Text>
+        <Card style={styles.card}>
+          <View style={styles.form}>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>닉네임</Text>
+              <View style={styles.inlineInputRow}>
+                <TextInput
+                  value={nickname}
+                  onChangeText={setNickname}
+                  placeholder="닉네임을 입력해 주세요"
+                  placeholderTextColor="rgba(255,255,255,0.45)"
+                  style={[styles.input, styles.inlineInput]}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Pressable
+                  accessibilityLabel="닉네임 입력 되돌리기"
+                  onPress={handleResetProfileForm}
+                  disabled={isSavingProfile}
+                  style={({ pressed }) => [styles.resetIconButton, isSavingProfile && styles.controlDisabled, pressed && styles.pressed]}
+                >
+                  <ResetIcon />
+                </Pressable>
+              </View>
+            </View>
+          </View>
 
-        <View style={styles.form}>
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>닉네임</Text>
-            <TextInput
-              value={nickname}
-              onChangeText={setNickname}
-              placeholder="닉네임을 입력해 주세요"
-              placeholderTextColor="rgba(255,255,255,0.45)"
-              style={styles.input}
-              autoCapitalize="none"
-              autoCorrect={false}
+          <View style={styles.actionRow}>
+            <SmallButton
+              title={isSavingProfile ? '저장 중...' : '정보 저장'}
+              onPress={() => void handleSaveProfile()}
+              disabled={isSavingProfile}
             />
           </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>이름</Text>
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder="이름을 입력해 주세요"
-              placeholderTextColor="rgba(255,255,255,0.45)"
-              style={styles.input}
-              autoCapitalize="words"
+          {profileStatus ? (
+            <Text style={[styles.statusText, profileStatus.tone === 'success' ? styles.statusSuccess : styles.statusError]}>
+              {profileStatus.text}
+            </Text>
+          ) : null}
+        </Card>
+      </View>
+
+      <View style={styles.sectionBlock}>
+        <Text style={styles.sectionHeader}>비밀번호 변경</Text>
+        <Card style={styles.card}>
+          <View style={styles.form}>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>현재 비밀번호</Text>
+              <View style={styles.passwordRow}>
+                <TextInput
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  placeholder="현재 비밀번호를 입력해 주세요"
+                  placeholderTextColor="rgba(255,255,255,0.45)"
+                  style={[styles.input, styles.passwordInput]}
+                  secureTextEntry={!isCurrentPasswordVisible}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Pressable
+                  accessibilityLabel={isCurrentPasswordVisible ? '현재 비밀번호 숨기기' : '현재 비밀번호 보기'}
+                  onPress={() => setIsCurrentPasswordVisible((current) => !current)}
+                  style={({ pressed }) => [styles.passwordToggle, pressed && styles.pressed]}
+                >
+                  <EyeIcon visible={isCurrentPasswordVisible} />
+                </Pressable>
+              </View>
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>새 비밀번호</Text>
+              <View style={styles.passwordRow}>
+                <TextInput
+                  value={nextPassword}
+                  onChangeText={setNextPassword}
+                  placeholder="새 비밀번호를 입력해 주세요"
+                  placeholderTextColor="rgba(255,255,255,0.45)"
+                  style={[styles.input, styles.passwordInput]}
+                  secureTextEntry={!isNextPasswordVisible}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Pressable
+                  accessibilityLabel={isNextPasswordVisible ? '새 비밀번호 숨기기' : '새 비밀번호 보기'}
+                  onPress={() => setIsNextPasswordVisible((current) => !current)}
+                  style={({ pressed }) => [styles.passwordToggle, pressed && styles.pressed]}
+                >
+                  <EyeIcon visible={isNextPasswordVisible} />
+                </Pressable>
+              </View>
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>새 비밀번호 다시 입력</Text>
+              <View style={styles.passwordRow}>
+                <TextInput
+                  value={nextPasswordConfirm}
+                  onChangeText={setNextPasswordConfirm}
+                  placeholder="새 비밀번호를 다시 입력해 주세요"
+                  placeholderTextColor="rgba(255,255,255,0.45)"
+                  style={[styles.input, styles.passwordInput]}
+                  secureTextEntry={!isConfirmPasswordVisible}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Pressable
+                  accessibilityLabel={isConfirmPasswordVisible ? '비밀번호 확인 숨기기' : '비밀번호 확인 보기'}
+                  onPress={() => setIsConfirmPasswordVisible((current) => !current)}
+                  style={({ pressed }) => [styles.passwordToggle, pressed && styles.pressed]}
+                >
+                  <EyeIcon visible={isConfirmPasswordVisible} />
+                </Pressable>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.actionRow}>
+            <SmallButton
+              title={isChangingPassword ? '변경 중...' : '비밀번호 변경'}
+              onPress={() => void handleChangePassword()}
+              disabled={isChangingPassword}
             />
           </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>나이</Text>
-            <TextInput
-              value={age}
-              onChangeText={setAge}
-              placeholder="나이를 입력해 주세요"
-              placeholderTextColor="rgba(255,255,255,0.45)"
-              style={styles.input}
-              keyboardType="number-pad"
-            />
-          </View>
+          {passwordStatus ? (
+            <Text style={[styles.statusText, passwordStatus.tone === 'success' ? styles.statusSuccess : styles.statusError]}>
+              {passwordStatus.text}
+            </Text>
+          ) : null}
+        </Card>
+      </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>성별</Text>
-            <View style={styles.genderRow}>
-              {GENDER_OPTIONS.map((option) => {
-                const active = gender === option.key;
-
-                return (
-                  <Pressable
-                    key={option.key}
-                    onPress={() => setGender(option.key)}
-                    style={({ pressed }) => [styles.genderButton, active && styles.genderButtonActive, pressed && styles.pressed]}
-                  >
-                    <Text style={[styles.genderButtonText, active && styles.genderButtonTextActive]}>{option.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.actionRow}>
-          <SmallButton
-            title={isSavingProfile ? '저장 중...' : '정보 저장'}
-            onPress={() => void handleSaveProfile()}
-            disabled={isSavingProfile}
-          />
-          <SmallButton title="입력 되돌리기" onPress={handleResetProfileForm} variant="dark" disabled={isSavingProfile} />
-        </View>
-
-        {profileStatus ? (
-          <Text style={[styles.statusText, profileStatus.tone === 'success' ? styles.statusSuccess : styles.statusError]}>
-            {profileStatus.text}
-          </Text>
-        ) : null}
-      </Card>
-
-      <Card title="비밀번호 변경" style={styles.card}>
-        <Text style={styles.lead}>현재 비밀번호를 확인한 뒤 새 비밀번호를 두 번 입력해서 변경합니다.</Text>
-
-        <View style={styles.form}>
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>현재 비밀번호</Text>
-            <View style={styles.passwordRow}>
-              <TextInput
-                value={currentPassword}
-                onChangeText={setCurrentPassword}
-                placeholder="현재 비밀번호를 입력해 주세요"
-                placeholderTextColor="rgba(255,255,255,0.45)"
-                style={[styles.input, styles.passwordInput]}
-                secureTextEntry={!isCurrentPasswordVisible}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <Pressable
-                accessibilityLabel={isCurrentPasswordVisible ? '현재 비밀번호 숨기기' : '현재 비밀번호 보기'}
-                onPress={() => setIsCurrentPasswordVisible((current) => !current)}
-                style={({ pressed }) => [styles.passwordToggle, pressed && styles.pressed]}
-              >
-                <EyeIcon visible={isCurrentPasswordVisible} />
-              </Pressable>
-            </View>
-          </View>
-
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>새 비밀번호</Text>
-            <View style={styles.passwordRow}>
-              <TextInput
-                value={nextPassword}
-                onChangeText={setNextPassword}
-                placeholder="새 비밀번호를 입력해 주세요"
-                placeholderTextColor="rgba(255,255,255,0.45)"
-                style={[styles.input, styles.passwordInput]}
-                secureTextEntry={!isNextPasswordVisible}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <Pressable
-                accessibilityLabel={isNextPasswordVisible ? '새 비밀번호 숨기기' : '새 비밀번호 보기'}
-                onPress={() => setIsNextPasswordVisible((current) => !current)}
-                style={({ pressed }) => [styles.passwordToggle, pressed && styles.pressed]}
-              >
-                <EyeIcon visible={isNextPasswordVisible} />
-              </Pressable>
-            </View>
-          </View>
-
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>새 비밀번호 다시 입력</Text>
-            <View style={styles.passwordRow}>
-              <TextInput
-                value={nextPasswordConfirm}
-                onChangeText={setNextPasswordConfirm}
-                placeholder="새 비밀번호를 다시 입력해 주세요"
-                placeholderTextColor="rgba(255,255,255,0.45)"
-                style={[styles.input, styles.passwordInput]}
-                secureTextEntry={!isConfirmPasswordVisible}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <Pressable
-                accessibilityLabel={isConfirmPasswordVisible ? '비밀번호 확인 숨기기' : '비밀번호 확인 보기'}
-                onPress={() => setIsConfirmPasswordVisible((current) => !current)}
-                style={({ pressed }) => [styles.passwordToggle, pressed && styles.pressed]}
-              >
-                <EyeIcon visible={isConfirmPasswordVisible} />
-              </Pressable>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.actionRow}>
-          <SmallButton
-            title={isChangingPassword ? '변경 중...' : '비밀번호 변경'}
-            onPress={() => void handleChangePassword()}
-            disabled={isChangingPassword}
-          />
-        </View>
-
-        {passwordStatus ? (
-          <Text style={[styles.statusText, passwordStatus.tone === 'success' ? styles.statusSuccess : styles.statusError]}>
-            {passwordStatus.text}
-          </Text>
-        ) : null}
-      </Card>
-
-      <Card title="로그아웃" style={styles.card}>
-        <View style={styles.logoutActionRow}>
-          <SmallButton title="로그아웃" onPress={onLogout} variant="red" />
-        </View>
-      </Card>
+      <View style={styles.logoutButtonWrap}>
+        <SmallButton title="로그아웃" onPress={onLogout} variant="red" />
+      </View>
     </View>
   );
 }
@@ -305,6 +255,15 @@ export function ProfileScreen({ currentUser, onUpdateProfile, onChangePassword, 
 const styles = StyleSheet.create({
   contentGap: {
     gap: 16,
+  },
+  sectionBlock: {
+    gap: 10,
+  },
+  sectionHeader: {
+    color: colors.textSoft,
+    fontSize: 20,
+    fontWeight: '800',
+    paddingHorizontal: 18,
   },
   card: {
     minHeight: 0,
@@ -337,31 +296,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  genderRow: {
+  inlineInputRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
   },
-  genderButton: {
+  inlineInput: {
     flex: 1,
-    borderRadius: 0,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  genderButtonActive: {
-    backgroundColor: 'rgba(208,145,85,0.18)',
-    borderColor: 'rgba(208,145,85,0.32)',
-  },
-  genderButtonText: {
-    color: colors.textMuted,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  genderButtonTextActive: {
-    color: colors.text,
   },
   passwordRow: {
     flexDirection: 'row',
@@ -374,12 +315,28 @@ const styles = StyleSheet.create({
   passwordToggle: {
     width: 48,
     height: 48,
-    borderRadius: 0,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  resetIconButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  resetIconGlyph: {
+    color: colors.textSoft,
+    fontSize: 22,
+    fontWeight: '800',
+    lineHeight: 22,
   },
   eyeIconWrap: {
     width: 22,
@@ -423,6 +380,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 10,
   },
+  logoutButtonWrap: {
+    paddingHorizontal: 18,
+    alignItems: 'flex-start',
+  },
   statusText: {
     marginTop: 14,
     fontSize: 13,
@@ -434,6 +395,9 @@ const styles = StyleSheet.create({
   },
   statusError: {
     color: '#f0a0a8',
+  },
+  controlDisabled: {
+    opacity: 0.45,
   },
   pressed: {
     opacity: 0.9,

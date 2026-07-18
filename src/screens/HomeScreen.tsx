@@ -6,6 +6,8 @@ import { getDesktopMobileFrameWidth, shouldUseDesktopMobileLayout } from '../uti
 type HomeMenuArtworkType = 'lesson' | 'diary';
 const lessonPlayerSilhouette = require('../../assets/lesson-player-silhouette.png');
 const diaryCalendarArt = require('../../assets/diary-calendar-art.png');
+const lessonBallIcon = require('../../assets/lesson-basketball-icon.png');
+const diaryPencilIcon = require('../../assets/diary-pencil-icon.png');
 
 interface HomeScreenProps {
   homeworkToShow: HomeworkProgressItem[];
@@ -22,7 +24,7 @@ interface HomeMenuButtonProps {
   artworkType: HomeMenuArtworkType;
   label: string;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   onPress: () => void;
   isWide: boolean;
   isCompact: boolean;
@@ -64,6 +66,7 @@ function HomeMenuButton({
 }: HomeMenuButtonProps) {
   const hasArtwork = !isCompact;
   const isDiaryArtwork = !isCompact && artworkType === 'diary';
+  const hasSubtitle = Boolean(subtitle);
 
   return (
     <Pressable
@@ -80,8 +83,11 @@ function HomeMenuButton({
       <View
         style={[
           styles.mainButton,
+          !hasSubtitle && styles.mainButtonNoSubtitle,
           isWide && styles.mainButtonWide,
+          isWide && !hasSubtitle && styles.mainButtonWideNoSubtitle,
           isCompact && styles.mainButtonCompact,
+          isCompact && !hasSubtitle && styles.mainButtonCompactNoSubtitle,
           hasArtwork && styles.mainButtonWithArtwork,
           isDiaryArtwork && styles.mainButtonDiary,
           isBorderless && styles.mainButtonBorderless,
@@ -98,12 +104,19 @@ function HomeMenuButton({
           <View
             style={[
               styles.mainButtonTop,
+              !hasSubtitle && styles.mainButtonTopNoSubtitle,
               isDiaryArtwork && styles.mainButtonTopDiary,
+              isDiaryArtwork && !hasSubtitle && styles.mainButtonTopDiaryNoSubtitle,
               isCompact && styles.mainButtonTopCompact,
+              isCompact && !hasSubtitle && styles.mainButtonTopCompactNoSubtitle,
             ]}
           >
             <View style={[styles.mainButtonIcon, isCompact && styles.mainButtonIconCompact, { backgroundColor: accentSoft }]}>
-              <View style={[styles.mainButtonIconDot, { backgroundColor: accentColor }]} />
+              {artworkType === 'lesson' ? (
+                <Image source={lessonBallIcon} resizeMode="contain" style={[styles.lessonBallIcon, isCompact && styles.lessonBallIconCompact]} />
+              ) : (
+                <Image source={diaryPencilIcon} resizeMode="contain" style={[styles.diaryPencilIcon, isCompact && styles.diaryPencilIconCompact]} />
+              )}
             </View>
             <Text style={[styles.mainButtonLabel, isCompact && styles.mainButtonLabelCompact]}>{label}</Text>
           </View>
@@ -111,23 +124,27 @@ function HomeMenuButton({
           <Text
             style={[
               styles.mainButtonTitle,
+              hasSubtitle && styles.mainButtonTitleWithSubtitle,
               hasArtwork && styles.mainButtonTitleWithArtwork,
               isDiaryArtwork && styles.mainButtonTitleDiary,
               isCompact && styles.mainButtonTitleCompact,
+              isCompact && hasSubtitle && styles.mainButtonTitleCompactWithSubtitle,
             ]}
           >
             {title}
           </Text>
-          <Text
-            style={[
-              styles.mainButtonSubtitle,
-              hasArtwork && styles.mainButtonSubtitleWithArtwork,
-              isDiaryArtwork && styles.mainButtonSubtitleDiary,
-              isCompact && styles.mainButtonSubtitleCompact,
-            ]}
-          >
-            {subtitle}
-          </Text>
+          {hasSubtitle ? (
+            <Text
+              style={[
+                styles.mainButtonSubtitle,
+                hasArtwork && styles.mainButtonSubtitleWithArtwork,
+                isDiaryArtwork && styles.mainButtonSubtitleDiary,
+                isCompact && styles.mainButtonSubtitleCompact,
+              ]}
+            >
+              {subtitle}
+            </Text>
+          ) : null}
         </View>
       </View>
     </Pressable>
@@ -154,7 +171,7 @@ export function HomeScreen({
       artworkType: 'lesson' as const,
       label: '실시간 분석',
       title: 'AI에게 레슨 받기',
-      subtitle: '카메라로 동작을 분석하고 실시간 코칭을 받을 수 있어요.',
+      subtitle: undefined,
       onPress: onOpenLesson,
       isBorderless: true,
     },
@@ -165,7 +182,7 @@ export function HomeScreen({
       artworkType: 'diary' as const,
       label: '기록 확인',
       title: '기록일지',
-      subtitle: '출석, 연습 기록, 다양한 레슨 영상을 날짜별로 확인할 수 있어요.',
+      subtitle: undefined,
       onPress: onOpenDiary,
     },
   ];
@@ -245,10 +262,6 @@ export function HomeScreen({
           </View>
         ) : (
           <View style={styles.homeworkHiddenCard}>
-            <Text style={styles.homeworkHiddenTitle}>오늘의 숙제 확인하기</Text>
-            <Text style={styles.homeworkHiddenText}>
-              버튼을 누르면 오늘 해야 할 숙제 내용과 진행도가 보이고, 그 뒤에는 계속 표시됩니다.
-            </Text>
             <Pressable onPress={onRevealHomework} style={({ pressed }) => [styles.homeworkRevealButton, pressed && styles.pressed]}>
               <Text style={styles.homeworkRevealButtonText}>오늘의 숙제 확인하기</Text>
             </Pressable>
@@ -267,14 +280,9 @@ export function HomeScreen({
         >
           <View style={styles.rulesCard}>
             <Text style={styles.rulesTitle}>농구 규칙 가이드</Text>
-            <Text style={styles.rulesText}>기본 규칙과 경기 흐름을 빠르게 확인하고 레슨 전에 필요한 내용을 다시 볼 수 있어요.</Text>
+            <Text style={styles.rulesText}>기본 규칙을 빠르게 확인할 수 있어요.</Text>
           </View>
         </Pressable>
-
-        <View style={[styles.tipCard, isWide && styles.secondaryCardCompactWide]}>
-          <Text style={styles.tipTitle}>연습 팁</Text>
-          <Text style={styles.tipText}>기본 숙제를 끝내면 다음 숙제가 열리고, 좌우 차이가 크면 보정 숙제도 추가됩니다.</Text>
-        </View>
       </View>
     </View>
   );
@@ -315,7 +323,7 @@ const styles = StyleSheet.create({
   },
   mainButtonWrap: {
     width: 232,
-    borderRadius: 0,
+    borderRadius: 24,
   },
   mainButtonWrapWide: {
     flex: 1,
@@ -332,13 +340,16 @@ const styles = StyleSheet.create({
   },
   mainButton: {
     minHeight: 178,
-    borderRadius: 0,
+    borderRadius: 24,
     padding: 18,
     backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
     position: 'relative',
+  },
+  mainButtonNoSubtitle: {
+    minHeight: 148,
   },
   mainButtonBorderless: {
     borderWidth: 0,
@@ -347,10 +358,16 @@ const styles = StyleSheet.create({
   mainButtonWide: {
     minHeight: 194,
   },
+  mainButtonWideNoSubtitle: {
+    minHeight: 160,
+  },
   mainButtonCompact: {
     minHeight: 120,
-    borderRadius: 0,
+    borderRadius: 22,
     padding: 14,
+  },
+  mainButtonCompactNoSubtitle: {
+    minHeight: 104,
   },
   mainButtonWithArtwork: {
     paddingRight: 22,
@@ -374,12 +391,21 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 20,
   },
+  mainButtonTopNoSubtitle: {
+    marginBottom: 10,
+  },
   mainButtonTopDiary: {
     marginBottom: 18,
+  },
+  mainButtonTopDiaryNoSubtitle: {
+    marginBottom: 10,
   },
   mainButtonTopCompact: {
     marginBottom: 8,
     gap: 8,
+  },
+  mainButtonTopCompactNoSubtitle: {
+    marginBottom: 4,
   },
   mainButtonIcon: {
     width: 44,
@@ -398,6 +424,22 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 999,
   },
+  lessonBallIcon: {
+    width: 22,
+    height: 22,
+  },
+  lessonBallIconCompact: {
+    width: 16,
+    height: 16,
+  },
+  diaryPencilIcon: {
+    width: 24,
+    height: 24,
+  },
+  diaryPencilIconCompact: {
+    width: 17,
+    height: 17,
+  },
   mainButtonLabel: {
     color: colors.textAccent,
     fontSize: 12,
@@ -410,10 +452,14 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 19,
     fontWeight: '800',
+  },
+  mainButtonTitleWithSubtitle: {
     marginBottom: 8,
   },
   mainButtonTitleCompact: {
     fontSize: 16,
+  },
+  mainButtonTitleCompactWithSubtitle: {
     marginBottom: 4,
   },
   mainButtonTitleWithArtwork: {
@@ -586,20 +632,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     alignItems: 'center',
   },
-  homeworkHiddenTitle: {
-    color: colors.text,
-    fontSize: 17,
-    fontWeight: '800',
-    marginBottom: 8,
-  },
-  homeworkHiddenText: {
-    color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
   homeworkRevealButton: {
-    marginTop: 14,
     borderRadius: 0,
     backgroundColor: colors.secondary,
     paddingHorizontal: 18,
@@ -627,11 +660,11 @@ const styles = StyleSheet.create({
   },
   rulesCard: {
     flex: 1,
-    minHeight: 118,
+    minHeight: 88,
     borderRadius: 20,
     backgroundColor: colors.surface,
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderWidth: 0,
     borderColor: 'transparent',
   },
@@ -639,33 +672,12 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 15,
     fontWeight: '800',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   rulesText: {
     color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  tipCard: {
-    flex: 1,
-    minHeight: 118,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderWidth: 0,
-    borderColor: 'transparent',
-  },
-  tipTitle: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  tipText: {
-    color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 17,
   },
   pressed: {
     opacity: 0.92,

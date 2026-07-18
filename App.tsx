@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import { StatusBar } from 'expo-status-bar';
-import { Animated, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { setStatusBarBackgroundColor, setStatusBarHidden, StatusBar as ExpoStatusBar, setStatusBarStyle, setStatusBarTranslucent } from 'expo-status-bar';
+import { Animated, AppState, Platform, Pressable, SafeAreaView, ScrollView, StatusBar as NativeStatusBar, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SmallButton } from './src/components/common/Buttons';
 import { FireworkBurst } from './src/components/common/FireworkBurst';
 import { Header } from './src/components/common/Header';
@@ -18,44 +18,58 @@ import { colors } from './src/theme/colors';
 import { getDesktopMobileFrameWidth, shouldUseDesktopMobileLayout } from './src/utils/layout';
 
 type SideDrawerType = 'settings' | 'profile';
+type NavigationBarModule = typeof import('expo-navigation-bar');
 const APP_TOP_OFFSET = 12;
+const APP_SHELL_HORIZONTAL_PADDING = 16;
 const HOME_UTILITY_BAR_HEIGHT = 84;
-const HOME_UTILITY_BAR_HIDE_DISTANCE = 120;
+const HOME_UTILITY_ICON_HIT_SLOP = { top: 14, right: 14, bottom: 14, left: 14 } as const;
+
+function ProfileSilhouetteIcon({ active = false }: { active?: boolean }) {
+  return (
+    <View style={styles.profileIcon}>
+      <View style={[styles.profileIconHead, active && styles.profileIconPartActive]} />
+      <View style={[styles.profileIconBody, active && styles.profileIconPartActive]} />
+    </View>
+  );
+}
 
 export default function App() {
   const app = useBasketballCoachApp();
   const { width } = useWindowDimensions();
+  const RootContainer = Platform.OS === 'web' ? SafeAreaView : View;
   const isDesktopMobileMode = shouldUseDesktopMobileLayout(width);
   const appFrameWidth = isDesktopMobileMode ? getDesktopMobileFrameWidth(width) : width;
   const showBack = Boolean(app.currentUser && app.screen !== 'home');
   const isLessonScreen = app.isReady && app.currentUser && app.screen === 'lesson';
   const isHomeScreen = app.isReady && app.currentUser && app.screen === 'home';
+  const isDiaryScreen = app.isReady && app.currentUser && app.screen === 'diary';
   const shouldShowHomeUtilityBar = Boolean(app.isReady && app.currentUser && app.screen === 'home');
-  const shouldShowHeader = !isLessonScreen && !isHomeScreen;
+  const shouldShowHeader = Boolean(app.currentUser) && !isLessonScreen && !isHomeScreen && !isDiaryScreen;
+  const shouldShowHeaderProfile =
+    Boolean(app.currentUser) && app.screen !== 'diary' && app.screen !== 'rules';
   const headerScrollY = useRef(new Animated.Value(0)).current;
   const sideDrawerProgress = useRef(new Animated.Value(0)).current;
+  const navigationBarModuleRef = useRef<NavigationBarModule | null>(null);
+  const navigationBarHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const statusBarHideTimeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [headerMeasuredHeight, setHeaderMeasuredHeight] = useState(0);
   const [activeDrawer, setActiveDrawer] = useState<SideDrawerType | null>(null);
   const [renderedDrawer, setRenderedDrawer] = useState<SideDrawerType>('settings');
   const [shouldRenderDrawer, setShouldRenderDrawer] = useState(false);
   const effectiveHeaderHeight = Math.max(headerMeasuredHeight, 96);
-  const sideDrawerWidth =
-    isDesktopMobileMode
-      ? Math.min(Math.max(appFrameWidth - 12, 300), appFrameWidth)
-      : width >= 960
-        ? Math.min(width * 0.48, 460)
-        : Math.min(Math.max(width * 0.82, 280), width - 16);
   const isDrawerVisible = activeDrawer !== null;
   const shouldShowDrawer = shouldRenderDrawer && Boolean(app.currentUser) && !isLessonScreen;
   const visibleDrawer = activeDrawer ?? renderedDrawer;
+  const isSettingsDrawerVisible = visibleDrawer === 'settings';
+  const currentDrawerWidth =
+    isDesktopMobileMode
+      ? appFrameWidth + APP_SHELL_HORIZONTAL_PADDING * 2
+      : width + APP_SHELL_HORIZONTAL_PADDING * 2;
+  const activeHomeUtilityItem: SideDrawerType | 'home' = shouldShowDrawer ? visibleDrawer : 'home';
   const sideDrawerTitle = visibleDrawer === 'profile' ? '프로필' : '설정';
   const headerScrollClamp = useMemo(
     () => Animated.diffClamp(headerScrollY, 0, effectiveHeaderHeight),
     [effectiveHeaderHeight, headerScrollY]
-  );
-  const homeUtilityBarScrollClamp = useMemo(
-    () => Animated.diffClamp(headerScrollY, 0, HOME_UTILITY_BAR_HIDE_DISTANCE),
-    [headerScrollY]
   );
   const handleHeaderScroll = useMemo(
     () =>
@@ -77,33 +91,138 @@ export default function App() {
     void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
   }, []);
 
-  useEffect(() => {
+  const toggleDrawer = useCallback((drawer: SideDrawerType) => {
+    setActiveDrawer((currentDrawer) => (currentDrawer === drawer ? null : drawer));
+  }, []);
+
+  const clearStatusBarHideTimeouts = useCallback(() => {
+    statusBarHideTimeoutRefs.current.forEach((timeoutId) => clearTimeout(timeoutId));
+    statusBarHideTimeoutRefs.current = [];
+  }, []);
+
+  const scheduleStatusBarHide = useCallback(() => {
+    if (Platform.OS === 'web') {
+      return;
+    }
+
+    const applyStatusBarHidden = () => {
+      setStatusBarStyle('light');
+      setStatusBarHidden(true, 'fade');
+      NativeStatusBar.setBarStyle('light-content', true);
+      NativeStatusBar.setHidden(true, 'fade');
+
+      if (Platform.OS === 'android') {
+        setStatusBarBackgroundColor('transparent', true);
+        setStatusBarTranslucent(true);
+        NativeStatusBar.setBackgroundColor('transparent', true);
+        NativeStatusBar.setTranslucent(true);
+      }
+    };
+
+    clearStatusBarHideTimeouts();
+    applyStatusBarHidden();
+    statusBarHideTimeoutRefs.current = [160, 420, 900].map((delay) => setTimeout(applyStatusBarHidden, delay));
+  }, [clearStatusBarHideTimeouts]);
+
+  const ensureAndroidNavigationBarHidden = useCallback(async () => {
     if (Platform.OS !== 'android') {
       return;
     }
 
-    let isCancelled = false;
+    try {
+      const NavigationBar = navigationBarModuleRef.current ?? (await import('expo-navigation-bar'));
+      navigationBarModuleRef.current = NavigationBar;
+      await NavigationBar.setVisibilityAsync('hidden');
+    } catch (error) {
+      console.warn('Failed to hide Android navigation bar.', error);
+    }
+  }, []);
 
-    const hideNavigationBar = async () => {
+  const scheduleAndroidNavigationBarHide = useCallback(() => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+
+    void ensureAndroidNavigationBarHidden();
+
+    if (navigationBarHideTimeoutRef.current) {
+      clearTimeout(navigationBarHideTimeoutRef.current);
+    }
+
+    navigationBarHideTimeoutRef.current = setTimeout(() => {
+      void ensureAndroidNavigationBarHidden();
+    }, 180);
+  }, [ensureAndroidNavigationBarHidden]);
+
+  useLayoutEffect(() => {
+    if (Platform.OS === 'web') {
+      return;
+    }
+
+    scheduleStatusBarHide();
+
+    if (Platform.OS === 'android') {
+      scheduleAndroidNavigationBarHide();
+    }
+
+    return () => {
+      clearStatusBarHideTimeouts();
+
+      if (navigationBarHideTimeoutRef.current) {
+        clearTimeout(navigationBarHideTimeoutRef.current);
+        navigationBarHideTimeoutRef.current = null;
+      }
+    };
+  }, [app.currentUser, app.screen, clearStatusBarHideTimeouts, scheduleAndroidNavigationBarHide, scheduleStatusBarHide]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      return;
+    }
+
+    let isMounted = true;
+    let visibilitySubscription: { remove: () => void } | null = null;
+
+    const setupNavigationBarPersistence = async () => {
       try {
-        const NavigationBar = await import('expo-navigation-bar');
+        const NavigationBar = navigationBarModuleRef.current ?? (await import('expo-navigation-bar'));
 
-        if (isCancelled) {
+        if (!isMounted) {
           return;
         }
 
-        await NavigationBar.setVisibilityAsync('hidden');
+        navigationBarModuleRef.current = NavigationBar;
+        visibilitySubscription = NavigationBar.addVisibilityListener(({ visibility }) => {
+          if (visibility === 'visible') {
+            scheduleStatusBarHide();
+            scheduleAndroidNavigationBarHide();
+          }
+        });
       } catch (error) {
-        console.warn('Failed to hide Android navigation bar.', error);
+        console.warn('Failed to observe Android navigation bar visibility.', error);
       }
     };
 
-    void hideNavigationBar();
+    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        scheduleStatusBarHide();
+
+        if (Platform.OS === 'android') {
+          scheduleAndroidNavigationBarHide();
+        }
+      }
+    });
+
+    if (Platform.OS === 'android') {
+      void setupNavigationBarPersistence();
+    }
 
     return () => {
-      isCancelled = true;
+      isMounted = false;
+      visibilitySubscription?.remove();
+      appStateSubscription.remove();
     };
-  }, [app.currentUser, app.screen]);
+  }, [scheduleAndroidNavigationBarHide, scheduleStatusBarHide]);
 
   useEffect(() => {
     setActiveDrawer(null);
@@ -160,19 +279,9 @@ export default function App() {
     outputRange: [0, -(effectiveHeaderHeight + APP_TOP_OFFSET)],
     extrapolate: 'clamp',
   });
-  const homeUtilityBarTranslateY = homeUtilityBarScrollClamp.interpolate({
-    inputRange: [0, HOME_UTILITY_BAR_HIDE_DISTANCE],
-    outputRange: [0, HOME_UTILITY_BAR_HIDE_DISTANCE],
-    extrapolate: 'clamp',
-  });
-  const homeUtilityBarOpacity = homeUtilityBarScrollClamp.interpolate({
-    inputRange: [0, HOME_UTILITY_BAR_HIDE_DISTANCE],
-    outputRange: [1, 0.72],
-    extrapolate: 'clamp',
-  });
   const sideDrawerTranslateX = sideDrawerProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [sideDrawerWidth + 24, 0],
+    outputRange: [isSettingsDrawerVisible ? -(currentDrawerWidth + 24) : currentDrawerWidth + 24, 0],
   });
   const sideDrawerBackdropOpacity = sideDrawerProgress.interpolate({
     inputRange: [0, 1],
@@ -180,8 +289,8 @@ export default function App() {
   });
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar hidden style="light" />
+    <RootContainer style={styles.safeArea}>
+      <ExpoStatusBar hidden translucent backgroundColor="transparent" style="light" hideTransitionAnimation="fade" />
       <View style={[styles.appViewport, isDesktopMobileMode && styles.appViewportDesktop]}>
       <View
         style={[
@@ -192,33 +301,55 @@ export default function App() {
       >
         <FireworkBurst visible={app.showFireworks} items={app.fireworks} />
         {shouldShowHeader ? (
-          <Animated.View
-            style={[
-              styles.headerAnimatedWrap,
-              {
-                opacity: animatedHeaderOpacity,
-                transform: [{ translateY: animatedHeaderTranslateY }],
-              },
-            ]}
-          >
-            <View
-              onLayout={(event) => {
-                const nextHeight = Math.round(event.nativeEvent.layout.height);
+          isDiaryScreen ? (
+            <View style={styles.headerAnimatedWrap}>
+              <View
+                onLayout={(event) => {
+                  const nextHeight = Math.round(event.nativeEvent.layout.height);
 
-                if (nextHeight > 0 && nextHeight !== headerMeasuredHeight) {
-                  setHeaderMeasuredHeight(nextHeight);
-                }
-              }}
-            >
-              <Header
-                showBack={showBack}
-                onBack={() => void app.navigateTo('home')}
-                showProfile={Boolean(app.currentUser)}
-                profileLabel={app.currentUser?.nickname}
-                onOpenProfile={() => setActiveDrawer('profile')}
-              />
+                  if (nextHeight > 0 && nextHeight !== headerMeasuredHeight) {
+                    setHeaderMeasuredHeight(nextHeight);
+                  }
+                }}
+              >
+                <Header
+                  showBack={showBack}
+                  onBack={() => void app.navigateTo('home')}
+                  showProfile={shouldShowHeaderProfile}
+                  profileLabel={app.currentUser?.nickname}
+                  onOpenProfile={() => toggleDrawer('profile')}
+                />
+              </View>
             </View>
-          </Animated.View>
+          ) : (
+            <Animated.View
+              style={[
+                styles.headerAnimatedWrap,
+                {
+                  opacity: animatedHeaderOpacity,
+                  transform: [{ translateY: animatedHeaderTranslateY }],
+                },
+              ]}
+            >
+              <View
+                onLayout={(event) => {
+                  const nextHeight = Math.round(event.nativeEvent.layout.height);
+
+                  if (nextHeight > 0 && nextHeight !== headerMeasuredHeight) {
+                    setHeaderMeasuredHeight(nextHeight);
+                  }
+                }}
+              >
+                <Header
+                  showBack={showBack}
+                  onBack={() => void app.navigateTo('home')}
+                  showProfile={shouldShowHeaderProfile}
+                  profileLabel={app.currentUser?.nickname}
+                  onOpenProfile={() => toggleDrawer('profile')}
+                />
+              </View>
+            </Animated.View>
+          )
         ) : null}
         {isLessonScreen ? (
           <View style={styles.lessonScreenWrap}>
@@ -259,11 +390,11 @@ export default function App() {
               styles.scrollContent,
               {
                 paddingTop: shouldShowHeader ? effectiveHeaderHeight : 0,
-                paddingBottom: shouldShowHomeUtilityBar ? 120 : 32,
+                paddingBottom: shouldShowHomeUtilityBar ? HOME_UTILITY_BAR_HEIGHT + 24 : 32,
               },
             ]}
             showsVerticalScrollIndicator={false}
-            onScroll={handleHeaderScroll}
+            onScroll={isDiaryScreen ? undefined : handleHeaderScroll}
             scrollEventThrottle={16}
           >
           {!app.isReady && (
@@ -321,6 +452,7 @@ export default function App() {
               shotGraphData={app.shotGraphData}
               onChangeMonth={app.changeMonth}
               onOpenDate={app.openDiaryDate}
+              onGoBack={() => void app.navigateTo('home')}
               onToggleShotOutcome={app.toggleLessonRecordShotOutcome}
               onDeleteRecord={(recordId) => void app.deleteLessonRecord(recordId)}
             />
@@ -344,43 +476,68 @@ export default function App() {
         )}
         {shouldShowHomeUtilityBar ? (
           <View pointerEvents="box-none" style={styles.homeUtilityBarOverlay}>
-            <Animated.View
-              style={[
-                styles.homeUtilityBar,
-                {
-                  opacity: homeUtilityBarOpacity,
-                  transform: [{ translateY: homeUtilityBarTranslateY }],
-                },
-              ]}
-            >
+            <View style={styles.homeUtilityBar}>
+              <Pressable
+                onPress={() => toggleDrawer('settings')}
+                hitSlop={HOME_UTILITY_ICON_HIT_SLOP}
+                style={({ pressed }) => [styles.homeUtilityAction, styles.homeUtilitySettingsButton, pressed && styles.pressed]}
+                accessibilityState={{ selected: activeHomeUtilityItem === 'settings' }}
+              >
+                <View style={styles.homeUtilityActionContent}>
+                  <Text style={[styles.homeUtilityIconText, activeHomeUtilityItem === 'settings' && styles.homeUtilityIconTextActive]}>⚙</Text>
+                  <View
+                    style={[
+                      styles.homeUtilityIndicator,
+                      activeHomeUtilityItem === 'settings' ? styles.homeUtilityIndicatorActive : styles.homeUtilityIndicatorInactive,
+                    ]}
+                  />
+                </View>
+              </Pressable>
+
               <Pressable
                 onPress={() => {
                   setActiveDrawer(null);
                   void app.navigateTo('home');
                 }}
+                hitSlop={HOME_UTILITY_ICON_HIT_SLOP}
                 style={({ pressed }) => [styles.homeUtilityAction, styles.homeUtilityHomeButton, pressed && styles.pressed]}
+                accessibilityState={{ selected: activeHomeUtilityItem === 'home' }}
               >
-                <Text style={styles.homeUtilityIconText}>⌂</Text>
+                <View style={styles.homeUtilityActionContent}>
+                  <Text style={[styles.homeUtilityIconText, activeHomeUtilityItem === 'home' && styles.homeUtilityIconTextActive]}>⌂</Text>
+                  <View
+                    style={[
+                      styles.homeUtilityIndicator,
+                      activeHomeUtilityItem === 'home' ? styles.homeUtilityIndicatorActive : styles.homeUtilityIndicatorInactive,
+                    ]}
+                  />
+                </View>
               </Pressable>
 
               <Pressable
-                onPress={() => setActiveDrawer('profile')}
+                onPress={() => toggleDrawer('profile')}
+                hitSlop={HOME_UTILITY_ICON_HIT_SLOP}
                 style={({ pressed }) => [styles.homeUtilityAction, styles.homeUtilityProfileButton, pressed && styles.pressed]}
+                accessibilityState={{ selected: activeHomeUtilityItem === 'profile' }}
               >
-                <Text style={styles.homeUtilityActionText}>프로필</Text>
+                <View style={styles.homeUtilityActionContent}>
+                  <ProfileSilhouetteIcon active={activeHomeUtilityItem === 'profile'} />
+                  <View
+                    style={[
+                      styles.homeUtilityIndicator,
+                      activeHomeUtilityItem === 'profile' ? styles.homeUtilityIndicatorActive : styles.homeUtilityIndicatorInactive,
+                    ]}
+                  />
+                </View>
               </Pressable>
-
-              <Pressable
-                onPress={() => setActiveDrawer('settings')}
-                style={({ pressed }) => [styles.homeUtilityAction, styles.homeUtilitySettingsButton, pressed && styles.pressed]}
-              >
-                <Text style={styles.homeUtilityIconText}>⚙</Text>
-              </Pressable>
-            </Animated.View>
+            </View>
           </View>
         ) : null}
         {shouldShowDrawer ? (
-          <View pointerEvents="box-none" style={styles.settingsOverlay}>
+          <View
+            pointerEvents="box-none"
+            style={[styles.settingsOverlay, styles.settingsOverlayFullScreen]}
+          >
             <Pressable
               onPress={() => setActiveDrawer(null)}
               style={styles.settingsBackdropPressable}
@@ -390,8 +547,9 @@ export default function App() {
             <Animated.View
               style={[
                 styles.settingsDrawer,
+                styles.settingsDrawerFullScreen,
                 {
-                  width: sideDrawerWidth,
+                  width: currentDrawerWidth,
                   transform: [{ translateX: sideDrawerTranslateX }],
                 },
               ]}
@@ -404,35 +562,37 @@ export default function App() {
                 contentContainerStyle={styles.settingsDrawerContent}
                 showsVerticalScrollIndicator={false}
               >
-                {visibleDrawer === 'profile' ? (
-                  <ProfileScreen
-                    currentUser={app.currentUser!}
-                    onUpdateProfile={app.updateProfile}
-                    onChangePassword={app.changePassword}
-                    onLogout={() => {
-                      setActiveDrawer(null);
-                      void app.logout();
-                    }}
-                  />
-                ) : (
-                  <SettingsScreen
-                    selectedBallBrand={app.selectedBallBrand}
-                    selectedBallColors={app.selectedBallColors}
-                    selectedPosition={app.selectedPosition}
-                    homeworkTestState={app.homeworkTestState}
-                    onSelectBallBrand={app.selectBallBrand}
-                    onToggleBallColor={app.toggleBallColor}
-                    onSelectPosition={app.selectPosition}
-                    onApplyHomeworkTestState={app.applyHomeworkTestState}
-                  />
-                )}
+                <View style={styles.settingsDrawerInner}>
+                  {visibleDrawer === 'profile' ? (
+                    <ProfileScreen
+                      currentUser={app.currentUser!}
+                      onUpdateProfile={app.updateProfile}
+                      onChangePassword={app.changePassword}
+                      onLogout={() => {
+                        setActiveDrawer(null);
+                        void app.logout();
+                      }}
+                    />
+                  ) : (
+                    <SettingsScreen
+                      selectedBallBrand={app.selectedBallBrand}
+                      selectedBallColors={app.selectedBallColors}
+                      selectedPosition={app.selectedPosition}
+                      homeworkTestState={app.homeworkTestState}
+                      onSelectBallBrand={app.selectBallBrand}
+                      onToggleBallColor={app.toggleBallColor}
+                      onSelectPosition={app.selectPosition}
+                      onApplyHomeworkTestState={app.applyHomeworkTestState}
+                    />
+                  )}
+                </View>
               </ScrollView>
             </Animated.View>
           </View>
         ) : null}
       </View>
       </View>
-    </SafeAreaView>
+    </RootContainer>
   );
 }
 
@@ -453,7 +613,7 @@ const styles = StyleSheet.create({
   appShell: {
     flex: 1,
     backgroundColor: colors.background,
-    paddingHorizontal: 16,
+    paddingHorizontal: APP_SHELL_HORIZONTAL_PADDING,
     paddingTop: APP_TOP_OFFSET,
     position: 'relative',
   },
@@ -491,33 +651,32 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'space-between',
   },
   homeUtilityAction: {
-    minHeight: 46,
-    borderRadius: 18,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
+    minHeight: 68,
+    minWidth: 68,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    borderColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  homeUtilityActionContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   homeUtilityHomeButton: {
-    width: 54,
-    backgroundColor: '#000000',
-    borderColor: '#000000',
-    paddingHorizontal: 0,
+    width: 72,
   },
   homeUtilityProfileButton: {
-    flex: 1,
-    minWidth: 86,
+    width: 72,
   },
   homeUtilitySettingsButton: {
-    width: 54,
-    backgroundColor: '#000000',
-    borderColor: '#000000',
-    paddingHorizontal: 0,
+    width: 72,
   },
   homeUtilityActionText: {
     color: colors.text,
@@ -526,9 +685,49 @@ const styles = StyleSheet.create({
   },
   homeUtilityIconText: {
     color: '#ffffff',
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: '900',
-    lineHeight: 22,
+    lineHeight: 28,
+  },
+  homeUtilityIconTextActive: {
+    color: colors.secondary,
+  },
+  homeUtilityIndicator: {
+    width: 22,
+    height: 3,
+    borderRadius: 999,
+    marginTop: 10,
+  },
+  homeUtilityIndicatorActive: {
+    backgroundColor: colors.secondary,
+  },
+  homeUtilityIndicatorInactive: {
+    backgroundColor: 'transparent',
+  },
+  profileIcon: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileIconHead: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: '#ffffff',
+    marginBottom: 3,
+  },
+  profileIconBody: {
+    width: 18,
+    height: 12,
+    borderTopLeftRadius: 9,
+    borderTopRightRadius: 9,
+    borderBottomLeftRadius: 5,
+    borderBottomRightRadius: 5,
+    backgroundColor: '#ffffff',
+  },
+  profileIconPartActive: {
+    backgroundColor: colors.secondary,
   },
   lessonScreenWrap: {
     flex: 1,
@@ -551,6 +750,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
   },
+  settingsOverlayFullScreen: {
+    top: 0,
+    left: -APP_SHELL_HORIZONTAL_PADDING,
+    right: -APP_SHELL_HORIZONTAL_PADDING,
+    bottom: HOME_UTILITY_BAR_HEIGHT,
+  },
   settingsBackdropPressable: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -559,23 +764,32 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   settingsDrawer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
     height: '100%',
     backgroundColor: colors.background,
-    borderLeftWidth: 1,
-    borderLeftColor: colors.border,
     shadowColor: '#000',
     shadowOpacity: 0.26,
     shadowRadius: 18,
-    shadowOffset: { width: -6, height: 0 },
     elevation: 18,
+  },
+  settingsDrawerFullScreen: {
+    left: 0,
+    right: 0,
+    borderWidth: 0,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
   },
   settingsDrawerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
     gap: 12,
     paddingHorizontal: 18,
-    paddingTop: 18,
+    paddingTop: 34,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
@@ -584,6 +798,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 22,
     fontWeight: '800',
+    textAlign: 'center',
   },
   settingsDrawerScroll: {
     flex: 1,
@@ -591,6 +806,11 @@ const styles = StyleSheet.create({
   settingsDrawerContent: {
     padding: 18,
     paddingBottom: 28,
+    alignItems: 'center',
+  },
+  settingsDrawerInner: {
+    width: '100%',
+    maxWidth: 760,
   },
   loadingCard: {
     borderRadius: 18,

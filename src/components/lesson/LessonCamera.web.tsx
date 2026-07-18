@@ -177,13 +177,11 @@ export function LessonCamera({
 
 const styles = StyleSheet.create({
   videoWrap: {
-    height: 560,
+    flex: 1,
+    width: '100%',
+    minHeight: 0,
     backgroundColor: colors.cameraBg,
-    borderRadius: 22,
     overflow: 'hidden',
-    borderWidth: 0,
-    borderColor: 'transparent',
-    marginBottom: 16,
     position: 'relative',
   },
   iframe: {

@@ -13,3 +13,156 @@ Web Bundled 36ms index.js (1 module)
 Web .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
 Web Bundled 45ms index.js (1 module)
  LOG  [web] Logs will appear in the browser console
+Web .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 377ms index.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+

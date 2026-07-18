@@ -1,6 +1,5 @@
 export type AppScreen = 'home' | 'lesson' | 'skill' | 'diary' | 'settings' | 'rules';
 export type AuthMode = 'login' | 'signup';
-export type AccountGender = 'male' | 'female';
 
 export type LessonMode = 'dribble' | 'shoot';
 export type DribbleLessonView = 'front' | 'side';
@@ -9,9 +8,6 @@ export type ShotOutcome = 'success' | 'failure';
 export interface UserAccount {
   id: string;
   nickname: string;
-  name: string;
-  age: number;
-  gender: AccountGender;
   password: string;
   createdAt: string;
 }
@@ -19,9 +15,6 @@ export interface UserAccount {
 export interface AuthUser {
   id: string;
   nickname: string;
-  name: string;
-  age: number;
-  gender: AccountGender;
 }
 
 export interface AuthSession {
