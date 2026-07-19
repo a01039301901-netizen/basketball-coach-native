@@ -32,7 +32,7 @@ export type CalendarCell =
       date: number;
       dateKey: string;
       status: string;
-      variant: 'default' | 'attended' | 'absent';
+      variant: 'default' | 'good' | 'average' | 'bad';
     };
 
 export type SkillKey = 'shoot' | 'crossover' | 'layup' | 'stepback' | 'spin' | 'defense';
@@ -129,23 +129,19 @@ export interface ShotGraphDatum {
 }
 
 export interface DiarySkillInsight {
-  practiceThresholds: {
-    dribbleCount: number;
-    shootAttemptCount: number;
-  };
-  isPracticeThresholdMet: boolean;
   selectedShotAttempts: number;
   selectedShotSuccesses: number;
   selectedShotSuccessRate: number;
-  recentAverageShotAttempts: number | null;
-  recentAverageDribbleCount: number | null;
-  recentAverageShotSuccessRate: number | null;
-  shotTrend: 'up' | 'flat' | 'down' | 'insufficient_history' | 'below_threshold';
-  shotTrendDelta: number | null;
   leftDribbleCount: number;
   rightDribbleCount: number;
   dribbleBalance: 'balanced' | 'left' | 'right' | 'none';
   dribbleBalanceGap: number;
+  canShowDailySummary: boolean;
+  yesterdayPracticeTotal: number;
+  previousPracticeDateKey: string | null;
+  previousPracticeTotal: number;
+  evaluationCounts: Record<LessonRecordLevel, number>;
+  evaluationDominantLevel: LessonRecordLevel | 'mixed' | 'none';
 }
 
 export interface HomeworkProgressItem {

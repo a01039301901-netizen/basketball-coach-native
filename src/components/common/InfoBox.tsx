@@ -5,11 +5,12 @@ interface InfoBoxProps {
   label: string;
   text: string;
   reserveToggleSpace?: boolean;
+  translucent?: boolean;
 }
 
-export function InfoBox({ label, text, reserveToggleSpace = false }: InfoBoxProps) {
+export function InfoBox({ label, text, reserveToggleSpace = false, translucent = false }: InfoBoxProps) {
   return (
-    <View style={[styles.box, reserveToggleSpace && styles.boxWithToggleSpace]}>
+    <View style={[styles.box, translucent && styles.translucentBox, reserveToggleSpace && styles.boxWithToggleSpace]}>
       <Text style={styles.label}>{label}</Text>
       <Text style={styles.text}>{text}</Text>
     </View>
@@ -27,6 +28,11 @@ const styles = StyleSheet.create({
   },
   boxWithToggleSpace: {
     paddingRight: 54,
+  },
+  translucentBox: {
+    backgroundColor: 'rgba(7,7,7,0.26)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   label: {
     color: colors.textAccent,

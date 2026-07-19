@@ -1268,7 +1268,7 @@ function buildDiarySkillInsight(
   const selectedShotAttempts = selectedShotGraph?.attempts ?? 0;
   const selectedShotSuccesses = selectedShotGraph?.successes ?? 0;
   const selectedShotSuccessRate = selectedShotGraph?.successRate ?? 0;
-  const selectedDribbleCount = selectedDateKey ? dailyDribbleRecords[selectedDateKey] || 0 : 0;
+  const selectedDateDribbleCount = selectedDateKey ? Math.max(0, dailyDribbleRecords[selectedDateKey] || 0) : 0;
   const todayDateKey = formatDateKey(new Date());
   const selectedHomeworkState = selectedDateKey ? homeworkState[selectedDateKey] ?? null : null;
   const selectedDateDribbleRecords = lessonRecords.filter(
@@ -1303,125 +1303,62 @@ function buildDiarySkillInsight(
         : leftDribbleCount > rightDribbleCount
           ? 'left'
           : 'right';
-  const isPracticeThresholdMet =
-    selectedDribbleCount >= DAILY_DRIBBLE_TARGET && selectedShotAttempts >= DAILY_SHOOT_TARGET;
+  const evaluationCounts: Record<LessonRecordLevel, number> = {
+    good: 0,
+    average: 0,
+    bad: 0,
+  };
 
-  if (!selectedDateKey) {
-    return {
-      practiceThresholds: {
-        dribbleCount: DAILY_DRIBBLE_TARGET,
-        shootAttemptCount: DAILY_SHOOT_TARGET,
-      },
-      isPracticeThresholdMet: false,
-      selectedShotAttempts,
-      selectedShotSuccesses,
-      selectedShotSuccessRate,
-      recentAverageShotAttempts: null,
-      recentAverageDribbleCount: null,
-      recentAverageShotSuccessRate: null,
-      shotTrend: 'below_threshold',
-      shotTrendDelta: null,
-      leftDribbleCount,
-      rightDribbleCount,
-      dribbleBalance,
-      dribbleBalanceGap,
-    };
+  for (const record of lessonRecords) {
+    const level = record.dateKey === selectedDateKey ? record.evaluation?.level : null;
+
+    if (level) {
+      evaluationCounts[level] += 1;
+    }
   }
 
-  const sortedQualifiedDates = shotGraphData
-    .filter((item) => item.attempts >= DAILY_SHOOT_TARGET && (dailyDribbleRecords[item.dateKey] || 0) >= DAILY_DRIBBLE_TARGET)
-    .slice()
-    .sort((left, right) => parseDateKeyToTime(left.dateKey) - parseDateKeyToTime(right.dateKey));
-  const selectedDateTime = parseDateKeyToTime(selectedDateKey);
-  const recentComparisonDates = sortedQualifiedDates
-    .filter((item) => parseDateKeyToTime(item.dateKey) < selectedDateTime)
-    .slice(-3);
-
-  if (!isPracticeThresholdMet) {
-    return {
-      practiceThresholds: {
-        dribbleCount: DAILY_DRIBBLE_TARGET,
-        shootAttemptCount: DAILY_SHOOT_TARGET,
-      },
-      isPracticeThresholdMet,
-      selectedShotAttempts,
-      selectedShotSuccesses,
-      selectedShotSuccessRate,
-      recentAverageShotAttempts: recentComparisonDates.length
-        ? Math.round(recentComparisonDates.reduce((sum, item) => sum + item.attempts, 0) / recentComparisonDates.length)
-        : null,
-      recentAverageDribbleCount: recentComparisonDates.length
-        ? Math.round(
-            recentComparisonDates.reduce((sum, item) => sum + (dailyDribbleRecords[item.dateKey] || 0), 0) /
-              recentComparisonDates.length
-          )
-        : null,
-      recentAverageShotSuccessRate: recentComparisonDates.length
-        ? Math.round(recentComparisonDates.reduce((sum, item) => sum + item.successRate, 0) / recentComparisonDates.length)
-        : null,
-      shotTrend: 'below_threshold',
-      shotTrendDelta: null,
-      leftDribbleCount,
-      rightDribbleCount,
-      dribbleBalance,
-      dribbleBalanceGap,
-    };
-  }
-
-  if (recentComparisonDates.length === 0) {
-    return {
-      practiceThresholds: {
-        dribbleCount: DAILY_DRIBBLE_TARGET,
-        shootAttemptCount: DAILY_SHOOT_TARGET,
-      },
-      isPracticeThresholdMet,
-      selectedShotAttempts,
-      selectedShotSuccesses,
-      selectedShotSuccessRate,
-      recentAverageShotAttempts: null,
-      recentAverageDribbleCount: null,
-      recentAverageShotSuccessRate: null,
-      shotTrend: 'insufficient_history',
-      shotTrendDelta: null,
-      leftDribbleCount,
-      rightDribbleCount,
-      dribbleBalance,
-      dribbleBalanceGap,
-    };
-  }
-
-  const recentAverageShotAttempts = Math.round(
-    recentComparisonDates.reduce((sum, item) => sum + item.attempts, 0) / recentComparisonDates.length
-  );
-  const recentAverageDribbleCount = Math.round(
-    recentComparisonDates.reduce((sum, item) => sum + (dailyDribbleRecords[item.dateKey] || 0), 0) /
-      recentComparisonDates.length
-  );
-  const recentAverageShotSuccessRate = Math.round(
-    recentComparisonDates.reduce((sum, item) => sum + item.successRate, 0) / recentComparisonDates.length
-  );
-  const shotTrendDelta = selectedShotSuccessRate - recentAverageShotSuccessRate;
-  const shotTrend =
-    shotTrendDelta >= 5 ? 'up' : shotTrendDelta <= -5 ? 'down' : 'flat';
+  const rankedEvaluationLevels = (Object.entries(evaluationCounts) as [LessonRecordLevel, number][])
+    .sort((left, right) => right[1] - left[1]);
+  const evaluationDominantLevel: DiarySkillInsight['evaluationDominantLevel'] =
+    !rankedEvaluationLevels[0] || rankedEvaluationLevels[0][1] <= 0
+      ? 'none'
+      : rankedEvaluationLevels[0][1] === rankedEvaluationLevels[1]?.[1]
+        ? 'mixed'
+        : rankedEvaluationLevels[0][0];
+  const shotAttemptsByDate = new Map(shotGraphData.map((item) => [item.dateKey, item.attempts]));
+  const getPracticeTotalForDate = (dateKey: string) =>
+    Math.max(0, dailyDribbleRecords[dateKey] || 0) + Math.max(0, shotAttemptsByDate.get(dateKey) || 0);
+  const selectedDateTime = selectedDateKey ? parseDateKeyToTime(selectedDateKey) : 0;
+  const selectedDate = selectedDateKey ? parseDateKeyToDate(selectedDateKey) : null;
+  const yesterdayKey = selectedDate
+    ? formatDateKey(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() - 1))
+    : '';
+  const yesterdayPracticeTotal = yesterdayKey ? getPracticeTotalForDate(yesterdayKey) : 0;
+  const previousPracticeDateKeys = Array.from(
+    new Set([...Object.keys(dailyDribbleRecords), ...shotGraphData.map((item) => item.dateKey)])
+  )
+    .filter((dateKey) => dateKey !== selectedDateKey && parseDateKeyToTime(dateKey) < selectedDateTime && getPracticeTotalForDate(dateKey) > 0)
+    .sort((left, right) => parseDateKeyToTime(right) - parseDateKeyToTime(left));
+  const previousPracticeDateKey = previousPracticeDateKeys.find((dateKey) => dateKey !== yesterdayKey)
+    ?? (yesterdayPracticeTotal > 0 ? null : previousPracticeDateKeys[0] ?? null);
+  const previousPracticeTotal = previousPracticeDateKey ? getPracticeTotalForDate(previousPracticeDateKey) : 0;
+  const canShowDailySummary =
+    selectedDateDribbleCount >= DAILY_DRIBBLE_TARGET && selectedShotAttempts >= DAILY_SHOOT_TARGET;
 
   return {
-    practiceThresholds: {
-      dribbleCount: DAILY_DRIBBLE_TARGET,
-      shootAttemptCount: DAILY_SHOOT_TARGET,
-    },
-    isPracticeThresholdMet,
     selectedShotAttempts,
     selectedShotSuccesses,
     selectedShotSuccessRate,
-    recentAverageShotAttempts,
-    recentAverageDribbleCount,
-    recentAverageShotSuccessRate,
-    shotTrend,
-    shotTrendDelta,
     leftDribbleCount,
     rightDribbleCount,
     dribbleBalance,
     dribbleBalanceGap,
+    canShowDailySummary,
+    yesterdayPracticeTotal,
+    previousPracticeDateKey,
+    previousPracticeTotal,
+    evaluationCounts,
+    evaluationDominantLevel,
   };
 }
 
@@ -1816,9 +1753,50 @@ export function useBasketballCoachApp() {
       todayShotSuccessCount,
     ]
   );
+  const calendarRecordLevels = useMemo(() => {
+    const levelCountsByDate: Record<string, Record<LessonRecordLevel, number>> = {};
+
+    for (const record of lessonRecords) {
+      const level = record.evaluation?.level;
+
+      if (!level) {
+        continue;
+      }
+
+      if (!levelCountsByDate[record.dateKey]) {
+        levelCountsByDate[record.dateKey] = {
+          good: 0,
+          average: 0,
+          bad: 0,
+        };
+      }
+
+      levelCountsByDate[record.dateKey][level] += 1;
+    }
+
+    const dominantLevelsByDate: Record<string, LessonRecordLevel> = {};
+
+    for (const [dateKey, counts] of Object.entries(levelCountsByDate)) {
+      const rankedLevels = (Object.entries(counts) as [LessonRecordLevel, number][]).sort(
+        (left, right) => right[1] - left[1]
+      );
+
+      if (!rankedLevels[0] || rankedLevels[0][1] <= 0) {
+        continue;
+      }
+
+      if (rankedLevels[0][1] === rankedLevels[1]?.[1]) {
+        continue;
+      }
+
+      dominantLevelsByDate[dateKey] = rankedLevels[0][0];
+    }
+
+    return dominantLevelsByDate;
+  }, [lessonRecords]);
   const calendarCells = useMemo(
-    () => getCalendarCells(currentDate, attendance, dailyDribbleRecords, shotAttemptRecords),
-    [attendance, currentDate, dailyDribbleRecords, shotAttemptRecords]
+    () => getCalendarCells(currentDate, calendarRecordLevels),
+    [calendarRecordLevels, currentDate]
   );
   const selectedDateRecords = useMemo(
     () => lessonRecords.filter((record) => record.dateKey === selectedDateKey).slice().reverse(),
@@ -3099,6 +3077,12 @@ export function useBasketballCoachApp() {
   );
 
   const saveLessonRecord = useCallback((videoUri: string, reviewClip?: LessonReviewClip | null) => {
+    const normalizedVideoUri = videoUri.trim();
+
+    if (!normalizedVideoUri) {
+      return false;
+    }
+
     const dateKey = formatDateKey(new Date());
     const mode = lessonModeRef.current;
     const latestDribbleAnalysis = latestDribbleAnalysisRef.current;
@@ -3114,7 +3098,7 @@ export function useBasketballCoachApp() {
       shotOutcome,
       feedback: latestFeedbackRef.current,
       feedbackTimeline: [...feedbackTimelineRef.current],
-      videoUri,
+      videoUri: normalizedVideoUri,
       createdAt: new Date().toLocaleString(),
       reviewFeedback: reviewClip?.feedback,
       reviewStartAtMs: reviewClip?.startAtMs,
@@ -3138,6 +3122,7 @@ export function useBasketballCoachApp() {
     persistLessonRecords(nextLessonRecords);
 
     setSelectedDateKey(dateKey);
+    return true;
   }, [persistLessonRecords]);
 
   const finalizeLessonSession = useCallback(
@@ -3156,15 +3141,17 @@ export function useBasketballCoachApp() {
       const shouldPersistShootRecord =
         lessonModeRef.current !== 'shoot' || hasCompletedShootAttempt();
 
-      if (shouldSaveRecord && shouldPersistShootRecord) {
-        if (lessonModeRef.current === 'shoot') {
+      const didSaveLessonRecord =
+        shouldSaveRecord && shouldPersistShootRecord
+          ? saveLessonRecord(videoUri)
+          : false;
+
+      if (didSaveLessonRecord && lessonModeRef.current === 'shoot') {
           const completedShootHomework = recordDailyShootAttempt();
           if (completedShootHomework) {
             celebrateHomeworkCompletion();
             setImmediateLessonFeedback(getHomeworkCompletionMessage('shoot'));
           }
-        }
-        saveLessonRecord(videoUri);
       }
 
       lessonStartedAtRef.current = null;

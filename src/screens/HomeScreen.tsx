@@ -8,6 +8,7 @@ const lessonPlayerSilhouette = require('../../assets/lesson-player-silhouette.pn
 const diaryCalendarArt = require('../../assets/diary-calendar-art.png');
 const lessonBallIcon = require('../../assets/lesson-basketball-icon.png');
 const diaryPencilIcon = require('../../assets/diary-pencil-icon.png');
+const rulesGuideIcon = require('../../assets/rules-guide-icon.png');
 
 interface HomeScreenProps {
   homeworkToShow: HomeworkProgressItem[];
@@ -238,7 +239,6 @@ export function HomeScreen({
         <View style={styles.homeworkTopRow}>
           <View>
             <Text style={styles.homeworkTitle}>오늘의 연습 숙제</Text>
-            <Text style={styles.homeworkDescription}>오늘 날짜 기준으로 숙제 진행도를 확인할 수 있어요.</Text>
           </View>
         </View>
 
@@ -261,11 +261,9 @@ export function HomeScreen({
             ))}
           </View>
         ) : (
-          <View style={styles.homeworkHiddenCard}>
-            <Pressable onPress={onRevealHomework} style={({ pressed }) => [styles.homeworkRevealButton, pressed && styles.pressed]}>
-              <Text style={styles.homeworkRevealButtonText}>오늘의 숙제 확인하기</Text>
-            </Pressable>
-          </View>
+          <Pressable onPress={onRevealHomework} style={({ pressed }) => [styles.homeworkHiddenCard, pressed && styles.pressed]}>
+            <Text style={styles.homeworkHiddenCardText}>오늘의 숙제 확인하기</Text>
+          </Pressable>
         )}
       </View>
 
@@ -279,8 +277,13 @@ export function HomeScreen({
           ]}
         >
           <View style={styles.rulesCard}>
-            <Text style={styles.rulesTitle}>농구 규칙 가이드</Text>
-            <Text style={styles.rulesText}>기본 규칙을 빠르게 확인할 수 있어요.</Text>
+            <View style={styles.rulesCardContent}>
+              <View style={styles.rulesTextWrap}>
+                <Text style={styles.rulesTitle}>농구 규칙 가이드</Text>
+                <Text style={styles.rulesText}>기본 규칙을 빠르게 확인할 수 있어요.</Text>
+              </View>
+              <Image source={rulesGuideIcon} resizeMode="contain" style={styles.rulesGuideIcon} />
+            </View>
           </View>
         </Pressable>
       </View>
@@ -629,19 +632,16 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     borderColor: 'transparent',
     paddingHorizontal: 18,
-    paddingVertical: 20,
+    paddingVertical: 28,
+    minHeight: 112,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  homeworkRevealButton: {
-    borderRadius: 0,
-    backgroundColor: colors.secondary,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-  },
-  homeworkRevealButtonText: {
-    color: colors.lightButtonText,
-    fontSize: 13,
+  homeworkHiddenCardText: {
+    color: colors.text,
+    fontSize: 16,
     fontWeight: '700',
+    textAlign: 'center',
   },
   secondaryCards: {
     gap: 12,
@@ -668,6 +668,16 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     borderColor: 'transparent',
   },
+  rulesCardContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 14,
+  },
+  rulesTextWrap: {
+    flex: 1,
+  },
   rulesTitle: {
     color: colors.text,
     fontSize: 15,
@@ -678,6 +688,11 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     lineHeight: 17,
+  },
+  rulesGuideIcon: {
+    width: 46,
+    height: 46,
+    opacity: 0.96,
   },
   pressed: {
     opacity: 0.92,

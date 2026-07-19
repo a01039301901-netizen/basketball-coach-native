@@ -88,8 +88,10 @@ export default function App() {
       return;
     }
 
-    void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-  }, []);
+    void ScreenOrientation.lockAsync(
+      isLessonScreen ? ScreenOrientation.OrientationLock.DEFAULT : ScreenOrientation.OrientationLock.PORTRAIT_UP
+    );
+  }, [isLessonScreen]);
 
   const toggleDrawer = useCallback((drawer: SideDrawerType) => {
     setActiveDrawer((currentDrawer) => (currentDrawer === drawer ? null : drawer));

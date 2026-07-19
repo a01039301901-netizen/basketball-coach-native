@@ -1,12 +1,29 @@
 import { type AVPlaybackStatus, ResizeMode, Video } from 'expo-av';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import {
+  Animated,
+  Easing,
+  Image,
+  Modal,
+  PanResponder,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import type { ImageSourcePropType } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
 import { InfoBox } from '../components/common/InfoBox';
 import { LessonCamera } from '../components/lesson/LessonCamera';
 import { colors } from '../theme/colors';
 import type { BallBrandOption, BallColorOption, DribbleLessonView, LessonMode, LessonReviewClip } from '../types/app';
 import { getDesktopMobileFrameWidth, shouldUseDesktopMobileLayout } from '../utils/layout';
+
+const DRIBBLE_MODE_IMAGE = require('../../assets/lesson-player-silhouette.png');
+const SHOOT_MODE_IMAGE = require('../../assets/lesson-mode/shoot.png');
 
 interface LessonScreenProps {
   lessonMode: LessonMode;
@@ -41,24 +58,33 @@ interface LessonScreenProps {
 
 interface ModeButtonProps {
   title: string;
+  imageSource: ImageSourcePropType;
+  imageTintColor?: string;
   active: boolean;
   disabled: boolean;
   onPress: () => void;
 }
 
-function ModeButton({ title, active, disabled, onPress }: ModeButtonProps) {
+function ModeButton({ title, imageSource, imageTintColor, active, disabled, onPress }: ModeButtonProps) {
   return (
     <Pressable
+      accessibilityState={{ disabled, selected: active }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.modeButton,
-        active && styles.modeButtonActive,
         disabled && styles.modeButtonDisabled,
         pressed && styles.pressed,
       ]}
     >
-      <Text style={[styles.modeButtonText, active && styles.modeButtonTextActive]}>{title}</Text>
+      <View style={styles.modeButtonArtworkFrame}>
+        <Image
+          source={imageSource}
+          style={[styles.modeButtonArtwork, imageTintColor ? { tintColor: imageTintColor } : null]}
+          resizeMode="contain"
+        />
+      </View>
+      <Text style={styles.modeButtonText}>{title}</Text>
     </Pressable>
   );
 }
@@ -86,25 +112,25 @@ function OverlayUtilityButton({ title, onPress, variant = 'neutral' }: OverlayUt
 }
 
 interface CameraShutterButtonProps {
-  busy: boolean;
-  disabled: boolean;
+  active: boolean;
+  disabled?: boolean;
   onPress: () => void;
 }
 
-function CameraShutterButton({ busy, disabled, onPress }: CameraShutterButtonProps) {
+function CameraShutterButton({ active, disabled = false, onPress }: CameraShutterButtonProps) {
   return (
     <Pressable
-      accessibilityLabel={busy ? '레슨 진행 중' : '레슨 시작'}
+      accessibilityLabel={active ? '레슨 종료' : '레슨 시작'}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.shutterButton,
-        busy && styles.shutterButtonBusy,
+        active && styles.shutterButtonActive,
         disabled && styles.shutterButtonDisabled,
         pressed && !disabled && styles.pressed,
       ]}
     >
-      <View style={[styles.shutterButtonInner, busy && styles.shutterButtonInnerBusy]} />
+      <View style={[styles.shutterButtonInner, active && styles.shutterButtonInnerActive]} />
     </Pressable>
   );
 }
@@ -173,6 +199,7 @@ interface RealtimeCoachingPanelProps {
 }
 
 type CoachingSectionKey = 'dribbleCount' | 'feedback' | 'review' | 'camera' | 'tips';
+type CoachingPanelState = 'expanded' | 'half' | 'hidden';
 
 interface CoachingSectionProps {
   title: string;
@@ -302,7 +329,7 @@ function RealtimeCoachingPanel({
           allowCollapse={allowSectionCollapse}
           onToggle={() => toggleSection('dribbleCount')}
         >
-          <InfoBox label="드리블 횟수" text={`${currentDribbleCount}회`} reserveToggleSpace={allowSectionCollapse} />
+          <InfoBox label="드리블 횟수" text={`${currentDribbleCount}회`} reserveToggleSpace={allowSectionCollapse} translucent />
         </CoachingSection>
       ) : null}
 
@@ -312,7 +339,7 @@ function RealtimeCoachingPanel({
         allowCollapse={allowSectionCollapse}
         onToggle={() => toggleSection('feedback')}
       >
-        <InfoBox label="실시간 피드백" text={feedbackText} reserveToggleSpace={allowSectionCollapse} />
+        <InfoBox label="실시간 피드백" text={feedbackText} reserveToggleSpace={allowSectionCollapse} translucent />
       </CoachingSection>
 
       {lessonReview ? (
@@ -397,30 +424,37 @@ export function LessonScreen({
   const layoutWidth = isDesktopMobileMode ? getDesktopMobileFrameWidth(width) : width;
   const isWideLayout = !isDesktopMobileMode && layoutWidth >= 1080;
   const isLandscapeMobileLayout = !isDesktopMobileMode && !isWideLayout && width > height;
-  const isSideDockedCoaching = isWideLayout || isLandscapeMobileLayout;
+  const shouldLeftDockCoaching = isLandscapeMobileLayout;
+  const isSideDockedCoaching = isWideLayout;
   const isLessonSessionBusy = isLessonActive || isCameraActive;
   const allowPanelDragHide = !isSideDockedCoaching;
+  const coachingPanelTopInset = 88;
+  const coachingPanelBottomInset = 12;
   const bottomControlsInset = 170;
   const floatingCoachingHeight = isSideDockedCoaching
-    ? Math.max(320, Math.min(height - bottomControlsInset - 24, 760))
-    : Math.max(240, Math.min(height * 0.36, 320));
+    ? Math.max(320, height - coachingPanelTopInset - coachingPanelBottomInset)
+    : Math.max(240, height - coachingPanelTopInset - coachingPanelBottomInset);
   const floatingCoachingWidth = isWideLayout
     ? Math.max(320, Math.min(layoutWidth * 0.32, 420))
     : isLandscapeMobileLayout
       ? Math.max(280, Math.min(layoutWidth * 0.34, 360))
       : Math.min(layoutWidth - 24, 420);
-  const coachingHiddenOffset = floatingCoachingHeight + 48;
-  const coachingHideThreshold = Math.min(120, Math.max(72, floatingCoachingHeight * 0.24));
+  const coachingHiddenOffset = floatingCoachingHeight + coachingPanelBottomInset + 32;
+  const coachingHalfOffset = Math.max(0, Math.min(coachingHiddenOffset - 72, floatingCoachingHeight * 0.5));
   const coachingPanelTranslateY = useRef(new Animated.Value(allowPanelDragHide ? coachingHiddenOffset : 0)).current;
   const coachingPanelTranslateYRef = useRef(0);
   const coachingPanelDragStartRef = useRef(0);
+  const coachingPanelIsAnimatingRef = useRef(false);
 
   const [showDribbleGuide, setShowDribbleGuide] = useState(false);
   const [dribbleGuideStep, setDribbleGuideStep] = useState(0);
+  const [showLessonModePicker, setShowLessonModePicker] = useState(false);
   const [showShootGuide, setShowShootGuide] = useState(false);
   const [shootGuideStep, setShootGuideStep] = useState(0);
   const [dribbleCountInput, setDribbleCountInput] = useState('10');
-  const [isCoachingPanelHidden, setIsCoachingPanelHidden] = useState(allowPanelDragHide);
+  const [coachingPanelState, setCoachingPanelState] = useState<CoachingPanelState>(allowPanelDragHide ? 'hidden' : 'expanded');
+  const isCoachingPanelHidden = coachingPanelState === 'hidden';
+  const isCoachingPanelHalfOpen = coachingPanelState === 'half';
 
   const parsedDribbleCount = useMemo(() => {
     const nextValue = Number.parseInt(dribbleCountInput, 10);
@@ -449,6 +483,10 @@ export function LessonScreen({
   );
 
   useEffect(() => {
+    if (isLessonActive || isCameraActive) {
+      setShowLessonModePicker(false);
+    }
+
     if (lessonMode !== 'dribble' || isLessonActive) {
       setShowDribbleGuide(false);
       setDribbleGuideStep(0);
@@ -458,7 +496,7 @@ export function LessonScreen({
       setShowShootGuide(false);
       setShootGuideStep(0);
     }
-  }, [isLessonActive, lessonMode]);
+  }, [isCameraActive, isLessonActive, lessonMode]);
 
   useEffect(() => {
     const listenerId = coachingPanelTranslateY.addListener(({ value }) => {
@@ -472,61 +510,151 @@ export function LessonScreen({
 
   useEffect(() => {
     if (!allowPanelDragHide) {
-      setIsCoachingPanelHidden(false);
+      setCoachingPanelState('expanded');
+      coachingPanelIsAnimatingRef.current = false;
       coachingPanelTranslateY.stopAnimation();
       coachingPanelTranslateY.setValue(0);
       return;
     }
 
-    if (isCoachingPanelHidden) {
-      coachingPanelTranslateY.setValue(coachingHiddenOffset);
-    }
-  }, [allowPanelDragHide, coachingHiddenOffset, coachingPanelTranslateY, isCoachingPanelHidden]);
-
-  function restoreCoachingPanel() {
-    setIsCoachingPanelHidden(false);
-    Animated.spring(coachingPanelTranslateY, {
-      toValue: 0,
-      damping: 24,
-      stiffness: 220,
-      mass: 0.9,
-      useNativeDriver: true,
-    }).start();
-  }
-
-  function hideCoachingPanel() {
-    setIsCoachingPanelHidden(true);
-    Animated.timing(coachingPanelTranslateY, {
-      toValue: coachingHiddenOffset,
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }
-
-  function finishCoachingPanelDrag(dy: number, vy: number) {
-    const dragDistance = Math.max(0, coachingPanelDragStartRef.current + dy);
-    const shouldHide = dragDistance >= coachingHideThreshold || vy >= 0.9;
-
-    if (shouldHide) {
-      hideCoachingPanel();
+    if (coachingPanelIsAnimatingRef.current) {
       return;
     }
 
-    restoreCoachingPanel();
+    if (coachingPanelState === 'hidden') {
+      coachingPanelTranslateY.setValue(coachingHiddenOffset);
+      return;
+    }
+
+    if (coachingPanelState === 'half') {
+      coachingPanelTranslateY.setValue(coachingHalfOffset);
+    }
+  }, [allowPanelDragHide, coachingHalfOffset, coachingHiddenOffset, coachingPanelState, coachingPanelTranslateY]);
+
+  useEffect(() => {
+    if (isCameraActive) {
+      if (allowPanelDragHide) {
+        setCoachingPanelState('hidden');
+        coachingPanelIsAnimatingRef.current = false;
+        coachingPanelTranslateY.stopAnimation();
+        coachingPanelTranslateY.setValue(coachingHiddenOffset);
+      }
+      return;
+    }
+
+    coachingPanelIsAnimatingRef.current = false;
+    coachingPanelTranslateY.stopAnimation();
+
+    if (allowPanelDragHide) {
+      setCoachingPanelState('hidden');
+      coachingPanelTranslateY.setValue(coachingHiddenOffset);
+      return;
+    }
+
+    setCoachingPanelState('expanded');
+    coachingPanelTranslateY.setValue(0);
+  }, [allowPanelDragHide, coachingHiddenOffset, coachingPanelTranslateY, isCameraActive]);
+
+  function getCoachingPanelOffset(nextState: CoachingPanelState) {
+    if (nextState === 'expanded') {
+      return 0;
+    }
+
+    if (nextState === 'half') {
+      return coachingHalfOffset;
+    }
+
+    return coachingHiddenOffset;
   }
 
-  function finishCoachingPanelRestoreDrag(dy: number, vy: number) {
-    const dragDistance = Math.max(0, Math.min(coachingHiddenOffset, coachingPanelDragStartRef.current + dy));
-    const restoredDistance = coachingHiddenOffset - dragDistance;
-    const shouldRestore = restoredDistance >= coachingHideThreshold || vy <= -0.9;
+  function animateCoachingPanelTo(nextState: CoachingPanelState) {
+    setCoachingPanelState(nextState);
+    coachingPanelIsAnimatingRef.current = true;
 
-    if (shouldRestore) {
-      restoreCoachingPanel();
+    const toValue = getCoachingPanelOffset(nextState);
+    const animation =
+      nextState === 'hidden'
+        ? Animated.timing(coachingPanelTranslateY, {
+            toValue,
+            duration: 220,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          })
+        : Animated.spring(coachingPanelTranslateY, {
+            toValue,
+            damping: 24,
+            stiffness: 220,
+            mass: 0.9,
+            useNativeDriver: true,
+          });
+
+    animation.start(() => {
+      coachingPanelIsAnimatingRef.current = false;
+    });
+  }
+
+  function expandCoachingPanel() {
+    animateCoachingPanelTo('expanded');
+  }
+
+  function halfOpenCoachingPanel() {
+    animateCoachingPanelTo('half');
+  }
+
+  function hideCoachingPanel() {
+    animateCoachingPanelTo('hidden');
+  }
+
+  function getNearestCoachingPanelState(offset: number, velocityY: number): CoachingPanelState {
+    const projectedOffset = Math.max(0, Math.min(coachingHiddenOffset, offset + velocityY * 96));
+    const snapPoints: Array<{ state: CoachingPanelState; offset: number }> = [
+      { state: 'expanded', offset: 0 },
+      { state: 'half', offset: coachingHalfOffset },
+      { state: 'hidden', offset: coachingHiddenOffset },
+    ];
+
+    let closestState: CoachingPanelState = 'expanded';
+    let closestDistance = Number.POSITIVE_INFINITY;
+
+    snapPoints.forEach(({ state, offset: snapOffset }) => {
+      const distance = Math.abs(projectedOffset - snapOffset);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestState = state;
+      }
+    });
+
+    return closestState;
+  }
+
+  function snapCoachingPanel(offset: number, velocityY: number) {
+    const nextState = getNearestCoachingPanelState(offset, velocityY);
+
+    if (nextState === 'expanded') {
+      expandCoachingPanel();
+      return;
+    }
+
+    if (nextState === 'half') {
+      halfOpenCoachingPanel();
       return;
     }
 
     hideCoachingPanel();
+  }
+
+  function restoreCoachingPanel() {
+    halfOpenCoachingPanel();
+  }
+
+  function finishCoachingPanelDrag(dy: number, vy: number) {
+    const nextOffset = Math.max(0, Math.min(coachingHiddenOffset, coachingPanelDragStartRef.current + dy));
+    snapCoachingPanel(nextOffset, vy);
+  }
+
+  function finishCoachingPanelRestoreDrag(dy: number, vy: number) {
+    const nextOffset = Math.max(0, Math.min(coachingHiddenOffset, coachingPanelDragStartRef.current + dy));
+    snapCoachingPanel(nextOffset, vy);
   }
 
   const coachingPanelPanResponder = allowPanelDragHide
@@ -582,18 +710,56 @@ export function LessonScreen({
     outputRange: [16, 0],
     extrapolate: 'clamp',
   });
+  const coachingPanelFadeStartOffset = Math.min(
+    coachingHiddenOffset - 24,
+    Math.max(coachingHalfOffset + 1, coachingHiddenOffset * 0.84)
+  );
+  const coachingPanelOpacity = coachingPanelTranslateY.interpolate({
+    inputRange: [0, coachingHalfOffset, coachingPanelFadeStartOffset, coachingHiddenOffset],
+    outputRange: [1, 1, 0.22, 0],
+    extrapolate: 'clamp',
+  });
+  const isRoundLessonControlActive = isLessonActive || isCameraActive;
+  const floatingCoachingFrame = isLandscapeMobileLayout
+    ? {
+        left: 12,
+        top: coachingPanelTopInset,
+        bottom: coachingPanelBottomInset,
+        width: floatingCoachingWidth,
+      }
+    : {
+        left: 12,
+        right: 12,
+        top: coachingPanelTopInset,
+        bottom: coachingPanelBottomInset,
+      };
 
   function openLessonStart() {
     if (isLessonSessionBusy) {
       return;
     }
 
-    if (lessonMode === 'dribble') {
+    setShowLessonModePicker(true);
+  }
+
+  function closeLessonModePicker() {
+    setShowLessonModePicker(false);
+  }
+
+  function openLessonGuide(mode: LessonMode) {
+    setShowLessonModePicker(false);
+    onSelectMode(mode);
+
+    if (mode === 'dribble') {
+      setShowShootGuide(false);
+      setShootGuideStep(0);
       setDribbleGuideStep(0);
       setShowDribbleGuide(true);
       return;
     }
 
+    setShowDribbleGuide(false);
+    setDribbleGuideStep(0);
     setShootGuideStep(0);
     setShowShootGuide(true);
   }
@@ -664,10 +830,32 @@ export function LessonScreen({
         </Pressable>
       </View>
 
-      {isSideDockedCoaching ? (
-        <View pointerEvents="box-none" style={styles.sideRailOverlay}>
-          <View style={[styles.sideCard, styles.sideCardDockedOverlay, { width: floatingCoachingWidth, maxHeight: floatingCoachingHeight }]}>
-            <ScrollView contentContainerStyle={styles.sideCardContent} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+      {isCameraActive && isSideDockedCoaching ? (
+        <View
+          pointerEvents="box-none"
+          style={[
+            styles.sideRailOverlay,
+            shouldLeftDockCoaching ? styles.sideRailOverlayLandscape : null,
+            { top: coachingPanelTopInset, bottom: coachingPanelBottomInset },
+          ]}
+        >
+          <View
+            style={[
+              styles.sideCard,
+              styles.sideCardDockedOverlay,
+              shouldLeftDockCoaching ? styles.sideCardDockedOverlayLandscape : null,
+              { width: floatingCoachingWidth, height: '100%' },
+            ]}
+          >
+            <ScrollView
+              style={styles.sideCardScroll}
+              contentContainerStyle={[
+                styles.sideCardContent,
+                isCoachingPanelHalfOpen ? { paddingBottom: coachingHalfOffset + 24 } : null,
+              ]}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled
+            >
               <RealtimeCoachingPanel
                 lessonMode={lessonMode}
                 currentDribbleCount={currentDribbleCount}
@@ -681,21 +869,17 @@ export function LessonScreen({
         </View>
       ) : null}
 
-      {!isSideDockedCoaching ? (
+      {isCameraActive && !isSideDockedCoaching ? (
         <View pointerEvents="box-none" style={styles.coachingOverlay}>
           <Animated.View
             pointerEvents={allowPanelDragHide && isCoachingPanelHidden ? 'none' : 'auto'}
             style={[
               styles.sideCard,
               styles.sideCardFloating,
-              {
-                left: 12,
-                right: 12,
-                bottom: bottomControlsInset,
-                maxHeight: floatingCoachingHeight,
-              },
+              floatingCoachingFrame,
               allowPanelDragHide
                 ? {
+                    opacity: coachingPanelOpacity,
                     transform: [{ translateY: coachingPanelTranslateY }],
                   }
                 : null,
@@ -707,7 +891,15 @@ export function LessonScreen({
                 <Text style={styles.panelDragHint}>숨기기</Text>
               </View>
             ) : null}
-            <ScrollView contentContainerStyle={styles.sideCardContent} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+            <ScrollView
+              style={styles.sideCardScroll}
+              contentContainerStyle={[
+                styles.sideCardContent,
+                isCoachingPanelHalfOpen ? { paddingBottom: coachingHalfOffset + 24 } : null,
+              ]}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled
+            >
               <RealtimeCoachingPanel
                 lessonMode={lessonMode}
                 currentDribbleCount={currentDribbleCount}
@@ -724,8 +916,7 @@ export function LessonScreen({
               pointerEvents="box-none"
               style={[
                 styles.coachingRestoreWrap,
-                { bottom: bottomControlsInset },
-                isLandscapeMobileLayout ? styles.coachingRestoreWrapWide : null,
+                isLandscapeMobileLayout ? styles.coachingRestoreWrapLandscape : { bottom: bottomControlsInset },
               ]}
             >
               <Animated.View
@@ -745,51 +936,76 @@ export function LessonScreen({
         </View>
       ) : null}
 
-      <View pointerEvents="box-none" style={styles.bottomControlsOverlay}>
-        <View style={[styles.bottomControlsStack, isWideLayout ? styles.bottomControlsStackWide : null]}>
-          <View style={styles.modeButtons}>
-            <ModeButton
-              title="드리블 분석"
-              active={lessonMode === 'dribble'}
-              disabled={isLessonSessionBusy}
-              onPress={() => onSelectMode('dribble')}
-            />
-            <ModeButton
-              title="슛 분석"
-              active={lessonMode === 'shoot'}
-              disabled={isLessonSessionBusy}
-              onPress={() => onSelectMode('shoot')}
-            />
-          </View>
-
-          <View style={styles.captureModeChip}>
-            <Text style={styles.captureModeChipText}>{lessonMode === 'shoot' ? '슛 분석' : dribbleViewLabel}</Text>
-          </View>
-
-          <View style={styles.captureControlsRow}>
-            <View style={styles.captureSideSlot}>
-              {isLessonActive || isCameraActive ? (
-                <OverlayUtilityButton title="레슨 종료" onPress={onEndLesson} variant="danger" />
-              ) : (
-                <View style={styles.captureSidePlaceholder} />
-              )}
+      <View
+        pointerEvents="box-none"
+        style={[styles.bottomControlsOverlay, isLandscapeMobileLayout ? styles.bottomControlsOverlayLandscape : null]}
+      >
+        {isLandscapeMobileLayout ? (
+          <>
+            <View pointerEvents="box-none" style={styles.landscapeShutterDock}>
+              <CameraShutterButton active={isRoundLessonControlActive} onPress={isRoundLessonControlActive ? onEndLesson : openLessonStart} />
             </View>
 
-            <View style={styles.captureButtonStack}>
-              <CameraShutterButton busy={isLessonSessionBusy} disabled={isLessonSessionBusy} onPress={openLessonStart} />
-              <Text style={styles.captureButtonLabel}>{isLessonSessionBusy ? '레슨 진행 중' : '레슨 시작'}</Text>
-            </View>
-
-            <View style={styles.captureSideSlot}>
-              {lessonMode === 'shoot' && isShootSuccessButtonVisible ? (
+            {lessonMode === 'shoot' && isShootSuccessButtonVisible ? (
+              <View pointerEvents="box-none" style={styles.landscapeUtilityDock}>
                 <OverlayUtilityButton title="슛 성공" onPress={onRegisterSuccessfulShot} variant="accent" />
-              ) : (
+              </View>
+            ) : null}
+          </>
+        ) : (
+          <View style={[styles.bottomControlsStack, isWideLayout ? styles.bottomControlsStackWide : null]}>
+            <View style={styles.captureControlsRow}>
+              <View style={styles.captureSideSlot}>
                 <View style={styles.captureSidePlaceholder} />
-              )}
+              </View>
+
+              <View style={styles.captureButtonStack}>
+                <CameraShutterButton active={isRoundLessonControlActive} onPress={isRoundLessonControlActive ? onEndLesson : openLessonStart} />
+              </View>
+
+              <View style={styles.captureSideSlot}>
+                {lessonMode === 'shoot' && isShootSuccessButtonVisible ? (
+                  <OverlayUtilityButton title="슛 성공" onPress={onRegisterSuccessfulShot} variant="accent" />
+                ) : (
+                  <View style={styles.captureSidePlaceholder} />
+                )}
+              </View>
+            </View>
+          </View>
+        )}
+      </View>
+
+      <Modal visible={showLessonModePicker} transparent animationType="fade" onRequestClose={closeLessonModePicker}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Pressable
+              onPress={closeLessonModePicker}
+              style={({ pressed }) => [styles.modalCloseButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.modalCloseButtonText}>X</Text>
+            </Pressable>
+            <Text style={styles.modalTitle}>레슨 모드 선택</Text>
+            <Text style={styles.modalBody}>이번 레슨에서 어떤 동작을 분석할지 선택해 주세요.</Text>
+            <View style={styles.modePickerOptions}>
+              <ModeButton
+                title="드리블"
+                imageSource={DRIBBLE_MODE_IMAGE}
+                imageTintColor="#050505"
+                active={lessonMode === 'dribble'}
+                disabled={false}
+                onPress={() => openLessonGuide('dribble')}
+              />
+              <ModeButton
+                title="슛"
+                imageSource={SHOOT_MODE_IMAGE}
+                active={lessonMode === 'shoot'}
+                disabled={false}
+                onPress={() => openLessonGuide('shoot')}
+              />
             </View>
           </View>
         </View>
-      </View>
+      </Modal>
 
       <Modal visible={showDribbleGuide} transparent animationType="fade" onRequestClose={closeDribbleGuide}>
         <View style={styles.modalBackdrop}>
@@ -984,7 +1200,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: 'rgba(10,10,10,0.52)',
+    backgroundColor: 'rgba(10,10,10,0.18)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
@@ -1013,7 +1229,7 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     height: 132,
-    backgroundColor: 'rgba(0,0,0,0.18)',
+    backgroundColor: 'transparent',
     pointerEvents: 'none',
   },
   cameraChromeBottom: {
@@ -1022,7 +1238,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: 240,
-    backgroundColor: 'rgba(0,0,0,0.24)',
+    backgroundColor: 'transparent',
     pointerEvents: 'none',
   },
   screenScroll: {
@@ -1128,7 +1344,7 @@ const styles = StyleSheet.create({
   },
   sideCard: {
     ...sharedPanel,
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: 'transparent',
     padding: 16,
     overflow: 'hidden',
   },
@@ -1143,11 +1359,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 84,
     right: 16,
-    bottom: 190,
+    bottom: 12,
     zIndex: 18,
     alignItems: 'flex-end',
     justifyContent: 'flex-start',
     pointerEvents: 'box-none',
+  },
+  sideRailOverlayLandscape: {
+    left: 16,
+    right: undefined,
+    alignItems: 'flex-start',
   },
   sideCardFloating: {
     position: 'absolute',
@@ -1156,8 +1377,15 @@ const styles = StyleSheet.create({
   sideCardDockedOverlay: {
     alignSelf: 'flex-end',
   },
+  sideCardDockedOverlayLandscape: {
+    alignSelf: 'flex-start',
+  },
+  sideCardScroll: {
+    flex: 1,
+  },
   sideCardContent: {
     paddingBottom: 8,
+    flexGrow: 1,
   },
   coachingOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -1176,13 +1404,20 @@ const styles = StyleSheet.create({
     bottom: undefined,
     alignItems: 'flex-end',
   },
+  coachingRestoreWrapLandscape: {
+    left: 12,
+    right: undefined,
+    top: 88,
+    bottom: undefined,
+    alignItems: 'flex-start',
+  },
   coachingRestoreChip: {
     borderRadius: 0,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: 'rgba(8,8,8,0.28)',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255,255,255,0.14)',
   },
   coachingRestoreChipText: {
     color: colors.text,
@@ -1208,12 +1443,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   coachingHero: {
-    marginBottom: 16,
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-    borderWidth: 0,
-    borderColor: 'transparent',
+    display: 'none',
   },
   coachingHeroTop: {
     flexDirection: 'row',
@@ -1229,9 +1459,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 0,
-    borderColor: 'transparent',
+    backgroundColor: 'rgba(7,7,7,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   liveDot: {
     width: 8,
@@ -1249,9 +1479,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 0,
-    borderColor: 'transparent',
+    backgroundColor: 'rgba(7,7,7,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   modePillText: {
     color: colors.textSoft,
@@ -1287,9 +1517,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: colors.surface,
-    borderWidth: 0,
-    borderColor: 'transparent',
+    backgroundColor: 'rgba(7,7,7,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
     justifyContent: 'center',
   },
   sectionToggleButtonRound: {
@@ -1330,9 +1560,9 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     padding: 14,
     borderRadius: 14,
-    backgroundColor: colors.surface,
-    borderWidth: 0,
-    borderColor: 'transparent',
+    backgroundColor: 'rgba(7,7,7,0.24)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   sectionCardWithToggleSpace: {
     paddingRight: 54,
@@ -1376,29 +1606,51 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   modeButton: {
-    minWidth: 118,
-    borderRadius: 999,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    flex: 1,
+    minWidth: 0,
+    borderRadius: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(247, 238, 226, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
+    gap: 14,
+    overflow: 'hidden',
   },
   modeButtonActive: {
-    backgroundColor: 'rgba(255,159,28,0.92)',
-    borderColor: 'rgba(255,246,232,0.72)',
+    backgroundColor: 'rgba(247, 238, 226, 0.12)',
+    borderColor: 'rgba(255,214,160,0.82)',
+    shadowColor: '#f4b36b',
+    shadowOpacity: 0.24,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 6,
   },
   modeButtonDisabled: {
     opacity: 0.48,
   },
+  modeButtonArtworkFrame: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 18,
+    backgroundColor: '#f7f3eb',
+    padding: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  modeButtonArtwork: {
+    width: '100%',
+    height: '100%',
+  },
   modeButtonText: {
     color: '#fff8f0',
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: '800',
   },
   modeButtonTextActive: {
-    color: '#27170a',
+    color: '#fff8f0',
   },
   modeStatusText: {
     color: colors.text,
@@ -1419,7 +1671,29 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 24,
     paddingHorizontal: 16,
-    paddingBottom: 26,
+    paddingBottom: 2,
+    pointerEvents: 'box-none',
+  },
+  bottomControlsOverlayLandscape: {
+    top: 0,
+    bottom: 0,
+    paddingBottom: 0,
+  },
+  landscapeShutterDock: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    pointerEvents: 'box-none',
+  },
+  landscapeUtilityDock: {
+    position: 'absolute',
+    right: 20,
+    bottom: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
     pointerEvents: 'box-none',
   },
   bottomControlsStack: {
@@ -1430,19 +1704,6 @@ const styles = StyleSheet.create({
   },
   bottomControlsStackWide: {
     maxWidth: 760,
-  },
-  captureModeChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(10,10,10,0.46)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-  captureModeChipText: {
-    color: '#f7efe7',
-    fontSize: 13,
-    fontWeight: '800',
   },
   captureControlsRow: {
     width: '100%',
@@ -1464,16 +1725,7 @@ const styles = StyleSheet.create({
   captureButtonStack: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  captureButtonLabel: {
-    marginTop: 10,
-    color: '#fff6ed',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.2,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
+    marginTop: 12,
   },
   shutterButton: {
     width: 92,
@@ -1491,8 +1743,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 8,
   },
-  shutterButtonBusy: {
-    borderColor: 'rgba(255,159,28,0.92)',
+  shutterButtonActive: {
+    borderColor: 'rgba(239,68,68,0.96)',
   },
   shutterButtonDisabled: {
     opacity: 0.78,
@@ -1503,9 +1755,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: '#fff6ed',
   },
-  shutterButtonInnerBusy: {
-    borderRadius: 24,
-    backgroundColor: '#ff9f1c',
+  shutterButtonInnerActive: {
+    borderRadius: 999,
+    backgroundColor: '#ef4444',
   },
   overlayUtilityButton: {
     minWidth: 88,
@@ -1536,9 +1788,9 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     padding: 14,
     borderRadius: 14,
-    backgroundColor: 'rgba(191, 80, 88, 0.12)',
-    borderWidth: 0,
-    borderColor: 'transparent',
+    backgroundColor: 'rgba(191, 80, 88, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,215,0.14)',
   },
   errorText: {
     color: '#ffd5d5',
@@ -1550,9 +1802,9 @@ const styles = StyleSheet.create({
     marginTop: 0,
     padding: 16,
     borderRadius: 14,
-    backgroundColor: colors.surface,
-    borderWidth: 0,
-    borderColor: 'transparent',
+    backgroundColor: 'rgba(7,7,7,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
     gap: 8,
   },
   tipTitle: {
@@ -1572,11 +1824,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   modalCard: {
+    position: 'relative',
     borderRadius: 18,
     backgroundColor: colors.surface,
     borderWidth: 0,
     borderColor: 'transparent',
     padding: 20,
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    zIndex: 2,
+  },
+  modalCloseButtonText: {
+    color: colors.textSoft,
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 18,
   },
   modalTitle: {
     color: colors.text,
@@ -1602,6 +1875,17 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 14,
     lineHeight: 22,
+  },
+  modePickerOptions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+    marginBottom: 14,
+  },
+  modePickerHint: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
   },
   countInput: {
     marginTop: 2,

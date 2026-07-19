@@ -25,33 +25,79 @@ interface DiaryScreenProps {
 }
 
 type RecordFilter = 'all' | 'dribble' | 'shoot' | 'shootSuccess';
+type SuccessRateRange = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+const SUCCESS_RATE_COMPARE_TRACK_HEIGHT = 150;
+const SUCCESS_RATE_COMPARE_BAR_MIN_HEIGHT = 12;
+const SUCCESS_RATE_COMPARE_EMPTY_HEIGHT = 8;
+const SUCCESS_RATE_COMPARE_VALUE_OFFSET = 30;
+const SUCCESS_RATE_COMPARE_MIN_ATTEMPTS = 20;
+
+interface SuccessRateComparisonFrame {
+  label: string;
+  detail: string;
+  start: Date;
+  end: Date;
+}
 
 function getRecordTitle(mode: LessonRecord['mode']) {
-  return mode === 'shoot' ? '슛 분석' : '드리블 분석';
+  return mode === 'shoot' ? '\uC29B \uBD84\uC11D' : '\uB4DC\uB9AC\uBE14 \uBD84\uC11D';
 }
 
 function getRecordModeLabel(mode: LessonRecord['mode']) {
-  return mode === 'shoot' ? '슛 레슨' : '드리블 레슨';
+  return mode === 'shoot' ? '\uC29B \uB808\uC2A8' : '\uB4DC\uB9AC\uBE14 \uB808\uC2A8';
 }
 
 function getShotOutcomeLabel(shotOutcome: LessonRecord['shotOutcome']) {
-  return shotOutcome === 'success' ? '성공' : '실패';
+  return shotOutcome === 'success' ? '\uC131\uACF5' : '\uC2E4\uD328';
 }
 
 function getRecordFilterLabel(filter: RecordFilter) {
   if (filter === 'dribble') {
-    return '드리블 분석';
+    return '\uB4DC\uB9AC\uBE14 \uBD84\uC11D';
   }
 
   if (filter === 'shoot') {
-    return '슛 분석';
+    return '\uC29B \uBD84\uC11D';
   }
 
   if (filter === 'shootSuccess') {
-    return '슛 성공';
+    return '\uC29B \uC131\uACF5';
   }
 
-  return '전체';
+  return '\uC804\uCCB4';
+}
+
+function getSuccessRateRangeLabel(range: SuccessRateRange) {
+  if (range === 'yearly') {
+    return '\uC5F0\uAC04';
+  }
+
+  if (range === 'monthly') {
+    return '\uC6D4\uAC04';
+  }
+
+  if (range === 'weekly') {
+    return '\uC8FC\uAC04';
+  }
+
+  return '\uC77C\uAC04';
+}
+
+function getSuccessRateRangeSummaryText(range: SuccessRateRange) {
+  if (range === 'yearly') {
+    return '\uC774\uBC88 \uD574\uC640 \uC9C1\uC804 2\uB144 \uC804\uCCB4';
+  }
+
+  if (range === 'monthly') {
+    return '\uC774\uBC88\uB2EC\uACFC \uC9C1\uC804 2\uAC1C\uC6D4 \uC804\uCCB4';
+  }
+
+  if (range === 'weekly') {
+    return '\uC774\uBC88\uC8FC\uC640 \uC9C1\uC804 2\uC8FC \uC804\uCCB4';
+  }
+
+  return '\uC624\uB298\uACFC \uC9C1\uC804 2\uC77C';
 }
 
 function parseDateKeyToDate(dateKey: string) {
@@ -65,6 +111,77 @@ function parseDateKeyToDate(dateKey: string) {
   }
 
   return new Date(year, month - 1, day);
+}
+
+function getStartOfWeek(date: Date) {
+  const nextDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = nextDate.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+
+  nextDate.setDate(nextDate.getDate() + diff);
+  return nextDate;
+}
+
+function buildSuccessRateComparisonFrames(anchorDate: Date, range: SuccessRateRange): SuccessRateComparisonFrame[] {
+  if (range === 'yearly') {
+    return [-2, -1, 0].map((offset) => {
+      const start = new Date(anchorDate.getFullYear() + offset, 0, 1);
+      const end = new Date(start.getFullYear() + 1, 0, 0, 23, 59, 59, 999);
+
+      return {
+        label: offset === 0 ? '\uC774\uBC88 \uD574' : `${Math.abs(offset)}\uB144 \uC804`,
+        detail: '',
+        start,
+        end,
+      };
+    });
+  }
+
+  if (range === 'monthly') {
+    return [-2, -1, 0].map((offset) => {
+      const start = new Date(anchorDate.getFullYear(), anchorDate.getMonth() + offset, 1);
+      const end = new Date(start.getFullYear(), start.getMonth() + 1, 0, 23, 59, 59, 999);
+
+      return {
+        label: offset === 0 ? '\uC774\uBC88\uB2EC' : `${Math.abs(offset)}\uAC1C\uC6D4 \uC804`,
+        detail: '',
+        start,
+        end,
+      };
+    });
+  }
+
+  if (range === 'weekly') {
+    const currentWeekStart = getStartOfWeek(anchorDate);
+
+    return [-2, -1, 0].map((offset) => {
+      const start = new Date(
+        currentWeekStart.getFullYear(),
+        currentWeekStart.getMonth(),
+        currentWeekStart.getDate() + offset * 7
+      );
+      const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6, 23, 59, 59, 999);
+
+      return {
+        label: offset === 0 ? '\uC774\uBC88\uC8FC' : `${Math.abs(offset)}\uC8FC \uC804`,
+        detail: '',
+        start,
+        end,
+      };
+    });
+  }
+
+  return [-2, -1, 0].map((offset) => {
+    const start = new Date(anchorDate.getFullYear(), anchorDate.getMonth(), anchorDate.getDate() + offset);
+    const end = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 23, 59, 59, 999);
+
+    return {
+      label: offset === 0 ? '\uC624\uB298' : `${Math.abs(offset)}\uC77C \uC804`,
+      detail: `${start.getMonth() + 1}/${start.getDate()}`,
+      start,
+      end,
+    };
+  });
 }
 
 function getSyncedFeedback(timeline: FeedbackMoment[], fallback: string, positionMillis: number) {
@@ -143,8 +260,8 @@ function DateArrowIcon({ direction }: { direction: 'left' | 'right' }) {
         onPress={onToggleMenu}
         style={({ pressed }) => [styles.recordFilterDropdown, styles.evaluationDropdownButton, pressed && styles.pressed]}
       >
-        <Text style={styles.recordFilterDropdownText}>{`기록 평가: ${isEvaluationVisible ? '보기' : '숨김'}`}</Text>
-        <Text style={styles.recordFilterDropdownIcon}>{isMenuOpen ? '▲' : '▼'}</Text>
+        <Text style={styles.recordFilterDropdownText}>{`湲곕줉 ?됯?: ${isEvaluationVisible ? '蹂닿린' : '?④?'}`}</Text>
+        <Text style={styles.recordFilterDropdownIcon}>{isMenuOpen ? '?? : '??}</Text>
       </Pressable>
 
       <Animated.View
@@ -160,8 +277,8 @@ function DateArrowIcon({ direction }: { direction: 'left' | 'right' }) {
       >
         <View style={styles.evaluationDropdownMenu}>
           {([
-            { label: '보기', value: true },
-            { label: '숨기기', value: false },
+            { label: '蹂닿린', value: true },
+            { label: '?④린湲?, value: false },
           ] as const).map((option) => (
             <Pressable
               key={option.label}
@@ -188,9 +305,7 @@ function DateArrowIcon({ direction }: { direction: 'left' | 'right' }) {
 } */
 
 interface CollapsibleRecordSectionProps {
-  title: string;
   expanded: boolean;
-  onToggle: () => void;
   children: React.ReactNode;
 }
 
@@ -202,7 +317,7 @@ interface CollapsibleRecordSectionProps {
 }: CollapsibleRecordSectionProps) {
   const contentAnimation = useRef(new Animated.Value(expanded ? 1 : 0)).current;
   const [contentHeight, setContentHeight] = useState(0);
-  const sectionTitle = '기록 평가';
+  const sectionTitle = '湲곕줉 ?됯?';
 
   useEffect(() => {
     Animated.timing(contentAnimation, {
@@ -229,7 +344,7 @@ interface CollapsibleRecordSectionProps {
   return (
     <View style={[styles.evaluationSection, !expanded && styles.evaluationSectionCollapsed]}>
       <Pressable
-        accessibilityLabel={expanded ? `${sectionTitle} 숨기기` : `${sectionTitle} 펼치기`}
+        accessibilityLabel={expanded ? `${sectionTitle} ?④린湲? : `${sectionTitle} ?쇱튂湲?}
         onPress={onToggle}
         style={({ pressed }) => [
           styles.evaluationSectionToggle,
@@ -265,14 +380,11 @@ interface CollapsibleRecordSectionProps {
 } */
 
 function CollapsibleRecordSection({
-  title,
   expanded,
-  onToggle,
   children,
 }: CollapsibleRecordSectionProps) {
   const contentAnimation = useRef(new Animated.Value(expanded ? 1 : 0)).current;
   const [contentHeight, setContentHeight] = useState(0);
-  const sectionTitle = title || '기록 평가';
 
   useEffect(() => {
     Animated.timing(contentAnimation, {
@@ -298,19 +410,6 @@ function CollapsibleRecordSection({
 
   return (
     <View style={[styles.evaluationSection, !expanded && styles.evaluationSectionCollapsed]}>
-      <Pressable
-        accessibilityLabel={expanded ? `${sectionTitle} 숨기기` : `${sectionTitle} 펼치기`}
-        onPress={onToggle}
-        style={({ pressed }) => [
-          styles.evaluationSectionToggle,
-          expanded ? styles.evaluationSectionToggleFloating : styles.evaluationSectionToggleCollapsed,
-          expanded ? styles.evaluationSectionToggleRound : styles.evaluationSectionToggleChip,
-          pressed && styles.pressed,
-        ]}
-      >
-        <Text style={styles.evaluationSectionToggleIcon}>{expanded ? 'v' : '^'}</Text>
-        {!expanded ? <Text style={styles.evaluationSectionToggleLabel}>{sectionTitle}</Text> : null}
-      </Pressable>
       <Animated.View
         pointerEvents={expanded ? 'auto' : 'none'}
         style={[
@@ -337,68 +436,134 @@ function CollapsibleRecordSection({
 
 function getRecordLevelLabel(level: NonNullable<LessonRecord['evaluation']>['level']) {
   if (level === 'good') {
-    return '좋음';
+    return '\uC88B\uC74C';
   }
 
   if (level === 'average') {
-    return '보통';
+    return '\uBCF4\uD1B5';
   }
 
-  return '나쁨';
+  return '\uB098\uC068';
 }
 
-function getShotTrendLabel(trend: DiarySkillInsight['shotTrend'], delta: number | null) {
-  if (trend === 'up') {
-    return `최근 평균보다 ${Math.abs(delta ?? 0)}% 상승`;
-  }
-
-  if (trend === 'down') {
-    return `최근 평균보다 ${Math.abs(delta ?? 0)}% 하락`;
-  }
-
-  if (trend === 'flat') {
-    return '최근 평균과 비슷함';
-  }
-
-  if (trend === 'insufficient_history') {
-    return '비교할 이전 기록이 더 필요함';
-  }
-
-  return '연습 기준을 채우면 해석 가능';
-}
 
 function getDribbleBalanceNarration(insight: DiarySkillInsight, totalCount: number) {
   const trackedCount = insight.leftDribbleCount + insight.rightDribbleCount;
 
   if (totalCount === 0) {
-    return '오늘은 아직 드리블 균형을 해석할 기록이 없어요.';
+    return '\uC624\uB298\uC740 \uC544\uC9C1 \uB4DC\uB9AC\uBE14 \uADE0\uD615\uC744 \uD574\uC11D\uD560 \uAE30\uB85D\uC774 \uC5C6\uC5B4\uC694.';
   }
 
   if (trackedCount === 0) {
-    return `오늘 드리블은 ${totalCount}회 기록됐지만, 좌우 균형을 해석할 정보는 아직 부족해요.`;
+    return `\uC624\uB298 \uB4DC\uB9AC\uBE14\uC740 ${totalCount}\uD68C \uAE30\uB85D\uB410\uC9C0\uB9CC, \uC88C\uC6B0 \uADE0\uD615\uC744 \uD574\uC11D\uD560 \uC815\uBCF4\uB294 \uC544\uC9C1 \uBD80\uC871\uD574\uC694.`;
   }
 
   if (insight.dribbleBalance === 'balanced') {
-    return `오늘은 왼손과 오른손 드리블을 고르게 연습하셨군요. 좌우 차이가 ${insight.dribbleBalanceGap}회로 균형이 좋습니다.`;
+    return `\uC624\uB298\uC740 \uC67C\uC190\uACFC \uC624\uB978\uC190 \uB4DC\uB9AC\uBE14\uC744 \uACE0\uB974\uAC8C \uC5F0\uC2B5\uD558\uC168\uAD70\uC694. \uC88C\uC6B0 \uCC28\uC774\uAC00 ${insight.dribbleBalanceGap}\uD68C\uB85C \uADE0\uD615\uC774 \uC88B\uC2B5\uB2C8\uB2E4.`;
   }
 
   return insight.dribbleBalance === 'left'
-    ? `오늘은 왼손 드리블을 더 많이 연습하셨군요. 오른손보다 ${insight.dribbleBalanceGap}회 더 많았습니다.`
-    : `오늘은 오른손 드리블을 더 많이 연습하셨군요. 왼손보다 ${insight.dribbleBalanceGap}회 더 많았습니다.`;
+    ? `\uC624\uB298\uC740 \uC67C\uC190 \uB4DC\uB9AC\uBE14\uC744 \uB354 \uB9CE\uC774 \uC5F0\uC2B5\uD558\uC168\uAD70\uC694. \uC624\uB978\uC190\uBCF4\uB2E4 ${insight.dribbleBalanceGap}\uD68C \uB354 \uB9CE\uC558\uC2B5\uB2C8\uB2E4.`
+    : `\uC624\uB298\uC740 \uC624\uB978\uC190 \uB4DC\uB9AC\uBE14\uC744 \uB354 \uB9CE\uC774 \uC5F0\uC2B5\uD558\uC168\uAD70\uC694. \uC67C\uC190\uBCF4\uB2E4 ${insight.dribbleBalanceGap}\uD68C \uB354 \uB9CE\uC558\uC2B5\uB2C8\uB2E4.`;
 }
 
 function getDribbleBalanceSummary(insight: DiarySkillInsight, totalCount: number) {
   const trackedCount = insight.leftDribbleCount + insight.rightDribbleCount;
 
   if (trackedCount === 0) {
-    return `해당 날짜 드리블 횟수: ${totalCount}회`;
+    return `\uD574\uB2F9 \uB0A0\uC9DC \uB4DC\uB9AC\uBE14 \uD69F\uC218: ${totalCount}\uD68C`;
   }
 
   if (trackedCount < totalCount) {
-    return `전체 ${totalCount}회 중 왼손 ${insight.leftDribbleCount}회, 오른손 ${insight.rightDribbleCount}회가 구분되어 기록됐습니다.`;
+    return `\uC804\uCCB4 ${totalCount}\uD68C \uC911 \uC67C\uC190 ${insight.leftDribbleCount}\uD68C, \uC624\uB978\uC190 ${insight.rightDribbleCount}\uD68C\uAC00 \uAD6C\uBD84\uB418\uC5B4 \uAE30\uB85D\uB410\uC2B5\uB2C8\uB2E4.`;
   }
 
-  return `전체 ${totalCount}회 중 왼손 ${insight.leftDribbleCount}회, 오른손 ${insight.rightDribbleCount}회입니다.`;
+  return `\uC804\uCCB4 ${totalCount}\uD68C \uC911 \uC67C\uC190 ${insight.leftDribbleCount}\uD68C, \uC624\uB978\uC190 ${insight.rightDribbleCount}\uD68C\uC785\uB2C8\uB2E4.`;
+}
+
+function formatDiarySummaryDateLabel(dateKey: string) {
+  const date = parseDateKeyToDate(dateKey);
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+function getPracticeComparisonSentence(label: string, delta: number) {
+  if (delta > 0) {
+    return `${label}\uBCF4\uB2E4 ${Math.abs(delta)}\uD68C \uB354 \uB9CE\uC2B5\uB2C8\uB2E4.`;
+  }
+
+  if (delta < 0) {
+    return `${label}\uBCF4\uB2E4 ${Math.abs(delta)}\uD68C \uB354 \uC801\uC2B5\uB2C8\uB2E4.`;
+  }
+
+  return `${label}\uBCF4\uB2E4 \uAC19\uC2B5\uB2C8\uB2E4.`;
+}
+
+function getDailySummaryPracticeText(insight: DiarySkillInsight, selectedDateDribbleCount: number) {
+  const selectedPracticeTotal = selectedDateDribbleCount + insight.selectedShotAttempts;
+  const summaryParts = [
+    `\uC624\uB298 \uC5F0\uC2B5\uB7C9\uC740 \uB4DC\uB9AC\uBE14 ${selectedDateDribbleCount}\uD68C\uC640 \uC29B ${insight.selectedShotAttempts}\uD68C\uB85C \uCD1D ${selectedPracticeTotal}\uD68C\uC785\uB2C8\uB2E4.`,
+    getPracticeComparisonSentence('\uC5B4\uC81C', selectedPracticeTotal - insight.yesterdayPracticeTotal),
+  ];
+
+  if (insight.previousPracticeDateKey) {
+    summaryParts.push(
+      getPracticeComparisonSentence(
+        `\uC774\uC804 \uC5F0\uC2B5\uC77C(${formatDiarySummaryDateLabel(insight.previousPracticeDateKey)})`,
+        selectedPracticeTotal - insight.previousPracticeTotal
+      )
+    );
+  }
+
+  return summaryParts.join(' ');
+}
+
+function getDailySummaryEvaluationText(insight: DiarySkillInsight) {
+  const { good, average, bad } = insight.evaluationCounts;
+  const totalEvaluatedCount = good + average + bad;
+
+  if (totalEvaluatedCount === 0) {
+    return '\uC624\uB298 \uB808\uC2A8 \uAE30\uB85D\uC740 \uC544\uC9C1 \uD3C9\uAC00 \uC815\uBCF4\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.';
+  }
+
+  if (insight.evaluationDominantLevel === 'good') {
+    return `\uC624\uB298 \uB808\uC2A8 \uAE30\uB85D\uC740 \uB300\uCCB4\uB85C \uC88B\uC740 \uD750\uB984\uC785\uB2C8\uB2E4. \uC88B\uC74C ${good}\uAC1C, \uBCF4\uD1B5 ${average}\uAC1C, \uB098\uC068 ${bad}\uAC1C\uC785\uB2C8\uB2E4.`;
+  }
+
+  if (insight.evaluationDominantLevel === 'average') {
+    return `\uC624\uB298 \uB808\uC2A8 \uAE30\uB85D\uC740 \uB300\uCCB4\uB85C \uBCF4\uD1B5 \uD750\uB984\uC785\uB2C8\uB2E4. \uC88B\uC74C ${good}\uAC1C, \uBCF4\uD1B5 ${average}\uAC1C, \uB098\uC068 ${bad}\uAC1C\uC785\uB2C8\uB2E4.`;
+  }
+
+  if (insight.evaluationDominantLevel === 'bad') {
+    return `\uC624\uB298 \uB808\uC2A8 \uAE30\uB85D\uC740 \uB300\uCCB4\uB85C \uBCF4\uC644\uC774 \uB354 \uD544\uC694\uD569\uB2C8\uB2E4. \uC88B\uC74C ${good}\uAC1C, \uBCF4\uD1B5 ${average}\uAC1C, \uB098\uC068 ${bad}\uAC1C\uC785\uB2C8\uB2E4.`;
+  }
+
+  return `\uC624\uB298 \uB808\uC2A8 \uAE30\uB85D\uC740 \uC88B\uC740 \uC810\uACFC \uBCF4\uC644\uD560 \uC810\uC774 \uD568\uAED8 \uBCF4\uC785\uB2C8\uB2E4. \uC88B\uC74C ${good}\uAC1C, \uBCF4\uD1B5 ${average}\uAC1C, \uB098\uC068 ${bad}\uAC1C\uC785\uB2C8\uB2E4.`;
+}
+
+function getDailySummaryShotText(insight: DiarySkillInsight) {
+  return `\uC624\uB298 \uC29B \uC131\uACF5\uB960\uC740 ${insight.selectedShotSuccessRate}%\uC785\uB2C8\uB2E4. ${insight.selectedShotAttempts}\uD68C \uC911 ${insight.selectedShotSuccesses}\uD68C \uC131\uACF5\uD588\uC2B5\uB2C8\uB2E4.`;
+}
+
+function getDailySummaryDribbleText(insight: DiarySkillInsight, selectedDateDribbleCount: number) {
+  const trackedDribbleCount = insight.leftDribbleCount + insight.rightDribbleCount;
+
+  if (trackedDribbleCount === 0) {
+    return `\uC624\uB298 \uB4DC\uB9AC\uBE14\uC740 ${selectedDateDribbleCount}\uD68C\uC600\uC9C0\uB9CC \uC88C\uC6B0 \uAD6C\uBD84 \uAE30\uB85D\uC740 \uC544\uC9C1 \uBD80\uC871\uD569\uB2C8\uB2E4.`;
+  }
+
+  if (insight.dribbleBalance === 'balanced') {
+    return `\uC624\uB298\uC740 \uC67C\uC190\uACFC \uC624\uB978\uC190 \uB4DC\uB9AC\uBE14\uC744 \uACE0\uB974\uAC8C \uC5F0\uC2B5\uD588\uC2B5\uB2C8\uB2E4. \uC67C\uC190 ${insight.leftDribbleCount}\uD68C, \uC624\uB978\uC190 ${insight.rightDribbleCount}\uD68C\uC785\uB2C8\uB2E4.`;
+  }
+
+  if (insight.dribbleBalance === 'left') {
+    return `\uC624\uB298\uC740 \uC67C\uC190 \uB4DC\uB9AC\uBE14\uC744 \uB354 \uB9CE\uC774 \uCC64\uC2B5\uB2C8\uB2E4. \uC67C\uC190 ${insight.leftDribbleCount}\uD68C, \uC624\uB978\uC190 ${insight.rightDribbleCount}\uD68C\uC785\uB2C8\uB2E4.`;
+  }
+
+  if (insight.dribbleBalance === 'right') {
+    return `\uC624\uB298\uC740 \uC624\uB978\uC190 \uB4DC\uB9AC\uBE14\uC744 \uB354 \uB9CE\uC774 \uCC64\uC2B5\uB2C8\uB2E4. \uC67C\uC190 ${insight.leftDribbleCount}\uD68C, \uC624\uB978\uC190 ${insight.rightDribbleCount}\uD68C\uC785\uB2C8\uB2E4.`;
+  }
+
+  return `\uC624\uB298 \uB4DC\uB9AC\uBE14\uC740 ${selectedDateDribbleCount}\uD68C\uC600\uC2B5\uB2C8\uB2E4.`;
 }
 
 export function DiaryScreen({
@@ -419,18 +584,18 @@ export function DiaryScreen({
   const layoutWidth = shouldUseDesktopMobileLayout(width) ? getDesktopMobileFrameWidth(width) : width;
   const isWide = layoutWidth >= 980;
   const isCompactMobile = layoutWidth < 640;
+  const recordCardWidth = isWide
+    ? Math.min(420, Math.max(360, Math.floor(layoutWidth * 0.34)))
+    : Math.max(280, Math.min(layoutWidth - 40, 336));
   const [playbackFeedback, setPlaybackFeedback] = useState<Record<string, string>>({});
   const [visibleRecordEvaluations, setVisibleRecordEvaluations] = useState<Record<string, boolean>>({});
-  const [showAllShotGraph, setShowAllShotGraph] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [recordFilter, setRecordFilter] = useState<RecordFilter>('all');
   const [showRecordFilterMenu, setShowRecordFilterMenu] = useState(false);
+  const [successRateRange, setSuccessRateRange] = useState<SuccessRateRange>('daily');
+  const [showSuccessRateRangeMenu, setShowSuccessRateRangeMenu] = useState(false);
   const videoRefs = useRef<Record<string, Video | null>>({});
   const playbackPollersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
-  const selectedShotGraph = useMemo(
-    () => shotGraphData.find((item) => item.dateKey === selectedDateKey) ?? null,
-    [selectedDateKey, shotGraphData]
-  );
   const dribbleGraphTotal = Math.max(
     selectedDateDribbleCount,
     diarySkillInsight.leftDribbleCount + diarySkillInsight.rightDribbleCount
@@ -443,30 +608,57 @@ export function DiaryScreen({
   const rightDribbleGraphWidth: `${number}%` = dribbleGraphTotal > 0
     ? `${(diarySkillInsight.rightDribbleCount / dribbleGraphTotal) * 100}%`
     : '0%';
-  const practiceShootThreshold = diarySkillInsight.practiceThresholds.shootAttemptCount;
-  const graphMaxValue = useMemo(
-    () => Math.max(1, selectedShotGraph?.attempts ?? 0, selectedShotGraph?.successes ?? 0),
-    [selectedShotGraph]
-  );
-  const allShotGraphData = useMemo(
-    () => shotGraphData.filter((item) => item.attempts >= practiceShootThreshold),
-    [practiceShootThreshold, shotGraphData]
-  );
-  const allGraphChartWidth = useMemo(() => Math.max(320, allShotGraphData.length * 86 + 48), [allShotGraphData.length]);
   const selectedDate = useMemo(() => (selectedDateKey ? parseDateKeyToDate(selectedDateKey) : new Date()), [selectedDateKey]);
-  const selectedDateAttendance = useMemo(() => {
+  const successRateComparisonFrames = useMemo(
+    () => buildSuccessRateComparisonFrames(selectedDate, successRateRange),
+    [selectedDate, successRateRange]
+  );
+  const successRateComparisonData = useMemo(
+    () =>
+      successRateComparisonFrames.map((frame) => {
+        let attempts = 0;
+        let successes = 0;
+
+        for (const item of shotGraphData) {
+          const itemTime = parseDateKeyToDate(item.dateKey).getTime();
+
+          if (
+            item.attempts >= SUCCESS_RATE_COMPARE_MIN_ATTEMPTS
+            && itemTime >= frame.start.getTime()
+            && itemTime <= frame.end.getTime()
+          ) {
+            attempts += item.attempts;
+            successes += item.successes;
+          }
+        }
+
+        return {
+          ...frame,
+          attempts,
+          successes,
+          successRate: attempts > 0 ? Math.min(100, Math.round((successes / attempts) * 100)) : 0,
+        };
+      }),
+    [shotGraphData, successRateComparisonFrames]
+  );
+  const hasSuccessRateComparisonData = successRateComparisonData.some((item) => item.attempts > 0);
+  const selectedDateRecordState = useMemo(() => {
     const selectedCell = calendarCells.find((cell) => cell.type === 'day' && cell.dateKey === selectedDateKey);
 
     if (!selectedCell || selectedCell.type !== 'day') {
       return { status: 'default' as const };
     }
 
-    if (selectedCell.variant === 'attended') {
-      return { status: 'attended' as const };
+    if (selectedCell.variant === 'good') {
+      return { status: 'good' as const };
     }
 
-    if (selectedCell.variant === 'absent') {
-      return { status: 'absent' as const };
+    if (selectedCell.variant === 'average') {
+      return { status: 'average' as const };
+    }
+
+    if (selectedCell.variant === 'bad') {
+      return { status: 'bad' as const };
     }
 
     return { status: 'default' as const };
@@ -698,7 +890,7 @@ export function DiaryScreen({
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={styles.shotOutcomeToggleLabel}>슛 결과</Text>
+              <Text style={styles.shotOutcomeToggleLabel}>{'\uC29B \uACB0\uACFC'}</Text>
               <Text style={styles.shotOutcomeToggleValue}>{getShotOutcomeLabel(record.shotOutcome)}</Text>
             </Pressable>
           ) : null}
@@ -726,12 +918,12 @@ export function DiaryScreen({
           <CollapsibleRecordSection
             expanded={isEvaluationVisible}
             onToggle={() => toggleRecordEvaluation(record.id)}
-            title={isEvaluationVisible ? '기록 평가 숨기기' : '기록 평가 보기'}
+            title={isEvaluationVisible ? '湲곕줉 ?됯? ?④린湲? : '湲곕줉 ?됯? 蹂닿린'}
           >
 
             {evaluation ? (
             <View style={styles.evaluationBox}>
-              <Text style={styles.evaluationTitle}>기록 평가</Text>
+              <Text style={styles.evaluationTitle}>湲곕줉 ?됯?</Text>
               <Text style={styles.evaluationSummary}>{evaluation.summary}</Text>
 
               <View style={styles.criteriaRow}>
@@ -744,13 +936,13 @@ export function DiaryScreen({
                     ]}
                   >
                     <Text style={styles.criterionChipLabel}>{criterion.label}</Text>
-                    <Text style={styles.criterionChipValue}>{criterion.isStable ? '안정' : '보완'}</Text>
+                    <Text style={styles.criterionChipValue}>{criterion.isStable ? '?덉젙' : '蹂댁셿'}</Text>
                   </View>
                 ))}
               </View>
 
               <View style={styles.highlightGroup}>
-                <Text style={styles.highlightGroupTitle}>잘한 점 다시보기</Text>
+                <Text style={styles.highlightGroupTitle}>?섑븳 ???ㅼ떆蹂닿린</Text>
                 {evaluation.strengths.length > 0 ? (
                   evaluation.strengths.map((highlight, index) => (
                     <Pressable
@@ -763,12 +955,12 @@ export function DiaryScreen({
                     </Pressable>
                   ))
                 ) : (
-                  <Text style={styles.highlightEmptyText}>아직 표시할 안정 장면이 없습니다.</Text>
+                  <Text style={styles.highlightEmptyText}>?꾩쭅 ?쒖떆???덉젙 ?λ㈃???놁뒿?덈떎.</Text>
                 )}
               </View>
 
               <View style={styles.highlightGroup}>
-                <Text style={styles.highlightGroupTitle}>보완할 점 다시보기</Text>
+                <Text style={styles.highlightGroupTitle}>蹂댁셿?????ㅼ떆蹂닿린</Text>
                 {evaluation.improvements.length > 0 ? (
                   evaluation.improvements.map((highlight, index) => (
                     <Pressable
@@ -781,24 +973,24 @@ export function DiaryScreen({
                     </Pressable>
                   ))
                 ) : (
-                  <Text style={styles.highlightEmptyText}>지금은 추가 보완 장면이 없습니다.</Text>
+                  <Text style={styles.highlightEmptyText}>吏湲덉? 異붽? 蹂댁셿 ?λ㈃???놁뒿?덈떎.</Text>
                 )}
               </View>
             </View>
           ) : (
             <View style={styles.evaluationEmptyBox}>
-              <Text style={styles.evaluationEmptyText}>자세 평가 정보는 새로 저장한 기록부터 함께 표시됩니다.</Text>
+              <Text style={styles.evaluationEmptyText}>?먯꽭 ?됯? ?뺣낫???덈줈 ??ν븳 湲곕줉遺???④퍡 ?쒖떆?⑸땲??</Text>
             </View>
             )}
           </CollapsibleRecordSection>
         </View>
 
         <View style={styles.liveFeedbackBox}>
-          <Text style={styles.liveFeedbackLabel}>영상과 함께 보는 실시간 피드백</Text>
+          <Text style={styles.liveFeedbackLabel}>{'\uC2E4\uC2DC\uAC04 \uD53C\uB4DC\uBC31'}</Text>
           <Text style={styles.liveFeedbackText}>{syncedFeedback}</Text>
         </View>
 
-        <SmallButton title="기록 삭제" onPress={() => onDeleteRecord(record.id)} variant="red" />
+        <SmallButton title="湲곕줉 ??젣" onPress={() => onDeleteRecord(record.id)} variant="red" />
       </View>
     );
   } */
@@ -809,23 +1001,20 @@ export function DiaryScreen({
     const isEvaluationVisible = Boolean(visibleRecordEvaluations[record.id]);
 
     return (
-      <View
+      <Pressable
+        onPress={() => toggleRecordEvaluation(record.id)}
         key={record.id}
-        style={[
+        style={({ pressed }) => [
           styles.recordCard,
+          styles.recordCardHorizontal,
           record.mode === 'shoot' ? styles.recordCardShoot : styles.recordCardDribble,
+          { width: recordCardWidth },
+          pressed && styles.pressed,
         ]}
       >
         <View style={styles.recordHeader}>
-          <View style={styles.recordHeaderBadges}>
-            <View
-              style={[
-                styles.recordBadge,
-                record.mode === 'shoot' ? styles.recordBadgeShoot : styles.recordBadgeDribble,
-              ]}
-            >
-              <Text style={styles.recordBadgeText}>{getRecordModeLabel(record.mode)}</Text>
-            </View>
+          <View style={styles.recordTitleRow}>
+            <Text style={styles.recordTitle}>{getRecordTitle(record.mode)}</Text>
 
             {evaluation ? (
               <View
@@ -854,13 +1043,12 @@ export function DiaryScreen({
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={styles.shotOutcomeToggleLabel}>슛 결과</Text>
+              <Text style={styles.shotOutcomeToggleLabel}>{'\uC29B \uACB0\uACFC'}</Text>
               <Text style={styles.shotOutcomeToggleValue}>{getShotOutcomeLabel(record.shotOutcome)}</Text>
             </Pressable>
           ) : null}
         </View>
 
-        <Text style={styles.recordTitle}>{getRecordTitle(record.mode)}</Text>
         <Text style={styles.recordMeta}>{record.createdAt}</Text>
 
         {record.videoUri ? (
@@ -880,10 +1068,10 @@ export function DiaryScreen({
         ) : null}
 
         <View style={styles.evaluationToggleRow}>
-          <CollapsibleRecordSection title="기록 평가" expanded={isEvaluationVisible} onToggle={() => toggleRecordEvaluation(record.id)}>
+          <CollapsibleRecordSection expanded={isEvaluationVisible}>
             {evaluation ? (
               <View style={styles.evaluationBox}>
-                <Text style={styles.evaluationTitle}>기록 평가</Text>
+                <Text style={styles.evaluationTitle}>{'\uAE30\uB85D \uD3C9\uAC00'}</Text>
                 <Text style={styles.evaluationSummary}>{evaluation.summary}</Text>
 
                 <View style={styles.criteriaRow}>
@@ -896,13 +1084,15 @@ export function DiaryScreen({
                       ]}
                     >
                       <Text style={styles.criterionChipLabel}>{criterion.label}</Text>
-                      <Text style={styles.criterionChipValue}>{criterion.isStable ? '안정' : '보완'}</Text>
+                      <Text style={styles.criterionChipValue}>
+                        {criterion.isStable ? '\uC548\uC815' : '\uBCF4\uC644'}
+                      </Text>
                     </View>
                   ))}
                 </View>
 
                 <View style={styles.highlightGroup}>
-                  <Text style={styles.highlightGroupTitle}>잘한 장면 다시보기</Text>
+                  <Text style={styles.highlightGroupTitle}>{'\uC798\uD55C \uC7A5\uBA74 \uB2E4\uC2DC\uBCF4\uAE30'}</Text>
                   {evaluation.strengths.length > 0 ? (
                     evaluation.strengths.map((highlight, index) => (
                       <Pressable
@@ -915,12 +1105,12 @@ export function DiaryScreen({
                       </Pressable>
                     ))
                   ) : (
-                    <Text style={styles.highlightEmptyText}>아직 표시할 안정 장면이 없습니다.</Text>
+                    <Text style={styles.highlightEmptyText}>{'\uC544\uC9C1 \uD45C\uC2DC\uD560 \uC548\uC815 \uC7A5\uBA74\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'}</Text>
                   )}
                 </View>
 
                 <View style={styles.highlightGroup}>
-                  <Text style={styles.highlightGroupTitle}>보완 장면 다시보기</Text>
+                  <Text style={styles.highlightGroupTitle}>{'\uBCF4\uC644 \uC7A5\uBA74 \uB2E4\uC2DC\uBCF4\uAE30'}</Text>
                   {evaluation.improvements.length > 0 ? (
                     evaluation.improvements.map((highlight, index) => (
                       <Pressable
@@ -933,25 +1123,25 @@ export function DiaryScreen({
                       </Pressable>
                     ))
                   ) : (
-                    <Text style={styles.highlightEmptyText}>지금은 추가로 보여줄 보완 장면이 없습니다.</Text>
+                    <Text style={styles.highlightEmptyText}>{'\uC9C0\uAE08\uC740 \uCD94\uAC00\uB85C \uBCF4\uC5EC\uC904 \uBCF4\uC644 \uC7A5\uBA74\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'}</Text>
                   )}
                 </View>
               </View>
             ) : (
               <View style={styles.evaluationEmptyBox}>
-                <Text style={styles.evaluationEmptyText}>자세 평가 정보는 새로 저장한 기록부터 함께 표시됩니다.</Text>
+                <Text style={styles.evaluationEmptyText}>{'\uC790\uC138 \uD3C9\uAC00 \uC815\uBCF4\uB294 AI\uB85C \uBD84\uC11D\uD55C \uAE30\uB85D\uBD80\uD130 \uD655\uC778 \uAC00\uB2A5\uD569\uB2C8\uB2E4.'}</Text>
               </View>
             )}
           </CollapsibleRecordSection>
         </View>
 
         <View style={styles.liveFeedbackBox}>
-          <Text style={styles.liveFeedbackLabel}>영상과 함께 보는 실시간 피드백</Text>
+          <Text style={styles.liveFeedbackLabel}>{'\uC2E4\uC2DC\uAC04 \uD53C\uB4DC\uBC31'}</Text>
           <Text style={styles.liveFeedbackText}>{syncedFeedback}</Text>
         </View>
 
-        <SmallButton title="기록 삭제" onPress={() => onDeleteRecord(record.id)} variant="red" />
-      </View>
+        <SmallButton title={'\uAE30\uB85D \uC0AD\uC81C'} onPress={() => onDeleteRecord(record.id)} variant="red" />
+      </Pressable>
     );
   }
 
@@ -962,7 +1152,7 @@ export function DiaryScreen({
           <Text style={styles.diaryBackButtonText}>{'<'}</Text>
         </Pressable>
         <View pointerEvents="none" style={styles.diaryTopBarTitleWrap}>
-          <Text style={styles.diaryScreenTitle}>기록일지</Text>
+          <Text style={styles.diaryScreenTitle}>{'\uAE30\uB85D\uC77C\uC9C0'}</Text>
         </View>
       </View>
       <View style={[styles.dateSelectorRow, isCompactMobile && styles.dateSelectorRowCompact]}>
@@ -970,8 +1160,9 @@ export function DiaryScreen({
           onPress={() => setShowCalendarModal(true)}
           style={[
             styles.dateSelectorMain,
-            selectedDateAttendance.status === 'attended' && styles.dateSelectorMainAttended,
-            selectedDateAttendance.status === 'absent' && styles.dateSelectorMainAbsent,
+            selectedDateRecordState.status === 'good' && styles.dateSelectorMainGood,
+            selectedDateRecordState.status === 'average' && styles.dateSelectorMainAverage,
+            selectedDateRecordState.status === 'bad' && styles.dateSelectorMainBad,
             isCompactMobile && styles.dateSelectorMainCompact,
           ]}
         >
@@ -988,135 +1179,241 @@ export function DiaryScreen({
       </View>
 
       <View style={styles.recordsSection}>
-        <Text style={styles.recordsTitle}>
-          {selectedDateKey ? `${selectedDateKey} 레슨 기록` : '날짜를 선택하면 레슨 기록을 볼 수 있습니다.'}
-        </Text>
-
         <View style={[styles.contentRow, isWide && styles.contentRowWide]}>
           <View style={[styles.graphColumn, isWide && styles.graphColumnWide]}>
             <View style={styles.skillInsightCard}>
               {!selectedDateKey ? (
-                <Text style={styles.skillInsightText}>날짜를 선택하면 최근 평균과 비교한 실력 해석을 볼 수 있습니다.</Text>
+                <Text style={styles.skillInsightText}>{'\uB0A0\uC9DC\uB97C \uC120\uD0DD\uD558\uBA74 \uAE30\uB85D \uD574\uC11D\uC744 \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4.'}</Text>
               ) : (
                 <>
-                  {diarySkillInsight.isPracticeThresholdMet ? (
-                    <Text style={styles.skillInsightText}>
-                      {diarySkillInsight.shotTrend === 'insufficient_history'
-                        ? '연습 기준은 충족했지만 비교할 이전 기준 기록이 더 필요합니다.'
-                        : `슛 성공률이 ${getShotTrendLabel(
-                            diarySkillInsight.shotTrend,
-                            diarySkillInsight.shotTrendDelta
-                          )} 상태입니다.`}
-                    </Text>
-                  ) : null}
-
                   <View style={styles.skillInsightStats}>
+                    {diarySkillInsight.canShowDailySummary ? (
+                      <View style={[styles.skillInsightStatCard, styles.dailySummaryCard]}>
+                        <Text style={styles.skillInsightStatLabel}>{'\uD558\uB8E8 \uCD1D\uD3C9'}</Text>
+                        <Text style={styles.dailySummaryLine}>
+                          {getDailySummaryPracticeText(diarySkillInsight, selectedDateDribbleCount)}
+                        </Text>
+                        <Text style={styles.dailySummaryLine}>{getDailySummaryEvaluationText(diarySkillInsight)}</Text>
+                        <Text style={styles.dailySummaryLine}>{getDailySummaryShotText(diarySkillInsight)}</Text>
+                        <Text style={styles.dailySummaryLine}>
+                          {getDailySummaryDribbleText(diarySkillInsight, selectedDateDribbleCount)}
+                        </Text>
+                      </View>
+                    ) : null}
+
                     <View style={[styles.skillInsightStatCard, styles.skillInsightShotCard]}>
                       <View style={styles.skillInsightShotHeader}>
                         <View style={styles.skillInsightShotTitleWrap}>
-                          <Text style={styles.skillInsightStatLabel}>오늘 성공률</Text>
+                          <Text style={styles.skillInsightStatLabel}>{'\uC131\uACF5\uB960'}</Text>
                           <Text style={styles.skillInsightStatHelper}>
-                            {selectedShotGraph
-                              ? `성공 ${diarySkillInsight.selectedShotSuccesses} / 시도 ${diarySkillInsight.selectedShotAttempts}`
-                              : selectedDateKey
-                                ? '선택한 날짜의 슛 기록이 아직 없습니다.'
-                                : '날짜를 선택하면 성공률 그래프를 볼 수 있습니다.'}
+                            {selectedDateKey
+                              ? `${getSuccessRateRangeSummaryText(successRateRange)} \uC2DC\uB3C4 ${SUCCESS_RATE_COMPARE_MIN_ATTEMPTS}\uD68C \uC774\uC0C1 \uAE30\uB85D\uB9CC \uBE44\uAD50`
+                              : `\uB0A0\uC9DC\uB97C \uC120\uD0DD\uD558\uBA74 \uC2DC\uB3C4 ${SUCCESS_RATE_COMPARE_MIN_ATTEMPTS}\uD68C \uC774\uC0C1 \uAE30\uB85D\uC758 \uC131\uACF5\uB960 \uBE44\uAD50 \uADF8\uB798\uD504\uB97C \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4.`}
                           </Text>
+                        </View>
+
+                        <View style={styles.successRateRangeWrap}>
+                          <Pressable
+                            onPress={() => {
+                              setShowSuccessRateRangeMenu((current) => !current);
+                              setShowRecordFilterMenu(false);
+                            }}
+                            style={({ pressed }) => [styles.successRateRangeButton, pressed && styles.pressed]}
+                          >
+                            <Text style={styles.successRateRangeButtonText}>{'\uBE44\uAD50: '}{getSuccessRateRangeLabel(successRateRange)}</Text>
+                            <Text style={styles.successRateRangeButtonIcon}>{showSuccessRateRangeMenu ? '\u25B2' : '\u25BC'}</Text>
+                          </Pressable>
+
+                          {showSuccessRateRangeMenu ? (
+                            <View style={styles.successRateRangeMenu}>
+                              {(['daily', 'weekly', 'monthly', 'yearly'] as SuccessRateRange[]).map((rangeOption) => (
+                                <Pressable
+                                  key={rangeOption}
+                                  onPress={() => {
+                                    setSuccessRateRange(rangeOption);
+                                    setShowSuccessRateRangeMenu(false);
+                                  }}
+                                  style={({ pressed }) => [
+                                    styles.successRateRangeMenuItem,
+                                    successRateRange === rangeOption && styles.successRateRangeMenuItemActive,
+                                    pressed && styles.pressed,
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.successRateRangeMenuText,
+                                      successRateRange === rangeOption && styles.successRateRangeMenuTextActive,
+                                    ]}
+                                  >
+                                    {getSuccessRateRangeLabel(rangeOption)}
+                                  </Text>
+                                </Pressable>
+                              ))}
+                            </View>
+                          ) : null}
                         </View>
                       </View>
 
-                      {selectedDateKey && selectedShotGraph ? (
+                      {selectedDateKey && hasSuccessRateComparisonData ? (
                         <View style={styles.skillInsightShotBody}>
-                          <View style={styles.graphTopRow}>
-                            <View style={styles.graphLegend}>
-                              <View style={styles.legendItem}>
-                                <View style={[styles.dot, styles.dotAttempt]} />
-                                <Text style={styles.legendText}>슛 시도</Text>
-                              </View>
-                              <View style={styles.legendItem}>
-                                <View style={[styles.dot, styles.dotSuccess]} />
-                                <Text style={styles.legendText}>슛 성공</Text>
-                              </View>
-                            </View>
-                          </View>
+                          <View style={styles.successRateComparePanel}>
+                            <View style={styles.successRateCompareChart}>
+                              <View style={[styles.successRateCompareGuide, styles.successRateCompareGuideTop]} />
+                              <View style={[styles.successRateCompareGuide, styles.successRateCompareGuideMiddle]} />
+                              <View style={[styles.successRateCompareGuide, styles.successRateCompareGuideBottom]} />
 
-                          <View style={styles.barAreaLarge}>
-                            <View style={styles.graphMetricRow}>
-                              <View style={styles.graphMetric}>
-                                <Text style={styles.graphMetricLabel}>시도</Text>
-                                <Text style={styles.graphMetricValue}>{selectedShotGraph.attempts}</Text>
-                              </View>
-                              <View style={styles.graphMetric}>
-                                <Text style={styles.graphMetricLabel}>성공</Text>
-                                <Text style={styles.graphMetricValue}>{selectedShotGraph.successes}</Text>
-                              </View>
-                            </View>
+                              {successRateComparisonData.map((item, index) => {
+                                const nextItem = successRateComparisonData[index + 1];
+                                const currentBarHeight =
+                                  item.attempts > 0
+                                    ? Math.max(
+                                        SUCCESS_RATE_COMPARE_BAR_MIN_HEIGHT,
+                                        (item.successRate / 100) * SUCCESS_RATE_COMPARE_TRACK_HEIGHT,
+                                      )
+                                    : SUCCESS_RATE_COMPARE_EMPTY_HEIGHT;
+                                const nextBarHeight = nextItem
+                                  ? nextItem.attempts > 0
+                                    ? Math.max(
+                                        SUCCESS_RATE_COMPARE_BAR_MIN_HEIGHT,
+                                        (nextItem.successRate / 100) * SUCCESS_RATE_COMPARE_TRACK_HEIGHT,
+                                      )
+                                    : SUCCESS_RATE_COMPARE_EMPTY_HEIGHT
+                                  : 0;
+                                const delta = nextItem ? nextItem.successRate - item.successRate : 0;
+                                const shouldShowDelta = delta !== 0;
+                                const deltaMagnitude = Math.abs(delta);
+                                const deltaArrowHeight = nextItem
+                                  ? Math.max(20, Math.round(Math.abs(nextBarHeight - currentBarHeight)))
+                                  : 0;
+                                const deltaIndicatorTop = nextItem
+                                  ? SUCCESS_RATE_COMPARE_VALUE_OFFSET +
+                                    SUCCESS_RATE_COMPARE_TRACK_HEIGHT -
+                                    Math.max(currentBarHeight, nextBarHeight)
+                                  : 0;
+                                const deltaTextSize = Math.min(16, 10 + Math.round((deltaMagnitude / 100) * 10));
 
-                            <View style={styles.graphBarRateRow}>
-                              <View style={styles.overlapBarWrap}>
-                                <View style={styles.overlapBarTrack}>
-                                  <View
-                                    style={[
-                                      styles.barLarge,
-                                      styles.attemptBar,
-                                      styles.overlapAttemptBar,
-                                      {
-                                        height:
-                                          selectedShotGraph.attempts > 0
-                                            ? Math.max(20, (selectedShotGraph.attempts / graphMaxValue) * 260)
-                                            : 10,
-                                      },
-                                    ]}
-                                  />
-                                  <View
-                                    style={[
-                                      styles.barLarge,
-                                      styles.successBar,
-                                      styles.overlapSuccessBar,
-                                      {
-                                        height:
-                                          selectedShotGraph.successes > 0
-                                            ? Math.max(20, (selectedShotGraph.successes / graphMaxValue) * 260)
-                                            : 10,
-                                      },
-                                    ]}
-                                  />
-                                </View>
-                              </View>
+                                return (
+                                  <View key={`${item.label}-${item.detail}`} style={styles.successRateCompareColumn}>
+                                    <View style={styles.successRateCompareBarRow}>
+                                      <View style={styles.successRateCompareBarStack}>
+                                        <Text style={styles.successRateCompareValue}>{item.successRate}%</Text>
+                                        <View style={styles.successRateCompareTrack}>
+                                          <View
+                                            style={[
+                                              styles.successRateCompareFill,
+                                              index === 0
+                                                ? styles.successRateCompareFillOldest
+                                                : index === 1
+                                                  ? styles.successRateCompareFillPrevious
+                                                  : styles.successRateCompareFillCurrent,
+                                              {
+                                                height: currentBarHeight,
+                                              },
+                                            ]}
+                                          />
+                                        </View>
+                                      </View>
 
-                              <View style={styles.graphRateSide}>
-                                <Text style={styles.graphRateSideLabel}>성공률</Text>
-                                <Text style={styles.graphRateSideValue}>{selectedShotGraph.successRate}%</Text>
-                              </View>
+                                      {nextItem ? (
+                                        <View
+                                          style={[
+                                            styles.successRateCompareDeltaGap,
+                                            {
+                                              top: deltaIndicatorTop,
+                                              height: deltaArrowHeight,
+                                            },
+                                          ]}
+                                        >
+                                          {shouldShowDelta ? (
+                                            <View style={styles.successRateCompareDeltaWrap}>
+                                              <View
+                                                style={[
+                                                  styles.successRateCompareDeltaArrowVisual,
+                                                  {
+                                                    height: deltaArrowHeight,
+                                                  },
+                                                ]}
+                                              >
+                                                {delta > 0 ? (
+                                                  <>
+                                                    <View
+                                                      style={[
+                                                        styles.successRateCompareDeltaHeadUp,
+                                                        styles.successRateCompareDeltaHeadUpColor,
+                                                      ]}
+                                                    />
+                                                    <View
+                                                      style={[
+                                                        styles.successRateCompareDeltaStem,
+                                                        styles.successRateCompareDeltaStemUp,
+                                                        {
+                                                          height: Math.max(8, deltaArrowHeight - 10),
+                                                        },
+                                                      ]}
+                                                    />
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <View
+                                                      style={[
+                                                        styles.successRateCompareDeltaStem,
+                                                        styles.successRateCompareDeltaStemDown,
+                                                        {
+                                                          height: Math.max(8, deltaArrowHeight - 10),
+                                                        },
+                                                      ]}
+                                                    />
+                                                    <View
+                                                      style={[
+                                                        styles.successRateCompareDeltaHeadDown,
+                                                        styles.successRateCompareDeltaHeadDownColor,
+                                                      ]}
+                                                    />
+                                                  </>
+                                                )}
+                                              </View>
+                                              <Text
+                                                style={[
+                                                  styles.successRateCompareDeltaText,
+                                                  delta > 0
+                                                    ? styles.successRateCompareDeltaTextUp
+                                                    : styles.successRateCompareDeltaTextDown,
+                                                  {
+                                                    fontSize: deltaTextSize,
+                                                    lineHeight: deltaTextSize,
+                                                  },
+                                                ]}
+                                              >
+                                                {Math.abs(delta)}%
+                                              </Text>
+                                            </View>
+                                          ) : null}
+                                        </View>
+                                      ) : null}
+                                    </View>
+
+                                      <Text style={styles.successRateCompareLabel}>{item.label}</Text>
+                                      {item.detail ? <Text style={styles.successRateCompareDetail}>{item.detail}</Text> : null}
+                                      <Text style={styles.successRateCompareMeta}>
+                                        {item.attempts > 0 ? `\uC131\uACF5 ${item.successes} / \uC2DC\uB3C4 ${item.attempts}` : '\uAE30\uB85D \uC5C6\uC74C'}
+                                      </Text>
+                                  </View>
+                                );
+                              })}
                             </View>
                           </View>
                         </View>
                       ) : (
                         <Text style={styles.graphEmpty}>
-                          {selectedDateKey ? '선택한 날짜에는 아직 슛 기록이 없습니다.' : '날짜를 선택하면 그래프가 표시됩니다.'}
+                          {selectedDateKey
+                            ? '\uC120\uD0DD\uD55C \uAD6C\uAC04\uC5D0\uB294 \uC544\uC9C1 \uC29B \uAE30\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'
+                            : '\uB0A0\uC9DC\uB97C \uC120\uD0DD\uD558\uBA74 \uC131\uACF5\uB960 \uBE44\uAD50 \uADF8\uB798\uD504\uB97C \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4.'}
                         </Text>
                       )}
                     </View>
-                    <View style={styles.skillInsightShotButtonRow}>
-                      <SmallButton title="모든 슛 성공도 보기" onPress={() => setShowAllShotGraph(true)} variant="dark" />
-                    </View>
 
                     <View style={styles.skillInsightStatCard}>
-                      <Text style={styles.skillInsightStatLabel}>최근 평균</Text>
-                      <Text style={styles.skillInsightStatValue}>
-                        {diarySkillInsight.recentAverageShotSuccessRate === null
-                          ? '-'
-                          : `${diarySkillInsight.recentAverageShotSuccessRate}%`}
-                      </Text>
-                      <Text style={styles.skillInsightStatHelper}>
-                        {diarySkillInsight.recentAverageShotAttempts === null
-                          ? '이전 기준 기록 없음'
-                          : `슛 ${diarySkillInsight.recentAverageShotAttempts}회 / 드리블 ${diarySkillInsight.recentAverageDribbleCount ?? 0}회`}
-                      </Text>
-                    </View>
-
-                    <View style={styles.skillInsightStatCard}>
-                      <Text style={styles.skillInsightStatLabel}>드리블 균형</Text>
+                      <Text style={styles.skillInsightStatLabel}>{'\uB4DC\uB9AC\uBE14 \uADE0\uD615'}</Text>
                       <Text style={styles.skillInsightNarration}>
                         {getDribbleBalanceNarration(diarySkillInsight, dribbleGraphTotal)}
                       </Text>
@@ -1130,9 +1427,7 @@ export function DiaryScreen({
                                 : styles.dribbleBalanceLegendDotSubtle,
                             ]}
                           />
-                          <Text style={styles.dribbleBalanceLegendText}>
-                            왼손 {diarySkillInsight.leftDribbleCount}회
-                          </Text>
+                          <Text style={styles.dribbleBalanceLegendText}>{`\uC67C\uC190 ${diarySkillInsight.leftDribbleCount}\uD68C`}</Text>
                         </View>
                         <View style={styles.dribbleBalanceLegendItem}>
                           <View
@@ -1143,9 +1438,7 @@ export function DiaryScreen({
                                 : styles.dribbleBalanceLegendDotSubtle,
                             ]}
                           />
-                          <Text style={styles.dribbleBalanceLegendText}>
-                            오른손 {diarySkillInsight.rightDribbleCount}회
-                          </Text>
+                          <Text style={styles.dribbleBalanceLegendText}>{`\uC624\uB978\uC190 ${diarySkillInsight.rightDribbleCount}\uD68C`}</Text>
                         </View>
                       </View>
                       <View style={styles.dribbleBalanceTrack}>
@@ -1189,14 +1482,17 @@ export function DiaryScreen({
           <View style={[styles.recordsColumn, isWide && styles.recordsColumnWide]}>
             <View style={styles.recordFilterWrap}>
               <Pressable
-                onPress={() => setShowRecordFilterMenu((current) => !current)}
+                onPress={() => {
+                  setShowRecordFilterMenu((current) => !current);
+                  setShowSuccessRateRangeMenu(false);
+                }}
                 style={({ pressed }) => [
                   styles.recordFilterDropdown,
                   pressed && styles.pressed,
                 ]}
               >
-                <Text style={styles.recordFilterDropdownText}>기록 보기: {getRecordFilterLabel(recordFilter)}</Text>
-                <Text style={styles.recordFilterDropdownIcon}>{showRecordFilterMenu ? '▲' : '▼'}</Text>
+                <Text style={styles.recordFilterDropdownText}>{'\uAE30\uB85D \uBCF4\uAE30: '}{getRecordFilterLabel(recordFilter)}</Text>
+                <Text style={styles.recordFilterDropdownIcon}>{showRecordFilterMenu ? '\u25B2' : '\u25BC'}</Text>
               </Pressable>
 
               {showRecordFilterMenu ? (
@@ -1231,17 +1527,18 @@ export function DiaryScreen({
             {isWide ? (
               <View style={styles.recordsPanel}>
                 <ScrollView
+                  horizontal
                   nestedScrollEnabled
                   style={styles.recordsScroll}
                   contentContainerStyle={styles.recordsScrollContent}
-                  showsVerticalScrollIndicator
+                  showsHorizontalScrollIndicator
                 >
                   {selectedDateKey && filteredDateRecords.length === 0 ? (
                     <View style={styles.recordCard}>
                       <Text style={styles.recordText}>
                         {recordFilter === 'all'
-                          ? '이 날짜에 저장된 레슨 영상이 없습니다.'
-                          : `이 날짜에 저장된 ${getRecordFilterLabel(recordFilter)} 기록이 없습니다.`}
+                          ? '\uC774 \uB0A0\uC9DC\uC5D0 \uC800\uC7A5\uB41C \uB808\uC2A8 \uC601\uC0C1\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'
+                          : `\uC774 \uB0A0\uC9DC\uC5D0 \uC800\uC7A5\uB41C ${getRecordFilterLabel(recordFilter)} \uAE30\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.`}
                       </Text>
                     </View>
                   ) : null}
@@ -1255,13 +1552,21 @@ export function DiaryScreen({
                   <View style={styles.recordCard}>
                     <Text style={styles.recordText}>
                       {recordFilter === 'all'
-                        ? '이 날짜에 저장된 레슨 영상이 없습니다.'
-                        : `이 날짜에 저장된 ${getRecordFilterLabel(recordFilter)} 기록이 없습니다.`}
+                        ? '\uC774 \uB0A0\uC9DC\uC5D0 \uC800\uC7A5\uB41C \uB808\uC2A8 \uC601\uC0C1\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'
+                        : `\uC774 \uB0A0\uC9DC\uC5D0 \uC800\uC7A5\uB41C ${getRecordFilterLabel(recordFilter)} \uAE30\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.`}
                     </Text>
                   </View>
                 ) : null}
 
-                {filteredDateRecords.map(renderRecordCard)}
+                <ScrollView
+                  horizontal
+                  nestedScrollEnabled
+                  style={styles.recordsScroll}
+                  contentContainerStyle={styles.recordsScrollContent}
+                  showsHorizontalScrollIndicator
+                >
+                  {filteredDateRecords.map(renderRecordCard)}
+                </ScrollView>
               </>
             )}
           </View>
@@ -1272,19 +1577,19 @@ export function DiaryScreen({
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, styles.calendarModalCard]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>날짜 선택</Text>
+              <Text style={styles.modalTitle}>{'\uB0A0\uC9DC \uC120\uD0DD'}</Text>
               <Pressable
                 onPress={() => setShowCalendarModal(false)}
                 style={({ pressed }) => [styles.modalCloseButton, pressed && styles.pressed]}
               >
-                <Text style={styles.modalCloseText}>닫기</Text>
+                <Text style={styles.modalCloseText}>{'\uB2EB\uAE30'}</Text>
               </Pressable>
             </View>
 
             <View style={styles.calendarTop}>
-              <SmallButton title="이전 달" onPress={() => onChangeMonth(-1)} variant="dark" />
+              <SmallButton title="<" onPress={() => onChangeMonth(-1)} variant="dark" />
               <Text style={styles.monthTitle}>{formatMonthTitle(currentDate)}</Text>
-              <SmallButton title="다음 달" onPress={() => onChangeMonth(1)} variant="dark" />
+              <SmallButton title=">" onPress={() => onChangeMonth(1)} variant="dark" />
             </View>
 
             <View style={styles.calendarGrid}>
@@ -1299,11 +1604,6 @@ export function DiaryScreen({
                   return <View key={cell.key} style={[styles.dayCell, styles.dayCellEmpty]} />;
                 }
 
-                const isFireStatus = cell.status.startsWith('🔥');
-                const isCheckStatus = cell.status.startsWith('✔️');
-                const isEmojiStatus = isFireStatus || isCheckStatus || cell.status === '💧' || cell.status === '🤦‍♂️';
-                const isStreakStatus = cell.status.includes('×(');
-
                 return (
                   <Pressable
                     key={cell.key}
@@ -1313,24 +1613,14 @@ export function DiaryScreen({
                     }}
                     style={({ pressed }) => [
                       styles.dayCell,
-                      cell.variant === 'attended' && styles.dayCellAttended,
-                      cell.variant === 'absent' && styles.dayCellAbsent,
+                      cell.variant === 'good' && styles.dayCellGood,
+                      cell.variant === 'average' && styles.dayCellAverage,
+                      cell.variant === 'bad' && styles.dayCellBad,
                       selectedDateKey === cell.dateKey && styles.dayCellSelected,
                       pressed && styles.pressed,
                     ]}
                   >
                     <Text style={styles.dayNumber}>{cell.date}</Text>
-                    <Text
-                      style={[
-                        styles.dayStatus,
-                        isEmojiStatus && styles.dayStatusEmoji,
-                        isFireStatus && styles.dayStatusFire,
-                        isCheckStatus && styles.dayStatusCheck,
-                        isStreakStatus && styles.dayStatusStreak,
-                      ]}
-                    >
-                      {cell.status}
-                    </Text>
                   </Pressable>
                 );
               })}
@@ -1338,93 +1628,18 @@ export function DiaryScreen({
 
             <View style={styles.legend}>
               <View style={styles.legendItem}>
-                <Text style={styles.legendEmoji}>🔥</Text>
-                <Text style={styles.legendText}>출석</Text>
+                <View style={[styles.dot, styles.dotGood]} />
+                <Text style={styles.legendText}>{'\uC88B\uC74C'}</Text>
               </View>
               <View style={styles.legendItem}>
-                <Text style={styles.legendEmoji}>💧</Text>
-                <Text style={styles.legendText}>결석</Text>
+                <View style={[styles.dot, styles.dotAverage]} />
+                <Text style={styles.legendText}>{'\uBCF4\uD1B5'}</Text>
               </View>
               <View style={styles.legendItem}>
-                <Text style={styles.legendEmoji}>🤦‍♂️</Text>
-                <Text style={styles.legendText}>연속 출석 후 결석</Text>
+                <View style={[styles.dot, styles.dotBad]} />
+                <Text style={styles.legendText}>{'\uB098\uC068'}</Text>
               </View>
             </View>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={showAllShotGraph}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowAllShotGraph(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>모든 날짜 슛 성공도</Text>
-              <Pressable
-                onPress={() => setShowAllShotGraph(false)}
-                style={({ pressed }) => [styles.modalCloseButton, pressed && styles.pressed]}
-              >
-                <Text style={styles.modalCloseText}>닫기</Text>
-              </Pressable>
-            </View>
-
-            <Text style={styles.modalDescription}>
-              가로축은 날짜, 세로축은 각 날짜의 슛 성공률입니다. 막대를 보면 날짜별 성공도를 한눈에 비교할 수 있습니다.
-            </Text>
-
-            {allShotGraphData.length === 0 ? (
-              <Text style={styles.graphEmpty}>슛 시도 횟수가 {practiceShootThreshold}회 이상인 날짜만 그래프에 표시됩니다.</Text>
-            ) : (
-              <>
-                <View style={styles.modalGuideLegend}>
-                  <View style={styles.modalGuideItem}>
-                    <View style={styles.modalGuideLine} />
-                    <Text style={styles.legendText}>성공률 기준선</Text>
-                  </View>
-                  <View style={styles.modalGuideItem}>
-                    <View style={styles.modalGuideBar} />
-                    <Text style={styles.legendText}>날짜별 성공률</Text>
-                  </View>
-                </View>
-
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.allGraphScroll}>
-                  <View style={[styles.allGraphArea, { width: allGraphChartWidth }]}>
-                    <View style={styles.allGraphGuideTop}>
-                      <Text style={styles.allGraphGuideText}>100%</Text>
-                    </View>
-                    <View style={styles.allGraphGuideUpper}>
-                      <Text style={styles.allGraphGuideText}>75%</Text>
-                    </View>
-                    <View style={styles.allGraphGuideMiddle}>
-                      <Text style={styles.allGraphGuideText}>50%</Text>
-                    </View>
-                    <View style={styles.allGraphGuideLower}>
-                      <Text style={styles.allGraphGuideText}>25%</Text>
-                    </View>
-                    <View style={styles.allGraphGuideBottom}>
-                      <Text style={styles.allGraphGuideText}>0%</Text>
-                    </View>
-
-                    {allShotGraphData.map((item, index) => {
-                      const left = 40 + index * 86;
-                      const barHeight = item.successRate > 0 ? Math.max(14, (item.successRate / 100) * 220) : 10;
-
-                      return (
-                        <View key={item.dateKey} style={[styles.allGraphBarWrap, { left }]}>
-                          <Text style={styles.allGraphBarValue}>{item.successRate}%</Text>
-                          <View style={[styles.allGraphBar, { height: barHeight }]} />
-                          <Text style={styles.allGraphAxisLabel}>{item.dateKey.slice(5)}</Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                </ScrollView>
-              </>
-            )}
           </View>
         </View>
       </Modal>
@@ -1507,11 +1722,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  dateSelectorMainAttended: {
+  dateSelectorMainGood: {
     backgroundColor: colors.green,
     borderColor: 'rgba(111,191,129,0.55)',
   },
-  dateSelectorMainAbsent: {
+  dateSelectorMainAverage: {
+    backgroundColor: 'rgba(214,186,92,0.32)',
+    borderColor: 'rgba(233,201,96,0.52)',
+  },
+  dateSelectorMainBad: {
     backgroundColor: colors.red,
     borderColor: 'rgba(225,121,130,0.5)',
   },
@@ -1605,10 +1824,13 @@ const styles = StyleSheet.create({
   dayCellEmpty: {
     opacity: 0,
   },
-  dayCellAttended: {
+  dayCellGood: {
     backgroundColor: colors.green,
   },
-  dayCellAbsent: {
+  dayCellAverage: {
+    backgroundColor: 'rgba(214,186,92,0.32)',
+  },
+  dayCellBad: {
     backgroundColor: colors.red,
   },
   dayCellSelected: {
@@ -1666,6 +1888,15 @@ const styles = StyleSheet.create({
     height: 14,
     borderRadius: 999,
   },
+  dotGood: {
+    backgroundColor: '#6fcb7d',
+  },
+  dotAverage: {
+    backgroundColor: '#e6c45f',
+  },
+  dotBad: {
+    backgroundColor: '#d46d75',
+  },
   dotGreen: {
     backgroundColor: 'limegreen',
   },
@@ -1691,15 +1922,14 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   contentRowWide: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: 'column',
   },
   graphColumn: {
     width: '100%',
     gap: 12,
   },
   graphColumnWide: {
-    width: 340,
+    width: '100%',
     flexShrink: 0,
   },
   skillInsightCard: {
@@ -1720,11 +1950,22 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 12,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
+  },
+  dailySummaryCard: {
+    gap: 8,
+  },
+  dailySummaryLine: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: '700',
   },
   skillInsightShotCard: {
     gap: 12,
+    padding: 12,
+    borderRadius: 22,
   },
   skillInsightShotHeader: {
     flexDirection: 'row',
@@ -1735,13 +1976,232 @@ const styles = StyleSheet.create({
   },
   skillInsightShotTitleWrap: {
     flex: 1,
-    minWidth: 180,
+    minWidth: 160,
+  },
+  successRateRangeWrap: {
+    position: 'relative',
+    width: 122,
+    zIndex: 14,
+  },
+  successRateRangeButton: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  successRateRangeButtonText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  successRateRangeButtonIcon: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  successRateRangeMenu: {
+    position: 'absolute',
+    top: 46,
+    left: 0,
+    right: 0,
+    borderRadius: 14,
+    padding: 6,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    gap: 4,
+  },
+  successRateRangeMenuItem: {
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  successRateRangeMenuItemActive: {
+    backgroundColor: 'rgba(208,145,85,0.18)',
+  },
+  successRateRangeMenuText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  successRateRangeMenuTextActive: {
+    color: colors.text,
   },
   skillInsightShotButtonRow: {
     alignItems: 'stretch',
   },
   skillInsightShotBody: {
     gap: 12,
+  },
+  successRateComparePanel: {
+    borderRadius: 22,
+    paddingHorizontal: 12,
+    paddingTop: 14,
+    paddingBottom: 12,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 0,
+    borderColor: 'transparent',
+  },
+  successRateCompareChart: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 8,
+    minHeight: 236,
+  },
+  successRateCompareGuide: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  successRateCompareGuideTop: {
+    top: 46,
+  },
+  successRateCompareGuideMiddle: {
+    top: 96,
+  },
+  successRateCompareGuideBottom: {
+    top: 146,
+  },
+  successRateCompareColumn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    minWidth: 0,
+    position: 'relative',
+  },
+  successRateCompareBarRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    width: '100%',
+    position: 'relative',
+  },
+  successRateCompareBarStack: {
+    alignItems: 'center',
+    minWidth: 0,
+    width: '100%',
+  },
+  successRateCompareValue: {
+    color: colors.textAccent,
+    fontSize: 18,
+    fontWeight: '900',
+    marginBottom: 6,
+  },
+  successRateCompareTrack: {
+    width: '100%',
+    maxWidth: 64,
+    height: SUCCESS_RATE_COMPARE_TRACK_HEIGHT,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  successRateCompareFill: {
+    width: '100%',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+  },
+  successRateCompareFillOldest: {
+    backgroundColor: 'rgba(208,145,85,0.42)',
+  },
+  successRateCompareFillPrevious: {
+    backgroundColor: 'rgba(208,145,85,0.68)',
+  },
+  successRateCompareFillCurrent: {
+    backgroundColor: colors.secondary,
+  },
+  successRateCompareDeltaGap: {
+    position: 'absolute',
+    left: '100%',
+    width: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: -16,
+    zIndex: 2,
+  },
+  successRateCompareDeltaWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  successRateCompareDeltaArrowVisual: {
+    width: 12,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  successRateCompareDeltaStem: {
+    width: 2,
+    borderRadius: 999,
+  },
+  successRateCompareDeltaStemUp: {
+    backgroundColor: '#6fcb7d',
+  },
+  successRateCompareDeltaStemDown: {
+    backgroundColor: '#d46d75',
+  },
+  successRateCompareDeltaHeadUp: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderBottomWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+  },
+  successRateCompareDeltaHeadUpColor: {
+    borderBottomColor: '#6fcb7d',
+  },
+  successRateCompareDeltaHeadDown: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+  },
+  successRateCompareDeltaHeadDownColor: {
+    borderTopColor: '#d46d75',
+  },
+  successRateCompareDeltaText: {
+    fontWeight: '800',
+  },
+  successRateCompareDeltaTextUp: {
+    color: '#6fcb7d',
+  },
+  successRateCompareDeltaTextDown: {
+    color: '#d46d75',
+  },
+  successRateCompareLabel: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  successRateCompareDetail: {
+    color: colors.textSoft,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  successRateCompareMeta: {
+    color: colors.textMuted,
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 6,
+    textAlign: 'center',
   },
   skillInsightStatLabel: {
     color: colors.textSoft,
@@ -1829,7 +2289,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   recordsColumnWide: {
-    flex: 1,
+    width: '100%',
     minHeight: 760,
   },
   recordFilterWrap: {
@@ -1843,8 +2303,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 9,
     backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1868,8 +2328,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 6,
     backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
     gap: 4,
   },
   recordFilterMenuItem: {
@@ -1889,19 +2349,21 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   recordsPanel: {
-    height: 760,
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
   recordsScroll: {
-    flex: 1,
+    width: '100%',
   },
   recordsScrollContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: 14,
     padding: 12,
+    paddingRight: 20,
   },
   graphLegend: {
     flexDirection: 'row',
@@ -1913,14 +2375,14 @@ const styles = StyleSheet.create({
   },
   barAreaLarge: {
     width: '100%',
-    minHeight: 320,
+    minHeight: 276,
     justifyContent: 'space-between',
-    gap: 16,
+    gap: 12,
   },
   graphMetricRow: {
     width: '100%',
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   graphMetric: {
     flex: 1,
@@ -1934,26 +2396,26 @@ const styles = StyleSheet.create({
   },
   graphMetricValue: {
     color: colors.text,
-    fontSize: 24,
+    fontSize: 21,
     fontWeight: '900',
   },
   graphBarRateRow: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
   },
   overlapBarWrap: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 260,
+    minHeight: 220,
   },
   graphRateSide: {
-    width: 84,
+    width: 76,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
   },
   graphRateSideLabel: {
     color: colors.textSoft,
@@ -1962,13 +2424,13 @@ const styles = StyleSheet.create({
   },
   graphRateSideValue: {
     color: colors.textAccent,
-    fontSize: 30,
+    fontSize: 26,
     fontWeight: '900',
   },
   overlapBarTrack: {
     width: '100%',
-    maxWidth: 180,
-    height: 260,
+    maxWidth: 160,
+    height: 220,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'flex-end',
@@ -1977,8 +2439,8 @@ const styles = StyleSheet.create({
     display: 'none',
   },
   barLarge: {
-    width: 64,
-    borderRadius: 18,
+    width: 56,
+    borderRadius: 16,
   },
   barValue: {
     color: colors.text,
@@ -2187,6 +2649,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14,
   },
+  recordCardHorizontal: {
+    flexShrink: 0,
+  },
   recordCardShoot: {
     borderColor: 'rgba(208,145,85,0.28)',
     backgroundColor: colors.surfaceStrong,
@@ -2198,35 +2663,18 @@ const styles = StyleSheet.create({
   recordHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
-    marginBottom: 10,
+    marginBottom: 8,
   },
-  recordHeaderBadges: {
+  recordTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     flexWrap: 'wrap',
     flex: 1,
-  },
-  recordBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 1,
-  },
-  recordBadgeShoot: {
-    backgroundColor: 'rgba(255,159,28,0.16)',
-    borderColor: 'rgba(255,159,28,0.45)',
-  },
-  recordBadgeDribble: {
-    backgroundColor: 'rgba(80,180,255,0.14)',
-    borderColor: 'rgba(80,180,255,0.38)',
-  },
-  recordBadgeText: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '900',
+    minWidth: 0,
+    paddingRight: 4,
   },
   recordLevelBadge: {
     borderRadius: 999,
@@ -2283,7 +2731,8 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 18,
     fontWeight: '900',
-    marginBottom: 4,
+    marginBottom: 0,
+    flexShrink: 1,
   },
   recordMeta: {
     color: '#ffd3ad',
@@ -2389,8 +2838,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     marginBottom: 0,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
     gap: 12,
   },
   evaluationTitle: {
@@ -2408,8 +2857,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     marginBottom: 0,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
   evaluationEmptyText: {
     color: colors.textMuted,
@@ -2425,7 +2874,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    borderWidth: 1,
+    borderWidth: 0,
     minWidth: 88,
   },
   criterionChipStable: {
@@ -2459,7 +2908,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderWidth: 1,
+    borderWidth: 0,
     gap: 4,
   },
   highlightButtonGood: {
@@ -2502,8 +2951,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
     minHeight: 96,
   },
   liveFeedbackLabel: {

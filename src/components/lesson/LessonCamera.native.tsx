@@ -33,7 +33,6 @@ export function LessonCamera({
   isCameraActive,
   isCameraPreviewHidden,
   isLessonActive,
-  isCameraReady,
   countdownValue,
   dribbleResetToken,
   shootResetToken,
@@ -89,9 +88,7 @@ export function LessonCamera({
         ? "window.__codexStopRecordingAndDisconnectCamera && window.__codexStopRecordingAndDisconnectCamera(); true;"
         : "window.__codexStopRecordingForReview && window.__codexStopRecordingForReview(); true;";
 
-    webViewRef.current?.injectJavaScript(
-      stopScript
-    );
+    webViewRef.current?.injectJavaScript(stopScript);
   }, [cameraStopMode, isCameraActive, lessonMode, recordingStopToken]);
 
   return (
@@ -105,7 +102,11 @@ export function LessonCamera({
             source={{ uri: `${POSE_WEB_BOOTSTRAP_URL}?session=${cameraSessionKey}&mode=${lessonMode}` }}
             style={[styles.webview, isCameraPreviewHidden && styles.hiddenCapture]}
             onMessage={onPoseMessage}
-            injectedJavaScriptBeforeContentLoaded={buildPoseBootstrapScript(lessonMode, selectedBallBrand, selectedBallColors)}
+            injectedJavaScriptBeforeContentLoaded={buildPoseBootstrapScript(
+              lessonMode,
+              selectedBallBrand,
+              selectedBallColors
+            )}
             javaScriptEnabled
             domStorageEnabled
             allowsInlineMediaPlayback
@@ -121,14 +122,11 @@ export function LessonCamera({
             renderLoading={() => (
               <View style={styles.loading}>
                 <ActivityIndicator size="large" color="#ff9f1c" />
-                <Text style={styles.loadingText}>MediaPipe 분석 화면을 준비하는 중입니다.</Text>
+                <Text style={styles.loadingText}>MediaPipe 분석 화면을 준비하고 있습니다.</Text>
               </View>
             )}
           />
           <View style={styles.overlay}>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{isCameraReady ? 'LIVE' : 'LOADING'}</Text>
-            </View>
             {countdownValue !== null ? (
               <View style={styles.countdownWrap}>
                 <View style={styles.countdownBubble}>
@@ -141,14 +139,17 @@ export function LessonCamera({
           {isCameraPreviewHidden ? (
             <View style={styles.placeholderOverlay}>
               <Text style={styles.placeholderTitle}>카메라 종료 중</Text>
-              <Text style={styles.placeholderText}>목표 횟수를 채워 카메라를 끄고 레슨 결과를 정리하고 있습니다.</Text>
+              <Text style={styles.placeholderText}>
+                목표 횟수를 채워 카메라를 끄고 레슨 결과를 정리하고 있습니다.
+              </Text>
             </View>
           ) : null}
         </>
       ) : (
         <View style={styles.placeholder}>
-          <Text style={styles.placeholderTitle}>카메라 대기 중</Text>
-          <Text style={styles.placeholderText}>레슨 시작을 누르면 MediaPipe 분석 카메라가 실행됩니다.</Text>
+          <View style={styles.placeholderTitleWrap}>
+            <Text style={[styles.placeholderTitle, styles.placeholderTitleSolo]}>카메라 대기 중</Text>
+          </View>
         </View>
       )}
     </View>
@@ -199,19 +200,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     backgroundColor: colors.cameraBg,
   },
-  badge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(230,57,70,0.9)',
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  badgeText: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
   countdownWrap: {
     flex: 1,
     alignItems: 'center',
@@ -246,11 +234,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
   },
+  placeholderTitleWrap: {
+    alignItems: 'center',
+    transform: [{ translateY: -56 }],
+  },
   placeholderTitle: {
     color: colors.text,
     fontSize: 24,
     fontWeight: '900',
     marginBottom: 8,
+  },
+  placeholderTitleSolo: {
+    marginBottom: 0,
   },
   placeholderText: {
     color: '#ddd1c8',

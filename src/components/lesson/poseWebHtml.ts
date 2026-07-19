@@ -26,6 +26,7 @@ export function buildPoseWebHtml(
         width: 100%;
         height: 100%;
         background: #0f0f0f;
+        touch-action: none;
       }
 
       video,
@@ -44,9 +45,10 @@ export function buildPoseWebHtml(
 
       .hud {
         position: absolute;
-        left: 12px;
-        right: 12px;
-        bottom: 12px;
+        left: 50%;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 126px);
+        width: min(calc(100% - 32px), 360px);
+        transform: translateX(-50%);
         z-index: 5;
         color: #ffffff;
         background: rgba(0, 0, 0, 0.5);
@@ -54,11 +56,20 @@ export function buildPoseWebHtml(
         padding: 10px 12px;
         font-size: 13px;
         line-height: 1.45;
+        text-align: center;
+        pointer-events: none;
+      }
+
+      @media (orientation: landscape) {
+        .hud {
+          bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+          width: min(calc(100% - 168px), 420px);
+        }
       }
     </style>
   </head>
   <body>
-    <div class="wrap">
+    <div class="wrap" id="wrap">
       <video id="video" autoplay playsinline muted webkit-playsinline></video>
       <canvas id="canvas"></canvas>
       <div class="hud" id="hud">MediaPipe와 공 인식을 준비하고 있습니다.</div>
@@ -68,12 +79,16 @@ export function buildPoseWebHtml(
       const lessonMode = ${JSON.stringify(lessonMode)};
       const selectedBallBrand = ${JSON.stringify(selectedBallBrand)};
       const selectedBallColors = ${JSON.stringify(selectedBallColors)};
+      const wrap = document.getElementById("wrap");
       const video = document.getElementById("video");
       const canvas = document.getElementById("canvas");
       const hud = document.getElementById("hud");
       const ctx = canvas.getContext("2d");
       const processingCanvas = document.createElement("canvas");
       const processingContext = processingCanvas.getContext("2d", { willReadFrequently: true });
+      const CAMERA_SWITCH_THRESHOLD_PX = 72;
+      const REAR_CAMERA_LABEL_PATTERN = /(back|rear|environment|world|후면|뒤)/i;
+      const FRONT_CAMERA_LABEL_PATTERN = /(front|user|face|전면|앞)/i;
 
       const INDEX = {
         nose: 0,
@@ -120,6 +135,13 @@ export function buildPoseWebHtml(
         preparingModel: "MediaPipe와 공 인식 모델을 준비하고 있습니다.",
         startingCamera: "카메라를 시작하는 중입니다.",
         cameraConnected: "카메라 연결 완료. 자세와 공을 분석하고 있습니다.",
+        frontCameraConnected: "앞 카메라 연결 완료. 자세와 공을 분석하고 있습니다.",
+        rearCameraConnected: "뒤 카메라 연결 완료. 자세와 공을 분석하고 있습니다.",
+        switchingFrontCamera: "앞 카메라로 전환하는 중입니다.",
+        switchingRearCamera: "뒤 카메라로 전환하는 중입니다.",
+        frontCameraUnavailable: "앞 카메라를 전환하지 못했습니다.",
+        rearCameraUnavailable: "뒤 카메라를 전환하지 못했습니다.",
+        switchCameraFailed: "카메라를 전환하지 못했습니다.",
         unsupportedCamera: "이 브라우저는 카메라 연결을 지원하지 않습니다.",
         startFailed: "분석을 시작하지 못했습니다."
       };
@@ -149,6 +171,12 @@ export function buildPoseWebHtml(
       let shootSuccessGestureEvaluated = false;
       let shootReleaseTiming = "unknown";
       let cameraStreamStopped = false;
+      let currentCameraFacingMode = "user";
+      let isSwitchingCamera = false;
+      let isRenderLoopRunning = false;
+      let dragStartX = null;
+      let dragStartY = null;
+      let dragTriggered = false;
 
       function post(payload) {
         if (window.ReactNativeWebView) {
@@ -180,17 +208,31 @@ export function buildPoseWebHtml(
         shootReleaseTiming = "unknown";
       }
 
+      function resetAnalysisSummaries() {
+        lastVideoTime = -1;
+        lastPointSummary = "";
+        lastDribbleSummary = "";
+        lastShootSummary = "";
+        lastSentAt = 0;
+      }
+
+      function stopActiveVideoStream() {
+        const activeStream = video.srcObject;
+        if (!activeStream) {
+          return;
+        }
+
+        activeStream.getTracks().forEach((track) => track.stop());
+        video.srcObject = null;
+      }
+
       function disconnectCameraStream() {
         if (cameraStreamStopped) {
           return;
         }
 
         cameraStreamStopped = true;
-
-        if (video.srcObject) {
-          video.srcObject.getTracks().forEach((track) => track.stop());
-          video.srcObject = null;
-        }
+        stopActiveVideoStream();
 
         setHud("카메라 연결을 종료했습니다.");
       }
@@ -311,8 +353,57 @@ export function buildPoseWebHtml(
         canvas.height = height;
       }
 
+      function isFrontCameraActive() {
+        return currentCameraFacingMode === "user";
+      }
+
+      function normalizeFacingMode(value) {
+        return value === "user" || value === "environment" ? value : null;
+      }
+
+      function inferFacingModeFromStream(stream, fallbackFacingMode = currentCameraFacingMode) {
+        const track = stream && stream.getVideoTracks ? stream.getVideoTracks()[0] : null;
+
+        if (!track) {
+          return fallbackFacingMode;
+        }
+
+        const settingsFacingMode =
+          track.getSettings && typeof track.getSettings === "function"
+            ? normalizeFacingMode(track.getSettings().facingMode)
+            : null;
+
+        if (settingsFacingMode) {
+          return settingsFacingMode;
+        }
+
+        const label = track.label || "";
+
+        if (REAR_CAMERA_LABEL_PATTERN.test(label)) {
+          return "environment";
+        }
+
+        if (FRONT_CAMERA_LABEL_PATTERN.test(label)) {
+          return "user";
+        }
+
+        return fallbackFacingMode;
+      }
+
+      function updateVideoPresentation() {
+        video.style.transform = isFrontCameraActive() ? "scaleX(-1)" : "none";
+      }
+
+      function getCameraConnectedMessage(facingMode = currentCameraFacingMode) {
+        return facingMode === "environment" ? UI.rearCameraConnected : UI.frontCameraConnected;
+      }
+
+      function getCameraSwitchingMessage(facingMode) {
+        return facingMode === "environment" ? UI.switchingRearCamera : UI.switchingFrontCamera;
+      }
+
       function projectX(x) {
-        return (1 - x) * canvas.width;
+        return (isFrontCameraActive() ? 1 - x : x) * canvas.width;
       }
 
       function projectY(y) {
@@ -722,35 +813,6 @@ export function buildPoseWebHtml(
         ctx.font = "bold 13px Arial";
         ctx.textAlign = "center";
         ctx.fillText(ball.color === "orange" ? UI.orangeBall : UI.redBall, centerX, centerY - Math.max(radius, 16) - 16);
-        ctx.textAlign = "left";
-      }
-
-      function drawFacingBadge(bodyFacing) {
-        if (lessonMode !== "dribble") {
-          return;
-        }
-
-        const label =
-          bodyFacing === "front"
-            ? "방향: 앞"
-            : bodyFacing === "side"
-              ? "방향: 옆"
-              : "방향: 판단 중";
-
-        const badgeWidth = 120;
-        const badgeHeight = 34;
-        const x = canvas.width - badgeWidth - 14;
-        const y = 14;
-
-        ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
-        ctx.fillRect(x, y, badgeWidth, badgeHeight);
-        ctx.strokeStyle = bodyFacing === "unknown" ? "rgba(255,255,255,0.32)" : "rgba(255,159,28,0.92)";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(x, y, badgeWidth, badgeHeight);
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 14px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText(label, x + badgeWidth / 2, y + 22);
         ctx.textAlign = "left";
       }
 
@@ -1347,8 +1409,10 @@ export function buildPoseWebHtml(
       function renderPose(landmarks) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.save();
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
+        if (isFrontCameraActive()) {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         ctx.restore();
         const ball = detectBall();
@@ -1408,7 +1472,6 @@ export function buildPoseWebHtml(
           rightAnkle
         };
 
-        drawFacingBadge(dribbleAnalysis.bodyFacing);
         drawPoseSkeleton(joints, problemJointKeys);
         if (visible(head)) drawPoint(head, LABELS.head, getJointColor(problemJointKeys, "head", "#ff6b6b"));
         if (neck && visible(neck)) drawPoint(neck, LABELS.neck, getJointColor(problemJointKeys, "neck", "#f7b267"));
@@ -1489,37 +1552,158 @@ export function buildPoseWebHtml(
         setHud(UI.startingCamera);
       }
 
-      async function setupCamera() {
+      function getMatchingCameraDeviceId(devices, facingMode) {
+        const labelPattern = facingMode === "environment" ? REAR_CAMERA_LABEL_PATTERN : FRONT_CAMERA_LABEL_PATTERN;
+        const matchingDevice = devices.find((device) => device.kind === "videoinput" && labelPattern.test(device.label || ""));
+        return matchingDevice?.deviceId || null;
+      }
+
+      async function requestCameraStream(facingMode, allowGenericFallback = facingMode === "user") {
+        const sharedVideoConstraints = {
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        };
+        const attempts = [
+          { ...sharedVideoConstraints, facingMode: { exact: facingMode } },
+          { ...sharedVideoConstraints, facingMode }
+        ];
+
+        if (navigator.mediaDevices.enumerateDevices) {
+          try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const matchingDeviceId = getMatchingCameraDeviceId(devices, facingMode);
+            if (matchingDeviceId) {
+              attempts.push({ ...sharedVideoConstraints, deviceId: { exact: matchingDeviceId } });
+            }
+          } catch (error) {
+            // Ignore device enumeration errors and fall back to generic requests.
+          }
+        }
+
+        if (allowGenericFallback) {
+          attempts.push(sharedVideoConstraints);
+        }
+
+        let lastError = null;
+
+        for (const videoConstraints of attempts) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              audio: false,
+              video: videoConstraints
+            });
+
+            const resolvedFacingMode = inferFacingModeFromStream(stream, facingMode);
+
+            if (!allowGenericFallback && resolvedFacingMode !== facingMode) {
+              stream.getTracks().forEach((track) => track.stop());
+              lastError = new Error(
+                facingMode === "environment" ? UI.rearCameraUnavailable : UI.frontCameraUnavailable
+              );
+              continue;
+            }
+
+            return stream;
+          } catch (error) {
+            lastError = error;
+          }
+        }
+
+        throw lastError instanceof Error ? lastError : new Error(UI.startFailed);
+      }
+
+      async function bindCameraStream(stream, preferredFacingMode) {
+        const resolvedFacingMode = inferFacingModeFromStream(stream, preferredFacingMode);
+        stopActiveVideoStream();
+        currentCameraFacingMode = resolvedFacingMode;
+        cameraStreamStopped = false;
+        resetAnalysisSummaries();
+        video.srcObject = stream;
+        updateVideoPresentation();
+        await video.play();
+        resizeCanvas();
+
+        if (typeof MediaRecorder !== "undefined" && !composedStream) {
+          composedStream = canvas.captureStream(30);
+        }
+
+        return resolvedFacingMode;
+      }
+
+      function ensureRenderLoopRunning() {
+        if (isRenderLoopRunning) {
+          return;
+        }
+
+        isRenderLoopRunning = true;
+        requestAnimationFrame(loop);
+      }
+
+      async function setupCamera(facingMode = currentCameraFacingMode) {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           throw new Error(UI.unsupportedCamera);
         }
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: {
-            facingMode: "user",
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          }
-        });
-
-        cameraStreamStopped = false;
-        video.srcObject = stream;
-        await video.play();
-        resizeCanvas();
-        window.addEventListener("resize", resizeCanvas);
-
-        if (typeof MediaRecorder !== "undefined") {
-          composedStream = canvas.captureStream(30);
-        }
+        const stream = await requestCameraStream(facingMode);
+        const resolvedFacingMode = await bindCameraStream(stream, facingMode);
 
         post({ type: "stream_started" });
-        setHud(UI.cameraConnected);
-        requestAnimationFrame(loop);
+        setHud(getCameraConnectedMessage(resolvedFacingMode));
+        ensureRenderLoopRunning();
+      }
+
+      async function switchCameraFacing() {
+        if (cameraStreamStopped || isSwitchingCamera || !video.srcObject) {
+          return;
+        }
+
+        const previousFacingMode = currentCameraFacingMode;
+        const nextFacingMode = previousFacingMode === "user" ? "environment" : "user";
+        isSwitchingCamera = true;
+        setHud(getCameraSwitchingMessage(nextFacingMode));
+
+        try {
+          let stream = null;
+
+          try {
+            stream = await requestCameraStream(nextFacingMode, false);
+          } catch (firstError) {
+            stopActiveVideoStream();
+            stream = await requestCameraStream(nextFacingMode, false);
+          }
+
+          const resolvedFacingMode = await bindCameraStream(stream, nextFacingMode);
+
+          if (resolvedFacingMode !== nextFacingMode) {
+            stopActiveVideoStream();
+            throw new Error(
+              nextFacingMode === "environment" ? UI.rearCameraUnavailable : UI.frontCameraUnavailable
+            );
+          }
+
+          setHud(getCameraConnectedMessage(resolvedFacingMode));
+        } catch (error) {
+          try {
+            const restoreStream = await requestCameraStream(previousFacingMode, true);
+            const restoredFacingMode = await bindCameraStream(restoreStream, previousFacingMode);
+            setHud(getCameraConnectedMessage(restoredFacingMode));
+          } catch (restoreError) {
+            const message =
+              error instanceof Error && error.message
+                ? error.message
+                : restoreError instanceof Error && restoreError.message
+                  ? restoreError.message
+                  : UI.switchCameraFailed;
+            setHud(message);
+          }
+        } finally {
+          isSwitchingCamera = false;
+        }
       }
 
       function loop() {
         if (cameraStreamStopped) {
+          isRenderLoopRunning = false;
           return;
         }
 
@@ -1536,6 +1720,69 @@ export function buildPoseWebHtml(
         }
 
         requestAnimationFrame(loop);
+      }
+
+      function resetCameraSwitchDrag() {
+        dragStartX = null;
+        dragStartY = null;
+        dragTriggered = false;
+      }
+
+      function maybeSwitchCameraFromDrag(clientX, clientY) {
+        if (dragStartX === null || dragStartY === null || dragTriggered || isSwitchingCamera) {
+          return;
+        }
+
+        const deltaX = clientX - dragStartX;
+        const deltaY = clientY - dragStartY;
+
+        if (Math.abs(deltaY) > Math.abs(deltaX)) {
+          return;
+        }
+
+        if (Math.abs(deltaX) < CAMERA_SWITCH_THRESHOLD_PX) {
+          return;
+        }
+
+        dragTriggered = true;
+        void switchCameraFacing();
+      }
+
+      function bindCameraSwitchGesture() {
+        if (!wrap || (navigator.maxTouchPoints || 0) <= 0) {
+          return;
+        }
+
+        wrap.addEventListener(
+          "touchstart",
+          (event) => {
+            const touch = event.touches && event.touches[0];
+            if (!touch) {
+              return;
+            }
+
+            dragStartX = touch.clientX;
+            dragStartY = touch.clientY;
+            dragTriggered = false;
+          },
+          { passive: true }
+        );
+
+        wrap.addEventListener(
+          "touchmove",
+          (event) => {
+            const touch = event.touches && event.touches[0];
+            if (!touch) {
+              return;
+            }
+
+            maybeSwitchCameraFromDrag(touch.clientX, touch.clientY);
+          },
+          { passive: true }
+        );
+
+        wrap.addEventListener("touchend", resetCameraSwitchDrag);
+        wrap.addEventListener("touchcancel", resetCameraSwitchDrag);
       }
 
       async function start() {
@@ -1557,6 +1804,8 @@ export function buildPoseWebHtml(
         disconnectCameraStream();
       });
 
+      window.addEventListener("resize", resizeCanvas);
+      bindCameraSwitchGesture();
       start();
     </script>
   </body>
