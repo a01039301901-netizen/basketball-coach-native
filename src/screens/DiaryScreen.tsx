@@ -5,8 +5,8 @@ import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
 import { DAY_NAMES } from '../constants/content';
 import { colors } from '../theme/colors';
-import type { CalendarCell, DiarySkillInsight, FeedbackMoment, LessonRecord, ShotGraphDatum } from '../types/app';
-import { formatDateKey, formatMonthTitle } from '../utils/date';
+import type { CalendarCell, DiarySkillInsight, FeedbackMoment, LessonRecord, LessonRecordCriterion, ShotGraphDatum } from '../types/app';
+import { formatDateKey } from '../utils/date';
 import { getDesktopMobileFrameWidth, shouldUseDesktopMobileLayout } from '../utils/layout';
 
 interface DiaryScreenProps {
@@ -54,11 +54,11 @@ function getShotOutcomeLabel(shotOutcome: LessonRecord['shotOutcome']) {
 
 function getRecordFilterLabel(filter: RecordFilter) {
   if (filter === 'dribble') {
-    return '\uB4DC\uB9AC\uBE14 \uBD84\uC11D';
+    return '\uB4DC\uB9AC\uBE14';
   }
 
   if (filter === 'shoot') {
-    return '\uC29B \uBD84\uC11D';
+    return '\uC29B';
   }
 
   if (filter === 'shootSuccess') {
@@ -447,24 +447,43 @@ function getRecordLevelLabel(level: NonNullable<LessonRecord['evaluation']>['lev
 }
 
 
-function getDribbleBalanceNarration(insight: DiarySkillInsight, totalCount: number) {
+function formatSignedCountDelta(delta: number) {
+  return `${delta > 0 ? '+' : ''}${delta}`;
+}
+
+function getDribbleBalanceHeadline(insight: DiarySkillInsight, totalCount: number) {
   const trackedCount = insight.leftDribbleCount + insight.rightDribbleCount;
 
   if (totalCount === 0) {
-    return '\uC624\uB298\uC740 \uC544\uC9C1 \uB4DC\uB9AC\uBE14 \uADE0\uD615\uC744 \uD574\uC11D\uD560 \uAE30\uB85D\uC774 \uC5C6\uC5B4\uC694.';
+    return '\uB4DC\uB9AC\uBE14 \uADE0\uD615 \uAE30\uB85D \uC5C6\uC74C';
   }
 
   if (trackedCount === 0) {
-    return `\uC624\uB298 \uB4DC\uB9AC\uBE14\uC740 ${totalCount}\uD68C \uAE30\uB85D\uB410\uC9C0\uB9CC, \uC88C\uC6B0 \uADE0\uD615\uC744 \uD574\uC11D\uD560 \uC815\uBCF4\uB294 \uC544\uC9C1 \uBD80\uC871\uD574\uC694.`;
+    return '\uC88C\uC6B0 \uAD6C\uBD84 \uAE30\uB85D \uBD80\uC871';
   }
 
   if (insight.dribbleBalance === 'balanced') {
-    return `\uC624\uB298\uC740 \uC67C\uC190\uACFC \uC624\uB978\uC190 \uB4DC\uB9AC\uBE14\uC744 \uACE0\uB974\uAC8C \uC5F0\uC2B5\uD558\uC168\uAD70\uC694. \uC88C\uC6B0 \uCC28\uC774\uAC00 ${insight.dribbleBalanceGap}\uD68C\uB85C \uADE0\uD615\uC774 \uC88B\uC2B5\uB2C8\uB2E4.`;
+    return (
+      <>
+        <Text style={styles.skillInsightNarrationEmphasis}>{'\uC67C\uC190\uACFC \uC624\uB978\uC190 \uB4DC\uB9AC\uBE14'}</Text>
+        {` \uADE0\uD615 \u00B7 \uC67C\uC190 ${insight.leftDribbleCount} / \uC624\uB978\uC190 ${insight.rightDribbleCount}`}
+      </>
+    );
   }
 
   return insight.dribbleBalance === 'left'
-    ? `\uC624\uB298\uC740 \uC67C\uC190 \uB4DC\uB9AC\uBE14\uC744 \uB354 \uB9CE\uC774 \uC5F0\uC2B5\uD558\uC168\uAD70\uC694. \uC624\uB978\uC190\uBCF4\uB2E4 ${insight.dribbleBalanceGap}\uD68C \uB354 \uB9CE\uC558\uC2B5\uB2C8\uB2E4.`
-    : `\uC624\uB298\uC740 \uC624\uB978\uC190 \uB4DC\uB9AC\uBE14\uC744 \uB354 \uB9CE\uC774 \uC5F0\uC2B5\uD558\uC168\uAD70\uC694. \uC67C\uC190\uBCF4\uB2E4 ${insight.dribbleBalanceGap}\uD68C \uB354 \uB9CE\uC558\uC2B5\uB2C8\uB2E4.`;
+    ? (
+        <>
+          <Text style={styles.skillInsightNarrationEmphasis}>{'\uC67C\uC190 \uB4DC\uB9AC\uBE14'}</Text>
+          {` \uC6B0\uC138 \u00B7 \uC67C\uC190 ${insight.leftDribbleCount} / \uC624\uB978\uC190 ${insight.rightDribbleCount}`}
+        </>
+      )
+    : (
+        <>
+          <Text style={styles.skillInsightNarrationEmphasis}>{'\uC624\uB978\uC190 \uB4DC\uB9AC\uBE14'}</Text>
+          {` \uC6B0\uC138 \u00B7 \uC67C\uC190 ${insight.leftDribbleCount} / \uC624\uB978\uC190 ${insight.rightDribbleCount}`}
+        </>
+      );
 }
 
 function getDribbleBalanceSummary(insight: DiarySkillInsight, totalCount: number) {
@@ -486,35 +505,27 @@ function formatDiarySummaryDateLabel(dateKey: string) {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
-function getPracticeComparisonSentence(label: string, delta: number) {
-  if (delta > 0) {
-    return `${label}\uBCF4\uB2E4 ${Math.abs(delta)}\uD68C \uB354 \uB9CE\uC2B5\uB2C8\uB2E4.`;
-  }
-
-  if (delta < 0) {
-    return `${label}\uBCF4\uB2E4 ${Math.abs(delta)}\uD68C \uB354 \uC801\uC2B5\uB2C8\uB2E4.`;
-  }
-
-  return `${label}\uBCF4\uB2E4 \uAC19\uC2B5\uB2C8\uB2E4.`;
+function formatDiaryDateLabel(date: Date) {
+  return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
-function getDailySummaryPracticeText(insight: DiarySkillInsight, selectedDateDribbleCount: number) {
-  const selectedPracticeTotal = selectedDateDribbleCount + insight.selectedShotAttempts;
-  const summaryParts = [
-    `\uC624\uB298 \uC5F0\uC2B5\uB7C9\uC740 \uB4DC\uB9AC\uBE14 ${selectedDateDribbleCount}\uD68C\uC640 \uC29B ${insight.selectedShotAttempts}\uD68C\uB85C \uCD1D ${selectedPracticeTotal}\uD68C\uC785\uB2C8\uB2E4.`,
-    getPracticeComparisonSentence('\uC5B4\uC81C', selectedPracticeTotal - insight.yesterdayPracticeTotal),
-  ];
+function formatDiaryMonthLabel(date: Date) {
+  return `${date.getMonth() + 1}\uC6D4`;
+}
 
-  if (insight.previousPracticeDateKey) {
-    summaryParts.push(
-      getPracticeComparisonSentence(
-        `\uC774\uC804 \uC5F0\uC2B5\uC77C(${formatDiarySummaryDateLabel(insight.previousPracticeDateKey)})`,
-        selectedPracticeTotal - insight.previousPracticeTotal
-      )
-    );
+function getDailySummaryPracticeText(
+  insight: DiarySkillInsight,
+  selectedDateDribbleCount: number
+) {
+  const baseText = `\uB4DC\uB9AC\uBE14 ${selectedDateDribbleCount}\uD68C / \uC29B ${insight.selectedShotAttempts}\uD68C`;
+
+  if (!insight.previousPracticeDateKey) {
+    return baseText;
   }
 
-  return summaryParts.join(' ');
+  const dribbleDelta = selectedDateDribbleCount - insight.previousPracticeDribbleCount;
+  const shootDelta = insight.selectedShotAttempts - insight.previousPracticeShotAttempts;
+  return `${baseText} \u00B7 ${formatDiarySummaryDateLabel(insight.previousPracticeDateKey)} \uB300\uBE44 \uB4DC\uB9AC\uBE14 ${formatSignedCountDelta(dribbleDelta)}, \uC29B ${formatSignedCountDelta(shootDelta)}`;
 }
 
 function getDailySummaryEvaluationText(insight: DiarySkillInsight) {
@@ -522,48 +533,172 @@ function getDailySummaryEvaluationText(insight: DiarySkillInsight) {
   const totalEvaluatedCount = good + average + bad;
 
   if (totalEvaluatedCount === 0) {
-    return '\uC624\uB298 \uB808\uC2A8 \uAE30\uB85D\uC740 \uC544\uC9C1 \uD3C9\uAC00 \uC815\uBCF4\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.';
+    return '\uD3C9\uAC00 \uC815\uBCF4 \uC5C6\uC74C';
   }
 
   if (insight.evaluationDominantLevel === 'good') {
-    return `\uC624\uB298 \uB808\uC2A8 \uAE30\uB85D\uC740 \uB300\uCCB4\uB85C \uC88B\uC740 \uD750\uB984\uC785\uB2C8\uB2E4. \uC88B\uC74C ${good}\uAC1C, \uBCF4\uD1B5 ${average}\uAC1C, \uB098\uC068 ${bad}\uAC1C\uC785\uB2C8\uB2E4.`;
+    return `\uB300\uCCB4\uB85C \uC88B\uC2B5\uB2C8\uB2E4 \u00B7 \uC88B\uC74C ${good}, \uBCF4\uD1B5 ${average}, \uB098\uC068 ${bad}`;
   }
 
   if (insight.evaluationDominantLevel === 'average') {
-    return `\uC624\uB298 \uB808\uC2A8 \uAE30\uB85D\uC740 \uB300\uCCB4\uB85C \uBCF4\uD1B5 \uD750\uB984\uC785\uB2C8\uB2E4. \uC88B\uC74C ${good}\uAC1C, \uBCF4\uD1B5 ${average}\uAC1C, \uB098\uC068 ${bad}\uAC1C\uC785\uB2C8\uB2E4.`;
+    return `\uB300\uCCB4\uB85C \uB098\uC058\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4 \u00B7 \uC88B\uC74C ${good}, \uBCF4\uD1B5 ${average}, \uB098\uC068 ${bad}`;
   }
 
   if (insight.evaluationDominantLevel === 'bad') {
-    return `\uC624\uB298 \uB808\uC2A8 \uAE30\uB85D\uC740 \uB300\uCCB4\uB85C \uBCF4\uC644\uC774 \uB354 \uD544\uC694\uD569\uB2C8\uB2E4. \uC88B\uC74C ${good}\uAC1C, \uBCF4\uD1B5 ${average}\uAC1C, \uB098\uC068 ${bad}\uAC1C\uC785\uB2C8\uB2E4.`;
+    return `\uB300\uCCB4\uB85C \uBCF4\uC644\uC774 \uB354 \uD544\uC694\uD569\uB2C8\uB2E4 \u00B7 \uC88B\uC74C ${good}, \uBCF4\uD1B5 ${average}, \uB098\uC068 ${bad}`;
   }
 
-  return `\uC624\uB298 \uB808\uC2A8 \uAE30\uB85D\uC740 \uC88B\uC740 \uC810\uACFC \uBCF4\uC644\uD560 \uC810\uC774 \uD568\uAED8 \uBCF4\uC785\uB2C8\uB2E4. \uC88B\uC74C ${good}\uAC1C, \uBCF4\uD1B5 ${average}\uAC1C, \uB098\uC068 ${bad}\uAC1C\uC785\uB2C8\uB2E4.`;
+  return `\uB300\uCCB4\uB85C \uB098\uC058\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4 \u00B7 \uC88B\uC74C ${good}, \uBCF4\uD1B5 ${average}, \uB098\uC068 ${bad}`;
+}
+
+function getDailySummaryToggleHeadline(insight: DiarySkillInsight) {
+  const { good, average, bad } = insight.evaluationCounts;
+  const totalEvaluatedCount = good + average + bad;
+
+  if (totalEvaluatedCount === 0) {
+    return '\uC624\uB298 \uB808\uC2A8 \uC0C1\uD0DC\uB97C \uB354 \uAE30\uB85D\uD574 \uBCF4\uC138\uC694';
+  }
+
+  if (insight.evaluationDominantLevel === 'good') {
+    return '\uC624\uB298\uC740 \uB300\uCCB4\uB85C \uC88B\uC74C\uC774 \uB9CE\uC544\uC694';
+  }
+
+  if (insight.evaluationDominantLevel === 'average') {
+    return '\uC624\uB298\uC740 \uB300\uCCB4\uB85C \uBCF4\uD1B5\uC774 \uB9CE\uC544\uC694';
+  }
+
+  if (insight.evaluationDominantLevel === 'bad') {
+    return '\uC624\uB298\uC740 \uB300\uCCB4\uB85C \uB098\uC068\uC774 \uB9CE\uC544\uC694';
+  }
+
+  return '\uC624\uB298 \uB808\uC2A8 \uC0C1\uD0DC\uB97C \uD655\uC778\uD574 \uBCF4\uC138\uC694';
+}
+
+function getDiaryCriterionDisplayLabel(criterion: LessonRecordCriterion) {
+  if (criterion.key === 'shoot-leg-angle') {
+    return '\uBB34\uB98E \uAC01\uB3C4';
+  }
+
+  if (criterion.key === 'shoot-release-timing') {
+    return '\uC29B \uD0C0\uC774\uBC0D';
+  }
+
+  if (criterion.key === 'shoot-result') {
+    return '\uC29B \uC131\uACF5';
+  }
+
+  if (criterion.key === 'dribble-torso-posture') {
+    return '\uC0C1\uCCB4 \uAE30\uC6B8\uAE30';
+  }
+
+  if (criterion.key === 'dribble-height') {
+    return '\uB4DC\uB9AC\uBE14 \uB192\uC774';
+  }
+
+  if (criterion.key === 'dribble-eye-focus') {
+    return '\uC2DC\uC120 \uCC98\uB9AC';
+  }
+
+  return criterion.label;
+}
+
+function getDailySummaryCorrectionText(records: LessonRecord[]) {
+  const correctionCounts = new Map<string, { label: string; count: number }>();
+  let hasEvaluation = false;
+
+  for (const record of records) {
+    const criteria = record.evaluation?.criteria ?? [];
+
+    if (criteria.length > 0) {
+      hasEvaluation = true;
+    }
+
+    for (const criterion of criteria) {
+      if (criterion.isStable) {
+        continue;
+      }
+
+      const current = correctionCounts.get(criterion.key);
+      const label = getDiaryCriterionDisplayLabel(criterion);
+
+      if (current) {
+        current.count += 1;
+        continue;
+      }
+
+      correctionCounts.set(criterion.key, {
+        label,
+        count: 1,
+      });
+    }
+  }
+
+  const topCorrection = [...correctionCounts.values()].sort((left, right) => right.count - left.count)[0] ?? null;
+
+  if (topCorrection) {
+    return `${topCorrection.label} \uD53C\uB4DC\uBC31\uC774 \uAC00\uC7A5 \uB9CE\uC544\uC694. \uC774 \uBD80\uBD84\uC744 \uD558\uB098 \uACE0\uCCD0\uBCF4\uC790\uACE0\uC694.`;
+  }
+
+  if (hasEvaluation) {
+    return '\uC624\uB298\uC740 \uD06C\uAC8C \uACE0\uCCD0\uBCFC \uD53C\uB4DC\uBC31\uC774 \uB9CE\uC9C0 \uC54A\uC544\uC694.';
+  }
+
+  return '\uC544\uC9C1 \uD53C\uB4DC\uBC31 \uAE30\uB85D\uC774 \uB354 \uD544\uC694\uD574\uC694.';
 }
 
 function getDailySummaryShotText(insight: DiarySkillInsight) {
-  return `\uC624\uB298 \uC29B \uC131\uACF5\uB960\uC740 ${insight.selectedShotSuccessRate}%\uC785\uB2C8\uB2E4. ${insight.selectedShotAttempts}\uD68C \uC911 ${insight.selectedShotSuccesses}\uD68C \uC131\uACF5\uD588\uC2B5\uB2C8\uB2E4.`;
+  if (insight.previousShotDateKey === null || insight.previousShotSuccessRate === null) {
+    return `\uC131\uACF5\uB960 ${insight.selectedShotSuccessRate}%`;
+  }
+
+  const delta = insight.selectedShotSuccessRate - insight.previousShotSuccessRate;
+  const deltaText = delta === 0 ? '\uBCC0\uD654 \uC5C6\uC74C' : `${formatSignedCountDelta(delta)}%`;
+  return `\uC131\uACF5\uB960 ${insight.selectedShotSuccessRate}% \u00B7 ${formatDiarySummaryDateLabel(insight.previousShotDateKey)} \uB300\uBE44 ${deltaText}`;
 }
 
 function getDailySummaryDribbleText(insight: DiarySkillInsight, selectedDateDribbleCount: number) {
   const trackedDribbleCount = insight.leftDribbleCount + insight.rightDribbleCount;
 
   if (trackedDribbleCount === 0) {
-    return `\uC624\uB298 \uB4DC\uB9AC\uBE14\uC740 ${selectedDateDribbleCount}\uD68C\uC600\uC9C0\uB9CC \uC88C\uC6B0 \uAD6C\uBD84 \uAE30\uB85D\uC740 \uC544\uC9C1 \uBD80\uC871\uD569\uB2C8\uB2E4.`;
+    return `\uC88C\uC6B0 \uAD6C\uBD84 \uAE30\uB85D \uBD80\uC871 \u00B7 \uB4DC\uB9AC\uBE14 ${selectedDateDribbleCount}\uD68C`;
   }
 
   if (insight.dribbleBalance === 'balanced') {
-    return `\uC624\uB298\uC740 \uC67C\uC190\uACFC \uC624\uB978\uC190 \uB4DC\uB9AC\uBE14\uC744 \uACE0\uB974\uAC8C \uC5F0\uC2B5\uD588\uC2B5\uB2C8\uB2E4. \uC67C\uC190 ${insight.leftDribbleCount}\uD68C, \uC624\uB978\uC190 ${insight.rightDribbleCount}\uD68C\uC785\uB2C8\uB2E4.`;
+    return `\uB4DC\uB9AC\uBE14 \uADE0\uD615 \u00B7 \uC67C\uC190 ${insight.leftDribbleCount} / \uC624\uB978\uC190 ${insight.rightDribbleCount}`;
   }
 
   if (insight.dribbleBalance === 'left') {
-    return `\uC624\uB298\uC740 \uC67C\uC190 \uB4DC\uB9AC\uBE14\uC744 \uB354 \uB9CE\uC774 \uCC64\uC2B5\uB2C8\uB2E4. \uC67C\uC190 ${insight.leftDribbleCount}\uD68C, \uC624\uB978\uC190 ${insight.rightDribbleCount}\uD68C\uC785\uB2C8\uB2E4.`;
+    return `\uC67C\uC190 \uB4DC\uB9AC\uBE14 \uC6B0\uC138 \u00B7 \uC67C\uC190 ${insight.leftDribbleCount} / \uC624\uB978\uC190 ${insight.rightDribbleCount}`;
   }
 
   if (insight.dribbleBalance === 'right') {
-    return `\uC624\uB298\uC740 \uC624\uB978\uC190 \uB4DC\uB9AC\uBE14\uC744 \uB354 \uB9CE\uC774 \uCC64\uC2B5\uB2C8\uB2E4. \uC67C\uC190 ${insight.leftDribbleCount}\uD68C, \uC624\uB978\uC190 ${insight.rightDribbleCount}\uD68C\uC785\uB2C8\uB2E4.`;
+    return `\uC624\uB978\uC190 \uB4DC\uB9AC\uBE14 \uC6B0\uC138 \u00B7 \uC67C\uC190 ${insight.leftDribbleCount} / \uC624\uB978\uC190 ${insight.rightDribbleCount}`;
   }
 
-  return `\uC624\uB298 \uB4DC\uB9AC\uBE14\uC740 ${selectedDateDribbleCount}\uD68C\uC600\uC2B5\uB2C8\uB2E4.`;
+  return `\uB4DC\uB9AC\uBE14 ${selectedDateDribbleCount}\uD68C`;
+}
+
+function getSuccessRateHeadline(
+  comparisonData: Array<{ label: string; attempts: number; successRate: number }>
+) {
+  const currentItem = comparisonData[comparisonData.length - 1] ?? null;
+
+  if (!currentItem || currentItem.attempts <= 0) {
+    return '\uC131\uACF5\uB960 \uBE44\uAD50 \uAE30\uB85D \uC5C6\uC74C';
+  }
+
+  const previousItem = [...comparisonData]
+    .slice(0, -1)
+    .reverse()
+    .find((item) => item.attempts > 0);
+
+  if (!previousItem) {
+    return `\uC131\uACF5\uB960 ${currentItem.successRate}%`;
+  }
+
+  const delta = currentItem.successRate - previousItem.successRate;
+  const deltaText = delta === 0 ? '\uBCC0\uD654 \uC5C6\uC74C' : `${formatSignedCountDelta(delta)}%`;
+  return `\uC131\uACF5\uB960 ${currentItem.successRate}% \u00B7 ${previousItem.label} \uB300\uBE44 ${deltaText}`;
 }
 
 export function DiaryScreen({
@@ -588,14 +723,16 @@ export function DiaryScreen({
     ? Math.min(420, Math.max(360, Math.floor(layoutWidth * 0.34)))
     : Math.max(280, Math.min(layoutWidth - 40, 336));
   const [playbackFeedback, setPlaybackFeedback] = useState<Record<string, string>>({});
-  const [visibleRecordEvaluations, setVisibleRecordEvaluations] = useState<Record<string, boolean>>({});
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [recordFilter, setRecordFilter] = useState<RecordFilter>('all');
   const [showRecordFilterMenu, setShowRecordFilterMenu] = useState(false);
+  const [showDailySummary, setShowDailySummary] = useState(false);
   const [successRateRange, setSuccessRateRange] = useState<SuccessRateRange>('daily');
   const [showSuccessRateRangeMenu, setShowSuccessRateRangeMenu] = useState(false);
+  const [openedEvaluationRecordId, setOpenedEvaluationRecordId] = useState<string | null>(null);
   const videoRefs = useRef<Record<string, Video | null>>({});
   const playbackPollersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  const menuOpenSpacerHeight = showSuccessRateRangeMenu ? 220 : 0;
   const dribbleGraphTotal = Math.max(
     selectedDateDribbleCount,
     diarySkillInsight.leftDribbleCount + diarySkillInsight.rightDribbleCount
@@ -613,6 +750,11 @@ export function DiaryScreen({
     () => buildSuccessRateComparisonFrames(selectedDate, successRateRange),
     [selectedDate, successRateRange]
   );
+
+  useEffect(() => {
+    setShowDailySummary(false);
+  }, [selectedDateKey]);
+
   const successRateComparisonData = useMemo(
     () =>
       successRateComparisonFrames.map((frame) => {
@@ -674,6 +816,14 @@ export function DiaryScreen({
 
     return selectedDateRecords.filter((record) => record.mode === recordFilter);
   }, [recordFilter, selectedDateRecords]);
+  const dailySummaryCorrectionText = useMemo(
+    () => getDailySummaryCorrectionText(selectedDateRecords),
+    [selectedDateRecords]
+  );
+  const openedEvaluationRecord = useMemo(
+    () => (openedEvaluationRecordId ? selectedDateRecords.find((record) => record.id === openedEvaluationRecordId) ?? null : null),
+    [openedEvaluationRecordId, selectedDateRecords]
+  );
 
   const moveSelectedDate = useCallback(
     (delta: number) => {
@@ -704,23 +854,10 @@ export function DiaryScreen({
   }, [selectedDateRecords]);
 
   useEffect(() => {
-    setVisibleRecordEvaluations((current) => {
-      const visibleRecordIds = new Set(selectedDateRecords.map((record) => record.id));
-      let hasChanged = false;
-      const next: Record<string, boolean> = {};
-
-      for (const [recordId, isVisible] of Object.entries(current)) {
-        if (isVisible && visibleRecordIds.has(recordId)) {
-          next[recordId] = true;
-          continue;
-        }
-
-        hasChanged = true;
-      }
-
-      return hasChanged ? next : current;
-    });
-  }, [selectedDateRecords]);
+    if (openedEvaluationRecordId && !selectedDateRecords.some((record) => record.id === openedEvaluationRecordId)) {
+      setOpenedEvaluationRecordId(null);
+    }
+  }, [openedEvaluationRecordId, selectedDateRecords]);
 
   useEffect(() => {
     const pollers = playbackPollersRef.current;
@@ -822,18 +959,12 @@ export function DiaryScreen({
     [startPlaybackPolling, syncFeedbackFromPosition]
   );
 
-  const toggleRecordEvaluation = useCallback((recordId: string) => {
-    setVisibleRecordEvaluations((current) => {
-      const next = { ...current };
+  const openRecordEvaluation = useCallback((recordId: string) => {
+    setOpenedEvaluationRecordId(recordId);
+  }, []);
 
-      if (next[recordId]) {
-        delete next[recordId];
-      } else {
-        next[recordId] = true;
-      }
-
-      return next;
-    });
+  const closeRecordEvaluation = useCallback(() => {
+    setOpenedEvaluationRecordId(null);
   }, []);
 
   /* function renderRecordCard(record: LessonRecord) {
@@ -995,42 +1126,116 @@ export function DiaryScreen({
     );
   } */
 
+  function renderRecordEvaluationContent(record: LessonRecord) {
+    const evaluation = record.evaluation;
+
+    if (!evaluation) {
+      return (
+        <View style={styles.evaluationEmptyBox}>
+          <Text style={styles.evaluationEmptyText}>{'\uC790\uC138 \uD3C9\uAC00 \uC815\uBCF4\uB294 AI\uB85C \uBD84\uC11D\uD55C \uAE30\uB85D\uBD80\uD130 \uD655\uC778 \uAC00\uB2A5\uD569\uB2C8\uB2E4.'}</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.evaluationBox}>
+        <Text style={styles.evaluationTitle}>{'\uAE30\uB85D \uD3C9\uAC00'}</Text>
+        <Text style={styles.evaluationSummary}>{evaluation.summary}</Text>
+
+        <View style={styles.criteriaRow}>
+          {evaluation.criteria.map((criterion) => (
+            <View
+              key={`${record.id}-${criterion.key}`}
+              style={[
+                styles.criterionChip,
+                criterion.isStable ? styles.criterionChipStable : styles.criterionChipUnstable,
+              ]}
+            >
+              <Text style={styles.criterionChipLabel}>{criterion.label}</Text>
+              <Text style={styles.criterionChipValue}>
+                {criterion.isStable ? '\uC548\uC815' : '\uBCF4\uC644'}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.highlightGroup}>
+          <Text style={styles.highlightGroupTitle}>{'\uC798\uD55C \uC7A5\uBA74 \uB2E4\uC2DC\uBCF4\uAE30'}</Text>
+          {evaluation.strengths.length > 0 ? (
+            evaluation.strengths.map((highlight, index) => (
+              <Pressable
+                key={`${record.id}-strength-${index}`}
+                onPress={() => void jumpToHighlight(record, highlight.startAtMs)}
+                style={({ pressed }) => [styles.highlightButton, styles.highlightButtonGood, pressed && styles.pressed]}
+              >
+                <Text style={styles.highlightButtonLabel}>{highlight.label}</Text>
+                <Text style={styles.highlightButtonDetail}>{highlight.detail}</Text>
+              </Pressable>
+            ))
+          ) : (
+            <Text style={styles.highlightEmptyText}>{'\uC544\uC9C1 \uD45C\uC2DC\uD560 \uC548\uC815 \uC7A5\uBA74\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'}</Text>
+          )}
+        </View>
+
+        <View style={styles.highlightGroup}>
+          <Text style={styles.highlightGroupTitle}>{'\uBCF4\uC644 \uC7A5\uBA74 \uB2E4\uC2DC\uBCF4\uAE30'}</Text>
+          {evaluation.improvements.length > 0 ? (
+            evaluation.improvements.map((highlight, index) => (
+              <Pressable
+                key={`${record.id}-improvement-${index}`}
+                onPress={() => void jumpToHighlight(record, highlight.startAtMs)}
+                style={({ pressed }) => [styles.highlightButton, styles.highlightButtonBad, pressed && styles.pressed]}
+              >
+                <Text style={styles.highlightButtonLabel}>{highlight.label}</Text>
+                <Text style={styles.highlightButtonDetail}>{highlight.detail}</Text>
+              </Pressable>
+            ))
+          ) : (
+            <Text style={styles.highlightEmptyText}>{'\uC9C0\uAE08\uC740 \uCD94\uAC00\uB85C \uBCF4\uC5EC\uC904 \uBCF4\uC644 \uC7A5\uBA74\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'}</Text>
+          )}
+        </View>
+      </View>
+    );
+  }
+
   function renderRecordCard(record: LessonRecord) {
     const syncedFeedback = playbackFeedback[record.id] || record.feedback;
     const evaluation = record.evaluation;
-    const isEvaluationVisible = Boolean(visibleRecordEvaluations[record.id]);
 
     return (
-      <Pressable
-        onPress={() => toggleRecordEvaluation(record.id)}
+      <View
         key={record.id}
-        style={({ pressed }) => [
+        style={[
           styles.recordCard,
           styles.recordCardHorizontal,
           record.mode === 'shoot' ? styles.recordCardShoot : styles.recordCardDribble,
           { width: recordCardWidth },
-          pressed && styles.pressed,
         ]}
       >
         <View style={styles.recordHeader}>
-          <View style={styles.recordTitleRow}>
-            <Text style={styles.recordTitle}>{getRecordTitle(record.mode)}</Text>
+          <Pressable
+            onPress={() => openRecordEvaluation(record.id)}
+            style={({ pressed }) => [styles.recordTitlePressable, pressed && styles.pressed]}
+          >
+            <View style={styles.recordTitleRow}>
+              <Text style={styles.recordTitle}>{getRecordTitle(record.mode)}</Text>
 
-            {evaluation ? (
-              <View
-                style={[
-                  styles.recordLevelBadge,
-                  evaluation.level === 'good'
-                    ? styles.recordLevelBadgeGood
-                    : evaluation.level === 'average'
-                      ? styles.recordLevelBadgeAverage
-                      : styles.recordLevelBadgeBad,
-                ]}
-              >
-                <Text style={styles.recordLevelBadgeText}>{getRecordLevelLabel(evaluation.level)}</Text>
-              </View>
-            ) : null}
-          </View>
+              {evaluation ? (
+                <View
+                  style={[
+                    styles.recordLevelBadge,
+                    evaluation.level === 'good'
+                      ? styles.recordLevelBadgeGood
+                      : evaluation.level === 'average'
+                        ? styles.recordLevelBadgeAverage
+                        : styles.recordLevelBadgeBad,
+                  ]}
+                >
+                  <Text style={styles.recordLevelBadgeText}>{getRecordLevelLabel(evaluation.level)}</Text>
+                </View>
+              ) : null}
+            </View>
+          </Pressable>
 
           {record.mode === 'shoot' ? (
             <Pressable
@@ -1049,99 +1254,38 @@ export function DiaryScreen({
           ) : null}
         </View>
 
-        <Text style={styles.recordMeta}>{record.createdAt}</Text>
+        <Pressable
+          onPress={() => openRecordEvaluation(record.id)}
+          style={({ pressed }) => [styles.recordBodyPressable, pressed && styles.pressed]}
+        >
+          <Text style={styles.recordMeta}>{record.createdAt}</Text>
 
-        {record.videoUri ? (
-          <Video
-            ref={(instance) => {
-              videoRefs.current[record.id] = instance;
-            }}
-            source={{ uri: record.videoUri }}
-            useNativeControls
-            shouldPlay={false}
-            isLooping={false}
-            progressUpdateIntervalMillis={200}
-            resizeMode={ResizeMode.COVER}
-            style={styles.recordVideo}
-            onPlaybackStatusUpdate={(status) => handlePlaybackStatus(record, status)}
-          />
-        ) : null}
+          {record.videoUri ? (
+            <Video
+              ref={(instance) => {
+                videoRefs.current[record.id] = instance;
+              }}
+              source={{ uri: record.videoUri }}
+              useNativeControls
+              shouldPlay={false}
+              isLooping={false}
+              progressUpdateIntervalMillis={200}
+              resizeMode={ResizeMode.COVER}
+              style={styles.recordVideo}
+              onPlaybackStatusUpdate={(status) => handlePlaybackStatus(record, status)}
+            />
+          ) : null}
 
-        <View style={styles.evaluationToggleRow}>
-          <CollapsibleRecordSection expanded={isEvaluationVisible}>
-            {evaluation ? (
-              <View style={styles.evaluationBox}>
-                <Text style={styles.evaluationTitle}>{'\uAE30\uB85D \uD3C9\uAC00'}</Text>
-                <Text style={styles.evaluationSummary}>{evaluation.summary}</Text>
+          <View style={styles.liveFeedbackBox}>
+            <Text style={styles.liveFeedbackLabel}>{'\uC2E4\uC2DC\uAC04 \uD53C\uB4DC\uBC31'}</Text>
+            <Text style={styles.liveFeedbackText}>{syncedFeedback}</Text>
+          </View>
 
-                <View style={styles.criteriaRow}>
-                  {evaluation.criteria.map((criterion) => (
-                    <View
-                      key={`${record.id}-${criterion.key}`}
-                      style={[
-                        styles.criterionChip,
-                        criterion.isStable ? styles.criterionChipStable : styles.criterionChipUnstable,
-                      ]}
-                    >
-                      <Text style={styles.criterionChipLabel}>{criterion.label}</Text>
-                      <Text style={styles.criterionChipValue}>
-                        {criterion.isStable ? '\uC548\uC815' : '\uBCF4\uC644'}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-
-                <View style={styles.highlightGroup}>
-                  <Text style={styles.highlightGroupTitle}>{'\uC798\uD55C \uC7A5\uBA74 \uB2E4\uC2DC\uBCF4\uAE30'}</Text>
-                  {evaluation.strengths.length > 0 ? (
-                    evaluation.strengths.map((highlight, index) => (
-                      <Pressable
-                        key={`${record.id}-strength-${index}`}
-                        onPress={() => void jumpToHighlight(record, highlight.startAtMs)}
-                        style={({ pressed }) => [styles.highlightButton, styles.highlightButtonGood, pressed && styles.pressed]}
-                      >
-                        <Text style={styles.highlightButtonLabel}>{highlight.label}</Text>
-                        <Text style={styles.highlightButtonDetail}>{highlight.detail}</Text>
-                      </Pressable>
-                    ))
-                  ) : (
-                    <Text style={styles.highlightEmptyText}>{'\uC544\uC9C1 \uD45C\uC2DC\uD560 \uC548\uC815 \uC7A5\uBA74\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'}</Text>
-                  )}
-                </View>
-
-                <View style={styles.highlightGroup}>
-                  <Text style={styles.highlightGroupTitle}>{'\uBCF4\uC644 \uC7A5\uBA74 \uB2E4\uC2DC\uBCF4\uAE30'}</Text>
-                  {evaluation.improvements.length > 0 ? (
-                    evaluation.improvements.map((highlight, index) => (
-                      <Pressable
-                        key={`${record.id}-improvement-${index}`}
-                        onPress={() => void jumpToHighlight(record, highlight.startAtMs)}
-                        style={({ pressed }) => [styles.highlightButton, styles.highlightButtonBad, pressed && styles.pressed]}
-                      >
-                        <Text style={styles.highlightButtonLabel}>{highlight.label}</Text>
-                        <Text style={styles.highlightButtonDetail}>{highlight.detail}</Text>
-                      </Pressable>
-                    ))
-                  ) : (
-                    <Text style={styles.highlightEmptyText}>{'\uC9C0\uAE08\uC740 \uCD94\uAC00\uB85C \uBCF4\uC5EC\uC904 \uBCF4\uC644 \uC7A5\uBA74\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'}</Text>
-                  )}
-                </View>
-              </View>
-            ) : (
-              <View style={styles.evaluationEmptyBox}>
-                <Text style={styles.evaluationEmptyText}>{'\uC790\uC138 \uD3C9\uAC00 \uC815\uBCF4\uB294 AI\uB85C \uBD84\uC11D\uD55C \uAE30\uB85D\uBD80\uD130 \uD655\uC778 \uAC00\uB2A5\uD569\uB2C8\uB2E4.'}</Text>
-              </View>
-            )}
-          </CollapsibleRecordSection>
-        </View>
-
-        <View style={styles.liveFeedbackBox}>
-          <Text style={styles.liveFeedbackLabel}>{'\uC2E4\uC2DC\uAC04 \uD53C\uB4DC\uBC31'}</Text>
-          <Text style={styles.liveFeedbackText}>{syncedFeedback}</Text>
-        </View>
+          <Text style={styles.recordOpenHint}>{'\uAE30\uB85D\uC744 \uB204\uB974\uBA74 \uAE30\uB85D \uD3C9\uAC00\uB97C \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4.'}</Text>
+        </Pressable>
 
         <SmallButton title={'\uAE30\uB85D \uC0AD\uC81C'} onPress={() => onDeleteRecord(record.id)} variant="red" />
-      </Pressable>
+      </View>
     );
   }
 
@@ -1170,7 +1314,9 @@ export function DiaryScreen({
             <Pressable onPress={() => moveSelectedDate(-1)} style={({ pressed }) => [styles.dateArrowButton, pressed && styles.pressed]}>
               <DateArrowIcon direction="left" />
             </Pressable>
-            <Text style={styles.dateSelectorText}>{selectedDateKey || formatDateKey(selectedDate)}</Text>
+            <Text style={styles.dateSelectorText}>
+              {selectedDateKey ? formatDiarySummaryDateLabel(selectedDateKey) : formatDiaryDateLabel(selectedDate)}
+            </Text>
             <Pressable onPress={() => moveSelectedDate(1)} style={({ pressed }) => [styles.dateArrowButton, pressed && styles.pressed]}>
               <DateArrowIcon direction="right" />
             </Pressable>
@@ -1183,33 +1329,74 @@ export function DiaryScreen({
           <View style={[styles.graphColumn, isWide && styles.graphColumnWide]}>
             <View style={styles.skillInsightCard}>
               {!selectedDateKey ? (
-                <Text style={styles.skillInsightText}>{'\uB0A0\uC9DC\uB97C \uC120\uD0DD\uD558\uBA74 \uAE30\uB85D \uD574\uC11D\uC744 \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4.'}</Text>
+                <View style={[styles.skillInsightStatCard, styles.skillInsightEmptyCard]}>
+                  <Text style={styles.skillInsightText}>{'\uB0A0\uC9DC\uB97C \uC120\uD0DD\uD558\uBA74 \uAE30\uB85D \uD574\uC11D\uC744 \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4.'}</Text>
+                </View>
               ) : (
                 <>
                   <View style={styles.skillInsightStats}>
                     {diarySkillInsight.canShowDailySummary ? (
-                      <View style={[styles.skillInsightStatCard, styles.dailySummaryCard]}>
-                        <Text style={styles.skillInsightStatLabel}>{'\uD558\uB8E8 \uCD1D\uD3C9'}</Text>
-                        <Text style={styles.dailySummaryLine}>
-                          {getDailySummaryPracticeText(diarySkillInsight, selectedDateDribbleCount)}
-                        </Text>
-                        <Text style={styles.dailySummaryLine}>{getDailySummaryEvaluationText(diarySkillInsight)}</Text>
-                        <Text style={styles.dailySummaryLine}>{getDailySummaryShotText(diarySkillInsight)}</Text>
-                        <Text style={styles.dailySummaryLine}>
-                          {getDailySummaryDribbleText(diarySkillInsight, selectedDateDribbleCount)}
-                        </Text>
+                      <View style={styles.dailySummarySection}>
+                        <Pressable
+                          onPress={() => setShowDailySummary((current) => !current)}
+                          style={({ pressed }) => [styles.dailySummaryToggle, pressed && styles.pressed]}
+                        >
+                          <View style={styles.dailySummaryToggleTextWrap}>
+                            <Text style={styles.dailySummaryToggleText}>
+                              {getDailySummaryToggleHeadline(diarySkillInsight)}
+                            </Text>
+                            <Text style={styles.dailySummaryToggleSubtext}>{dailySummaryCorrectionText}</Text>
+                            {!showDailySummary ? (
+                              <Text style={styles.dailySummaryToggleHint}>{'\uB354 \uBCF4\uAE30'}</Text>
+                            ) : null}
+                          </View>
+                        </Pressable>
+
+                        {showDailySummary ? (
+                          <>
+                            <View style={[styles.skillInsightStatCard, styles.dailySummaryCard]}>
+                              <View style={styles.summaryBoardRow}>
+                                <Text style={styles.summaryBoardLabel}>{'\uC5F0\uC2B5\uB7C9'}</Text>
+                                <Text style={styles.summaryBoardValue}>
+                                  {getDailySummaryPracticeText(diarySkillInsight, selectedDateDribbleCount)}
+                                </Text>
+                              </View>
+                              <View style={styles.summaryBoardRow}>
+                                <Text style={styles.summaryBoardLabel}>{'\uB808\uC2A8 \uD3C9\uAC00'}</Text>
+                                <Text style={styles.summaryBoardValue}>{getDailySummaryEvaluationText(diarySkillInsight)}</Text>
+                              </View>
+                              <View style={styles.summaryBoardRow}>
+                                <Text style={styles.summaryBoardLabel}>{'\uC29B \uC131\uACF5\uB960 \uBCC0\uD654'}</Text>
+                                <Text style={styles.summaryBoardValue}>{getDailySummaryShotText(diarySkillInsight)}</Text>
+                              </View>
+                              <View style={styles.summaryBoardRow}>
+                                <Text style={styles.summaryBoardLabel}>{'\uB4DC\uB9AC\uBE14 \uC6B0\uC138 \uC190'}</Text>
+                                <Text style={styles.summaryBoardValue}>
+                                  {getDailySummaryDribbleText(diarySkillInsight, selectedDateDribbleCount)}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <Pressable
+                              onPress={() => setShowDailySummary(false)}
+                              style={({ pressed }) => [styles.dailySummaryCollapseButton, pressed && styles.pressed]}
+                            >
+                              <Text style={styles.dailySummaryCollapseText}>{'\uC811\uAE30'}</Text>
+                            </Pressable>
+                          </>
+                        ) : null}
                       </View>
                     ) : null}
 
                     <View style={[styles.skillInsightStatCard, styles.skillInsightShotCard]}>
                       <View style={styles.skillInsightShotHeader}>
                         <View style={styles.skillInsightShotTitleWrap}>
-                          <Text style={styles.skillInsightStatLabel}>{'\uC131\uACF5\uB960'}</Text>
-                          <Text style={styles.skillInsightStatHelper}>
-                            {selectedDateKey
-                              ? `${getSuccessRateRangeSummaryText(successRateRange)} \uC2DC\uB3C4 ${SUCCESS_RATE_COMPARE_MIN_ATTEMPTS}\uD68C \uC774\uC0C1 \uAE30\uB85D\uB9CC \uBE44\uAD50`
-                              : `\uB0A0\uC9DC\uB97C \uC120\uD0DD\uD558\uBA74 \uC2DC\uB3C4 ${SUCCESS_RATE_COMPARE_MIN_ATTEMPTS}\uD68C \uC774\uC0C1 \uAE30\uB85D\uC758 \uC131\uACF5\uB960 \uBE44\uAD50 \uADF8\uB798\uD504\uB97C \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4.`}
-                          </Text>
+                          <Text style={styles.skillInsightStatLabel}>{'\uC131\uACF5\uB960 \uBE44\uAD50'}</Text>
+                          {!selectedDateKey ? (
+                            <Text style={styles.skillInsightStatHelper}>
+                              {`\uB0A0\uC9DC\uB97C \uC120\uD0DD\uD558\uBA74 \uC2DC\uB3C4 ${SUCCESS_RATE_COMPARE_MIN_ATTEMPTS}\uD68C \uC774\uC0C1 \uAE30\uB85D\uC758 \uC131\uACF5\uB960 \uBE44\uAD50 \uADF8\uB798\uD504\uB97C \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4.`}
+                            </Text>
+                          ) : null}
                         </View>
 
                         <View style={styles.successRateRangeWrap}>
@@ -1253,6 +1440,8 @@ export function DiaryScreen({
                           ) : null}
                         </View>
                       </View>
+
+                      <Text style={styles.skillInsightHeadline}>{getSuccessRateHeadline(successRateComparisonData)}</Text>
 
                       {selectedDateKey && hasSuccessRateComparisonData ? (
                         <View style={styles.skillInsightShotBody}>
@@ -1415,7 +1604,7 @@ export function DiaryScreen({
                     <View style={styles.skillInsightStatCard}>
                       <Text style={styles.skillInsightStatLabel}>{'\uB4DC\uB9AC\uBE14 \uADE0\uD615'}</Text>
                       <Text style={styles.skillInsightNarration}>
-                        {getDribbleBalanceNarration(diarySkillInsight, dribbleGraphTotal)}
+                        {getDribbleBalanceHeadline(diarySkillInsight, dribbleGraphTotal)}
                       </Text>
                       <View style={styles.dribbleBalanceLegendRow}>
                         <View style={styles.dribbleBalanceLegendItem}>
@@ -1427,7 +1616,9 @@ export function DiaryScreen({
                                 : styles.dribbleBalanceLegendDotSubtle,
                             ]}
                           />
-                          <Text style={styles.dribbleBalanceLegendText}>{`\uC67C\uC190 ${diarySkillInsight.leftDribbleCount}\uD68C`}</Text>
+                          <Text style={styles.dribbleBalanceLegendText}>
+                            {`\uC67C\uC190 ${diarySkillInsight.leftDribbleCount}\uD68C`}
+                          </Text>
                         </View>
                         <View style={styles.dribbleBalanceLegendItem}>
                           <View
@@ -1438,7 +1629,9 @@ export function DiaryScreen({
                                 : styles.dribbleBalanceLegendDotSubtle,
                             ]}
                           />
-                          <Text style={styles.dribbleBalanceLegendText}>{`\uC624\uB978\uC190 ${diarySkillInsight.rightDribbleCount}\uD68C`}</Text>
+                          <Text style={styles.dribbleBalanceLegendText}>
+                            {`\uC624\uB978\uC190 ${diarySkillInsight.rightDribbleCount}\uD68C`}
+                          </Text>
                         </View>
                       </View>
                       <View style={styles.dribbleBalanceTrack}>
@@ -1469,9 +1662,6 @@ export function DiaryScreen({
                           />
                         ) : null}
                       </View>
-                      <Text style={styles.skillInsightStatHelper}>
-                        {getDribbleBalanceSummary(diarySkillInsight, dribbleGraphTotal)}
-                      </Text>
                     </View>
                   </View>
                 </>
@@ -1496,7 +1686,7 @@ export function DiaryScreen({
               </Pressable>
 
               {showRecordFilterMenu ? (
-                  <View style={styles.recordFilterMenu}>
+                <View style={styles.recordFilterMenu}>
                   {(['all', 'dribble', 'shoot', 'shootSuccess'] as RecordFilter[]).map((filterOption) => (
                     <Pressable
                       key={filterOption}
@@ -1573,6 +1763,116 @@ export function DiaryScreen({
         </View>
       </View>
 
+      {menuOpenSpacerHeight > 0 ? <View style={[styles.menuOpenSpacer, { height: menuOpenSpacerHeight }]} /> : null}
+
+      <Modal
+        visible={openedEvaluationRecord !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={closeRecordEvaluation}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, styles.recordEvaluationModalCard]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{'\uAE30\uB85D \uD3C9\uAC00'}</Text>
+              <Pressable
+                onPress={closeRecordEvaluation}
+                style={({ pressed }) => [styles.modalCloseButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.modalCloseText}>{'\uB4A4\uB85C \uAC00\uAE30'}</Text>
+              </Pressable>
+            </View>
+
+            {openedEvaluationRecord ? (
+              <ScrollView
+                style={styles.recordEvaluationScroll}
+                contentContainerStyle={styles.recordEvaluationScrollContent}
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.recordEvaluationBody}>
+                  <View style={styles.recordHeader}>
+                    <View style={styles.recordTitleRow}>
+                      <Text style={styles.recordTitle}>{getRecordTitle(openedEvaluationRecord.mode)}</Text>
+
+                      {openedEvaluationRecord.evaluation ? (
+                        <View
+                          style={[
+                            styles.recordLevelBadge,
+                            openedEvaluationRecord.evaluation.level === 'good'
+                              ? styles.recordLevelBadgeGood
+                              : openedEvaluationRecord.evaluation.level === 'average'
+                                ? styles.recordLevelBadgeAverage
+                                : styles.recordLevelBadgeBad,
+                          ]}
+                        >
+                          <Text style={styles.recordLevelBadgeText}>
+                            {getRecordLevelLabel(openedEvaluationRecord.evaluation.level)}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+
+                    {openedEvaluationRecord.mode === 'shoot' ? (
+                      <Pressable
+                        onPress={() => onToggleShotOutcome(openedEvaluationRecord.id)}
+                        style={({ pressed }) => [
+                          styles.shotOutcomeToggle,
+                          openedEvaluationRecord.shotOutcome === 'success'
+                            ? styles.shotOutcomeToggleSuccess
+                            : styles.shotOutcomeToggleFailure,
+                          pressed && styles.pressed,
+                        ]}
+                      >
+                        <Text style={styles.shotOutcomeToggleLabel}>{'\uC29B \uACB0\uACFC'}</Text>
+                        <Text style={styles.shotOutcomeToggleValue}>
+                          {getShotOutcomeLabel(openedEvaluationRecord.shotOutcome)}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+
+                  <Text style={styles.recordMeta}>{openedEvaluationRecord.createdAt}</Text>
+
+                  {openedEvaluationRecord.videoUri ? (
+                    <Video
+                      ref={(instance) => {
+                        videoRefs.current[openedEvaluationRecord.id] = instance;
+                      }}
+                      source={{ uri: openedEvaluationRecord.videoUri }}
+                      useNativeControls
+                      shouldPlay={false}
+                      isLooping={false}
+                      progressUpdateIntervalMillis={200}
+                      resizeMode={ResizeMode.COVER}
+                      style={styles.recordEvaluationVideo}
+                      onPlaybackStatusUpdate={(status) => handlePlaybackStatus(openedEvaluationRecord, status)}
+                    />
+                  ) : null}
+
+                  {renderRecordEvaluationContent(openedEvaluationRecord)}
+
+                  <View style={styles.liveFeedbackBox}>
+                    <Text style={styles.liveFeedbackLabel}>{'\uC2E4\uC2DC\uAC04 \uD53C\uB4DC\uBC31'}</Text>
+                    <Text style={styles.liveFeedbackText}>
+                      {playbackFeedback[openedEvaluationRecord.id] || openedEvaluationRecord.feedback}
+                    </Text>
+                  </View>
+
+                  <SmallButton
+                    title={'\uAE30\uB85D \uC0AD\uC81C'}
+                    onPress={() => {
+                      closeRecordEvaluation();
+                      onDeleteRecord(openedEvaluationRecord.id);
+                    }}
+                    variant="red"
+                  />
+                </View>
+              </ScrollView>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
       <Modal visible={showCalendarModal} transparent animationType="fade" onRequestClose={() => setShowCalendarModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, styles.calendarModalCard]}>
@@ -1588,7 +1888,7 @@ export function DiaryScreen({
 
             <View style={styles.calendarTop}>
               <SmallButton title="<" onPress={() => onChangeMonth(-1)} variant="dark" />
-              <Text style={styles.monthTitle}>{formatMonthTitle(currentDate)}</Text>
+              <Text style={styles.monthTitle}>{formatDiaryMonthLabel(currentDate)}</Text>
               <SmallButton title=">" onPress={() => onChangeMonth(1)} variant="dark" />
             </View>
 
@@ -1913,6 +2213,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
     gap: 12,
   },
+  menuOpenSpacer: {
+    width: '100%',
+  },
   recordsTitle: {
     color: colors.text,
     fontSize: 20,
@@ -1933,10 +2236,10 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   skillInsightCard: {
-    backgroundColor: colors.surfaceStrong,
-    borderRadius: 16,
-    padding: 16,
-    gap: 12,
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    padding: 0,
+    gap: 14,
   },
   skillInsightText: {
     color: colors.textMuted,
@@ -1944,28 +2247,92 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   skillInsightStats: {
-    gap: 10,
+    gap: 14,
   },
   skillInsightStatCard: {
-    borderRadius: 14,
-    padding: 12,
-    backgroundColor: colors.surface,
+    borderRadius: 18,
+    padding: 16,
+    backgroundColor: colors.surfaceStrong,
     borderWidth: 0,
     borderColor: 'transparent',
   },
-  dailySummaryCard: {
-    gap: 8,
+  skillInsightEmptyCard: {
+    minHeight: 88,
+    justifyContent: 'center',
   },
-  dailySummaryLine: {
+  dailySummarySection: {
+    gap: 12,
+    borderRadius: 18,
+    padding: 16,
+    backgroundColor: colors.surfaceStrong,
+  },
+  dailySummaryToggle: {
+    width: '100%',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    gap: 10,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
+  },
+  dailySummaryToggleTextWrap: {
+    gap: 6,
+  },
+  dailySummaryToggleText: {
     color: colors.text,
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: 18,
+    lineHeight: 26,
+    fontWeight: '800',
+  },
+  dailySummaryToggleSubtext: {
+    color: colors.textSoft,
+    fontSize: 13,
+    lineHeight: 20,
     fontWeight: '700',
+  },
+  dailySummaryToggleHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  dailySummaryCollapseButton: {
+    alignSelf: 'flex-start',
+    paddingTop: 2,
+  },
+  dailySummaryCollapseText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  dailySummaryCard: {
+    borderRadius: 0,
+    padding: 0,
+    backgroundColor: 'transparent',
+    gap: 10,
+  },
+  summaryBoardRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  summaryBoardLabel: {
+    width: 78,
+    color: colors.textSoft,
+    fontSize: 12,
+    lineHeight: 20,
+    fontWeight: '800',
+  },
+  summaryBoardValue: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: '800',
   },
   skillInsightShotCard: {
     gap: 12,
-    padding: 12,
-    borderRadius: 22,
+    padding: 16,
   },
   skillInsightShotHeader: {
     flexDirection: 'row',
@@ -2040,11 +2407,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   successRateComparePanel: {
-    borderRadius: 22,
-    paddingHorizontal: 12,
+    borderRadius: 0,
+    paddingHorizontal: 0,
     paddingTop: 14,
-    paddingBottom: 12,
-    backgroundColor: colors.surfaceStrong,
+    paddingBottom: 0,
+    backgroundColor: 'transparent',
     borderWidth: 0,
     borderColor: 'transparent',
   },
@@ -2214,12 +2581,23 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '900',
   },
-  skillInsightNarration: {
+  skillInsightHeadline: {
     color: colors.text,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: '700',
     marginTop: 2,
+  },
+  skillInsightNarration: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  skillInsightNarrationEmphasis: {
+    fontWeight: '900',
+    color: colors.text,
   },
   dribbleBalanceLegendRow: {
     flexDirection: 'row',
@@ -2293,10 +2671,32 @@ const styles = StyleSheet.create({
     minHeight: 760,
   },
   recordFilterWrap: {
-    position: 'relative',
     alignSelf: 'flex-start',
     minWidth: 170,
     zIndex: 10,
+  },
+  recordFilterChipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  recordFilterChip: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: colors.surfaceStrong,
+  },
+  recordFilterChipActive: {
+    backgroundColor: 'rgba(208,145,85,0.18)',
+  },
+  recordFilterChipText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  recordFilterChipTextActive: {
+    color: colors.text,
   },
   recordFilterDropdown: {
     borderRadius: 0,
@@ -2321,10 +2721,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   recordFilterMenu: {
-    position: 'absolute',
-    top: 50,
-    left: 0,
-    right: 0,
+    marginTop: 8,
     borderRadius: 14,
     padding: 6,
     backgroundColor: colors.surfaceStrong,
@@ -2497,6 +2894,11 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
   },
+  recordEvaluationModalCard: {
+    maxWidth: 760,
+    width: '100%',
+    alignSelf: 'center',
+  },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2521,6 +2923,22 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 13,
     fontWeight: '800',
+  },
+  recordEvaluationScroll: {
+    marginTop: 16,
+  },
+  recordEvaluationScrollContent: {
+    paddingBottom: 8,
+  },
+  recordEvaluationBody: {
+    gap: 14,
+  },
+  recordEvaluationVideo: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 14,
+    backgroundColor: '#000',
+    overflow: 'hidden',
   },
   modalDescription: {
     color: colors.textMuted,
@@ -2667,6 +3085,10 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 8,
   },
+  recordTitlePressable: {
+    flex: 1,
+    minWidth: 0,
+  },
   recordTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2738,6 +3160,16 @@ const styles = StyleSheet.create({
     color: '#ffd3ad',
     fontSize: 13,
     marginBottom: 10,
+  },
+  recordOpenHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  recordBodyPressable: {
+    gap: 0,
   },
   evaluationToggleRow: {
     position: 'relative',

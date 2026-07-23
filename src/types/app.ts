@@ -137,9 +137,13 @@ export interface DiarySkillInsight {
   dribbleBalance: 'balanced' | 'left' | 'right' | 'none';
   dribbleBalanceGap: number;
   canShowDailySummary: boolean;
-  yesterdayPracticeTotal: number;
+  yesterdayDribbleCount: number;
+  yesterdayShotAttempts: number;
   previousPracticeDateKey: string | null;
-  previousPracticeTotal: number;
+  previousPracticeDribbleCount: number;
+  previousPracticeShotAttempts: number;
+  previousShotDateKey: string | null;
+  previousShotSuccessRate: number | null;
   evaluationCounts: Record<LessonRecordLevel, number>;
   evaluationDominantLevel: LessonRecordLevel | 'mixed' | 'none';
 }

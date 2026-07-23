@@ -1326,22 +1326,28 @@ function buildDiarySkillInsight(
         ? 'mixed'
         : rankedEvaluationLevels[0][0];
   const shotAttemptsByDate = new Map(shotGraphData.map((item) => [item.dateKey, item.attempts]));
+  const getDribbleCountForDate = (dateKey: string) => Math.max(0, dailyDribbleRecords[dateKey] || 0);
+  const getShotAttemptsForDate = (dateKey: string) => Math.max(0, shotAttemptsByDate.get(dateKey) || 0);
   const getPracticeTotalForDate = (dateKey: string) =>
-    Math.max(0, dailyDribbleRecords[dateKey] || 0) + Math.max(0, shotAttemptsByDate.get(dateKey) || 0);
+    getDribbleCountForDate(dateKey) + getShotAttemptsForDate(dateKey);
   const selectedDateTime = selectedDateKey ? parseDateKeyToTime(selectedDateKey) : 0;
   const selectedDate = selectedDateKey ? parseDateKeyToDate(selectedDateKey) : null;
   const yesterdayKey = selectedDate
     ? formatDateKey(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() - 1))
     : '';
-  const yesterdayPracticeTotal = yesterdayKey ? getPracticeTotalForDate(yesterdayKey) : 0;
+  const yesterdayDribbleCount = yesterdayKey ? getDribbleCountForDate(yesterdayKey) : 0;
+  const yesterdayShotAttempts = yesterdayKey ? getShotAttemptsForDate(yesterdayKey) : 0;
   const previousPracticeDateKeys = Array.from(
     new Set([...Object.keys(dailyDribbleRecords), ...shotGraphData.map((item) => item.dateKey)])
   )
     .filter((dateKey) => dateKey !== selectedDateKey && parseDateKeyToTime(dateKey) < selectedDateTime && getPracticeTotalForDate(dateKey) > 0)
     .sort((left, right) => parseDateKeyToTime(right) - parseDateKeyToTime(left));
-  const previousPracticeDateKey = previousPracticeDateKeys.find((dateKey) => dateKey !== yesterdayKey)
-    ?? (yesterdayPracticeTotal > 0 ? null : previousPracticeDateKeys[0] ?? null);
-  const previousPracticeTotal = previousPracticeDateKey ? getPracticeTotalForDate(previousPracticeDateKey) : 0;
+  const previousPracticeDateKey = previousPracticeDateKeys[0] ?? null;
+  const previousPracticeDribbleCount = previousPracticeDateKey ? getDribbleCountForDate(previousPracticeDateKey) : 0;
+  const previousPracticeShotAttempts = previousPracticeDateKey ? getShotAttemptsForDate(previousPracticeDateKey) : 0;
+  const previousShotRecord = shotGraphData
+    .filter((item) => item.dateKey !== selectedDateKey && parseDateKeyToTime(item.dateKey) < selectedDateTime && item.attempts > 0)
+    .sort((left, right) => parseDateKeyToTime(right.dateKey) - parseDateKeyToTime(left.dateKey))[0] ?? null;
   const canShowDailySummary =
     selectedDateDribbleCount >= DAILY_DRIBBLE_TARGET && selectedShotAttempts >= DAILY_SHOOT_TARGET;
 
@@ -1354,9 +1360,13 @@ function buildDiarySkillInsight(
     dribbleBalance,
     dribbleBalanceGap,
     canShowDailySummary,
-    yesterdayPracticeTotal,
+    yesterdayDribbleCount,
+    yesterdayShotAttempts,
     previousPracticeDateKey,
-    previousPracticeTotal,
+    previousPracticeDribbleCount,
+    previousPracticeShotAttempts,
+    previousShotDateKey: previousShotRecord?.dateKey ?? null,
+    previousShotSuccessRate: previousShotRecord?.successRate ?? null,
     evaluationCounts,
     evaluationDominantLevel,
   };
