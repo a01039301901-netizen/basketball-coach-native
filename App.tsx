@@ -464,11 +464,9 @@ export default function App() {
             <SettingsScreen
               selectedBallBrand={app.selectedBallBrand}
               selectedBallColors={app.selectedBallColors}
-              selectedPosition={app.selectedPosition}
               homeworkTestState={app.homeworkTestState}
               onSelectBallBrand={app.selectBallBrand}
               onToggleBallColor={app.toggleBallColor}
-              onSelectPosition={app.selectPosition}
               onApplyHomeworkTestState={app.applyHomeworkTestState}
             />
           )}
@@ -579,11 +577,9 @@ export default function App() {
                     <SettingsScreen
                       selectedBallBrand={app.selectedBallBrand}
                       selectedBallColors={app.selectedBallColors}
-                      selectedPosition={app.selectedPosition}
                       homeworkTestState={app.homeworkTestState}
                       onSelectBallBrand={app.selectBallBrand}
                       onToggleBallColor={app.toggleBallColor}
-                      onSelectPosition={app.selectPosition}
                       onApplyHomeworkTestState={app.applyHomeworkTestState}
                     />
                   )}

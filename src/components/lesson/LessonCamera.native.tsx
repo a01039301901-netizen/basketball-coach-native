@@ -3,11 +3,12 @@ import type { StyleProp, ViewStyle } from 'react-native';
 import { useEffect, useRef } from 'react';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { colors } from '../../theme/colors';
-import type { BallBrandOption, BallColorOption, LessonMode } from '../../types/app';
+import type { BallBrandOption, BallColorOption, DribbleLessonView, LessonMode } from '../../types/app';
 import { buildPoseBootstrapScript, POSE_WEB_BOOTSTRAP_URL } from './poseWebHtml';
 
 interface LessonCameraProps {
   lessonMode: LessonMode;
+  selectedDribbleView: DribbleLessonView;
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
   cameraSessionKey: number;
@@ -27,6 +28,7 @@ interface LessonCameraProps {
 
 export function LessonCamera({
   lessonMode,
+  selectedDribbleView,
   selectedBallBrand,
   selectedBallColors,
   cameraSessionKey,
@@ -104,6 +106,7 @@ export function LessonCamera({
             onMessage={onPoseMessage}
             injectedJavaScriptBeforeContentLoaded={buildPoseBootstrapScript(
               lessonMode,
+              selectedDribbleView,
               selectedBallBrand,
               selectedBallColors
             )}

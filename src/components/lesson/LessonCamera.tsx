@@ -1,10 +1,11 @@
 import { Platform } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
-import type { BallBrandOption, BallColorOption, LessonMode } from '../../types/app';
+import type { BallBrandOption, BallColorOption, DribbleLessonView, LessonMode } from '../../types/app';
 
 interface LessonCameraProps {
   lessonMode: LessonMode;
+  selectedDribbleView: DribbleLessonView;
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
   cameraSessionKey: number;

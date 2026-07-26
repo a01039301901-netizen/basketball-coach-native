@@ -585,6 +585,14 @@ function getDiaryCriterionDisplayLabel(criterion: LessonRecordCriterion) {
     return '\uD0C0\uC774\uBC0D';
   }
 
+  if (criterion.key === 'shoot-release-point') {
+    return '\uC29B \uD0C0\uC810';
+  }
+
+  if (criterion.key === 'shoot-release-duration') {
+    return '\uB9B4\uB9AC\uC988 \uC2DC\uAC04';
+  }
+
   if (criterion.key === 'shoot-result') {
     return '\uC131\uACF5 \uC5EC\uBD80';
   }

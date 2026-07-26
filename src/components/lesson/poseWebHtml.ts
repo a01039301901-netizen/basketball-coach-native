@@ -2,6 +2,7 @@
 
 export function buildPoseWebHtml(
   lessonMode: 'dribble' | 'shoot' = 'dribble',
+  selectedDribbleView: 'front' | 'side' = 'front',
   selectedBallBrand: 'wilson' | 'spalding' | 'molten' = 'wilson',
   selectedBallColors: string[] = ['orange']
 ): string {
@@ -77,6 +78,7 @@ export function buildPoseWebHtml(
 
     <script type="module">
       const lessonMode = ${JSON.stringify(lessonMode)};
+      const selectedDribbleView = ${JSON.stringify(selectedDribbleView)};
       const selectedBallBrand = ${JSON.stringify(selectedBallBrand)};
       const selectedBallColors = ${JSON.stringify(selectedBallColors)};
       const wrap = document.getElementById("wrap");
@@ -89,6 +91,17 @@ export function buildPoseWebHtml(
       const CAMERA_SWITCH_THRESHOLD_PX = 72;
       const REAR_CAMERA_LABEL_PATTERN = /(back|rear|environment|world|후면|뒤)/i;
       const FRONT_CAMERA_LABEL_PATTERN = /(front|user|face|전면|앞)/i;
+      const DRIBBLE_STABILITY_WINDOW_SIZE = 8;
+      const DRIBBLE_POSITION_MIN_SAMPLES = 6;
+      const DRIBBLE_HEIGHT_MIN_SAMPLES = 6;
+      const DRIBBLE_TEMPO_MIN_SAMPLES = 5;
+      const DRIBBLE_HEIGHT_TOLERANCE_RATIO = 0.15;
+      const DRIBBLE_TEMPO_TOLERANCE_RATIO = 0.18;
+      const DRIBBLE_FRONT_POSITION_TOLERANCE = 0.2;
+      const DRIBBLE_SIDE_POSITION_TOLERANCE = 0.18;
+      const DRIBBLE_FRONT_OUTSIDE_LANE_STABLE_RATIO = 0.8;
+      const DRIBBLE_STABLE_RATIO = 0.7;
+      const DRIBBLE_MIXED_RATIO = 0.5;
       const SHOOT_BALL_HAND_CONTACT_DISTANCE = 0.16;
       const SHOOT_BALL_HAND_SEPARATION_DISTANCE = 0.22;
       const SHOOT_BALL_HAND_SEPARATION_DELTA = 0.045;
@@ -97,6 +110,10 @@ export function buildPoseWebHtml(
       const SHOOT_ARM_EXTENSION_TARGET_ANGLE = 145;
       const SHOOT_ARM_EXTENSION_MIN_DELTA = 16;
       const SHOOT_ARM_EXTENSION_MIN_SPEED = 0.08;
+      const SHOOT_KNEE_EXTENSION_MIN_DELTA = 4;
+      const SHOOT_KNEE_EXTENSION_FROM_LOWEST_DELTA = 10;
+      const SHOOT_TIMING_SYNC_WINDOW_MS = 180;
+      const SHOOT_RELEASE_DURATION_BALANCED_MS = 600;
 
       const INDEX = {
         nose: 0,
@@ -169,15 +186,33 @@ export function buildPoseWebHtml(
       let leftHandDribbleCount = 0;
       let rightHandDribbleCount = 0;
       let wasBallNearFoot = false;
+      let wasBallBelowKnee = false;
+      let dribbleBounceLocked = false;
       let highestBounceY = null;
       let lowestBounceY = null;
       let lastBounceHand = "unknown";
+      let lastDribbleBounceAtMs = null;
+      let dribbleHeightSamples = [];
+      let dribbleTempoSamples = [];
+      let dribbleFrontPositionSamples = [];
+      let dribbleFrontOutsideLaneSamples = [];
+      let dribbleSidePositionSamples = [];
       let shootLowestLegAngle = null;
+      let shootLowestLegAngleAtMs = null;
       let shootHeadPeakY = null;
+      let shootLatestControlledBallY = null;
+      let shootLatestControlledHeadY = null;
       let shootReleaseDetected = false;
       let shootReleaseDetectedAtMs = null;
       let shootSuccessGestureEvaluated = false;
       let shootReleaseTiming = "unknown";
+      let shootReleasePointY = null;
+      let shootReleasePointState = "unknown";
+      let shootReleaseDurationMs = null;
+      let shootReleaseDurationState = "unknown";
+      let shootPreviousLegAngle = null;
+      let shootPreviousLegAngleAtMs = null;
+      let shootKneeExtensionAtMs = null;
       let shootPreviousArmAngle = null;
       let shootPreviousArmAngleAtMs = null;
       let shootPreviousBallHandDistance = null;
@@ -206,19 +241,37 @@ export function buildPoseWebHtml(
         leftHandDribbleCount = 0;
         rightHandDribbleCount = 0;
         wasBallNearFoot = false;
+        wasBallBelowKnee = false;
+        dribbleBounceLocked = false;
         highestBounceY = null;
         lowestBounceY = null;
         lastBounceHand = "unknown";
+        lastDribbleBounceAtMs = null;
+        dribbleHeightSamples = [];
+        dribbleTempoSamples = [];
+        dribbleFrontPositionSamples = [];
+        dribbleFrontOutsideLaneSamples = [];
+        dribbleSidePositionSamples = [];
       }
 
       function resetShootTracking() {
         previousHipY = null;
         shootLowestLegAngle = null;
+        shootLowestLegAngleAtMs = null;
         shootHeadPeakY = null;
+        shootLatestControlledBallY = null;
+        shootLatestControlledHeadY = null;
         shootReleaseDetected = false;
         shootReleaseDetectedAtMs = null;
         shootSuccessGestureEvaluated = false;
         shootReleaseTiming = "unknown";
+        shootReleasePointY = null;
+        shootReleasePointState = "unknown";
+        shootReleaseDurationMs = null;
+        shootReleaseDurationState = "unknown";
+        shootPreviousLegAngle = null;
+        shootPreviousLegAngleAtMs = null;
+        shootKneeExtensionAtMs = null;
         shootPreviousArmAngle = null;
         shootPreviousArmAngleAtMs = null;
         shootPreviousBallHandDistance = null;
@@ -442,6 +495,70 @@ export function buildPoseWebHtml(
 
       function distanceBetween(a, b) {
         return Math.hypot(a.x - b.x, a.y - b.y);
+      }
+
+      function pushLimitedSample(samples, value) {
+        samples.push(value);
+        if (samples.length > DRIBBLE_STABILITY_WINDOW_SIZE) {
+          samples.shift();
+        }
+      }
+
+      function getMedian(values) {
+        if (!values.length) {
+          return null;
+        }
+
+        const sorted = [...values].sort((left, right) => left - right);
+        const middleIndex = Math.floor(sorted.length / 2);
+        return sorted.length % 2 === 0
+          ? (sorted[middleIndex - 1] + sorted[middleIndex]) / 2
+          : sorted[middleIndex];
+      }
+
+      function buildStabilityStateFromRatio(stableRatio, sampleCount, minSampleCount) {
+        if (sampleCount < minSampleCount || stableRatio === null) {
+          return "unknown";
+        }
+
+        if (stableRatio >= DRIBBLE_STABLE_RATIO) {
+          return "stable";
+        }
+
+        if (stableRatio >= DRIBBLE_MIXED_RATIO) {
+          return "mixed";
+        }
+
+        return "unstable";
+      }
+
+      function calculateRatioWithinTolerance(values, tolerance) {
+        if (!values.length) {
+          return null;
+        }
+
+        const median = getMedian(values);
+        if (median === null) {
+          return null;
+        }
+
+        const stableCount = values.filter((value) => Math.abs(value - median) <= tolerance).length;
+        return stableCount / values.length;
+      }
+
+      function calculateScaledRatioWithinTolerance(values, toleranceRatio) {
+        if (!values.length) {
+          return null;
+        }
+
+        const median = getMedian(values);
+        if (median === null) {
+          return null;
+        }
+
+        const tolerance = Math.abs(median) * toleranceRatio;
+        const stableCount = values.filter((value) => Math.abs(value - median) <= tolerance).length;
+        return stableCount / values.length;
       }
 
       function angleAt(a, b, c) {
@@ -1086,17 +1203,138 @@ export function buildPoseWebHtml(
         return "unknown";
       }
 
+      function recordDribbleStabilitySample(landmarks, ball, now) {
+        if (!ball) {
+          return;
+        }
+
+        if (dribbleCount <= 0) {
+          lastDribbleBounceAtMs = now;
+          return;
+        }
+
+        if (highestBounceY !== null && lowestBounceY !== null) {
+          pushLimitedSample(dribbleHeightSamples, Math.max(0, lowestBounceY - highestBounceY));
+        }
+
+        if (lastDribbleBounceAtMs !== null) {
+          pushLimitedSample(dribbleTempoSamples, Math.max(0, now - lastDribbleBounceAtMs));
+        }
+
+        if (selectedDribbleView === "front") {
+          const leftAnkle = landmarks[INDEX.leftAnkle];
+          const rightAnkle = landmarks[INDEX.rightAnkle];
+
+          if (visible(leftAnkle) && visible(rightAnkle)) {
+            const footWidth = Math.abs(leftAnkle.x - rightAnkle.x);
+            if (footWidth > 0.0001) {
+              const ankleMidX = (leftAnkle.x + rightAnkle.x) / 2;
+              pushLimitedSample(dribbleFrontPositionSamples, Math.abs(ball.x - ankleMidX) / footWidth);
+              pushLimitedSample(
+                dribbleFrontOutsideLaneSamples,
+                classifyFrontBallLaneState(landmarks, ball) === "outside_legs" ? 1 : 0
+              );
+            }
+          }
+        } else {
+          const leftShoulder = landmarks[INDEX.leftShoulder];
+          const rightShoulder = landmarks[INDEX.rightShoulder];
+          const leftHip = landmarks[INDEX.leftHip];
+          const rightHip = landmarks[INDEX.rightHip];
+          const shoulderMid = visible(leftShoulder) && visible(rightShoulder) ? midpoint(leftShoulder, rightShoulder) : null;
+          const hipMid = visible(leftHip) && visible(rightHip) ? midpoint(leftHip, rightHip) : null;
+          const torsoCenterX =
+            shoulderMid && hipMid
+              ? (shoulderMid.x + hipMid.x) / 2
+              : shoulderMid
+                ? shoulderMid.x
+                : hipMid
+                  ? hipMid.x
+                  : null;
+
+          if (torsoCenterX !== null) {
+            pushLimitedSample(dribbleSidePositionSamples, Math.abs(ball.x - torsoCenterX));
+          }
+        }
+
+        lastDribbleBounceAtMs = now;
+      }
+
+      function getDribbleStabilityMetrics() {
+        const heightStableRatio = calculateScaledRatioWithinTolerance(dribbleHeightSamples, DRIBBLE_HEIGHT_TOLERANCE_RATIO);
+        const tempoStableRatio = calculateScaledRatioWithinTolerance(dribbleTempoSamples, DRIBBLE_TEMPO_TOLERANCE_RATIO);
+        const positionSamples = selectedDribbleView === "front" ? dribbleFrontPositionSamples : dribbleSidePositionSamples;
+
+        let positionStableRatio =
+          selectedDribbleView === "front"
+            ? calculateRatioWithinTolerance(dribbleFrontPositionSamples, DRIBBLE_FRONT_POSITION_TOLERANCE)
+            : calculateRatioWithinTolerance(dribbleSidePositionSamples, DRIBBLE_SIDE_POSITION_TOLERANCE);
+
+        let positionStabilityState = buildStabilityStateFromRatio(
+          positionStableRatio,
+          positionSamples.length,
+          DRIBBLE_POSITION_MIN_SAMPLES
+        );
+
+        if (selectedDribbleView === "front" && dribbleFrontOutsideLaneSamples.length > 0 && positionStableRatio !== null) {
+          const outsideLaneStableRatio =
+            dribbleFrontOutsideLaneSamples.reduce((sum, value) => sum + value, 0) / dribbleFrontOutsideLaneSamples.length;
+          positionStableRatio = Math.min(positionStableRatio, outsideLaneStableRatio);
+          positionStabilityState = buildStabilityStateFromRatio(
+            positionStableRatio,
+            dribbleFrontPositionSamples.length,
+            DRIBBLE_POSITION_MIN_SAMPLES
+          );
+
+          if (
+            positionStabilityState === "stable" &&
+            outsideLaneStableRatio < DRIBBLE_FRONT_OUTSIDE_LANE_STABLE_RATIO
+          ) {
+            positionStabilityState = outsideLaneStableRatio >= DRIBBLE_MIXED_RATIO ? "mixed" : "unstable";
+          }
+        }
+
+        return {
+          positionStableRatio: positionStableRatio ?? undefined,
+          positionStabilityState,
+          heightStableRatio: heightStableRatio ?? undefined,
+          heightStabilityState: buildStabilityStateFromRatio(
+            heightStableRatio,
+            dribbleHeightSamples.length,
+            DRIBBLE_HEIGHT_MIN_SAMPLES
+          ),
+          tempoStableRatio: tempoStableRatio ?? undefined,
+          tempoStabilityState: buildStabilityStateFromRatio(
+            tempoStableRatio,
+            dribbleTempoSamples.length,
+            DRIBBLE_TEMPO_MIN_SAMPLES
+          ),
+          stabilitySampleCount: Math.max(
+            positionSamples.length,
+            dribbleHeightSamples.length,
+            dribbleTempoSamples.length
+          ),
+        };
+      }
+
       function updateDribbleBounceTracking(landmarks, ball) {
         const leftAnkle = landmarks[INDEX.leftAnkle];
         const rightAnkle = landmarks[INDEX.rightAnkle];
+        const leftKnee = landmarks[INDEX.leftKnee];
+        const rightKnee = landmarks[INDEX.rightKnee];
+        const visibleKnees = [leftKnee, rightKnee].filter(visible);
 
-        if (!ball || !visible(leftAnkle) || !visible(rightAnkle)) {
+        if (!ball || !visible(leftAnkle) || !visible(rightAnkle) || visibleKnees.length === 0) {
           wasBallNearFoot = false;
+          wasBallBelowKnee = false;
           return;
         }
 
         const footY = (leftAnkle.y + rightAnkle.y) / 2;
+        const kneeY = visibleKnees.reduce((sum, point) => sum + point.y, 0) / visibleKnees.length;
         const nearFoot = ball.y >= footY - 0.07;
+        const belowKnee = ball.y >= kneeY;
+        const aboveResetLine = ball.y <= kneeY - 0.04;
 
         if (highestBounceY === null || ball.y < highestBounceY) {
           highestBounceY = ball.y;
@@ -1106,7 +1344,15 @@ export function buildPoseWebHtml(
           lowestBounceY = ball.y;
         }
 
-        if (nearFoot && !wasBallNearFoot) {
+        const enteredBounceZone = (belowKnee && !wasBallBelowKnee) || (nearFoot && !wasBallNearFoot);
+
+        if (aboveResetLine) {
+          dribbleBounceLocked = false;
+        }
+
+        if (enteredBounceZone && !dribbleBounceLocked) {
+          const now = performance.now();
+          recordDribbleStabilitySample(landmarks, ball, now);
           dribbleCount += 1;
           lastBounceHand = detectControllingHand(landmarks, ball);
 
@@ -1118,9 +1364,11 @@ export function buildPoseWebHtml(
 
           highestBounceY = ball.y;
           lowestBounceY = ball.y;
+          dribbleBounceLocked = true;
         }
 
         wasBallNearFoot = nearFoot;
+        wasBallBelowKnee = belowKnee;
       }
 
       function classifyBounceStates(shoulderMid, hipMid) {
@@ -1150,7 +1398,7 @@ export function buildPoseWebHtml(
         const frontStanceAngle = classifyFrontStanceAngle(landmarks, hipMid);
         const torsoLeanAngle = getTorsoLeanAngle(shoulderMid, hipMid);
         const stanceState = classifyStanceState(bodyFacing, torsoLeanAngle, frontStanceAngle);
-        const dribbleStarted = bodyFacing === "front" ? true : didDribbleStart(landmarks, ball);
+        const dribbleStarted = selectedDribbleView === "front" ? true : didDribbleStart(landmarks, ball);
 
         if (dribbleStarted) {
           updateDribbleBounceTracking(landmarks, ball);
@@ -1159,17 +1407,19 @@ export function buildPoseWebHtml(
         const eyeFocus = classifyEyeFocus(landmarks, neck);
         const dribbleHeight = dribbleStarted ? classifyDribbleHeight(landmarks, neck, hipMid) : "unknown";
         const torsoPosture = classifyTorsoPosture(shoulderMid, hipMid, torsoLeanAngle);
-        const frontBallLaneState = bodyFacing === "front" ? classifyFrontBallLaneState(landmarks, ball) : "unknown";
-        const footSpacingState = bodyFacing === "front" ? classifyFootSpacingState(landmarks) : "unknown";
+        const frontBallLaneState = selectedDribbleView === "front" ? classifyFrontBallLaneState(landmarks, ball) : "unknown";
+        const footSpacingState = selectedDribbleView === "front" ? classifyFootSpacingState(landmarks) : "unknown";
         const handBalanceState = dribbleCount >= 2 && Math.abs(leftHandDribbleCount - rightHandDribbleCount) >= 2
           ? "unbalanced"
           : dribbleCount > 0
             ? "balanced"
             : "unknown";
         const bounceStates = classifyBounceStates(shoulderMid, hipMid);
+        const stabilityMetrics = getDribbleStabilityMetrics();
 
         return {
           dribbleStarted,
+          dribbleView: selectedDribbleView,
           bodyFacing,
           eyeFocus,
           dribbleHeight,
@@ -1187,6 +1437,13 @@ export function buildPoseWebHtml(
           footSpacingState,
           highestBounceY,
           lowestBounceY,
+          positionStabilityState: stabilityMetrics.positionStabilityState,
+          positionStableRatio: stabilityMetrics.positionStableRatio,
+          heightStabilityState: stabilityMetrics.heightStabilityState,
+          heightStableRatio: stabilityMetrics.heightStableRatio,
+          tempoStabilityState: stabilityMetrics.tempoStabilityState,
+          tempoStableRatio: stabilityMetrics.tempoStableRatio,
+          stabilitySampleCount: stabilityMetrics.stabilitySampleCount,
           summary: [
             "??:" + bodyFacing,
             "???:" + (dribbleStarted ? "??" : "??"),
@@ -1310,8 +1567,30 @@ export function buildPoseWebHtml(
         const legAngle = legAngles.length > 0 ? legAngles.reduce((sum, value) => sum + value, 0) / legAngles.length : null;
 
         if (legAngle !== null) {
-          shootLowestLegAngle =
-            shootLowestLegAngle === null ? legAngle : Math.min(shootLowestLegAngle, legAngle);
+          if (shootLowestLegAngle === null || legAngle < shootLowestLegAngle) {
+            shootLowestLegAngle = legAngle;
+            shootLowestLegAngleAtMs = now;
+            shootKneeExtensionAtMs = null;
+          } else if (shootPreviousLegAngle !== null && shootPreviousLegAngleAtMs !== null) {
+            const legAngleDelta = legAngle - shootPreviousLegAngle;
+            const extensionFromLowest = shootLowestLegAngle !== null ? legAngle - shootLowestLegAngle : 0;
+
+            if (
+              shootKneeExtensionAtMs === null &&
+              shootLowestLegAngleAtMs !== null &&
+              now >= shootLowestLegAngleAtMs &&
+              legAngleDelta >= SHOOT_KNEE_EXTENSION_MIN_DELTA &&
+              extensionFromLowest >= SHOOT_KNEE_EXTENSION_FROM_LOWEST_DELTA
+            ) {
+              shootKneeExtensionAtMs = now;
+            }
+          }
+
+          shootPreviousLegAngle = legAngle;
+          shootPreviousLegAngleAtMs = now;
+        } else {
+          shootPreviousLegAngle = null;
+          shootPreviousLegAngleAtMs = null;
         }
 
         const referenceLegAngle = shootLowestLegAngle ?? legAngle;
@@ -1332,6 +1611,11 @@ export function buildPoseWebHtml(
             shootHeadPeakY === null ? currentHeadY : Math.min(shootHeadPeakY, currentHeadY);
         }
 
+        if (ballNearShootingHand && ballPoint && currentHeadY !== null) {
+          shootLatestControlledBallY = ballPoint.y;
+          shootLatestControlledHeadY = currentHeadY;
+        }
+
         const releaseDetectedNow =
           !shootReleaseDetected &&
           ballHandDistance !== null &&
@@ -1344,16 +1628,34 @@ export function buildPoseWebHtml(
           shootReleaseDetectedAtMs = performance.now();
           shootSuccessGestureEvaluated = false;
 
-          if (releaseVelocity !== null) {
-            if (releaseVelocity < -0.003) {
+          if (shootKneeExtensionAtMs !== null && shootArmExtensionAtMs !== null) {
+            const timingDeltaMs = shootArmExtensionAtMs - shootKneeExtensionAtMs;
+
+            if (timingDeltaMs < -SHOOT_TIMING_SYNC_WINDOW_MS) {
               shootReleaseTiming = "early";
-            } else if (releaseVelocity > 0.003) {
+            } else if (timingDeltaMs > SHOOT_TIMING_SYNC_WINDOW_MS) {
               shootReleaseTiming = "late";
             } else {
               shootReleaseTiming = "balanced";
             }
           } else {
-            shootReleaseTiming = "balanced";
+            shootReleaseTiming = "unknown";
+          }
+
+          shootReleasePointY = shootLatestControlledBallY;
+          if (shootLatestControlledBallY !== null && shootLatestControlledHeadY !== null) {
+            shootReleasePointState = shootLatestControlledBallY < shootLatestControlledHeadY ? "high" : "low";
+          } else {
+            shootReleasePointState = "unknown";
+          }
+
+          if (shootLowestLegAngleAtMs !== null) {
+            shootReleaseDurationMs = Math.max(0, now - shootLowestLegAngleAtMs);
+            shootReleaseDurationState =
+              shootReleaseDurationMs <= SHOOT_RELEASE_DURATION_BALANCED_MS ? "balanced" : "slow";
+          } else {
+            shootReleaseDurationMs = null;
+            shootReleaseDurationState = "unknown";
           }
         }
 
@@ -1378,6 +1680,8 @@ export function buildPoseWebHtml(
           releaseVelocity,
           lowestLegAngle: shootLowestLegAngle,
           headPeakY: shootHeadPeakY,
+          releasePointY: shootReleasePointY,
+          releaseDurationMs: shootReleaseDurationMs,
           releaseDetected: shootReleaseDetected,
           ballNearShootingHand,
           shootingHandRaised,
@@ -1385,11 +1689,15 @@ export function buildPoseWebHtml(
           armAngleState,
           releaseTiming,
           legAngleState,
+          releasePointState: shootReleasePointState,
+          releaseDurationState: shootReleaseDurationState,
           summary: [
             "Arm:" + (armAngleState === "narrow" ? "narrow" : armAngleState === "wide" ? "wide" : armAngleState === "balanced" ? "balanced" : "unknown"),
             "Ready:" + (readyPoseDetected ? "yes" : "no"),
             "Timing:" + (releaseTiming === "early" ? "early" : releaseTiming === "late" ? "late" : releaseTiming === "balanced" ? "balanced" : "unknown"),
             "Leg:" + (legAngleState === "low" ? "low" : legAngleState === "high" ? "high" : legAngleState === "balanced" ? "balanced" : "unknown"),
+            "Point:" + (shootReleasePointState === "high" ? "high" : shootReleasePointState === "low" ? "low" : "unknown"),
+            "ReleaseMs:" + (shootReleaseDurationMs !== null ? Math.round(shootReleaseDurationMs) : "unknown"),
             "Release:" + (shootReleaseDetected ? "yes" : "no"),
             "Ball:" + (ball ? ball.color : "searching")
           ].join(" | ")
@@ -1432,6 +1740,21 @@ export function buildPoseWebHtml(
             problemJoints.add(wristKey);
             problemJoints.add("leftHip");
             problemJoints.add("rightHip");
+            problemJoints.add("leftKnee");
+            problemJoints.add("rightKnee");
+          }
+
+          if (shootingSide && shootAnalysis.releasePointState === "low") {
+            problemJoints.add(wristKey);
+            problemJoints.add("head");
+          }
+
+          if (shootingSide && shootAnalysis.releaseDurationState === "slow") {
+            problemJoints.add(wristKey);
+            problemJoints.add("leftHip");
+            problemJoints.add("rightHip");
+            problemJoints.add("leftKnee");
+            problemJoints.add("rightKnee");
           }
 
           if (shootAnalysis.legAngleState !== "balanced" && shootAnalysis.legAngleState !== "unknown") {
@@ -1888,10 +2211,11 @@ export function buildPoseWebHtml(
 
 export function buildPoseBootstrapScript(
   lessonMode: 'dribble' | 'shoot' = 'dribble',
+  selectedDribbleView: 'front' | 'side' = 'front',
   selectedBallBrand: 'wilson' | 'spalding' | 'molten' = 'wilson',
   selectedBallColors: string[] = ['orange']
 ): string {
-  const html = JSON.stringify(buildPoseWebHtml(lessonMode, selectedBallBrand, selectedBallColors));
+  const html = JSON.stringify(buildPoseWebHtml(lessonMode, selectedDribbleView, selectedBallBrand, selectedBallColors));
 
   return `
     document.open();

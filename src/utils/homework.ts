@@ -128,7 +128,16 @@ export function inferHomeworkFeedbackCategoryFromText(text: string): HomeworkFee
     return 'shoot_arm_angle';
   }
 
-  if (text.includes('발사') || text.includes('타이밍') || text.includes('최고점') || text.includes('빨리') || text.includes('늦게')) {
+  if (
+    text.includes('발사') ||
+    text.includes('타이밍') ||
+    text.includes('최고점') ||
+    text.includes('빨리') ||
+    text.includes('늦게') ||
+    text.includes('타점') ||
+    text.includes('릴리즈 시간') ||
+    text.includes('0.6초')
+  ) {
     return 'shoot_release_timing';
   }
 

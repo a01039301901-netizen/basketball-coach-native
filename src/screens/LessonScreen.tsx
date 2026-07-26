@@ -464,6 +464,7 @@ export function LessonScreen({
     <LessonCamera
       key={cameraSessionKey}
       lessonMode={lessonMode}
+      selectedDribbleView={selectedDribbleView}
       selectedBallBrand={selectedBallBrand}
       selectedBallColors={selectedBallColors}
       cameraSessionKey={cameraSessionKey}

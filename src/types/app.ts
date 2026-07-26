@@ -8,7 +8,7 @@ export type ShotOutcome = 'success' | 'failure';
 export interface UserAccount {
   id: string;
   nickname: string;
-  password: string;
+  password?: string;
   createdAt: string;
 }
 
@@ -19,6 +19,7 @@ export interface AuthUser {
 
 export interface AuthSession {
   userId: string;
+  remoteToken?: string | null;
 }
 
 export type CalendarCell =
@@ -212,12 +213,14 @@ export type TorsoPostureState = 'high' | 'low' | 'balanced' | 'unknown';
 export type DribbleStanceState = 'ready' | 'too_upright' | 'too_low' | 'unknown';
 export type BounceHeightState = 'too_high' | 'too_low' | 'balanced' | 'unknown';
 export type BodyFacingState = 'front' | 'side' | 'unknown';
+export type DribbleStabilityState = 'stable' | 'mixed' | 'unstable' | 'unknown';
 export type FrontBallLaneState = 'between_legs' | 'outside_legs' | 'unknown';
 export type HandBalanceState = 'balanced' | 'unbalanced' | 'unknown';
 export type FootSpacingState = 'narrow' | 'wide' | 'balanced' | 'unknown';
 
 export interface DribbleAnalysis {
   dribbleStarted: boolean;
+  dribbleView: DribbleLessonView;
   bodyFacing: BodyFacingState;
   eyeFocus: EyeFocusState;
   dribbleHeight: DribbleHeightState;
@@ -235,12 +238,21 @@ export interface DribbleAnalysis {
   footSpacingState: FootSpacingState;
   highestBounceY: number | null;
   lowestBounceY: number | null;
+  positionStabilityState: DribbleStabilityState;
+  positionStableRatio?: number;
+  heightStabilityState: DribbleStabilityState;
+  heightStableRatio?: number;
+  tempoStabilityState: DribbleStabilityState;
+  tempoStableRatio?: number;
+  stabilitySampleCount: number;
   summary: string;
 }
 
 export type ShootArmAngleState = 'narrow' | 'wide' | 'balanced' | 'unknown';
 export type ShootReleaseTimingState = 'early' | 'late' | 'balanced' | 'unknown';
 export type ShootLegAngleState = 'low' | 'high' | 'balanced' | 'unknown';
+export type ShootReleasePointState = 'high' | 'low' | 'unknown';
+export type ShootReleaseDurationState = 'balanced' | 'slow' | 'unknown';
 
 export interface ShootAnalysis {
   armAngle: number | null;
@@ -248,6 +260,8 @@ export interface ShootAnalysis {
   releaseVelocity: number | null;
   lowestLegAngle: number | null;
   headPeakY: number | null;
+  releasePointY: number | null;
+  releaseDurationMs: number | null;
   releaseDetected: boolean;
   ballNearShootingHand: boolean;
   shootingHandRaised: boolean;
@@ -255,5 +269,7 @@ export interface ShootAnalysis {
   armAngleState: ShootArmAngleState;
   releaseTiming: ShootReleaseTimingState;
   legAngleState: ShootLegAngleState;
+  releasePointState: ShootReleasePointState;
+  releaseDurationState: ShootReleaseDurationState;
   summary: string;
 }

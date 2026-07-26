@@ -3,14 +3,15 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "expo start --tunnel --clear",
-    "start:phone": "expo start --tunnel --clear",
-    "start:lan": "expo start --lan --clear",
-    "start:tunnel": "expo start --tunnel --clear",
-    "start:local": "expo start --localhost --clear",
-    "android": "expo start --android --lan --clear",
-    "ios": "expo start --ios --lan --clear",
-    "web": "expo start --web --port 8083",
+    "start": "node ./etc/start-expo-with-auth.js --lan --clear",
+    "start:phone": "node ./etc/start-expo-with-auth.js --lan --clear",
+    "start:lan": "node ./etc/start-expo-with-auth.js --lan --clear",
+    "start:tunnel": "node ./etc/start-expo-with-auth.js --tunnel --clear",
+    "start:local": "node ./etc/start-expo-with-auth.js --localhost --clear",
+    "android": "node ./etc/start-expo-with-auth.js --android --lan --clear",
+    "ios": "node ./etc/start-expo-with-auth.js --ios --lan --clear",
+    "web": "node ./etc/start-expo-with-auth.js --web --port 8083",
+    "auth-server": "node ./etc/auth-server.js",
     "doctor": "npx expo-doctor"
   },
   "dependencies": {

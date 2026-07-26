@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
-import { BALL_BRAND_OPTIONS, BALL_COLOR_OPTIONS, POSITION_OPTIONS } from '../constants/settings';
+import { BALL_BRAND_OPTIONS, BALL_COLOR_OPTIONS } from '../constants/settings';
 import { colors } from '../theme/colors';
-import type { BallBrandOption, BallColorOption, HomeworkTestState, PositionOption } from '../types/app';
+import type { BallBrandOption, BallColorOption, HomeworkTestState } from '../types/app';
 
 const BALL_COLOR_ROWS: BallColorOption[][] = [
   ['yellow', 'orange', 'brown', 'red'],
@@ -23,11 +23,9 @@ const CORRECTION_OPTIONS: Array<{
 interface SettingsScreenProps {
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
-  selectedPosition: PositionOption;
   homeworkTestState: HomeworkTestState;
   onSelectBallBrand: (brand: BallBrandOption) => void;
   onToggleBallColor: (color: BallColorOption) => void;
-  onSelectPosition: (position: PositionOption) => void;
   onApplyHomeworkTestState: (nextState: HomeworkTestState) => void;
 }
 
@@ -49,14 +47,11 @@ function parseNumberInput(value: string) {
 export function SettingsScreen({
   selectedBallBrand,
   selectedBallColors,
-  selectedPosition,
   homeworkTestState,
   onSelectBallBrand,
   onToggleBallColor,
-  onSelectPosition,
   onApplyHomeworkTestState,
 }: SettingsScreenProps) {
-  const [isPositionOpen, setIsPositionOpen] = useState(false);
   const [isCorrectionOpen, setIsCorrectionOpen] = useState(false);
   const [dribbleCountInput, setDribbleCountInput] = useState(String(homeworkTestState.dribbleCount));
   const [shootAttemptInput, setShootAttemptInput] = useState(String(homeworkTestState.shootAttemptCount));
@@ -70,10 +65,6 @@ export function SettingsScreen({
     homeworkTestState.correctionDirection
   );
 
-  const selectedPositionLabel = useMemo(
-    () => POSITION_OPTIONS.find((option) => option.key === selectedPosition)?.label ?? '없음',
-    [selectedPosition]
-  );
   const correctionDirectionLabel = useMemo(
     () => getCorrectionDirectionLabel(correctionDirection),
     [correctionDirection]
@@ -122,46 +113,6 @@ export function SettingsScreen({
 
   return (
     <View style={styles.contentGap}>
-      <View style={styles.sectionBlock}>
-        <Text style={styles.sectionHeader}>사용자 포지션</Text>
-        <Card style={[styles.compactCard, styles.borderlessCard]}>
-          <View style={styles.positionWrap}>
-            <Pressable
-              onPress={() => setIsPositionOpen((current) => !current)}
-              style={({ pressed }) => [styles.positionTrigger, pressed && styles.pressed]}
-            >
-              <Text style={styles.positionTriggerValue}>{selectedPositionLabel}</Text>
-              <Text style={styles.positionTriggerArrow}>{isPositionOpen ? '▴' : '▾'}</Text>
-            </Pressable>
-
-            {isPositionOpen ? (
-              <View style={styles.positionDropdown}>
-                {POSITION_OPTIONS.map((option) => {
-                  const active = selectedPosition === option.key;
-
-                  return (
-                    <Pressable
-                      key={option.key}
-                      onPress={() => {
-                        onSelectPosition(option.key);
-                        setIsPositionOpen(false);
-                      }}
-                      style={({ pressed }) => [
-                        styles.positionOption,
-                        active && styles.positionOptionActive,
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      <Text style={[styles.positionOptionText, active && styles.positionOptionTextActive]}>{option.label}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
-          </View>
-        </Card>
-      </View>
-
       <View style={styles.sectionBlock}>
         <Text style={styles.sectionHeader}>인식 설정</Text>
         <Card style={[styles.compactCard, styles.borderlessCard]}>

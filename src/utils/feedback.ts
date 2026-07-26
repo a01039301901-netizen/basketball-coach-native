@@ -6,7 +6,9 @@ export function buildFeedbackText(mode: LessonMode, lines: [string, string, stri
 }
 
 export function buildDribbleFeedbackText(analysis: DribbleAnalysis): string {
-  if (analysis.bodyFacing === 'front') {
+  const stabilityLine = getDribbleStabilityFeedback(analysis);
+
+  if (analysis.dribbleView === 'front') {
     const stanceLine =
       analysis.stanceState === 'ready'
         ? `발-무릎-엉덩이 각도 ${analysis.frontStanceAngle ? analysis.frontStanceAngle.toFixed(1) : '--'}도로 준비 자세가 잘 잡혔습니다.`
@@ -35,7 +37,7 @@ export function buildDribbleFeedbackText(analysis: DribbleAnalysis): string {
             ? '발 간격은 안정적입니다.'
             : '발 간격을 확인하는 중입니다.';
 
-    return `드리블 피드백\n1. ${stanceLine}\n2. ${laneLine}\n3. ${balanceLine} ${footLine}`;
+    return `드리블 피드백\n1. ${stanceLine}\n2. ${laneLine}\n3. ${stabilityLine ?? `${balanceLine} ${footLine}`}`;
   }
 
   const stanceLine =
@@ -63,7 +65,7 @@ export function buildDribbleFeedbackText(analysis: DribbleAnalysis): string {
           ? `공 최저 높이가 엉덩이보다 위에 머물고 있습니다. 공을 조금 더 높게 튀겨 주세요. 현재 드리블 ${analysis.dribbleCount}회입니다.`
           : `공의 간격은 안정적입니다. 지금 리듬을 유지해 보세요. 현재 드리블 ${analysis.dribbleCount}회입니다.`;
 
-  return `드리블 피드백\n1. ${stanceLine}\n2. ${eyeLine}\n3. ${bounceLine}`;
+  return `드리블 피드백\n1. ${stanceLine}\n2. ${eyeLine}\n3. ${stabilityLine ?? bounceLine}`;
 }
 
 export function buildShootFeedbackText(analysis: ShootAnalysis): string {
@@ -76,6 +78,13 @@ export function buildShootFeedbackText(analysis: ShootAnalysis): string {
           ? '슛 준비 자세의 팔 각도는 좋습니다. 그대로 유지해 보세요.'
           : '어깨, 팔꿈치, 손목이 잘 보이도록 서서 준비 자세를 다시 잡아 주세요.';
 
+  const releasePointLine =
+    analysis.releasePointState === 'high'
+      ? '발사 직전 가장 최근 공의 위치가 머리보다 위에 있어 슛 타점이 좋습니다.'
+      : analysis.releasePointState === 'low'
+        ? '발사 직전 가장 최근 공의 위치가 머리보다 아래에 있습니다. 공을 조금 더 높게 끌어올려 슛해 주세요.'
+        : '발사 직전 가장 최근 공의 위치를 확인하는 중입니다. 머리와 공이 함께 보이도록 맞춰 주세요.';
+
   const legLine =
     analysis.legAngleState === 'low'
       ? `점프 준비 자세의 하체 각도가 ${analysis.lowestLegAngle ? analysis.lowestLegAngle.toFixed(1) : '--'}도로 너무 낮습니다. 무릎을 조금 더 펴서 점프해 주세요.`
@@ -87,12 +96,91 @@ export function buildShootFeedbackText(analysis: ShootAnalysis): string {
 
   const timingLine =
     analysis.releaseTiming === 'early'
-      ? '점프 최고점 전에 슛을 발사했습니다. 너무 급하게 쏘지 말고 조금 더 끌고 가 보세요.'
+      ? '무릎이 펴지기 전에 팔이 먼저 급하게 펴졌습니다. 하체가 올라오는 흐름과 팔 타이밍을 더 맞춰 보세요.'
       : analysis.releaseTiming === 'late'
-        ? '점프가 내려오는 구간에서 슛을 발사했습니다. 조금 더 이르게 던져 보세요.'
+        ? '무릎이 먼저 펴지고 난 뒤 팔이 늦게 따라 나왔습니다. 하체와 팔이 더 함께 펴지도록 맞춰 보세요.'
         : analysis.releaseTiming === 'balanced'
-          ? '점프 최고점 근처에서 슛을 발사하고 있습니다. 타이밍이 좋습니다.'
-          : '점프 최고점과 슛 발사 시점을 확인하는 중입니다. 전신이 잘 보이도록 맞춰 주세요.';
+          ? '무릎이 가장 많이 굽혀진 뒤 무릎과 팔이 함께 펴지며 슛이 나가고 있습니다. 타이밍이 좋습니다.'
+          : '무릎이 가장 많이 굽혀진 뒤 무릎과 팔이 함께 펴지는 흐름을 확인하는 중입니다. 하체와 슈팅 팔이 잘 보이도록 맞춰 주세요.';
 
-  return `슛 피드백\n1. ${armLine}\n2. ${legLine}\n3. ${timingLine}`;
+  const releaseDurationText =
+    analysis.releaseDurationMs !== null ? `${(analysis.releaseDurationMs / 1000).toFixed(2)}초` : '--';
+  const releaseDurationLine =
+    analysis.releaseDurationState === 'balanced'
+      ? `가장 많이 굽힌 무릎 이후 ${releaseDurationText} 만에 릴리즈되어 0.6초 기준 안에서 안정적입니다.`
+      : analysis.releaseDurationState === 'slow'
+        ? `가장 많이 굽힌 무릎 이후 ${releaseDurationText} 뒤에 릴리즈되어 0.6초 기준보다 늦었습니다. 조금 더 빠르게 공을 놓아 보세요.`
+        : '가장 많이 굽힌 무릎 이후 릴리즈 시간을 확인하는 중입니다. 하체와 슈팅 순간이 함께 보이도록 맞춰 주세요.';
+
+  return `슛 피드백\n1. ${armLine}\n2. ${legLine}\n3. ${timingLine}\n4. ${releasePointLine}\n5. ${releaseDurationLine}`;
+}
+
+function getStabilitySeverity(state: DribbleAnalysis['positionStabilityState']) {
+  if (state === 'unstable') {
+    return 2;
+  }
+
+  if (state === 'mixed') {
+    return 1;
+  }
+
+  return 0;
+}
+
+function getDribbleStabilityFeedback(analysis: DribbleAnalysis) {
+  if (analysis.stabilitySampleCount <= 0) {
+    return null;
+  }
+
+  const candidates = [
+    {
+      key: 'position',
+      severity: getStabilitySeverity(analysis.positionStabilityState),
+      text:
+        analysis.positionStabilityState === 'unstable'
+          ? analysis.dribbleView === 'front'
+            ? '공 위치가 매번 달라집니다. 같은 레인에서 반복해 주세요.'
+            : '공이 몸 앞뒤로 흔들립니다. 몸통 옆 같은 위치에서 반복해 주세요.'
+          : analysis.positionStabilityState === 'mixed'
+            ? analysis.dribbleView === 'front'
+              ? '공 위치가 조금씩 달라집니다. 같은 레인에서 반복해 주세요.'
+              : '공 위치가 조금씩 흔들립니다. 몸통 옆 같은 위치를 유지해 주세요.'
+            : null,
+    },
+    {
+      key: 'height',
+      severity: getStabilitySeverity(analysis.heightStabilityState),
+      text:
+        analysis.heightStabilityState === 'unstable'
+          ? '드리블 높이가 들쭉날쭉합니다. 같은 높이로 반복해 주세요.'
+          : analysis.heightStabilityState === 'mixed'
+            ? '드리블 높이가 조금씩 달라집니다. 같은 높이로 반복해 주세요.'
+            : null,
+    },
+    {
+      key: 'tempo',
+      severity: getStabilitySeverity(analysis.tempoStabilityState),
+      text:
+        analysis.tempoStabilityState === 'unstable'
+          ? '드리블 리듬이 흔들립니다. 같은 속도로 반복해 주세요.'
+          : analysis.tempoStabilityState === 'mixed'
+            ? '드리블 속도가 조금씩 흔들립니다. 같은 리듬을 유지해 주세요.'
+            : null,
+    },
+  ].filter((candidate) => candidate.text && candidate.severity > 0);
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  candidates.sort((left, right) => {
+    if (right.severity !== left.severity) {
+      return right.severity - left.severity;
+    }
+
+    const priorityOrder = ['position', 'height', 'tempo'];
+    return priorityOrder.indexOf(left.key) - priorityOrder.indexOf(right.key);
+  });
+
+  return candidates[0]?.text ?? null;
 }

@@ -3,11 +3,12 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
 import { colors } from '../../theme/colors';
-import type { BallBrandOption, BallColorOption, LessonMode } from '../../types/app';
+import type { BallBrandOption, BallColorOption, DribbleLessonView, LessonMode } from '../../types/app';
 import { buildPoseWebHtml } from './poseWebHtml';
 
 interface LessonCameraProps {
   lessonMode: LessonMode;
+  selectedDribbleView: DribbleLessonView;
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
   cameraSessionKey: number;
@@ -27,6 +28,7 @@ interface LessonCameraProps {
 
 export function LessonCamera({
   lessonMode,
+  selectedDribbleView,
   selectedBallBrand,
   selectedBallColors,
   cameraSessionKey,
@@ -129,8 +131,8 @@ export function LessonCamera({
   }, [cameraStopMode, isCameraActive, lessonMode, recordingStopToken]);
 
   const srcDoc = useMemo(
-    () => buildPoseWebHtml(lessonMode, selectedBallBrand, selectedBallColors),
-    [lessonMode, selectedBallBrand, selectedBallColors]
+    () => buildPoseWebHtml(lessonMode, selectedDribbleView, selectedBallBrand, selectedBallColors),
+    [lessonMode, selectedDribbleView, selectedBallBrand, selectedBallColors]
   );
 
   return (
