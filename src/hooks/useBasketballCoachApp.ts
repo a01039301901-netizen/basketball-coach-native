@@ -72,6 +72,8 @@ const DRIBBLE_STANCE_HOLD_MS = 3000;
 const SHOOT_RECOVERY_MS = 3000;
 const STORAGE_LOAD_TIMEOUT_MS = 4000;
 const STARTUP_RECOVERY_TIMEOUT_MS = 8000;
+const DEV_TEST_SHOOT_RECORD_ID = '__dev-test-shoot-bad-no-video-v1';
+const DEV_TEST_SHOOT_RECORD_SEED_KEY = 'basketballDevSeedShootBadNoVideo';
 const DEFAULT_DEBUG_TEXT = '移대찓?쇱? MediaPipe瑜?以鍮꾪븯怨??덉뒿?덈떎.';
 const COUNTDOWN_CUE_BASE64 =
   'UklGRogWAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YWQWAAAAAA8APAB/ANIAKAF1Aa0BxAGyAXEBAAFiAKH/xf7h/QX9Rfyz+2D7Wfum+0j8Pf14/ur/fAEVA5cE5wXqBogHsAdXB3wGJgVlA1EBCv+z/HP6c/jY9sH1SPV89WH28PcW+rb8qP+9AsYFjgjkCp0Mlw26DfwMYgv/CPMFbAKg/sr6K/cA9IDx2u8v75PvBvF588n2yPo4/9MDUAhjDMcPQRKhE8oTshJiEPoMqgiyA2L+DPkI9KrvPOz86Rbpn+mW6+PuV/Ox+J3+vQSxChYQkBTUF6UZ4Bl4GHwVFxGICyQFUf549wvxc+sP5yvk/eKg4xDmL+rA72/21f18BeoMpRM+GVUdoh/5H00esBpVFY4OwgZs/g/2NO5c5/nhZ97n3JjdeOBe5QTsBPTh/A4G+Q4RF9AdxCKYJRYmMCT7H7QZuxGKCLP+0fSE62Xj+tyw2NPWiNfM2nHgVehw8cH7dAbgEFkaRiIgKIUrNiwgKl4lNB4PFX4KJ/++8/zoj98U2AfTwtBw0Q7Vadsi5LLudfquBpwSfR2eJmgtaDFXMh0w1yrSIokYnAzI/9fym+bb20fTbs22ylLLWs+N1lfgHewh+ZIGmhNpH0EphDC+NKw1PjOcLR8lUBrbDYkAL/Oh5qrb+NIYzWbKD8sIzxHWut9n6174zwXjEskewiguMJc0tTV4MwIurCX6GpgOTQHt807nO9xk01jNd8rvyrnOmNUe37PqnPcMBSsSKB5BKNYvbTS8Na8zZi43JqMbVQ8RAq30/efO3NPTm82KytHKbM4g1YTe/+nb9kgEchGEHb4ney9ANMA15DPILsAmShwQENUCbfWt6GPdRNTgzaDKtsohzqvU691N6Rr2hQO4EOAcOSceLxE0wjUWNCgvRifwHMsQmAMt9l/p+t231CjOuMqdytnNONRU3ZzoWvXBAv0POhyyJr8u3zPANUU0hS/LJ5UdhRFcBO72EeqT3izVc87UyojKlM3I07/c7Oea9P0BQg+SGykmXS6qM7w1cTTfL04oOB4+Eh8FsPfF6i3fpNXBzvLKdcpRzVnTLNw959rzOQGFDukaniX4LXIztTWbNDcwzyjZHvYS4gVy+Hnryt8e1hDPE8tlyhHN7dKb25DmHPN1AMgNPxoRJZEtODOrNcI0jDBNKXkfrBOlBjT5L+xn4JrWY883y1jK1MyE0gzb5OVe8rL/Cg2TGYIkKC37Mp415jTfMMopFyBiFGcH9/nm7AfhGNe4z13LTcqZzBzSfto55aDx7v5MDOYY8SO9LLwyjzUINTAxRCq0IBcVKQi6+p7tqOGY1w/QhstFymHMt9Hz2ZDk5PAq/o0LNxheI08sejJ8NSY1fjG8Kk4hyxXrCH37Vu5K4hrYadCyy0HKLMxV0WnZ6OMo8Gb9zQqIF8oi3is1Mmc1QjXJMTIr5yF+FqwJQfwQ7+/in9jG0OHLPsr5y/XQ4thB423vovwMCtcWMyJsK+0xTzVcNREypit/Ii8XbQoE/crvlOMl2STRNsw/ysnLl9Bc2Jzis+7f+0wJJRabIfcqozE1NXI1WDIXLBQj4BctC8j9hvA75K7ZhtFGzEPKnMs80NnX+eH67Rv7ighxFQEhgCpXMRc1hjWbMoYsqCOPGOwLjP5C8eTkONrq0X3MScpxy+PPWNdX4ULtWPrIB70UZiAHKggx9zSXNdwy8yw6JDwZqwxQ///xjuXF2lDStsxSyknLjc/Y1rfgiuyV+QYHCBTIH4wptjDUNKU1GjNdLckk6RlpDRMAvfI55lPbuNLyzF7KJMs5z1vWGODU69P4RAZREykfDiliMK80sDVWM8UtVyWUGicO1wB78+bm49sj0zHNbcoCy+jO4NV73x/rEfiBBZoSiR6PKAswhjS5NY4zKy7kJT4b5A6bATr0lOd23JDTcs1+yuLKms5o1eDea+pP974E4RHnHQ0osi9bNL41xTOOLm4m5hugD18C+vRE6ArdANS2zZLKxspOzvHURt646Y72+gMoEUMdiSdWLy40wTX4M+8u9iaNHFsQIwO69fTooN1x1P3NqcqsygTOfdSv3QbpzfU3A24QnhwDJ/gu/TPBNSk0TS98JzIdFRHnA3r2puk33uXURs7DypTKvc0L1BndVegN9XMCsg/3G3smmC7KM781VzSpLwAo1h3PEaoEPPdZ6tHeXNWSzt/KgMp5zZvThNym5030rwH3Dk8b8SU1LpQzuTWCNAIwgih5HocSbQX99w3rbN/U1eDO/8puyjfNLtPy2/jmjvPrADoOpRpmJc8tWzOxNas0WTACKRkfPxMwBr/4wusI4E/WMc8hy1/K+MzD0mLbS+bQ8icAfA36GdgkZy0gM6Y10TSuMH8puB/1E/MGgvl47KfgzNaFz0bLU8q8zFrS09qf5RLyZP++DE4ZSCT9LOIymDX0NAAx+ylWIKsUtQdF+i/tR+FL19rPbctKyoLM9NFG2vXkVfGg/v8LoBi2I5EsojKINRQ1TzF0KvIgXxV3CAj75+3p4czXM9CXy0PKS8yQ0bzZTOSZ8Nz9QAvxFyMjIixeMnQ1MjWcMesqjCETFjgJy/ug7oziT9iO0MTLP8oXzC7RM9ml493vGP2ACkEXjiKxKxkyXjVNNeYxYCskIsUW+QmP/FrvMePU2OvQ9Ms+yubLz9Cs2P/iI+9U/L8JkBb3IT4r0DFFNWU1LjLTK7sidhe6ClP9FfDX41zZS9EnzEDKt8ty0CjYW+Jp7pH7/gjdFV4hyCqFMSk1ejVzMkQsTyMmGHkLFv7R8H/k5dmt0VzMRcqKyxjQpde44bDtzfo9CCkVwyBQKjgxCzWNNbUysiziI9QYOQza/o3xKOVw2hLSk8xMymHLwM8k1xfh+OwK+nsHdRQnINYp5zDqNJ019TIdLXMkghn3DJ7/S/LS5f3aedLOzFbKOstrz6bWd+BB7Ej5uAa/E4kfWimVMMY0qjUyM4ctAyUuGrUNYgAJ837mjdvj0gvNY8oWyxnPKtbZ34vrhfj2BQgT6R7cKEAwnzS0NW0z7i2QJdgacw4mAcfzLOce3E7TS81zyvXKyM6w1T3f1+rD9zMFUBJIHlso6C92NLs1pDNTLhsmgRsvD+oBh/Ta57HcvNONzYbK18p7zjjVot4j6gL3bwSXEaUd2CeOL0k0wDXZM7UupCYpHOsPrQJG9YroRd0t1NLNm8q7yjDOwtQJ3nDpQfasA90QAR1UJzEvGjTCNQw0FS8sJ88cphBxAwf2O+nc3aDUGs6zyqLK581P1HLdv+iA9egCIxBbHM0m0i7pM8E1PDRyL7EndB1gETUEyPbt6XTeFdVkzs7KjMqizd7T3dwP6MD0JAJnD7QbRCZwLrUzvTVpNM0vNCgXHhkS+ASJ96HqDt+M1bHO7Mp4yl7Nb9NK3GDnAfRgAasOCxu6JQwufjO2NZM0JjC1KLke0RK7BUv4Veuq3wXWAM8My2jKHs0D07jbsuZC85wA7g1hGi0lpi1EM601ujR7MDQpWR+IE34GDfkL7EjggdZSzy/LWsrgzJnSKNsG5oTy2f8wDbUZniQ9LQgzoTXfNM8wsSn4Hz4UQQfQ+cHs5+D+1qfPVctPyqXMMdKa2lvlxvEV/3IMCBkOJNIsyTKSNQE1IDEsKpQg8xQDCJP6ee2H4X7X/s9+y0fKbMzL0Q/aseQJ8VH+swtaGHwjZSyHMoA1ITVuMaQqLyGnFcQIVvsx7iriANhX0KnLQco2zGjRhdkJ5E7wjf3zCqsX5yL1K0MybDU9NboxGyvJIVoWhgkZ/OvuzuKE2LPQ18s/ygPMCNH92GLjku/J/DMK+hZRIoMr/DFUNVc1AzKPK2AiDBdGCt38pe9z4wrZEdEIzD/K0suq0HfYveLY7gb8cglIFrohDyuyMTo1bjVKMgAs9iK8FwYLof1g8Brkktly0TvMQsqly07Q89cZ4h/uQvuxCJUVICGYKmYxHjWCNY4ycCyKI2wYxgtl/hzxwuQc2tXRcsxHynrL9c9x13fhZu1/+u8H4RSFICAqGDH+NJM1zzLdLB0kGhmFDCn/2fFs5anaO9KqzFDKUcuez/LW1+Cv7Lz5LQcsFOgfpSnHMNw0ojUOM0gtrSTHGUMN7f+X8hfmN9uj0ubMW8osy0rPdNY44Pjr+vhrBnYTSR8oKXMwtzSuNUozsC07JXIaAQ6wAFXzxObG2w3TJM1pygnL+M751ZrfQ+s4+KgFvhKpHqgoHTCPNLc1gzMWLsglHBu+DnQBFPRx51jcetNlzXrK6cqpzoDV/96P6nb35QQGEgceJyjEL2Q0vTW6M3ouUibFG3oPOALT9CDo7Nzp06jNjsrLyl3OCdVl3tvptPYhBE0RZB2kJ2kvNzTBNe4z3C7bJmwcNhD8ApP10eiB3VrU882kyrHKE86U1M3dKen09V4DkxC/HB4nCy8HNMI1HzQ6L2EnER3wEL8DVPaC6RneztQ3zr7KmcrLzSLUNt146DP1mgLYDxgclyarLtQzvzVONJcv5ie2HaoRgwQV9zXqst5E1YLO2sqEyobNsdOi3Mnnc/TWARwPcBsNJkkunzO7NXo08S9oKFgeYhJGBdf36epM37zV0M74ynHKRM1D0w/cGue08xIBYA7HGoIl5C1nM7M1ozRIMOgo+R4aEwkGmfie6+nfNtYhzxrLYsoFzdjSfttt5vbyTgCiDRwa9CR8LSwzqDXJNJ0wZimZH9ETzAZb+VTsh+Cz1nTPPstVysjMb9Lv2sHlOPKL/+QMcBllJBMt7zKbNe008DDiKTYghxSOBx76Cu0n4THXyc9ly0vKjswI0mLaF+V78cf+JgzDGNQjpyyvMos1DjU/MVwq0yA7FVAI4frC7cjhstch0I/LRMpWzKPR19lu5L7wA/5mCxQYQSM4LGwyeDUsNY0x1CptIe8VEgmk+3vua+I12HvQu8tAyiHMQdFO2cbjA/A//aYKZBesIsgrJzJjNUg12DFJKwYioRbTCWj8Ne8Q47rY2NDqyz7K78vi0MfYIONI73v85gmzFhUiVSvfMUo1YDUgMrwrnSJTF5MKK/3w77bjQNk40RzMQMrAy4XQQth84o7uuPslCQEWfCHgKpQxLzV2NWUyLSwyIwMYUwvv/avwXeTJ2ZrRUcxEypPLKtC/19jh1e30+mQITRXiIGgqRzERNYk1qDKcLMUjshgTDLP+aPEG5VTa/tGIzEvKacvSzz7XN+Ed7TH6ogeZFEYg7yn4MPE0mjXoMggtViRfGdEMd/8l8rDl4dpk0sLMVMpCy3zPv9aX4GbsbvnfBuMTqR9zKaYwzTSnNSYzci3mJAsajw06AOPyXOZw283S/8xhyh3LKc9D1vnfsOus+B0GLRMJH/UoUTCnNLI1YTPZLXQlthpNDv4AofMJ5wHcOdM+zXDK/MrYzsjVXN/76ur3WgV1EmgedSj6L340ujWZMz8u/yVgGwkPwgFg9Lfnk9ym04DNgsrcyorOUNXB3kfqKPeXBLwRxh3zJ6AvUjS/Nc8zoS6JJggcxQ+GAiD1Z+gn3RbUxM2XysDKP87a1CjelOln9tMDAxEiHW8nRC8kNME1AjQCLxEnrhyAEEoD4PUY6b7diNQLzq7Kp8r2zWbUkN3i6Kf1DwNIEHwc6CblLvMzwTUyNGAvlidTHToRDgSh9srpVt791FXOyMqQyq/N9NP73DLo5vRMAo0P1RtgJoQuvzO+NWA0uy8aKPcd9BHRBGL3ferv3nTVoc7mynzKbM2F02fcg+cn9IgB0Q4tG9YlIS6JM7g1izQUMJwomR6sEpQFJPgx64vf7dXwzgXLa8orzRjT1dvV5mjzxAAUDoMaSSW7LVAzrzWzNGswGyk5H2MTVwbm+ObrKOBo1kLPKMtdyuzMrtJF2yjmqvIAAFENxBmRJAwtsTInNUk0KDAHKV0fxBP5Bsn5Bu184eTX1NC8zNzLPc650/TbaeZv8kT/GQwkGKMi8CqHMBIzazKdLuonvR6tE2sHvvpu7kHj6dn50uDO2835zxXV29zM5kjylv7vCpAWvyDZKGAu/DCHMAstwSYRHocTzwek+8nv++Tm2xvVA9Hdz7vRetbN3T3nMPL3/dMJCRXkHskmOyzlLp8ucCuNJVcdUxMjCHz8F/Gq5tzdN9ck0+LRg9Pp18zevOco8mf9xQiNExMdvyQZKs0ssizNKU4kkBwQE2kIRv1Y8k7oyd9P2UXV6tNR1WLZ199J6C7y5vzFBx4STBu8IvontCrBKiIoBCO8G78SnwgB/ovz5+mu4WHbZNf01SbX49ru4OToQ/J0/NMGuxCOGcAg3yWbKMwocCaxIdsaYBLHCK3+sfR164rjbt2B2QDYANlt3BDijOlm8hH87wVlD9sXyx7HI4Mm0ya3JFMg7hnyEeAISv/J9fbsXeV1353bDdrf2gDePuNB6pjyvfsaBRwOMxbeHLQhaiTYJPgi6x71GHYR6QjZ/9T2bO4n53fhtd0c3MPcm9925ATr2fJ3+1ME4AyVFPkapR9TItkiMSF5He8X7BDkCFcA0PfW7+focuPL3yzeq94+4brl1Oso80H7mgOxCwMTGxmbHT0g1yBlH/4b3RZVENAIyAC/+DPxnepm5d7hPOCY4OniCOew7IbzGfvxAo8KexFHF5YbKB7UHpIdehrAFbAPrggqAaD5hPJK7FPn7eNN4onim+Rg6Jrt8fMB+1UCewn/D3oVlxkUHM4cuxvuGJcU/Q58CH4BcvrJ8+ztOen55V3kfeRV5sPpkO5r9Pf6yQF0CI4OtxOdFwMaxxrdGVgXYhM9Dj0IwgE2+wH1hO8Y6wHobuZ15hXoMOuS7/P0/PpLAXsHKg39EagV9Be+GPsXuhUjEnAN7gf3Aez7LPYS8e/sBOp96HDo3Omm7KDwifUQ+9sAkAbRC0wQuhPoFbQWFBYVFNkQlQyRBx4ClPxJ95Tyvu4D7Izqbuqp6ybuu/Et9jP7ewCyBYQKpA7TEd8TqRQpFGcShA+uCyYHNgIt/Vr4DPSF8P3tmexu7Hztr+/h8t72ZPspAOIEQwkHDfIP2RGeEjkSshAkDroKrQY+Arf9Xvl49UTy8u+l7nHuVe9A8RP0nfek++j/IQQPCHMLGA7WD5MQRhD2DroMugklBjgCM/5U+tn2+fPh8a/wdfAz8dzyUPVp+PP7tP9uA+gG6glGDNgNiA5PDjINRwutCJAFJAKg/jz7Lvim9crzt/J68hbzfvSZ9kP5UPyO/8kCzQVrCHsK3Qt+DFUMaAvJCZMH7QQAAv/+F/x4+Un3rvW89IH0/vQp9uz3Kfq7/Hj/MgK/BPcGuAjnCXQKWAqYCUIIbgY7BM4BT//k/LX64/iL9772ifbr9tz3Svkd+zX9cP+pAb8DjgX9BvYHbAhZCMIHsgY9BXwDjQGQ/6P95vtz+mH5vfiR+Nz4lvmz+h38vf14/zABywIxBEsFCgZlBlcG5QUZBQAEsAI9AcL/VP4L/fr7MPu5+pn60PpY+yb8Kv1T/o7/xADlAd4CoQMjBF8EVAQEBHcDuALWAd8A5v/3/iP+dv35/LH8ovzJ/CH9o/1E/vj+s/9nAAwBlwEAAkICXAJPAh0CzAFlAe8AcwD6/4z/L//o/rn+pf6q/sT+8f4p/2n/qv/m/xkAQQBcAGgAZwBcAEgAMQAaAA==';
@@ -231,7 +233,26 @@ function toAuthUser(account: UserAccount): AuthUser {
 }
 
 function parseStoredJson<T>(value: string | null, fallback: T): T {
-  return value ? (JSON.parse(value) as T) : fallback;
+  if (typeof value !== 'string' || !value.trim()) {
+    return fallback;
+  }
+
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function sanitizeStoredSession(value: unknown): AuthSession | null {
+  if (!isRecordObject(value) || typeof value.userId !== 'string') {
+    return null;
+  }
+
+  return {
+    userId: value.userId,
+    remoteToken: typeof value.remoteToken === 'string' ? value.remoteToken : null,
+  };
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallbackValue: T): Promise<T> {
@@ -734,6 +755,76 @@ function normalizeLessonRecord(
   };
 }
 
+function buildDevTestShootBadLessonRecord(date = new Date()): LessonRecord {
+  return normalizeLessonRecord({
+    id: DEV_TEST_SHOOT_RECORD_ID,
+    dateKey: formatDateKey(date),
+    mode: 'shoot',
+    shotOutcome: 'failure',
+    feedback: '테스트용 슛 피드백입니다. 무릎 각도와 릴리스 타이밍이 불안정했습니다.',
+    feedbackTimeline: [
+      {
+        atMs: 0,
+        text: '테스트용 슛 피드백입니다. 무릎 각도와 릴리스 타이밍이 불안정했습니다.',
+      },
+    ],
+    videoUri: '',
+    createdAt: date.toLocaleString('ko-KR'),
+    representativeFeedbackCategory: 'leg_angle',
+    evaluation: {
+      level: 'bad',
+      summary: '5가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.',
+      criteria: [
+        {
+          key: 'shoot-leg-angle',
+          label: '무릎 각도',
+          isStable: false,
+          detail: '무릎 각도가 흔들려 하체 힘 전달이 일정하지 않았습니다.',
+        },
+        {
+          key: 'shoot-release-timing',
+          label: '슛 타이밍',
+          isStable: false,
+          detail: '릴리스 타이밍이 일정하지 않아 슛 흐름이 끊겼습니다.',
+        },
+        {
+          key: 'shoot-release-point',
+          label: '슛 타점',
+          isStable: false,
+          detail: '릴리스 타점이 낮아져 공이 짧게 나갈 수 있습니다.',
+        },
+        {
+          key: 'shoot-release-duration',
+          label: '릴리스 시간',
+          isStable: false,
+          detail: '릴리스 시간이 일정하지 않아 슛 리듬이 흔들렸습니다.',
+        },
+        {
+          key: 'shoot-result',
+          label: '슛 성공',
+          isStable: false,
+          detail: '이번 테스트 시도는 슛이 성공하지 않았습니다.',
+        },
+      ],
+      strengths: [],
+      improvements: [
+        {
+          label: '무릎 각도 보완',
+          detail: '하체를 조금 더 안정적으로 사용해 슛 리듬을 맞춰 보세요.',
+          startAtMs: 0,
+          durationMs: 2000,
+        },
+        {
+          label: '릴리스 타이밍 보완',
+          detail: '공을 놓는 타이밍을 조금 더 일정하게 맞춰 보세요.',
+          startAtMs: 0,
+          durationMs: 2000,
+        },
+      ],
+    },
+  });
+}
+
 function normalizeLessonRecordVideoMap(value: unknown) {
   if (!isRecordObject(value)) {
     return {} as Record<string, string>;
@@ -855,50 +946,22 @@ function buildRemoteSnapshot(payload: RemoteAccountSnapshot): RemoteAccountSnaps
   };
 }
 
-async function readStoredAccountSnapshot(userId: string): Promise<RemoteAccountSnapshot> {
-  const scopedKeys = getAccountStorageKeys(userId);
-  const entries = await withTimeout(
-    AppStorage.multiGet([
-      scopedKeys.attendance,
-      scopedKeys.homework,
-      scopedKeys.lessonRecords,
-      scopedKeys.lessonRecordVideos,
-      scopedKeys.dribbleCounts,
-      scopedKeys.shotAttempts,
-      scopedKeys.shotSuccess,
-      scopedKeys.ballColors,
-      scopedKeys.ballBrand,
-      scopedKeys.position,
-    ]),
-    STORAGE_LOAD_TIMEOUT_MS,
-    [
-      [scopedKeys.attendance, null],
-      [scopedKeys.homework, null],
-      [scopedKeys.lessonRecords, null],
-      [scopedKeys.lessonRecordVideos, null],
-      [scopedKeys.dribbleCounts, null],
-      [scopedKeys.shotAttempts, null],
-      [scopedKeys.shotSuccess, null],
-      [scopedKeys.ballColors, null],
-      [scopedKeys.ballBrand, null],
-      [scopedKeys.position, null],
-    ] as [string, string | null][]
-  );
-  const stored = Object.fromEntries(entries);
-  const parsedAttendance = parseStoredJson<Record<string, string>>(stored[scopedKeys.attendance], {});
+function parseStoredAccountSnapshotFromEntries(
+  scopedKeys: ReturnType<typeof getAccountStorageKeys>,
+  stored: Record<string, string | null>
+): RemoteAccountSnapshot {
+  const parsedAttendance = sanitizeStringRecord(parseStoredJson<unknown>(stored[scopedKeys.attendance], {}));
   const parsedHomework = sanitizeHomeworkStateRecord(parseStoredJson<unknown>(stored[scopedKeys.homework], {}));
-  const parsedLessonRecords = parseStoredJson<
-    Array<LessonRecord | (Omit<LessonRecord, 'feedbackTimeline'> & { feedbackTimeline?: FeedbackMoment[] | string[] })>
-  >(stored[scopedKeys.lessonRecords], []).map((record) => normalizeLessonRecord(record));
+  const parsedLessonRecords = sanitizeLessonRecords(parseStoredJson<unknown>(stored[scopedKeys.lessonRecords], []));
   const parsedLessonRecordVideos = normalizeLessonRecordVideoMap(
     parseStoredJson<unknown>(stored[scopedKeys.lessonRecordVideos], {})
   );
-  const parsedDribbleCounts = parseStoredJson<Record<string, number>>(stored[scopedKeys.dribbleCounts], {});
-  const parsedShotAttempts = parseStoredJson<Record<string, number>>(stored[scopedKeys.shotAttempts], {});
-  const parsedShotSuccess = parseStoredJson<Record<string, number>>(stored[scopedKeys.shotSuccess], {});
-  const parsedBallBrand = parseStoredJson<BallBrandOption>(stored[scopedKeys.ballBrand], DEFAULT_BALL_BRAND);
-  const parsedBallColors = parseStoredJson<BallColorOption[]>(stored[scopedKeys.ballColors], DEFAULT_BALL_COLORS);
-  const parsedPosition = parseStoredJson<PositionOption>(stored[scopedKeys.position], DEFAULT_POSITION);
+  const parsedDribbleCounts = sanitizeNumberRecord(parseStoredJson<unknown>(stored[scopedKeys.dribbleCounts], {}));
+  const parsedShotAttempts = sanitizeNumberRecord(parseStoredJson<unknown>(stored[scopedKeys.shotAttempts], {}));
+  const parsedShotSuccess = sanitizeNumberRecord(parseStoredJson<unknown>(stored[scopedKeys.shotSuccess], {}));
+  const parsedBallBrand = parseStoredJson<unknown>(stored[scopedKeys.ballBrand], DEFAULT_BALL_BRAND);
+  const parsedBallColors = parseStoredJson<unknown>(stored[scopedKeys.ballColors], DEFAULT_BALL_COLORS);
+  const parsedPosition = parseStoredJson<unknown>(stored[scopedKeys.position], DEFAULT_POSITION);
   const lessonRecordsWithVideos = hydrateLessonRecordVideos(parsedLessonRecords, parsedLessonRecordVideos);
   const hydratedLessonRecords = hydrateLegacyShotOutcomes(lessonRecordsWithVideos, parsedShotSuccess);
   const mergedShotAttempts = { ...parsedShotAttempts };
@@ -935,6 +998,39 @@ async function readStoredAccountSnapshot(userId: string): Promise<RemoteAccountS
     position: isPositionOption(parsedPosition) ? parsedPosition : DEFAULT_POSITION,
     homework: parsedHomework,
   });
+}
+
+async function readStoredAccountSnapshot(userId: string): Promise<RemoteAccountSnapshot> {
+  const scopedKeys = getAccountStorageKeys(userId);
+  const entries = await withTimeout(
+    AppStorage.multiGet([
+      scopedKeys.attendance,
+      scopedKeys.homework,
+      scopedKeys.lessonRecords,
+      scopedKeys.lessonRecordVideos,
+      scopedKeys.dribbleCounts,
+      scopedKeys.shotAttempts,
+      scopedKeys.shotSuccess,
+      scopedKeys.ballColors,
+      scopedKeys.ballBrand,
+      scopedKeys.position,
+    ]),
+    STORAGE_LOAD_TIMEOUT_MS,
+    [
+      [scopedKeys.attendance, null],
+      [scopedKeys.homework, null],
+      [scopedKeys.lessonRecords, null],
+      [scopedKeys.lessonRecordVideos, null],
+      [scopedKeys.dribbleCounts, null],
+      [scopedKeys.shotAttempts, null],
+      [scopedKeys.shotSuccess, null],
+      [scopedKeys.ballColors, null],
+      [scopedKeys.ballBrand, null],
+      [scopedKeys.position, null],
+    ] as [string, string | null][]
+  );
+  const stored = Object.fromEntries(entries);
+  return parseStoredAccountSnapshotFromEntries(scopedKeys, stored);
 }
 
 async function writeStoredAccountSnapshot(userId: string, snapshot: RemoteAccountSnapshot) {
@@ -2068,6 +2164,7 @@ export function useBasketballCoachApp() {
   const shotSuccessRecordsRef = useRef<Record<string, number>>({});
   const shootSuccessRecordedForCurrentAttemptRef = useRef(false);
   const startupRecoveryTriggeredRef = useRef(false);
+  const seededDevTestUsersRef = useRef<Set<string>>(new Set());
   const remoteTokenRef = useRef<string | null>(null);
   const lastRemoteSnapshotRef = useRef('');
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -2375,6 +2472,43 @@ export function useBasketballCoachApp() {
     [accounts, persistSession]
   );
 
+  const applyAccountSnapshot = useCallback((snapshot: RemoteAccountSnapshot) => {
+    const nextSnapshot = buildRemoteSnapshot(snapshot);
+    const nextTodayKey = formatDateKey(new Date());
+    const nextAttendance = {
+      ...nextSnapshot.attendance,
+      [nextTodayKey]: 'attended',
+    };
+    const nextBallBrand = isBallBrandOption(nextSnapshot.ballBrand) ? nextSnapshot.ballBrand : DEFAULT_BALL_BRAND;
+    const nextBallColors =
+      nextSnapshot.ballColors.length > 0
+        ? nextSnapshot.ballColors
+        : BALL_BRAND_PRESETS[nextBallBrand] ?? DEFAULT_BALL_COLORS;
+    const nextPosition = isPositionOption(nextSnapshot.position) ? nextSnapshot.position : DEFAULT_POSITION;
+
+    dailyDribbleRecordsRef.current = nextSnapshot.dribbleCounts;
+    homeworkStateRef.current = nextSnapshot.homework;
+    lessonRecordsRef.current = nextSnapshot.lessonRecords;
+    shotAttemptRecordsRef.current = nextSnapshot.shotAttempts;
+    shotSuccessRecordsRef.current = nextSnapshot.shotSuccess;
+    setAttendance(nextAttendance);
+    setDailyDribbleRecords(nextSnapshot.dribbleCounts);
+    setHomeworkState(nextSnapshot.homework);
+    setLessonRecords(nextSnapshot.lessonRecords);
+    setShotAttemptRecords(nextSnapshot.shotAttempts);
+    setShotSuccessRecords(nextSnapshot.shotSuccess);
+    setSelectedBallBrand(nextBallBrand);
+    setSelectedBallColors(nextBallColors);
+    setSelectedPosition(nextPosition);
+    setSelectedDateKey(nextTodayKey);
+    setCurrentDate(new Date());
+
+    return {
+      nextAttendance,
+      nextSnapshot,
+    };
+  }, []);
+
   const recoverStartupToLogin = useCallback(async () => {
     startupRecoveryTriggeredRef.current = true;
     remoteTokenRef.current = null;
@@ -2443,7 +2577,7 @@ export function useBasketballCoachApp() {
         );
         const stored = Object.fromEntries(entries);
         const parsedAccounts = sanitizeStoredAccounts(parseStoredJson<unknown[]>(stored[STORAGE_KEYS.accounts], []));
-        const parsedSession = parseStoredJson<AuthSession | null>(stored[STORAGE_KEYS.session], null);
+        const parsedSession = sanitizeStoredSession(parseStoredJson<unknown>(stored[STORAGE_KEYS.session], null));
 
         if (!isMounted) {
           return;
@@ -2538,10 +2672,21 @@ export function useBasketballCoachApp() {
           await AppStorage.removeItem(STORAGE_KEYS.session);
         }
       } catch {
+        remoteTokenRef.current = null;
+
+        try {
+          await AppStorage.removeItem(STORAGE_KEYS.session);
+          await AppStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify([]));
+        } catch {
+          // Ignore storage cleanup failures and continue to the login screen.
+        }
+
         if (isMounted) {
+          setAccounts([]);
+          setCurrentUser(null);
+          setAuthMode('login');
           setStartupStatusText('로그인 정보를 불러오지 못해 로그인 화면으로 이동합니다.');
         }
-        Alert.alert('불러오기 실패', '로그인 정보를 불러오는 중 문제가 발생했습니다.');
       } finally {
         if (isMounted) {
           setIsAuthReady(true);
@@ -2572,11 +2717,12 @@ export function useBasketballCoachApp() {
     resetAccountState();
 
     async function loadAccountData() {
+      const scopedKeys = getAccountStorageKeys(currentUserId);
+
       try {
         if (isMounted) {
           setStartupStatusText('계정 데이터를 불러오고 있습니다.');
         }
-        const scopedKeys = getAccountStorageKeys(currentUserId);
         const entries = await withTimeout(
           AppStorage.multiGet([
             scopedKeys.attendance,
@@ -2610,70 +2756,32 @@ export function useBasketballCoachApp() {
         }
 
         const stored = Object.fromEntries(entries);
-        const parsedAttendance = parseStoredJson<Record<string, string>>(stored[scopedKeys.attendance], {});
-        const parsedHomework = sanitizeHomeworkStateRecord(parseStoredJson<unknown>(stored[scopedKeys.homework], {}));
-        const parsedLessonRecords = parseStoredJson<
-          Array<LessonRecord | (Omit<LessonRecord, 'feedbackTimeline'> & { feedbackTimeline?: FeedbackMoment[] | string[] })>
-        >(stored[scopedKeys.lessonRecords], []).map((record) => normalizeLessonRecord(record));
-        const parsedLessonRecordVideos = normalizeLessonRecordVideoMap(
-          parseStoredJson<unknown>(stored[scopedKeys.lessonRecordVideos], {})
-        );
-        const parsedDribbleCounts = parseStoredJson<Record<string, number>>(stored[scopedKeys.dribbleCounts], {});
-        const parsedShotAttempts = parseStoredJson<Record<string, number>>(stored[scopedKeys.shotAttempts], {});
-        const parsedShotSuccess = parseStoredJson<Record<string, number>>(stored[scopedKeys.shotSuccess], {});
-        const lessonRecordsWithVideos = hydrateLessonRecordVideos(parsedLessonRecords, parsedLessonRecordVideos);
-        const hydratedLessonRecords = hydrateLegacyShotOutcomes(lessonRecordsWithVideos, parsedShotSuccess);
-        const derivedShotSuccess = deriveShotSuccessCounts(hydratedLessonRecords);
-        const mergedShotSuccess = { ...parsedShotSuccess };
-        const parsedBallBrand = parseStoredJson<BallBrandOption>(stored[scopedKeys.ballBrand], DEFAULT_BALL_BRAND);
-        const parsedBallColors = parseStoredJson<BallColorOption[]>(stored[scopedKeys.ballColors], DEFAULT_BALL_COLORS);
-        const parsedPosition = parseStoredJson<PositionOption>(stored[scopedKeys.position], DEFAULT_POSITION);
+        const snapshot = parseStoredAccountSnapshotFromEntries(scopedKeys, stored);
+        const { nextAttendance } = applyAccountSnapshot(snapshot);
 
-        const derivedShotAttempts = hydratedLessonRecords.reduce<Record<string, number>>((accumulator, record) => {
-          if (record.mode !== 'shoot') {
-            return accumulator;
-          }
-
-          accumulator[record.dateKey] = (accumulator[record.dateKey] || 0) + 1;
-          return accumulator;
-        }, {});
-
-        for (const [dateKey, count] of Object.entries(derivedShotAttempts)) {
-          parsedShotAttempts[dateKey] = Math.max(parsedShotAttempts[dateKey] || 0, count);
-        }
-
-        for (const [dateKey, count] of Object.entries(derivedShotSuccess)) {
-          mergedShotSuccess[dateKey] = Math.max(mergedShotSuccess[dateKey] || 0, count);
-        }
-
-        const nextTodayKey = formatDateKey(new Date());
-        parsedAttendance[nextTodayKey] = 'attended';
-
-        dailyDribbleRecordsRef.current = parsedDribbleCounts;
-        homeworkStateRef.current = parsedHomework;
-        lessonRecordsRef.current = hydratedLessonRecords;
-        shotAttemptRecordsRef.current = parsedShotAttempts;
-        shotSuccessRecordsRef.current = mergedShotSuccess;
-        setAttendance(parsedAttendance);
-        setDailyDribbleRecords(parsedDribbleCounts);
-        setHomeworkState(parsedHomework);
-        setLessonRecords(hydratedLessonRecords);
-        setShotAttemptRecords(parsedShotAttempts);
-        setShotSuccessRecords(mergedShotSuccess);
-        setSelectedBallBrand(parsedBallBrand);
-        setSelectedBallColors(
-          parsedBallColors.length > 0 ? parsedBallColors : BALL_BRAND_PRESETS[parsedBallBrand] ?? DEFAULT_BALL_COLORS
-        );
-        setSelectedPosition(parsedPosition);
-        setSelectedDateKey(nextTodayKey);
-        setCurrentDate(new Date());
-
-        await AppStorage.setItem(scopedKeys.attendance, JSON.stringify(parsedAttendance));
+        await AppStorage.setItem(scopedKeys.attendance, JSON.stringify(nextAttendance));
       } catch {
-        if (isMounted) {
-          setStartupStatusText('계정 데이터를 불러오지 못해 기본 화면으로 이동합니다.');
-          Alert.alert('불러오기 실패', '계정 데이터를 불러오는 중 문제가 발생했습니다.');
+        if (!isMounted) {
+          return;
         }
+
+        if (remoteTokenRef.current) {
+          setStartupStatusText('계정 데이터를 복구하고 있습니다.');
+          const remoteResult = await fetchRemoteSession(remoteTokenRef.current);
+
+          if (remoteResult.success && remoteResult.snapshot) {
+            const recoveredSnapshot = buildRemoteSnapshot(remoteResult.snapshot);
+            const { nextAttendance } = applyAccountSnapshot(recoveredSnapshot);
+
+            await writeStoredAccountSnapshot(currentUserId, recoveredSnapshot);
+            await AppStorage.setItem(scopedKeys.attendance, JSON.stringify(nextAttendance));
+            setStartupStatusText('');
+            return;
+          }
+        }
+
+        setStartupStatusText('계정 데이터를 불러오지 못해 기본 화면으로 이동합니다.');
+        Alert.alert('불러오기 실패', '계정 데이터를 불러오는 중 문제가 발생했습니다.');
       } finally {
         if (isMounted) {
           setIsAccountDataReady(true);
@@ -2687,6 +2795,66 @@ export function useBasketballCoachApp() {
       isMounted = false;
     };
   }, [currentUserId, resetAccountState]);
+
+  useEffect(() => {
+    if (!__DEV__ || !currentUserId || !isAccountDataReady) {
+      return;
+    }
+
+    if (seededDevTestUsersRef.current.has(currentUserId)) {
+      return;
+    }
+
+    seededDevTestUsersRef.current.add(currentUserId);
+
+    let isCancelled = false;
+
+    async function seedDevTestLessonRecord() {
+      const seedStorageKey = buildAccountStorageKey(DEV_TEST_SHOOT_RECORD_SEED_KEY, currentUserId);
+
+      try {
+        const seedStatus = await AppStorage.getItem(seedStorageKey);
+
+        if (isCancelled) {
+          return;
+        }
+
+        if (seedStatus === 'done') {
+          return;
+        }
+
+        if (lessonRecordsRef.current.some((record) => record.id === DEV_TEST_SHOOT_RECORD_ID)) {
+          await AppStorage.setItem(seedStorageKey, 'done');
+          return;
+        }
+
+        const seedDate = new Date();
+        const seededRecord = buildDevTestShootBadLessonRecord(seedDate);
+        const nextLessonRecords = [...lessonRecordsRef.current, seededRecord];
+        const nextShotAttemptRecords = {
+          ...shotAttemptRecordsRef.current,
+          [seededRecord.dateKey]: Math.max(0, shotAttemptRecordsRef.current[seededRecord.dateKey] || 0) + 1,
+        };
+
+        lessonRecordsRef.current = nextLessonRecords;
+        shotAttemptRecordsRef.current = nextShotAttemptRecords;
+        setLessonRecords(nextLessonRecords);
+        setShotAttemptRecords(nextShotAttemptRecords);
+        setSelectedDateKey(seededRecord.dateKey);
+        persistLessonRecords(nextLessonRecords);
+        persistScopedAccountValue('shotAttempts', nextShotAttemptRecords);
+        await AppStorage.setItem(seedStorageKey, 'done');
+      } catch {
+        seededDevTestUsersRef.current.delete(currentUserId);
+      }
+    }
+
+    void seedDevTestLessonRecord();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentUserId, isAccountDataReady, persistLessonRecords, persistScopedAccountValue]);
 
   useEffect(() => {
     if (isReady) {

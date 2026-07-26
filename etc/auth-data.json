@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "accounts": [
+    {
+      "id": "8c7ec6fc-a199-4351-b765-f52d8928eb1b",
+      "nickname": "개발자",
+      "nicknameKey": "개발자",
+      "passwordHash": "e596227f96d1f993278e5af747bc6963:7952f1edb3529255cee286bca91de44e190a5d8aaeba7f3d8ae9e26ae294219253e959ef982d7a225e1e1c7bd98b5e468f78ebf189abc8514c56a0f17d85cbf9",
+      "createdAt": "2026-07-17T23:14:47.268Z",
+      "updatedAt": "2026-07-26T05:41:46.017Z",
+      "snapshot": {
+        "attendance": {
+          "2026-7-18": "attended",
+          "2026-7-19": "attended",
+          "2026-7-26": "attended"
+        },
+        "lessonRecords": [
+          {
+            "id": "__dev-test-shoot-bad-no-video-v1",
+            "dateKey": "2026-7-26",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "테스트용 슛 피드백입니다. 무릎 각도와 릴리스 타이밍이 불안정했습니다.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "테스트용 슛 피드백입니다. 무릎 각도와 릴리스 타이밍이 불안정했습니다."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 26. 오후 2:35:11",
+            "representativeFeedbackCategory": "leg_angle",
+            "evaluation": {
+              "level": "bad",
+              "summary": "5媛吏 湲곗? 以?0媛吏媛 ?덉젙?곸씠???섏겏 湲곕줉?낅땲??",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 각도가 흔들려 하체 힘 전달이 일정하지 않았습니다."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "슛 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스 타이밍이 일정하지 않아 슛 흐름이 끊겼습니다."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "슛 타점",
+                  "isStable": false,
+                  "detail": "릴리스 타점이 낮아져 공이 짧게 나갈 수 있습니다."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": false,
+                  "detail": "릴리스 시간이 일정하지 않아 슛 리듬이 흔들렸습니다."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완",
+                  "detail": "하체를 조금 더 안정적으로 사용해 슛 리듬을 맞춰 보세요.",
+                  "startAtMs": 0,
+                  "durationMs": 2000
+                },
+                {
+                  "label": "릴리스 타이밍 보완",
+                  "detail": "공을 놓는 타이밍을 조금 더 일정하게 맞춰 보세요.",
+                  "startAtMs": 0,
+                  "durationMs": 2000
+                }
+              ]
+            }
+          }
+        ],
+        "dribbleCounts": {
+          "2026-7-26": 100
+        },
+        "shotAttempts": {
+          "2026-7-26": 20
+        },
+        "shotSuccess": {
+          "2026-7-26": 2
+        },
+        "ballColors": [
+          "brown",
+          "orange",
+          "black"
+        ],
+        "ballBrand": "wilson",
+        "position": "none",
+        "homework": {
+          "2026-7-26": {
+            "stage2Unlock": {
+              "unlockedAt": "2026-07-26T05:41:42.383Z",
+              "position": "none",
+              "dribbleCount": 100,
+              "shootAttemptCount": 20,
+              "shotSuccessCount": 2,
+              "lessonCount": 1
+            },
+            "skillVideoEvents": [],
+            "handDribbleTotals": {
+              "left": 77,
+              "right": 23
+            },
+            "correctionTask": null
+          }
+        }
+      }
+    }
+  ],
+  "sessions": {
+    "6958ed325b3b3c5d3a1f5d870fee54d6c0b96e42dd1cbd3dd4eff4bc81d4724f": {
+      "userId": "8c7ec6fc-a199-4351-b765-f52d8928eb1b",
+      "createdAt": "2026-07-26T05:10:49.670Z",
+      "lastUsedAt": "2026-07-26T05:10:50.444Z"
+    },
+    "801b5beefcd821a82af4679ead297d7d72147cd36a78377e0019e2a72a838d9f": {
+      "userId": "8c7ec6fc-a199-4351-b765-f52d8928eb1b",
+      "createdAt": "2026-07-26T05:11:02.318Z",
+      "lastUsedAt": "2026-07-26T05:11:02.318Z"
+    },
+    "6ea2e37dd6f784629b843b3799bfd4a3117e1925982852d60135ea0af2607979": {
+      "userId": "8c7ec6fc-a199-4351-b765-f52d8928eb1b",
+      "createdAt": "2026-07-26T05:12:43.035Z",
+      "lastUsedAt": "2026-07-26T05:12:43.035Z"
+    },
+    "a9f971d11ed7542c1f4ffd9c4776292ed99fe83e332f1fd6146f0af7ed4c9afb": {
+      "userId": "8c7ec6fc-a199-4351-b765-f52d8928eb1b",
+      "createdAt": "2026-07-26T05:24:10.502Z",
+      "lastUsedAt": "2026-07-26T05:24:10.502Z"
+    },
+    "5a2e44be1291a9aa0a1f0204684ff81553b68bb051423653bf3a7781559fa176": {
+      "userId": "8c7ec6fc-a199-4351-b765-f52d8928eb1b",
+      "createdAt": "2026-07-26T05:24:57.062Z",
+      "lastUsedAt": "2026-07-26T05:24:57.062Z"
+    },
+    "8a3450245431ac8a9a99a88c1e220950916d3e76e533b1429dadf2ec5488f8af": {
+      "userId": "8c7ec6fc-a199-4351-b765-f52d8928eb1b",
+      "createdAt": "2026-07-26T05:35:14.180Z",
+      "lastUsedAt": "2026-07-26T05:41:46.017Z"
+    }
+  }
+}

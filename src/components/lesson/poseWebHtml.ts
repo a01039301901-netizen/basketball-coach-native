@@ -105,7 +105,6 @@ export function buildPoseWebHtml(
       const SHOOT_BALL_HAND_CONTACT_DISTANCE = 0.16;
       const SHOOT_BALL_HAND_SEPARATION_DISTANCE = 0.22;
       const SHOOT_BALL_HAND_SEPARATION_DELTA = 0.045;
-      const SHOOT_RELEASE_WINDOW_MS = 260;
       const SHOOT_ARM_EXTENSION_BASE_ANGLE_MAX = 130;
       const SHOOT_ARM_EXTENSION_TARGET_ANGLE = 145;
       const SHOOT_ARM_EXTENSION_MIN_DELTA = 16;
@@ -1526,10 +1525,9 @@ export function buildPoseWebHtml(
               previousArmAngle <= SHOOT_ARM_EXTENSION_BASE_ANGLE_MAX &&
               armAngle >= SHOOT_ARM_EXTENSION_TARGET_ANGLE &&
               armAngleDelta >= SHOOT_ARM_EXTENSION_MIN_DELTA &&
-              elapsedMs <= SHOOT_RELEASE_WINDOW_MS &&
               armAngleDelta / elapsedMs >= SHOOT_ARM_EXTENSION_MIN_SPEED;
 
-            if (suddenArmExtensionDetected) {
+            if (suddenArmExtensionDetected && shootBallNearHandAtMs !== null) {
               shootArmExtensionAtMs = now;
             }
           }
@@ -1541,12 +1539,11 @@ export function buildPoseWebHtml(
           shootPreviousArmAngleAtMs = null;
         }
 
-        const recentBallControlDetected =
+        const ballControlDetected = shootBallNearHandAtMs !== null;
+        const armExtensionDetectedAfterBallControl =
           shootBallNearHandAtMs !== null &&
-          now - shootBallNearHandAtMs <= SHOOT_RELEASE_WINDOW_MS;
-        const recentArmExtensionDetected =
           shootArmExtensionAtMs !== null &&
-          now - shootArmExtensionAtMs <= SHOOT_RELEASE_WINDOW_MS;
+          shootArmExtensionAtMs >= shootBallNearHandAtMs;
         const ballSeparatedFromHand =
           ballHandDistance !== null &&
           (
@@ -1619,8 +1616,8 @@ export function buildPoseWebHtml(
         const releaseDetectedNow =
           !shootReleaseDetected &&
           ballHandDistance !== null &&
-          recentBallControlDetected &&
-          recentArmExtensionDetected &&
+          ballControlDetected &&
+          armExtensionDetectedAfterBallControl &&
           ballSeparatedFromHand;
 
         if (releaseDetectedNow) {

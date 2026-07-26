@@ -8,9 +8,11 @@ import type {
   PositionOption,
   UserAccount,
 } from '../types/app';
+import { GENERATED_AUTH_SERVER_URL } from '../generated/authServerConfig';
 
 const AUTH_SERVER_PORT = 4317;
-const AUTH_SERVER_OVERRIDE = process.env.EXPO_PUBLIC_AUTH_SERVER_URL?.trim() || '';
+const AUTH_SERVER_OVERRIDE =
+  GENERATED_AUTH_SERVER_URL.trim() || process.env.EXPO_PUBLIC_AUTH_SERVER_URL?.trim() || '';
 
 const REMOTE_SERVER_UNAVAILABLE_MESSAGE =
   '공용 로그인 서버에 연결할 수 없습니다. 같은 네트워크에서 앱을 실행하고 `npm run start`로 개발 서버를 함께 켜 주세요.';
