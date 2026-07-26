@@ -7,7 +7,7 @@
       "nicknameKey": "개발자",
       "passwordHash": "e596227f96d1f993278e5af747bc6963:7952f1edb3529255cee286bca91de44e190a5d8aaeba7f3d8ae9e26ae294219253e959ef982d7a225e1e1c7bd98b5e468f78ebf189abc8514c56a0f17d85cbf9",
       "createdAt": "2026-07-17T23:14:47.268Z",
-      "updatedAt": "2026-07-26T05:41:46.017Z",
+      "updatedAt": "2026-07-26T05:55:54.025Z",
       "snapshot": {
         "attendance": {
           "2026-7-18": "attended",
@@ -149,7 +149,12 @@
     "8a3450245431ac8a9a99a88c1e220950916d3e76e533b1429dadf2ec5488f8af": {
       "userId": "8c7ec6fc-a199-4351-b765-f52d8928eb1b",
       "createdAt": "2026-07-26T05:35:14.180Z",
-      "lastUsedAt": "2026-07-26T05:41:46.017Z"
+      "lastUsedAt": "2026-07-26T05:55:54.025Z"
+    },
+    "b9d30ee50acdcb142d265a2718f1cb5ef004f9e522c925b2a9cdfa93465e1d73": {
+      "userId": "8c7ec6fc-a199-4351-b765-f52d8928eb1b",
+      "createdAt": "2026-07-26T05:58:42.242Z",
+      "lastUsedAt": "2026-07-26T06:23:57.860Z"
     }
   }
 }

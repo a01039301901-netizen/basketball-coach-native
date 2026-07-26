@@ -105,6 +105,17 @@ export function buildPoseWebHtml(
       const SHOOT_BALL_HAND_CONTACT_DISTANCE = 0.16;
       const SHOOT_BALL_HAND_SEPARATION_DISTANCE = 0.22;
       const SHOOT_BALL_HAND_SEPARATION_DELTA = 0.045;
+      const BALL_TRACK_MAX_MISSING_FRAMES = 2;
+      const BALL_TRACK_MIN_SEARCH_RADIUS = 0.12;
+      const BALL_TRACK_MAX_SEARCH_RADIUS = 0.28;
+      const BALL_TRACK_RADIUS_MULTIPLIER = 5.5;
+      const BALL_TRACK_DISTANCE_BONUS = 160;
+      const BALL_TRACK_DISTANCE_PENALTY = 180;
+      const BALL_TRACK_DISTANCE_PENALTY_SCALE = 520;
+      const BALL_TRACK_RADIUS_BONUS = 32;
+      const BALL_TRACK_RADIUS_PENALTY_SCALE = 700;
+      const BALL_TRACK_COLOR_BONUS = 16;
+      const BALL_TRACK_VELOCITY_BLEND = 0.35;
       const SHOOT_ARM_EXTENSION_BASE_ANGLE_MAX = 130;
       const SHOOT_ARM_EXTENSION_TARGET_ANGLE = 145;
       const SHOOT_ARM_EXTENSION_MIN_DELTA = 16;
@@ -217,6 +228,10 @@ export function buildPoseWebHtml(
       let shootPreviousBallHandDistance = null;
       let shootBallNearHandAtMs = null;
       let shootArmExtensionAtMs = null;
+      let trackedBall = null;
+      let trackedBallVelocityX = 0;
+      let trackedBallVelocityY = 0;
+      let trackedBallMissingFrames = 0;
       let cameraStreamStopped = false;
       let currentCameraFacingMode = "user";
       let isSwitchingCamera = false;
@@ -276,6 +291,13 @@ export function buildPoseWebHtml(
         shootPreviousBallHandDistance = null;
         shootBallNearHandAtMs = null;
         shootArmExtensionAtMs = null;
+      }
+
+      function resetBallTracking() {
+        trackedBall = null;
+        trackedBallVelocityX = 0;
+        trackedBallVelocityY = 0;
+        trackedBallMissingFrames = 0;
       }
 
       function resetAnalysisSummaries() {
@@ -361,6 +383,7 @@ export function buildPoseWebHtml(
         };
         resetDribbleTracking();
         resetShootTracking();
+        resetBallTracking();
         recorder.start(1000);
         post({ type: "recording_started" });
       }
@@ -411,6 +434,7 @@ export function buildPoseWebHtml(
       window.__codexStopRecordingAndDisconnectCamera = stopRecordingAndDisconnectCamera;
       window.__codexResetDribbleTracking = resetDribbleTracking;
       window.__codexResetShootTracking = resetShootTracking;
+      window.__codexResetBallTracking = resetBallTracking;
 
       function setHud(text) {
         hud.textContent = text;
@@ -740,6 +764,93 @@ export function buildPoseWebHtml(
         };
       }
 
+      function clamp01(value) {
+        return Math.min(1, Math.max(0, value));
+      }
+
+      function getTrackedBallSearchRadius(ball) {
+        if (!ball) {
+          return BALL_TRACK_MIN_SEARCH_RADIUS;
+        }
+
+        return Math.max(
+          BALL_TRACK_MIN_SEARCH_RADIUS,
+          Math.min(BALL_TRACK_MAX_SEARCH_RADIUS, ball.radius * BALL_TRACK_RADIUS_MULTIPLIER)
+        );
+      }
+
+      function getPredictedTrackedBall() {
+        if (!trackedBall) {
+          return null;
+        }
+
+        return {
+          ...trackedBall,
+          x: clamp01(trackedBall.x + trackedBallVelocityX),
+          y: clamp01(trackedBall.y + trackedBallVelocityY)
+        };
+      }
+
+      function scoreBallCandidate(candidate, predictedBall) {
+        let score = candidate.pixelCount;
+
+        if (!predictedBall) {
+          return score;
+        }
+
+        const distance = distanceBetween(candidate, predictedBall);
+        const searchRadius = getTrackedBallSearchRadius(predictedBall);
+
+        if (distance <= searchRadius) {
+          score += (1 - distance / searchRadius) * BALL_TRACK_DISTANCE_BONUS;
+        } else {
+          score -= Math.min(
+            BALL_TRACK_DISTANCE_PENALTY,
+            Math.max(0, distance - searchRadius) * BALL_TRACK_DISTANCE_PENALTY_SCALE
+          );
+        }
+
+        const radiusDelta = Math.abs(candidate.radius - predictedBall.radius);
+        score += Math.max(0, BALL_TRACK_RADIUS_BONUS - radiusDelta * BALL_TRACK_RADIUS_PENALTY_SCALE);
+
+        if (candidate.color === predictedBall.color) {
+          score += BALL_TRACK_COLOR_BONUS;
+        }
+
+        return score;
+      }
+
+      function commitTrackedBall(nextBall) {
+        if (!nextBall) {
+          if (!trackedBall || trackedBallMissingFrames >= BALL_TRACK_MAX_MISSING_FRAMES) {
+            resetBallTracking();
+            return null;
+          }
+
+          trackedBallMissingFrames += 1;
+          trackedBall = {
+            ...trackedBall,
+            x: clamp01(trackedBall.x + trackedBallVelocityX),
+            y: clamp01(trackedBall.y + trackedBallVelocityY)
+          };
+          return trackedBall;
+        }
+
+        if (trackedBall) {
+          const deltaX = nextBall.x - trackedBall.x;
+          const deltaY = nextBall.y - trackedBall.y;
+          trackedBallVelocityX = trackedBallVelocityX * BALL_TRACK_VELOCITY_BLEND + deltaX * (1 - BALL_TRACK_VELOCITY_BLEND);
+          trackedBallVelocityY = trackedBallVelocityY * BALL_TRACK_VELOCITY_BLEND + deltaY * (1 - BALL_TRACK_VELOCITY_BLEND);
+        } else {
+          trackedBallVelocityX = 0;
+          trackedBallVelocityY = 0;
+        }
+
+        trackedBall = nextBall;
+        trackedBallMissingFrames = 0;
+        return trackedBall;
+      }
+
       function detectBall() {
         if (!processingContext) {
           return null;
@@ -785,7 +896,7 @@ export function buildPoseWebHtml(
           }
         }
 
-        let best = null;
+        const candidates = [];
         const sourceMap = profile.mergeColors ? mergedMap : colorMap;
 
         for (let index = 0; index < sourceMap.length; index += 1) {
@@ -893,12 +1004,27 @@ export function buildPoseWebHtml(
             color: redCount > orangeCount ? "red" : colorValue === 2 ? "red" : "orange"
           };
 
-          if (!best || candidate.pixelCount > best.pixelCount) {
+          candidates.push(candidate);
+        }
+
+        if (candidates.length === 0) {
+          return commitTrackedBall(null);
+        }
+
+        const predictedBall = getPredictedTrackedBall();
+        let best = null;
+        let bestScore = -Infinity;
+
+        for (const candidate of candidates) {
+          const score = scoreBallCandidate(candidate, predictedBall);
+
+          if (!best || score > bestScore) {
             best = candidate;
+            bestScore = score;
           }
         }
 
-        return best;
+        return commitTrackedBall(best);
       }
 
       function drawPoint(point, label, color) {
@@ -2012,6 +2138,7 @@ export function buildPoseWebHtml(
         currentCameraFacingMode = resolvedFacingMode;
         cameraStreamStopped = false;
         resetAnalysisSummaries();
+        resetBallTracking();
         video.srcObject = stream;
         updateVideoPresentation();
         await video.play();
