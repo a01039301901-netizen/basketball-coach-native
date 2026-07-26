@@ -6,7 +6,7 @@ import { Card } from '../components/common/Card';
 import { DAY_NAMES } from '../constants/content';
 import { colors } from '../theme/colors';
 import type { CalendarCell, DiarySkillInsight, FeedbackMoment, LessonRecord, LessonRecordCriterion, ShotGraphDatum } from '../types/app';
-import { formatDateKey } from '../utils/date';
+import { formatDateKey, formatMonthTitle } from '../utils/date';
 import { getDesktopMobileFrameWidth, shouldUseDesktopMobileLayout } from '../utils/layout';
 
 interface DiaryScreenProps {
@@ -27,11 +27,16 @@ interface DiaryScreenProps {
 type RecordFilter = 'all' | 'dribble' | 'shoot' | 'shootSuccess';
 type SuccessRateRange = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
-const SUCCESS_RATE_COMPARE_TRACK_HEIGHT = 150;
+const SUCCESS_RATE_COMPARE_TRACK_HEIGHT = 126;
 const SUCCESS_RATE_COMPARE_BAR_MIN_HEIGHT = 12;
 const SUCCESS_RATE_COMPARE_EMPTY_HEIGHT = 8;
-const SUCCESS_RATE_COMPARE_VALUE_OFFSET = 30;
+const SUCCESS_RATE_COMPARE_VALUE_OFFSET = 26;
 const SUCCESS_RATE_COMPARE_MIN_ATTEMPTS = 20;
+const DIARY_NEUTRAL_SURFACE = '#2b2e33';
+const DIARY_NEUTRAL_SURFACE_ALT = '#23262a';
+const DIARY_NEUTRAL_SURFACE_SOFT = '#1d2024';
+const DIARY_NEUTRAL_ACTIVE = 'rgba(255,255,255,0.08)';
+const DIARY_NEUTRAL_BORDER = 'rgba(255,255,255,0.1)';
 
 interface SuccessRateComparisonFrame {
   label: string;
@@ -201,17 +206,6 @@ function getSyncedFeedback(timeline: FeedbackMoment[], fallback: string, positio
   }
 
   return activeText || fallback;
-}
-
-function DateArrowIcon({ direction }: { direction: 'left' | 'right' }) {
-  return (
-    <View
-      style={[
-        styles.dateArrowIcon,
-        direction === 'left' ? styles.dateArrowIconLeft : styles.dateArrowIconRight,
-      ]}
-    />
-  );
 }
 
 /* interface RecordEvaluationDropdownProps {
@@ -505,12 +499,15 @@ function formatDiarySummaryDateLabel(dateKey: string) {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
-function formatDiaryDateLabel(date: Date) {
-  return `${date.getMonth() + 1}/${date.getDate()}`;
-}
-
-function formatDiaryMonthLabel(date: Date) {
-  return `${date.getMonth() + 1}\uC6D4`;
+function DateArrowIcon({ direction }: { direction: 'left' | 'right' }) {
+  return (
+    <View
+      style={[
+        styles.dateArrowIcon,
+        direction === 'left' ? styles.dateArrowIconLeft : styles.dateArrowIconRight,
+      ]}
+    />
+  );
 }
 
 function getDailySummaryPracticeText(
@@ -551,6 +548,11 @@ function getDailySummaryEvaluationText(insight: DiarySkillInsight) {
   return `\uB300\uCCB4\uB85C \uB098\uC058\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4 \u00B7 \uC88B\uC74C ${good}, \uBCF4\uD1B5 ${average}, \uB098\uC068 ${bad}`;
 }
 
+function getDailySummaryEvaluationCountText(insight: DiarySkillInsight) {
+  const { good, average, bad } = insight.evaluationCounts;
+  return `\uB098\uC068 : ${bad}\uAC1C   \uBCF4\uD1B5 : ${average}\uAC1C   \uC88B\uC74C : ${good}\uAC1C`;
+}
+
 function getDailySummaryToggleHeadline(insight: DiarySkillInsight) {
   const { good, average, bad } = insight.evaluationCounts;
   const totalEvaluatedCount = good + average + bad;
@@ -580,11 +582,11 @@ function getDiaryCriterionDisplayLabel(criterion: LessonRecordCriterion) {
   }
 
   if (criterion.key === 'shoot-release-timing') {
-    return '\uC29B \uD0C0\uC774\uBC0D';
+    return '\uD0C0\uC774\uBC0D';
   }
 
   if (criterion.key === 'shoot-result') {
-    return '\uC29B \uC131\uACF5';
+    return '\uC131\uACF5 \uC5EC\uBD80';
   }
 
   if (criterion.key === 'dribble-torso-posture') {
@@ -600,6 +602,22 @@ function getDiaryCriterionDisplayLabel(criterion: LessonRecordCriterion) {
   }
 
   return criterion.label;
+}
+
+function getDiaryCorrectionCategoryLabel(record: LessonRecord) {
+  if (record.mode === 'shoot') {
+    return '\uC29B';
+  }
+
+  if (record.dribbleView === 'front') {
+    return '\uC55E \uB4DC\uB9AC\uBE14';
+  }
+
+  if (record.dribbleView === 'side') {
+    return '\uC606 \uB4DC\uB9AC\uBE14';
+  }
+
+  return '\uB4DC\uB9AC\uBE14';
 }
 
 function getDailySummaryCorrectionText(records: LessonRecord[]) {
@@ -618,15 +636,18 @@ function getDailySummaryCorrectionText(records: LessonRecord[]) {
         continue;
       }
 
-      const current = correctionCounts.get(criterion.key);
-      const label = getDiaryCriterionDisplayLabel(criterion);
+      const categoryLabel = getDiaryCorrectionCategoryLabel(record);
+      const criterionLabel = getDiaryCriterionDisplayLabel(criterion);
+      const correctionKey = `${categoryLabel}:${criterion.key}`;
+      const current = correctionCounts.get(correctionKey);
+      const label = `${categoryLabel} ${criterionLabel}`;
 
       if (current) {
         current.count += 1;
         continue;
       }
 
-      correctionCounts.set(criterion.key, {
+      correctionCounts.set(correctionKey, {
         label,
         count: 1,
       });
@@ -636,7 +657,7 @@ function getDailySummaryCorrectionText(records: LessonRecord[]) {
   const topCorrection = [...correctionCounts.values()].sort((left, right) => right.count - left.count)[0] ?? null;
 
   if (topCorrection) {
-    return `${topCorrection.label} \uD53C\uB4DC\uBC31\uC774 \uAC00\uC7A5 \uB9CE\uC544\uC694. \uC774 \uBD80\uBD84\uC744 \uD558\uB098 \uACE0\uCCD0\uBCF4\uC790\uACE0\uC694.`;
+    return `${topCorrection.label} \uD53C\uB4DC\uBC31\uC774 \uAC00\uC7A5 \uB9CE\uC544\uC694. \uC774 \uBD80\uBD84\uC744 \uACE0\uCCD0\uBD10\uC694.`;
   }
 
   if (hasEvaluation) {
@@ -1140,24 +1161,6 @@ export function DiaryScreen({
     return (
       <View style={styles.evaluationBox}>
         <Text style={styles.evaluationTitle}>{'\uAE30\uB85D \uD3C9\uAC00'}</Text>
-        <Text style={styles.evaluationSummary}>{evaluation.summary}</Text>
-
-        <View style={styles.criteriaRow}>
-          {evaluation.criteria.map((criterion) => (
-            <View
-              key={`${record.id}-${criterion.key}`}
-              style={[
-                styles.criterionChip,
-                criterion.isStable ? styles.criterionChipStable : styles.criterionChipUnstable,
-              ]}
-            >
-              <Text style={styles.criterionChipLabel}>{criterion.label}</Text>
-              <Text style={styles.criterionChipValue}>
-                {criterion.isStable ? '\uC548\uC815' : '\uBCF4\uC644'}
-              </Text>
-            </View>
-          ))}
-        </View>
 
         <View style={styles.highlightGroup}>
           <Text style={styles.highlightGroupTitle}>{'\uC798\uD55C \uC7A5\uBA74 \uB2E4\uC2DC\uBCF4\uAE30'}</Text>
@@ -1280,8 +1283,6 @@ export function DiaryScreen({
             <Text style={styles.liveFeedbackLabel}>{'\uC2E4\uC2DC\uAC04 \uD53C\uB4DC\uBC31'}</Text>
             <Text style={styles.liveFeedbackText}>{syncedFeedback}</Text>
           </View>
-
-          <Text style={styles.recordOpenHint}>{'\uAE30\uB85D\uC744 \uB204\uB974\uBA74 \uAE30\uB85D \uD3C9\uAC00\uB97C \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4.'}</Text>
         </Pressable>
 
         <SmallButton title={'\uAE30\uB85D \uC0AD\uC81C'} onPress={() => onDeleteRecord(record.id)} variant="red" />
@@ -1315,7 +1316,7 @@ export function DiaryScreen({
               <DateArrowIcon direction="left" />
             </Pressable>
             <Text style={styles.dateSelectorText}>
-              {selectedDateKey ? formatDiarySummaryDateLabel(selectedDateKey) : formatDiaryDateLabel(selectedDate)}
+              {selectedDateKey || formatDateKey(selectedDate)}
             </Text>
             <Pressable onPress={() => moveSelectedDate(1)} style={({ pressed }) => [styles.dateArrowButton, pressed && styles.pressed]}>
               <DateArrowIcon direction="right" />
@@ -1355,26 +1356,24 @@ export function DiaryScreen({
                         {showDailySummary ? (
                           <>
                             <View style={[styles.skillInsightStatCard, styles.dailySummaryCard]}>
-                              <View style={styles.summaryBoardRow}>
-                                <Text style={styles.summaryBoardLabel}>{'\uC5F0\uC2B5\uB7C9'}</Text>
-                                <Text style={styles.summaryBoardValue}>
-                                  {getDailySummaryPracticeText(diarySkillInsight, selectedDateDribbleCount)}
-                                </Text>
-                              </View>
-                              <View style={styles.summaryBoardRow}>
-                                <Text style={styles.summaryBoardLabel}>{'\uB808\uC2A8 \uD3C9\uAC00'}</Text>
-                                <Text style={styles.summaryBoardValue}>{getDailySummaryEvaluationText(diarySkillInsight)}</Text>
-                              </View>
-                              <View style={styles.summaryBoardRow}>
-                                <Text style={styles.summaryBoardLabel}>{'\uC29B \uC131\uACF5\uB960 \uBCC0\uD654'}</Text>
-                                <Text style={styles.summaryBoardValue}>{getDailySummaryShotText(diarySkillInsight)}</Text>
-                              </View>
-                              <View style={styles.summaryBoardRow}>
-                                <Text style={styles.summaryBoardLabel}>{'\uB4DC\uB9AC\uBE14 \uC6B0\uC138 \uC190'}</Text>
-                                <Text style={styles.summaryBoardValue}>
-                                  {getDailySummaryDribbleText(diarySkillInsight, selectedDateDribbleCount)}
-                                </Text>
-                              </View>
+                            <View style={styles.summaryBoardRow}>
+                              <Text style={styles.summaryBoardLabel}>{'\uC5F0\uC2B5\uB7C9'}</Text>
+                              <Text style={styles.summaryBoardValue}>
+                                {getDailySummaryPracticeText(diarySkillInsight, selectedDateDribbleCount)}
+                              </Text>
+                            </View>
+                            <View style={styles.summaryBoardRow}>
+                              <Text style={styles.summaryBoardLabel}>{'\uC29B \uC131\uACF5\uB960'}</Text>
+                              <Text style={[styles.summaryBoardValue, styles.summaryBoardValueSuccessRate]}>
+                                {getDailySummaryShotText(diarySkillInsight)}
+                              </Text>
+                            </View>
+                            <View style={styles.summaryBoardRow}>
+                              <Text style={styles.summaryBoardLabel}>{'\uB4DC\uB9AC\uBE14 \uADE0\uD615'}</Text>
+                              <Text style={styles.summaryBoardValue}>
+                                {getDailySummaryDribbleText(diarySkillInsight, selectedDateDribbleCount)}
+                              </Text>
+                            </View>
                             </View>
 
                             <Pressable
@@ -1440,8 +1439,6 @@ export function DiaryScreen({
                           ) : null}
                         </View>
                       </View>
-
-                      <Text style={styles.skillInsightHeadline}>{getSuccessRateHeadline(successRateComparisonData)}</Text>
 
                       {selectedDateKey && hasSuccessRateComparisonData ? (
                         <View style={styles.skillInsightShotBody}>
@@ -1582,7 +1579,6 @@ export function DiaryScreen({
                                     </View>
 
                                       <Text style={styles.successRateCompareLabel}>{item.label}</Text>
-                                      {item.detail ? <Text style={styles.successRateCompareDetail}>{item.detail}</Text> : null}
                                       <Text style={styles.successRateCompareMeta}>
                                         {item.attempts > 0 ? `\uC131\uACF5 ${item.successes} / \uC2DC\uB3C4 ${item.attempts}` : '\uAE30\uB85D \uC5C6\uC74C'}
                                       </Text>
@@ -1670,47 +1666,53 @@ export function DiaryScreen({
           </View>
 
           <View style={[styles.recordsColumn, isWide && styles.recordsColumnWide]}>
-            <View style={styles.recordFilterWrap}>
-              <Pressable
-                onPress={() => {
-                  setShowRecordFilterMenu((current) => !current);
-                  setShowSuccessRateRangeMenu(false);
-                }}
-                style={({ pressed }) => [
-                  styles.recordFilterDropdown,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text style={styles.recordFilterDropdownText}>{'\uAE30\uB85D \uBCF4\uAE30: '}{getRecordFilterLabel(recordFilter)}</Text>
-                <Text style={styles.recordFilterDropdownIcon}>{showRecordFilterMenu ? '\u25B2' : '\u25BC'}</Text>
-              </Pressable>
+            <View style={styles.recordFilterHeaderRow}>
+              <View style={styles.recordFilterWrap}>
+                <Pressable
+                  onPress={() => {
+                    setShowRecordFilterMenu((current) => !current);
+                    setShowSuccessRateRangeMenu(false);
+                  }}
+                  style={({ pressed }) => [
+                    styles.recordFilterDropdown,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={styles.recordFilterDropdownText}>{'\uAE30\uB85D \uBCF4\uAE30: '}{getRecordFilterLabel(recordFilter)}</Text>
+                  <Text style={styles.recordFilterDropdownIcon}>{showRecordFilterMenu ? '\u25B2' : '\u25BC'}</Text>
+                </Pressable>
 
-              {showRecordFilterMenu ? (
-                <View style={styles.recordFilterMenu}>
-                  {(['all', 'dribble', 'shoot', 'shootSuccess'] as RecordFilter[]).map((filterOption) => (
-                    <Pressable
-                      key={filterOption}
-                      onPress={() => {
-                        setRecordFilter(filterOption);
-                        setShowRecordFilterMenu(false);
-                      }}
-                      style={({ pressed }) => [
-                        styles.recordFilterMenuItem,
-                        recordFilter === filterOption && styles.recordFilterMenuItemActive,
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.recordFilterMenuText,
-                          recordFilter === filterOption && styles.recordFilterMenuTextActive,
+                {showRecordFilterMenu ? (
+                  <View style={styles.recordFilterMenu}>
+                    {(['all', 'dribble', 'shoot', 'shootSuccess'] as RecordFilter[]).map((filterOption) => (
+                      <Pressable
+                        key={filterOption}
+                        onPress={() => {
+                          setRecordFilter(filterOption);
+                          setShowRecordFilterMenu(false);
+                        }}
+                        style={({ pressed }) => [
+                          styles.recordFilterMenuItem,
+                          recordFilter === filterOption && styles.recordFilterMenuItemActive,
+                          pressed && styles.pressed,
                         ]}
                       >
-                        {getRecordFilterLabel(filterOption)}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
+                        <Text
+                          style={[
+                            styles.recordFilterMenuText,
+                            recordFilter === filterOption && styles.recordFilterMenuTextActive,
+                          ]}
+                        >
+                          {getRecordFilterLabel(filterOption)}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+
+              {selectedDateKey ? (
+                <Text style={styles.recordFilterCountsText}>{getDailySummaryEvaluationCountText(diarySkillInsight)}</Text>
               ) : null}
             </View>
 
@@ -1773,14 +1775,16 @@ export function DiaryScreen({
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, styles.recordEvaluationModalCard]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{'\uAE30\uB85D \uD3C9\uAC00'}</Text>
+            <View style={styles.recordEvaluationHeader}>
               <Pressable
                 onPress={closeRecordEvaluation}
-                style={({ pressed }) => [styles.modalCloseButton, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.recordEvaluationBackButton, pressed && styles.pressed]}
               >
-                <Text style={styles.modalCloseText}>{'\uB4A4\uB85C \uAC00\uAE30'}</Text>
+                <Text style={styles.recordEvaluationBackButtonText}>{'<'}</Text>
               </Pressable>
+              <View style={styles.recordEvaluationHeaderTitleWrap}>
+                <Text style={styles.recordEvaluationModalTitle}>{'\uAE30\uB85D \uD3C9\uAC00'}</Text>
+              </View>
             </View>
 
             {openedEvaluationRecord ? (
@@ -1875,20 +1879,14 @@ export function DiaryScreen({
 
       <Modal visible={showCalendarModal} transparent animationType="fade" onRequestClose={() => setShowCalendarModal(false)}>
         <View style={styles.modalOverlay}>
+          <Pressable
+            style={styles.modalBackdropPressable}
+            onPress={() => setShowCalendarModal(false)}
+          />
           <View style={[styles.modalCard, styles.calendarModalCard]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{'\uB0A0\uC9DC \uC120\uD0DD'}</Text>
-              <Pressable
-                onPress={() => setShowCalendarModal(false)}
-                style={({ pressed }) => [styles.modalCloseButton, pressed && styles.pressed]}
-              >
-                <Text style={styles.modalCloseText}>{'\uB2EB\uAE30'}</Text>
-              </Pressable>
-            </View>
-
             <View style={styles.calendarTop}>
               <SmallButton title="<" onPress={() => onChangeMonth(-1)} variant="dark" />
-              <Text style={styles.monthTitle}>{formatDiaryMonthLabel(currentDate)}</Text>
+              <Text style={styles.monthTitle}>{formatMonthTitle(currentDate)}</Text>
               <SmallButton title=">" onPress={() => onChangeMonth(1)} variant="dark" />
             </View>
 
@@ -2018,9 +2016,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: DIARY_NEUTRAL_SURFACE,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: DIARY_NEUTRAL_BORDER,
   },
   dateSelectorMainGood: {
     backgroundColor: colors.green,
@@ -2051,9 +2049,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: DIARY_NEUTRAL_SURFACE_ALT,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: DIARY_NEUTRAL_BORDER,
   },
   dateArrowIcon: {
     width: 11,
@@ -2081,7 +2079,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
-    marginBottom: 18,
+    marginBottom: 12,
   },
   monthTitle: {
     color: colors.text,
@@ -2094,15 +2092,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'flex-start',
+    overflow: 'hidden',
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderColor: DIARY_NEUTRAL_BORDER,
   },
   dayName: {
     width: '14.2857%',
-    minHeight: 42,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    minHeight: 36,
+    borderRadius: 0,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: DIARY_NEUTRAL_BORDER,
   },
   dayNameText: {
     color: colors.text,
@@ -2111,18 +2115,19 @@ const styles = StyleSheet.create({
   },
   dayCell: {
     width: '14.2857%',
-    minHeight: 78,
+    minHeight: 66,
     borderRadius: 0,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    marginBottom: 8,
+    paddingVertical: 6,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: DIARY_NEUTRAL_BORDER,
   },
   dayCellEmpty: {
-    opacity: 0,
+    opacity: 1,
+    backgroundColor: 'transparent',
   },
   dayCellGood: {
     backgroundColor: colors.green,
@@ -2167,8 +2172,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 14,
-    marginTop: 18,
-    marginBottom: 18,
+    marginTop: 12,
+    marginBottom: 8,
   },
   legendItem: {
     flexDirection: 'row',
@@ -2252,7 +2257,7 @@ const styles = StyleSheet.create({
   skillInsightStatCard: {
     borderRadius: 18,
     padding: 16,
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: DIARY_NEUTRAL_SURFACE,
     borderWidth: 0,
     borderColor: 'transparent',
   },
@@ -2264,7 +2269,7 @@ const styles = StyleSheet.create({
     gap: 12,
     borderRadius: 18,
     padding: 16,
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: DIARY_NEUTRAL_SURFACE,
   },
   dailySummaryToggle: {
     width: '100%',
@@ -2330,9 +2335,12 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: '800',
   },
+  summaryBoardValueSuccessRate: {
+    color: '#32cd32',
+  },
   skillInsightShotCard: {
-    gap: 12,
-    padding: 16,
+    gap: 10,
+    padding: 14,
   },
   skillInsightShotHeader: {
     flexDirection: 'row',
@@ -2354,7 +2362,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 9,
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: DIARY_NEUTRAL_SURFACE_ALT,
     borderWidth: 0,
     borderColor: 'transparent',
     flexDirection: 'row',
@@ -2379,7 +2387,7 @@ const styles = StyleSheet.create({
     right: 0,
     borderRadius: 14,
     padding: 6,
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: DIARY_NEUTRAL_SURFACE,
     borderWidth: 0,
     borderColor: 'transparent',
     gap: 4,
@@ -2390,7 +2398,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   successRateRangeMenuItemActive: {
-    backgroundColor: 'rgba(208,145,85,0.18)',
+    backgroundColor: DIARY_NEUTRAL_ACTIVE,
   },
   successRateRangeMenuText: {
     color: colors.textMuted,
@@ -2404,12 +2412,12 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
   },
   skillInsightShotBody: {
-    gap: 12,
+    gap: 10,
   },
   successRateComparePanel: {
     borderRadius: 0,
     paddingHorizontal: 0,
-    paddingTop: 14,
+    paddingTop: 8,
     paddingBottom: 0,
     backgroundColor: 'transparent',
     borderWidth: 0,
@@ -2421,7 +2429,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'space-between',
     gap: 8,
-    minHeight: 236,
+    minHeight: 204,
   },
   successRateCompareGuide: {
     position: 'absolute',
@@ -2431,13 +2439,13 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255,255,255,0.08)',
   },
   successRateCompareGuideTop: {
-    top: 46,
+    top: 38,
   },
   successRateCompareGuideMiddle: {
-    top: 96,
+    top: 80,
   },
   successRateCompareGuideBottom: {
-    top: 146,
+    top: 122,
   },
   successRateCompareColumn: {
     flex: 1,
@@ -2460,23 +2468,23 @@ const styles = StyleSheet.create({
   },
   successRateCompareValue: {
     color: colors.textAccent,
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '900',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   successRateCompareTrack: {
     width: '100%',
-    maxWidth: 64,
+    maxWidth: 58,
     height: SUCCESS_RATE_COMPARE_TRACK_HEIGHT,
-    borderRadius: 18,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'flex-end',
     overflow: 'hidden',
   },
   successRateCompareFill: {
     width: '100%',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
   successRateCompareFillOldest: {
     backgroundColor: 'rgba(208,145,85,0.42)',
@@ -2551,23 +2559,23 @@ const styles = StyleSheet.create({
   },
   successRateCompareLabel: {
     color: colors.text,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
-    marginTop: 10,
+    marginTop: 8,
     textAlign: 'center',
   },
   successRateCompareDetail: {
     color: colors.textSoft,
     fontSize: 11,
     fontWeight: '700',
-    marginTop: 4,
+    marginTop: 3,
     textAlign: 'center',
   },
   successRateCompareMeta: {
     color: colors.textMuted,
     fontSize: 11,
     lineHeight: 15,
-    marginTop: 6,
+    marginTop: 4,
     textAlign: 'center',
   },
   skillInsightStatLabel: {
@@ -2665,15 +2673,30 @@ const styles = StyleSheet.create({
   },
   recordsColumn: {
     gap: 14,
+    overflow: 'visible',
   },
   recordsColumnWide: {
     width: '100%',
     minHeight: 760,
   },
+  recordFilterHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
   recordFilterWrap: {
+    position: 'relative',
     alignSelf: 'flex-start',
     minWidth: 170,
-    zIndex: 10,
+    zIndex: 20,
+  },
+  recordFilterCountsText: {
+    color: colors.textSoft,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '800',
+    flexShrink: 1,
   },
   recordFilterChipRow: {
     flexDirection: 'row',
@@ -2685,10 +2708,10 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: DIARY_NEUTRAL_SURFACE,
   },
   recordFilterChipActive: {
-    backgroundColor: 'rgba(208,145,85,0.18)',
+    backgroundColor: DIARY_NEUTRAL_ACTIVE,
   },
   recordFilterChipText: {
     color: colors.textMuted,
@@ -2699,10 +2722,10 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   recordFilterDropdown: {
-    borderRadius: 0,
+    borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 9,
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: DIARY_NEUTRAL_SURFACE,
     borderWidth: 0,
     borderColor: 'transparent',
     flexDirection: 'row',
@@ -2721,13 +2744,19 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   recordFilterMenu: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
     marginTop: 8,
     borderRadius: 14,
     padding: 6,
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: DIARY_NEUTRAL_SURFACE,
     borderWidth: 0,
     borderColor: 'transparent',
     gap: 4,
+    zIndex: 30,
+    elevation: 12,
   },
   recordFilterMenuItem: {
     borderRadius: 0,
@@ -2735,7 +2764,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   recordFilterMenuItemActive: {
-    backgroundColor: 'rgba(208,145,85,0.18)',
+    backgroundColor: DIARY_NEUTRAL_ACTIVE,
   },
   recordFilterMenuText: {
     color: colors.textMuted,
@@ -2748,9 +2777,10 @@ const styles = StyleSheet.create({
   recordsPanel: {
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: DIARY_NEUTRAL_SURFACE,
     borderWidth: 0,
     borderColor: 'transparent',
+    zIndex: 0,
   },
   recordsScroll: {
     width: '100%',
@@ -2876,53 +2906,71 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
+    position: 'relative',
     backgroundColor: 'rgba(0,0,0,0.62)',
     justifyContent: 'center',
     paddingHorizontal: 20,
     paddingVertical: 28,
   },
+  modalBackdropPressable: {
+    ...StyleSheet.absoluteFillObject,
+  },
   modalCard: {
     maxHeight: '88%',
     borderRadius: 18,
     padding: 20,
-    backgroundColor: colors.surface,
+    backgroundColor: DIARY_NEUTRAL_SURFACE_SOFT,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: DIARY_NEUTRAL_BORDER,
   },
   calendarModalCard: {
     maxWidth: 960,
     width: '100%',
     alignSelf: 'center',
+    paddingTop: 16,
+    paddingBottom: 12,
   },
   recordEvaluationModalCard: {
     maxWidth: 760,
     width: '100%',
     alignSelf: 'center',
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
+  recordEvaluationHeader: {
+    position: 'relative',
+    minHeight: 44,
+    justifyContent: 'center',
   },
-  modalTitle: {
-    flex: 1,
+  recordEvaluationHeaderTitleWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 64,
+  },
+  recordEvaluationModalTitle: {
     color: colors.text,
     fontSize: 22,
     fontWeight: '900',
+    textAlign: 'center',
   },
-  modalCloseButton: {
-    borderRadius: 0,
-    paddingHorizontal: 14,
+  recordEvaluationBackButton: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    minWidth: 48,
+    minHeight: 44,
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: DIARY_NEUTRAL_SURFACE_SOFT,
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
-  modalCloseText: {
+  recordEvaluationBackButtonText: {
     color: colors.text,
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 22,
   },
   recordEvaluationScroll: {
     marginTop: 16,
@@ -2979,9 +3027,9 @@ const styles = StyleSheet.create({
     height: 320,
     position: 'relative',
     borderRadius: 16,
-    backgroundColor: colors.surface,
+    backgroundColor: DIARY_NEUTRAL_SURFACE_ALT,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: DIARY_NEUTRAL_BORDER,
     paddingTop: 14,
     paddingBottom: 34,
   },
@@ -3063,20 +3111,20 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   recordCard: {
-    backgroundColor: colors.surfaceStrong,
-    borderRadius: 16,
+    backgroundColor: DIARY_NEUTRAL_SURFACE,
+    borderRadius: 0,
     padding: 14,
   },
   recordCardHorizontal: {
     flexShrink: 0,
   },
   recordCardShoot: {
-    borderColor: 'rgba(208,145,85,0.28)',
-    backgroundColor: colors.surfaceStrong,
+    borderColor: DIARY_NEUTRAL_BORDER,
+    backgroundColor: DIARY_NEUTRAL_SURFACE,
   },
   recordCardDribble: {
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: colors.surfaceStrong,
+    borderColor: DIARY_NEUTRAL_BORDER,
+    backgroundColor: DIARY_NEUTRAL_SURFACE,
   },
   recordHeader: {
     flexDirection: 'row',
@@ -3157,16 +3205,9 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   recordMeta: {
-    color: '#ffd3ad',
+    color: colors.textMuted,
     fontSize: 13,
     marginBottom: 10,
-  },
-  recordOpenHint: {
-    color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 12,
-    marginBottom: 12,
   },
   recordBodyPressable: {
     gap: 0,
@@ -3192,7 +3233,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: colors.surface,
+    backgroundColor: DIARY_NEUTRAL_SURFACE_ALT,
     borderWidth: 0,
     borderColor: 'transparent',
     justifyContent: 'center',
@@ -3244,9 +3285,9 @@ const styles = StyleSheet.create({
   evaluationDropdownMenu: {
     borderRadius: 14,
     padding: 6,
-    backgroundColor: colors.surface,
+    backgroundColor: DIARY_NEUTRAL_SURFACE_ALT,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: DIARY_NEUTRAL_BORDER,
     gap: 4,
   },
   evaluationDropdownMenuItem: {
@@ -3255,7 +3296,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   evaluationDropdownMenuItemActive: {
-    backgroundColor: 'rgba(208,145,85,0.18)',
+    backgroundColor: DIARY_NEUTRAL_ACTIVE,
   },
   evaluationDropdownMenuText: {
     color: colors.textMuted,
@@ -3266,7 +3307,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   evaluationBox: {
-    backgroundColor: colors.surface,
+    backgroundColor: DIARY_NEUTRAL_SURFACE_ALT,
     borderRadius: 14,
     padding: 14,
     marginBottom: 0,
@@ -3285,7 +3326,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   evaluationEmptyBox: {
-    backgroundColor: colors.surface,
+    backgroundColor: DIARY_NEUTRAL_SURFACE_ALT,
     borderRadius: 14,
     padding: 14,
     marginBottom: 0,
@@ -3369,7 +3410,7 @@ const styles = StyleSheet.create({
   recordVideo: {
     width: '100%',
     height: 260,
-    borderRadius: 16,
+    borderRadius: 0,
     backgroundColor: '#111111',
     marginBottom: 12,
   },
@@ -3379,8 +3420,8 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   liveFeedbackBox: {
-    backgroundColor: colors.surface,
-    borderRadius: 14,
+    backgroundColor: DIARY_NEUTRAL_SURFACE_ALT,
+    borderRadius: 0,
     padding: 14,
     marginBottom: 12,
     borderWidth: 0,

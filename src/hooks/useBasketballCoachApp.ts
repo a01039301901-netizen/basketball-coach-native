@@ -1465,7 +1465,7 @@ function buildReviewClipFromTimeline(
 
 function buildShootReviewFeedback(analysis: ShootAnalysis | null) {
   if (!analysis) {
-    return '슛 촬영 분석 결과\n2. 점프 준비 자세를 충분히 분석하지 못했습니다. 전신과 공이 함께 보이도록 다시 촬영해 주세요.\n3. 공이 머리보다 높아지는 발사 시점을 충분히 확인하지 못했습니다. 슛 순간이 화면 안에 잘 보이도록 다시 촬영해 주세요.';
+    return '슛 촬영 분석 결과\n2. 점프 준비 자세를 충분히 분석하지 못했습니다. 전신과 공이 함께 보이도록 다시 촬영해 주세요.\n3. 공과 손이 분리되는 순간 또는 슈팅 팔이 빠르게 펴지는 동작을 충분히 확인하지 못했습니다. 슛 순간의 공과 팔이 잘 보이도록 다시 촬영해 주세요.';
   }
 
   const legAngleText = analysis.lowestLegAngle !== null ? `${analysis.lowestLegAngle.toFixed(1)}도` : '--';
@@ -1480,12 +1480,12 @@ function buildShootReviewFeedback(analysis: ShootAnalysis | null) {
 
   const timingLine =
     analysis.releaseTiming === 'early'
-      ? '3. 공이 머리보다 높아지기 전에 너무 빨리 발사했습니다. 점프를 조금 더 끌고 가서 슛해 주세요.'
+      ? '3. 점프가 충분히 올라오기 전에 조금 빨리 발사했습니다. 점프를 조금 더 끌고 가서 슛해 주세요.'
       : analysis.releaseTiming === 'late'
-        ? '3. 공이 머리보다 높아진 뒤 늦게 발사했습니다. 최고점에 더 가깝게 슛해 주세요.'
+        ? '3. 점프가 올라온 뒤에 다소 늦게 발사했습니다. 올라오는 흐름에서 조금 더 빠르게 슛해 주세요.'
         : analysis.releaseTiming === 'balanced'
-          ? '3. 공이 머리보다 높아지는 구간에서 발사 타이밍이 안정적이었습니다.'
-          : '3. 공이 머리보다 높아지는 발사 시점을 충분히 확인하지 못했습니다. 슛 순간이 잘 보이도록 다시 촬영해 주세요.';
+          ? '3. 점프 흐름에 맞춘 발사 타이밍이 안정적이었습니다.'
+          : '3. 공과 손이 분리되는 순간 또는 슈팅 팔이 빠르게 펴지는 동작을 충분히 확인하지 못했습니다. 슛 순간의 공과 팔이 잘 보이도록 다시 촬영해 주세요.';
 
   return `슛 촬영 분석 결과\n${legLine}\n${timingLine}`;
 }
@@ -4306,7 +4306,7 @@ export function useBasketballCoachApp() {
           return;
         }
 
-        setDebugText('슛 촬영 중입니다. 공이 머리보다 높게 올라가는 발사 시점을 기다리고 있습니다.');
+        setDebugText('슛 촬영 중입니다. 공이 손에서 분리되고 슈팅 팔이 빠르게 펴지는 발사 시점을 기다리고 있습니다.');
         return;
       }
 

@@ -977,6 +977,7 @@ export function LessonScreen({
 
       <Modal visible={showLessonModePicker} transparent animationType="fade" onRequestClose={closeLessonModePicker}>
         <View style={styles.modalBackdrop}>
+          <Pressable onPress={closeLessonModePicker} style={styles.modalBackdropDismissArea} />
           <View style={styles.modalCard}>
             <Pressable
               onPress={closeLessonModePicker}
@@ -1009,6 +1010,7 @@ export function LessonScreen({
 
       <Modal visible={showDribbleGuide} transparent animationType="fade" onRequestClose={closeDribbleGuide}>
         <View style={styles.modalBackdrop}>
+          <Pressable onPress={closeDribbleGuide} style={styles.modalBackdropDismissArea} />
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>드리블 레슨 안내</Text>
             <Text style={styles.modalStep}>STEP {dribbleGuideStep + 1} / 4</Text>
@@ -1100,6 +1102,7 @@ export function LessonScreen({
 
       <Modal visible={showShootGuide} transparent animationType="fade" onRequestClose={closeShootGuide}>
         <View style={styles.modalBackdrop}>
+          <Pressable onPress={closeShootGuide} style={styles.modalBackdropDismissArea} />
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>슛 레슨 안내</Text>
             <Text style={styles.modalStep}>STEP {shootGuideStep + 1} / 3</Text>
@@ -1822,6 +1825,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.62)',
     justifyContent: 'center',
     paddingHorizontal: 20,
+  },
+  modalBackdropDismissArea: {
+    ...StyleSheet.absoluteFillObject,
   },
   modalCard: {
     position: 'relative',

@@ -89,6 +89,14 @@ export function buildPoseWebHtml(
       const CAMERA_SWITCH_THRESHOLD_PX = 72;
       const REAR_CAMERA_LABEL_PATTERN = /(back|rear|environment|world|후면|뒤)/i;
       const FRONT_CAMERA_LABEL_PATTERN = /(front|user|face|전면|앞)/i;
+      const SHOOT_BALL_HAND_CONTACT_DISTANCE = 0.16;
+      const SHOOT_BALL_HAND_SEPARATION_DISTANCE = 0.22;
+      const SHOOT_BALL_HAND_SEPARATION_DELTA = 0.045;
+      const SHOOT_RELEASE_WINDOW_MS = 260;
+      const SHOOT_ARM_EXTENSION_BASE_ANGLE_MAX = 130;
+      const SHOOT_ARM_EXTENSION_TARGET_ANGLE = 145;
+      const SHOOT_ARM_EXTENSION_MIN_DELTA = 16;
+      const SHOOT_ARM_EXTENSION_MIN_SPEED = 0.08;
 
       const INDEX = {
         nose: 0,
@@ -170,6 +178,11 @@ export function buildPoseWebHtml(
       let shootReleaseDetectedAtMs = null;
       let shootSuccessGestureEvaluated = false;
       let shootReleaseTiming = "unknown";
+      let shootPreviousArmAngle = null;
+      let shootPreviousArmAngleAtMs = null;
+      let shootPreviousBallHandDistance = null;
+      let shootBallNearHandAtMs = null;
+      let shootArmExtensionAtMs = null;
       let cameraStreamStopped = false;
       let currentCameraFacingMode = "user";
       let isSwitchingCamera = false;
@@ -206,6 +219,11 @@ export function buildPoseWebHtml(
         shootReleaseDetectedAtMs = null;
         shootSuccessGestureEvaluated = false;
         shootReleaseTiming = "unknown";
+        shootPreviousArmAngle = null;
+        shootPreviousArmAngleAtMs = null;
+        shootPreviousBallHandDistance = null;
+        shootBallNearHandAtMs = null;
+        shootArmExtensionAtMs = null;
       }
 
       function resetAnalysisSummaries() {
@@ -1211,6 +1229,10 @@ export function buildPoseWebHtml(
         const shootingWrist = shootingSide === "left" ? leftWrist : shootingSide === "right" ? rightWrist : null;
         const ballPoint = ball ? { x: ball.x, y: ball.y, visibility: 1 } : null;
         const armsCrossedX = detectArmsCrossedX(leftShoulder, leftWrist, rightShoulder, rightWrist);
+        const now = performance.now();
+        const previousArmAngle = shootPreviousArmAngle;
+        const previousArmAngleAtMs = shootPreviousArmAngleAtMs;
+        const previousBallHandDistance = shootPreviousBallHandDistance;
 
         let armAngleState = "unknown";
         if (armAngle !== null) {
@@ -1223,15 +1245,66 @@ export function buildPoseWebHtml(
           }
         }
 
+        const ballHandDistance =
+          ballPoint && visible(shootingWrist) ? distanceBetween(shootingWrist, ballPoint) : null;
         const ballNearShootingHand =
-          Boolean(ballPoint) &&
-          visible(shootingWrist) &&
-          distanceBetween(shootingWrist, ballPoint) <= 0.16;
+          ballHandDistance !== null && ballHandDistance <= SHOOT_BALL_HAND_CONTACT_DISTANCE;
         const shootingHandRaised =
           visible(shootingShoulder) &&
           visible(shootingWrist) &&
           shootingWrist.y <= shootingShoulder.y + 0.05;
         const readyPoseDetected = armAngleState === "balanced";
+
+        if (ballNearShootingHand) {
+          shootBallNearHandAtMs = now;
+        }
+
+        let suddenArmExtensionDetected = false;
+        if (armAngle !== null) {
+          if (previousArmAngle !== null && previousArmAngleAtMs !== null) {
+            const elapsedMs = Math.max(1, now - previousArmAngleAtMs);
+            const armAngleDelta = armAngle - previousArmAngle;
+
+            suddenArmExtensionDetected =
+              previousArmAngle <= SHOOT_ARM_EXTENSION_BASE_ANGLE_MAX &&
+              armAngle >= SHOOT_ARM_EXTENSION_TARGET_ANGLE &&
+              armAngleDelta >= SHOOT_ARM_EXTENSION_MIN_DELTA &&
+              elapsedMs <= SHOOT_RELEASE_WINDOW_MS &&
+              armAngleDelta / elapsedMs >= SHOOT_ARM_EXTENSION_MIN_SPEED;
+
+            if (suddenArmExtensionDetected) {
+              shootArmExtensionAtMs = now;
+            }
+          }
+
+          shootPreviousArmAngle = armAngle;
+          shootPreviousArmAngleAtMs = now;
+        } else {
+          shootPreviousArmAngle = null;
+          shootPreviousArmAngleAtMs = null;
+        }
+
+        const recentBallControlDetected =
+          shootBallNearHandAtMs !== null &&
+          now - shootBallNearHandAtMs <= SHOOT_RELEASE_WINDOW_MS;
+        const recentArmExtensionDetected =
+          shootArmExtensionAtMs !== null &&
+          now - shootArmExtensionAtMs <= SHOOT_RELEASE_WINDOW_MS;
+        const ballSeparatedFromHand =
+          ballHandDistance !== null &&
+          (
+            ballHandDistance >= SHOOT_BALL_HAND_SEPARATION_DISTANCE ||
+            (
+              previousBallHandDistance !== null &&
+              ballHandDistance - previousBallHandDistance >= SHOOT_BALL_HAND_SEPARATION_DELTA
+            )
+          );
+
+        if (ballHandDistance !== null) {
+          shootPreviousBallHandDistance = ballHandDistance;
+        } else {
+          shootPreviousBallHandDistance = null;
+        }
 
         const legAngles = [angleAt(leftHip, leftKnee, leftAnkle), angleAt(rightHip, rightKnee, rightAnkle)].filter((value) => value !== null);
         const legAngle = legAngles.length > 0 ? legAngles.reduce((sum, value) => sum + value, 0) / legAngles.length : null;
@@ -1261,9 +1334,10 @@ export function buildPoseWebHtml(
 
         const releaseDetectedNow =
           !shootReleaseDetected &&
-          ball &&
-          currentHeadY !== null &&
-          ball.y < currentHeadY - 0.015;
+          ballHandDistance !== null &&
+          recentBallControlDetected &&
+          recentArmExtensionDetected &&
+          ballSeparatedFromHand;
 
         if (releaseDetectedNow) {
           shootReleaseDetected = true;
