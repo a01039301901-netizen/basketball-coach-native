@@ -1,0 +1,13 @@
+Starting project at C:\basketball-coach\basketball-coach-native
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Waiting on http://localhost:8085
+Logs for your project will appear below.
+Android .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android .\index.js ▓▓░░░░░░░░░░░░░░ 13.7% ( 33/160)
+Android .\index.js ▓▓▓░░░░░░░░░░░░░ 23.7% (153/314)
+Android .\index.js ▓▓▓▓▓▓▓▓░░░░░░░░ 54.3% (370/502)
+Android .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 89.3% (617/653)
+Android .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.7% (786/787)
+Android .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (797/797)
+Android Bundled 23580ms index.js (797 modules)

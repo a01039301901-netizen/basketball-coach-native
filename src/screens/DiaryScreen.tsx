@@ -5,7 +5,15 @@ import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
 import { DAY_NAMES } from '../constants/content';
 import { colors } from '../theme/colors';
-import type { CalendarCell, DiarySkillInsight, FeedbackMoment, LessonRecord, LessonRecordCriterion, ShotGraphDatum } from '../types/app';
+import type {
+  CalendarCell,
+  DiarySkillInsight,
+  FeedbackMoment,
+  LessonRecord,
+  LessonRecordCriterion,
+  LessonRecordHighlight,
+  ShotGraphDatum,
+} from '../types/app';
 import { formatDateKey, formatMonthTitle } from '../utils/date';
 import { getDesktopMobileFrameWidth, shouldUseDesktopMobileLayout } from '../utils/layout';
 
@@ -26,6 +34,12 @@ interface DiaryScreenProps {
 
 type RecordFilter = 'all' | 'dribble' | 'shoot' | 'shootSuccess';
 type SuccessRateRange = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+interface SelectedImprovementInsight {
+  recordId: string;
+  label: string;
+  detail: string;
+}
 
 const SUCCESS_RATE_COMPARE_TRACK_HEIGHT = 126;
 const SUCCESS_RATE_COMPARE_BAR_MIN_HEIGHT = 12;
@@ -206,6 +220,66 @@ function getSyncedFeedback(timeline: FeedbackMoment[], fallback: string, positio
   }
 
   return activeText || fallback;
+}
+
+function isAllowedDiaryTextCodePoint(codePoint: number) {
+  return (
+    (codePoint >= 0x20 && codePoint <= 0x7e) ||
+    (codePoint >= 0x1100 && codePoint <= 0x11ff) ||
+    (codePoint >= 0x3130 && codePoint <= 0x318f) ||
+    (codePoint >= 0xac00 && codePoint <= 0xd7af) ||
+    codePoint === 0x09 ||
+    codePoint === 0x0a ||
+    codePoint === 0x0d
+  );
+}
+
+function isBrokenDiaryText(text: string) {
+  if (!text) {
+    return false;
+  }
+
+  if (text.includes('\uFFFD')) {
+    return true;
+  }
+
+  if (text.includes('??')) {
+    return true;
+  }
+
+  let suspiciousGlyphCount = 0;
+
+  for (const character of text) {
+    const codePoint = character.codePointAt(0) ?? 0;
+
+    if (isAllowedDiaryTextCodePoint(codePoint)) {
+      continue;
+    }
+
+    suspiciousGlyphCount += 1;
+
+    if (suspiciousGlyphCount >= 2) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function buildDiaryFeedbackFallback(record: LessonRecord) {
+  const unstableCriteria = (record.evaluation?.criteria ?? [])
+    .filter((criterion) => !criterion.isStable)
+    .map((criterion) => criterion.label);
+
+  if (unstableCriteria.length > 0) {
+    return `${getRecordModeLabel(record.mode)} \uD53C\uB4DC\uBC31\n\uBCF4\uC644\uC774 \uD544\uC694\uD55C \uAE30\uC900: ${unstableCriteria.join(', ')}\n\uAE30\uB85D \uD3C9\uAC00\uC5D0\uC11C \uC790\uC138\uD55C \uB0B4\uC6A9\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.`;
+  }
+
+  return `${getRecordModeLabel(record.mode)} \uD53C\uB4DC\uBC31\uC744 \uB2E4\uC2DC \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.`;
+}
+
+function getReadableDiaryFeedback(record: LessonRecord, text: string) {
+  return isBrokenDiaryText(text) ? buildDiaryFeedbackFallback(record) : text;
 }
 
 /* interface RecordEvaluationDropdownProps {
@@ -612,6 +686,82 @@ function getDiaryCriterionDisplayLabel(criterion: LessonRecordCriterion) {
   return criterion.label;
 }
 
+function getShootImprovementTitle(criterionKey: string) {
+  if (criterionKey === 'shoot-leg-angle') {
+    return '\uBB34\uB98E \uAC01\uB3C4 \uBCF4\uC644\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.';
+  }
+
+  if (criterionKey === 'shoot-release-timing') {
+    return '\uC29B \uD0C0\uC774\uBC0D \uBCF4\uC644\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.';
+  }
+
+  if (criterionKey === 'shoot-release-point') {
+    return '\uC29B \uD0C0\uC810(\uC704\uCE58) \uBCF4\uC644\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.';
+  }
+
+  if (criterionKey === 'shoot-release-duration') {
+    return '\uB9B4\uB9AC\uC988 \uC18D\uB3C4 \uBCF4\uC644\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.';
+  }
+
+  return '';
+}
+
+function findMatchingShootImprovementHighlight(
+  improvements: LessonRecordHighlight[],
+  criterionKey: string
+) {
+  return improvements.find((highlight) => {
+    const label = highlight.label;
+
+    if (criterionKey === 'shoot-leg-angle') {
+      return label.includes('\uBB34\uB98E');
+    }
+
+    if (criterionKey === 'shoot-release-timing') {
+      return label.includes('\uD0C0\uC774\uBC0D');
+    }
+
+    if (criterionKey === 'shoot-release-point') {
+      return label.includes('\uD0C0\uC810') || label.includes('\uB192\uC774');
+    }
+
+    if (criterionKey === 'shoot-release-duration') {
+      return label.includes('\uC18D\uB3C4') || label.includes('\uC2DC\uAC04');
+    }
+
+    return false;
+  });
+}
+
+function getShootImprovementHighlights(evaluation: NonNullable<LessonRecord['evaluation']>) {
+  const orderedKeys = [
+    'shoot-leg-angle',
+    'shoot-release-timing',
+    'shoot-release-point',
+    'shoot-release-duration',
+  ];
+
+  return orderedKeys.reduce<LessonRecordHighlight[]>((accumulator, criterionKey) => {
+    const criterion = evaluation.criteria.find((item) => item.key === criterionKey && !item.isStable);
+
+    if (!criterion) {
+      return accumulator;
+    }
+
+    const existingHighlight = findMatchingShootImprovementHighlight(evaluation.improvements, criterionKey);
+    const title = getShootImprovementTitle(criterionKey);
+
+    accumulator.push({
+      label: title || criterion.label,
+      detail: existingHighlight?.detail || criterion.detail,
+      startAtMs: existingHighlight?.startAtMs ?? 0,
+      durationMs: existingHighlight?.durationMs ?? 2200,
+    });
+
+    return accumulator;
+  }, []);
+}
+
 function getDiaryCorrectionCategoryLabel(record: LessonRecord) {
   if (record.mode === 'shoot') {
     return '\uC29B';
@@ -759,6 +909,8 @@ export function DiaryScreen({
   const [successRateRange, setSuccessRateRange] = useState<SuccessRateRange>('daily');
   const [showSuccessRateRangeMenu, setShowSuccessRateRangeMenu] = useState(false);
   const [openedEvaluationRecordId, setOpenedEvaluationRecordId] = useState<string | null>(null);
+  const [selectedImprovementInsight, setSelectedImprovementInsight] = useState<SelectedImprovementInsight | null>(null);
+  const [pendingDeleteRecordId, setPendingDeleteRecordId] = useState<string | null>(null);
   const videoRefs = useRef<Record<string, Video | null>>({});
   const playbackPollersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
   const menuOpenSpacerHeight = showSuccessRateRangeMenu ? 220 : 0;
@@ -889,6 +1041,10 @@ export function DiaryScreen({
   }, [openedEvaluationRecordId, selectedDateRecords]);
 
   useEffect(() => {
+    setSelectedImprovementInsight(null);
+  }, [openedEvaluationRecordId]);
+
+  useEffect(() => {
     const pollers = playbackPollersRef.current;
 
     return () => {
@@ -993,8 +1149,30 @@ export function DiaryScreen({
   }, []);
 
   const closeRecordEvaluation = useCallback(() => {
+    setSelectedImprovementInsight(null);
     setOpenedEvaluationRecordId(null);
   }, []);
+
+  const openDeleteConfirm = useCallback((recordId: string) => {
+    setPendingDeleteRecordId(recordId);
+  }, []);
+
+  const closeDeleteConfirm = useCallback(() => {
+    setPendingDeleteRecordId(null);
+  }, []);
+
+  const confirmDeleteRecord = useCallback(() => {
+    if (!pendingDeleteRecordId) {
+      return;
+    }
+
+    if (openedEvaluationRecordId === pendingDeleteRecordId) {
+      closeRecordEvaluation();
+    }
+
+    onDeleteRecord(pendingDeleteRecordId);
+    setPendingDeleteRecordId(null);
+  }, [closeRecordEvaluation, onDeleteRecord, openedEvaluationRecordId, pendingDeleteRecordId]);
 
   /* function renderRecordCard(record: LessonRecord) {
     const syncedFeedback = playbackFeedback[record.id] || record.feedback;
@@ -1166,14 +1344,21 @@ export function DiaryScreen({
       );
     }
 
+    const strengthHighlights =
+      record.mode === 'shoot'
+        ? evaluation.strengths.filter((highlight) => highlight.label !== '\uC29B \uC131\uACF5 \uC7A5\uBA74')
+        : evaluation.strengths;
+    const improvementHighlights =
+      record.mode === 'shoot' ? getShootImprovementHighlights(evaluation) : evaluation.improvements;
+
     return (
       <View style={styles.evaluationBox}>
         <Text style={styles.evaluationTitle}>{'\uAE30\uB85D \uD3C9\uAC00'}</Text>
 
         <View style={styles.highlightGroup}>
-          <Text style={styles.highlightGroupTitle}>{'\uC798\uD55C \uC7A5\uBA74 \uB2E4\uC2DC\uBCF4\uAE30'}</Text>
-          {evaluation.strengths.length > 0 ? (
-            evaluation.strengths.map((highlight, index) => (
+          <Text style={styles.highlightGroupTitle}>{'\uC798\uD55C \uC810'}</Text>
+          {strengthHighlights.length > 0 ? (
+            strengthHighlights.map((highlight, index) => (
               <Pressable
                 key={`${record.id}-strength-${index}`}
                 onPress={() => void jumpToHighlight(record, highlight.startAtMs)}
@@ -1184,21 +1369,31 @@ export function DiaryScreen({
               </Pressable>
             ))
           ) : (
-            <Text style={styles.highlightEmptyText}>{'\uC544\uC9C1 \uD45C\uC2DC\uD560 \uC548\uC815 \uC7A5\uBA74\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'}</Text>
+            <Text style={styles.highlightEmptyText}>{'\uC544\uC9C1 \uD45C\uC2DC\uD560 \uC798\uD55C \uC810\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'}</Text>
           )}
         </View>
 
         <View style={styles.highlightGroup}>
-          <Text style={styles.highlightGroupTitle}>{'\uBCF4\uC644 \uC7A5\uBA74 \uB2E4\uC2DC\uBCF4\uAE30'}</Text>
-          {evaluation.improvements.length > 0 ? (
-            evaluation.improvements.map((highlight, index) => (
+          <Text style={styles.highlightGroupTitle}>{'\uBCF4\uC644\uD560 \uC810'}</Text>
+          {improvementHighlights.length > 0 ? (
+            improvementHighlights.map((highlight, index) => (
               <Pressable
                 key={`${record.id}-improvement-${index}`}
-                onPress={() => void jumpToHighlight(record, highlight.startAtMs)}
-                style={({ pressed }) => [styles.highlightButton, styles.highlightButtonBad, pressed && styles.pressed]}
+                onPress={() => {
+                  setSelectedImprovementInsight((current) =>
+                    current?.recordId === record.id && current.label === highlight.label
+                      ? null
+                      : {
+                          recordId: record.id,
+                          label: highlight.label,
+                          detail: highlight.detail,
+                        }
+                  );
+                  void jumpToHighlight(record, highlight.startAtMs);
+                }}
+                style={({ pressed }) => [styles.improvementTriggerButton, pressed && styles.pressed]}
               >
-                <Text style={styles.highlightButtonLabel}>{highlight.label}</Text>
-                <Text style={styles.highlightButtonDetail}>{highlight.detail}</Text>
+                <Text style={[styles.highlightButtonLabel, styles.highlightButtonLabelBad]}>{highlight.label}</Text>
               </Pressable>
             ))
           ) : (
@@ -1210,7 +1405,7 @@ export function DiaryScreen({
   }
 
   function renderRecordCard(record: LessonRecord) {
-    const syncedFeedback = playbackFeedback[record.id] || record.feedback;
+    const syncedFeedback = getReadableDiaryFeedback(record, playbackFeedback[record.id] || record.feedback);
     const evaluation = record.evaluation;
 
     return (
@@ -1293,7 +1488,7 @@ export function DiaryScreen({
           </View>
         </Pressable>
 
-        <SmallButton title={'\uAE30\uB85D \uC0AD\uC81C'} onPress={() => onDeleteRecord(record.id)} variant="red" />
+        <SmallButton title={'\uAE30\uB85D \uC0AD\uC81C'} onPress={() => openDeleteConfirm(record.id)} variant="red" />
       </View>
     );
   }
@@ -1782,6 +1977,10 @@ export function DiaryScreen({
         onRequestClose={closeRecordEvaluation}
       >
         <View style={styles.modalOverlay}>
+          <Pressable
+            style={styles.modalBackdropPressable}
+            onPress={closeRecordEvaluation}
+          />
           <View style={[styles.modalCard, styles.recordEvaluationModalCard]}>
             <View style={styles.recordEvaluationHeader}>
               <Pressable
@@ -1861,26 +2060,69 @@ export function DiaryScreen({
                     />
                   ) : null}
 
+                  {selectedImprovementInsight?.recordId === openedEvaluationRecord.id ? (
+                    <View style={styles.selectedImprovementBox}>
+                      <Text style={[styles.selectedImprovementLabel, styles.highlightButtonLabelBad]}>
+                        {selectedImprovementInsight.label}
+                      </Text>
+                      <Text style={styles.selectedImprovementDetail}>{selectedImprovementInsight.detail}</Text>
+                    </View>
+                  ) : null}
+
                   {renderRecordEvaluationContent(openedEvaluationRecord)}
 
                   <View style={styles.liveFeedbackBox}>
                     <Text style={styles.liveFeedbackLabel}>{'\uC2E4\uC2DC\uAC04 \uD53C\uB4DC\uBC31'}</Text>
                     <Text style={styles.liveFeedbackText}>
-                      {playbackFeedback[openedEvaluationRecord.id] || openedEvaluationRecord.feedback}
+                      {getReadableDiaryFeedback(
+                        openedEvaluationRecord,
+                        playbackFeedback[openedEvaluationRecord.id] || openedEvaluationRecord.feedback
+                      )}
                     </Text>
                   </View>
 
                   <SmallButton
                     title={'\uAE30\uB85D \uC0AD\uC81C'}
-                    onPress={() => {
-                      closeRecordEvaluation();
-                      onDeleteRecord(openedEvaluationRecord.id);
-                    }}
+                    onPress={() => openDeleteConfirm(openedEvaluationRecord.id)}
                     variant="red"
                   />
                 </View>
               </ScrollView>
             ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={pendingDeleteRecordId !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={closeDeleteConfirm}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={styles.modalBackdropPressable}
+            onPress={closeDeleteConfirm}
+          />
+          <View style={[styles.modalCard, styles.deleteConfirmModalCard]}>
+            <Text style={styles.deleteConfirmTitle}>{'\uAE30\uB85D\uC744 \uC0AD\uC81C\uD560\uAE4C\uC694?'}</Text>
+            <Text style={styles.deleteConfirmDescription}>
+              {'\uC0AD\uC81C\uD558\uBA74 \uB2E4\uC2DC \uB418\uB3CC\uB9B4 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.'}
+            </Text>
+            <View style={styles.deleteConfirmActions}>
+              <Pressable
+                onPress={closeDeleteConfirm}
+                style={({ pressed }) => [styles.deleteConfirmButton, styles.deleteConfirmCancelButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.deleteConfirmCancelText}>{'\uC544\uB2C8\uC624'}</Text>
+              </Pressable>
+              <Pressable
+                onPress={confirmDeleteRecord}
+                style={({ pressed }) => [styles.deleteConfirmButton, styles.deleteConfirmSubmitButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.deleteConfirmSubmitText}>{'\uC608'}</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -2943,6 +3185,53 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
   },
+  deleteConfirmModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
+    gap: 16,
+  },
+  deleteConfirmTitle: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  deleteConfirmDescription: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  deleteConfirmActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  deleteConfirmButton: {
+    flex: 1,
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 0,
+  },
+  deleteConfirmCancelButton: {
+    backgroundColor: DIARY_NEUTRAL_SURFACE,
+  },
+  deleteConfirmSubmitButton: {
+    backgroundColor: 'rgba(191,80,88,0.18)',
+  },
+  deleteConfirmCancelText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  deleteConfirmSubmitText: {
+    color: '#d46d75',
+    fontSize: 14,
+    fontWeight: '900',
+  },
   recordEvaluationHeader: {
     position: 'relative',
     minHeight: 44,
@@ -3400,12 +3689,36 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(191,80,88,0.1)',
     borderColor: 'rgba(191,80,88,0.28)',
   },
+  improvementTriggerButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 0,
+    alignSelf: 'flex-start',
+  },
   highlightButtonLabel: {
     color: colors.text,
     fontSize: 13,
     fontWeight: '900',
   },
+  highlightButtonLabelBad: {
+    color: '#d46d75',
+  },
   highlightButtonDetail: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  selectedImprovementBox: {
+    backgroundColor: DIARY_NEUTRAL_SURFACE_ALT,
+    borderRadius: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 6,
+  },
+  selectedImprovementLabel: {
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  selectedImprovementDetail: {
     color: colors.textMuted,
     fontSize: 12,
     lineHeight: 18,

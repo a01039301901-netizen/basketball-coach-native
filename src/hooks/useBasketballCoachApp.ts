@@ -1,4 +1,5 @@
 ﻿import * as FileSystem from 'expo-file-system/legacy';
+import * as ImagePicker from 'expo-image-picker';
 import * as Linking from 'expo-linking';
 import { Audio } from 'expo-av';
 import { useCameraPermissions } from 'expo-camera';
@@ -26,6 +27,9 @@ import type {
   AuthUser,
   BallBrandOption,
   BallColorOption,
+  BallRecognitionPreview,
+  BallRecognitionProfile,
+  BallTrainingImageSource,
   CorrectionHomeworkState,
   DiarySkillInsight,
   DailyHomeworkState,
@@ -52,8 +56,19 @@ import type {
   UserAccount,
 } from '../types/app';
 import { getCalendarCells } from '../utils/calendar';
+import {
+  BALL_RECOGNITION_PREVIEW_LIMIT,
+  deleteBallRecognitionPreviewFiles,
+  sanitizeBallRecognitionPreviews,
+  sanitizeBallRecognitionProfile,
+  writeBallRecognitionPreviewFile,
+} from '../utils/ballRecognition';
 import { formatDateKey } from '../utils/date';
 import { buildDribbleFeedbackText, buildShootFeedbackText } from '../utils/feedback';
+import {
+  getLessonRecordEntriesWithMigration,
+  setLessonRecordEntries,
+} from '../utils/lessonRecordStorage';
 import {
   buildCorrectionHomeworkState,
   buildDailyHomeworkProgress,
@@ -73,7 +88,7 @@ const SHOOT_RECOVERY_MS = 3000;
 const STORAGE_LOAD_TIMEOUT_MS = 4000;
 const STARTUP_RECOVERY_TIMEOUT_MS = 8000;
 const DEV_TEST_SHOOT_RECORD_ID = '__dev-test-shoot-bad-no-video-v1';
-const DEV_TEST_SHOOT_RECORD_SEED_KEY = 'basketballDevSeedShootBadNoVideo';
+const DEV_TEST_SHOOT_RECORD_SEED_KEY = 'basketballDevSeedShootBadNoVideoV3';
 const DEFAULT_DEBUG_TEXT = '移대찓?쇱? MediaPipe瑜?以鍮꾪븯怨??덉뒿?덈떎.';
 const COUNTDOWN_CUE_BASE64 =
   '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';
@@ -137,9 +152,21 @@ interface AccountTransferPayload {
     shotSuccess: Record<string, number>;
     ballColors: BallColorOption[];
     ballBrand: BallBrandOption;
+    ballRecognitionProfile: BallRecognitionProfile | null;
     position: PositionOption;
     homework: HomeworkStateRecord;
   };
+}
+
+interface PendingBallRecognitionPreview extends BallRecognitionPreview {
+  dataUrl: string;
+}
+
+interface BallRecognitionCalibrationJob {
+  id: string;
+  previousPreviews: BallRecognitionPreview[];
+  previews: BallRecognitionPreview[];
+  pendingPreviews: PendingBallRecognitionPreview[];
 }
 
 const DEFAULT_DRIBBLE_FEEDBACK =
@@ -221,6 +248,8 @@ function getAccountStorageKeys(userId: string) {
     shotSuccess: buildAccountStorageKey(STORAGE_KEYS.shotSuccess, userId),
     ballColors: buildAccountStorageKey(STORAGE_KEYS.ballColors, userId),
     ballBrand: buildAccountStorageKey(STORAGE_KEYS.ballBrand, userId),
+    ballRecognitionProfile: buildAccountStorageKey(STORAGE_KEYS.ballRecognitionProfile, userId),
+    ballRecognitionPreviews: buildAccountStorageKey(STORAGE_KEYS.ballRecognitionPreviews, userId),
     position: buildAccountStorageKey(STORAGE_KEYS.position, userId),
   } as const;
 }
@@ -325,6 +354,257 @@ function isPositionOption(value: unknown): value is PositionOption {
 
 function isBallColorOption(value: unknown): value is BallColorOption {
   return value === 'orange' || value === 'brown' || value === 'yellow' || value === 'white' || value === 'black' || value === 'gray' || value === 'red';
+}
+
+function buildBallRecognitionPreviewId() {
+  return `ball-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function buildBallRecognitionMimeType(asset: ImagePicker.ImagePickerAsset) {
+  if (typeof asset.mimeType === 'string' && asset.mimeType) {
+    return asset.mimeType;
+  }
+
+  return buildBallRecognitionMimeTypeFromUri(asset.uri);
+}
+
+function buildBallRecognitionMimeTypeFromUri(uri: string) {
+  const normalizedUri = uri.toLowerCase();
+
+  if (normalizedUri.endsWith('.png')) {
+    return 'image/png';
+  }
+
+  if (normalizedUri.endsWith('.webp')) {
+    return 'image/webp';
+  }
+
+  return 'image/jpeg';
+}
+
+function normalizeBallRecognitionMimeType(mimeType: string | null | undefined, fallbackUri: string) {
+  const normalizedMimeType = typeof mimeType === 'string' ? mimeType.split(';')[0]?.trim().toLowerCase() : '';
+
+  if (normalizedMimeType?.startsWith('image/')) {
+    return normalizedMimeType;
+  }
+
+  return buildBallRecognitionMimeTypeFromUri(fallbackUri);
+}
+
+function buildBallRecognitionFileNameFromUrl(url: string) {
+  try {
+    const parsedUrl = new URL(url);
+    const fileName = parsedUrl.pathname.split('/').pop()?.trim();
+    return fileName || `ball-reference-${Date.now()}.jpg`;
+  } catch {
+    return `ball-reference-${Date.now()}.jpg`;
+  }
+}
+
+async function buildPendingBallRecognitionPreviewFromBase64(
+  userId: string,
+  {
+    base64,
+    fileName,
+    mimeType,
+    source,
+  }: {
+    base64: string;
+    fileName?: string | null;
+    mimeType: string;
+    source: BallTrainingImageSource;
+  }
+): Promise<PendingBallRecognitionPreview> {
+  const id = buildBallRecognitionPreviewId();
+  const uri = await writeBallRecognitionPreviewFile({
+    userId,
+    previewId: id,
+    base64,
+    fileName,
+    mimeType,
+  });
+
+  return {
+    id,
+    uri,
+    source,
+    createdAt: new Date().toISOString(),
+    dataUrl: `data:${mimeType};base64,${base64}`,
+  };
+}
+
+async function buildPendingBallRecognitionPreview(
+  userId: string,
+  asset: ImagePicker.ImagePickerAsset,
+  source: BallTrainingImageSource
+): Promise<PendingBallRecognitionPreview> {
+  const base64 =
+    typeof asset.base64 === 'string' && asset.base64
+      ? asset.base64
+      : await FileSystem.readAsStringAsync(asset.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+  const mimeType = buildBallRecognitionMimeType(asset);
+  return buildPendingBallRecognitionPreviewFromBase64(userId, {
+    base64,
+    mimeType,
+    fileName: asset.fileName,
+    source,
+  });
+}
+
+async function readBlobAsDataUrl(blob: Blob): Promise<string> {
+  if (typeof FileReader === 'undefined') {
+    throw new Error('file_reader_unavailable');
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string' && reader.result) {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error('image_data_url_unavailable'));
+    };
+
+    reader.onerror = () => {
+      reject(new Error('image_data_url_read_failed'));
+    };
+
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function downloadBallRecognitionImageFromUrl(url: string) {
+  if (Platform.OS !== 'web' && FileSystem.cacheDirectory) {
+    const tempUri = `${FileSystem.cacheDirectory}${buildBallRecognitionPreviewId()}`;
+
+    try {
+      const result = await FileSystem.downloadAsync(url, tempUri);
+      const mimeType = normalizeBallRecognitionMimeType(
+        result.headers?.['Content-Type'] ?? result.headers?.['content-type'],
+        result.uri
+      );
+
+      if (!mimeType.startsWith('image/')) {
+        throw new Error('remote_image_type_invalid');
+      }
+
+      const base64 = await FileSystem.readAsStringAsync(result.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      return {
+        base64,
+        mimeType,
+        fileName: buildBallRecognitionFileNameFromUrl(url),
+      };
+    } finally {
+      await FileSystem.deleteAsync(tempUri, { idempotent: true }).catch(() => {
+        // Ignore temporary file cleanup failures.
+      });
+    }
+  }
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`remote_image_fetch_failed:${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const mimeType = normalizeBallRecognitionMimeType(blob.type, url);
+
+  if (!mimeType.startsWith('image/')) {
+    throw new Error('remote_image_type_invalid');
+  }
+
+  const dataUrl = await readBlobAsDataUrl(blob);
+  const base64 = dataUrl.split(',')[1] ?? '';
+
+  if (!base64) {
+    throw new Error('remote_image_base64_missing');
+  }
+
+  return {
+    base64,
+    mimeType,
+    fileName: buildBallRecognitionFileNameFromUrl(url),
+  };
+}
+
+async function buildPendingBallRecognitionPreviewFromUrl(
+  userId: string,
+  url: string
+): Promise<PendingBallRecognitionPreview> {
+  const downloadedImage = await downloadBallRecognitionImageFromUrl(url);
+
+  return buildPendingBallRecognitionPreviewFromBase64(userId, {
+    base64: downloadedImage.base64,
+    mimeType: downloadedImage.mimeType,
+    fileName: downloadedImage.fileName,
+    source: 'url',
+  });
+}
+
+function parseBallRecognitionImageUrls(rawValue: string) {
+  const uniqueUrls = new Set<string>();
+
+  for (const entry of rawValue.split(/[\n,]+/)) {
+    const trimmedEntry = entry.trim();
+
+    if (!trimmedEntry) {
+      continue;
+    }
+
+    try {
+      const parsedUrl = new URL(trimmedEntry);
+
+      if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+        continue;
+      }
+
+      uniqueUrls.add(parsedUrl.toString());
+    } catch {
+      // Ignore invalid URLs and only keep well-formed image links.
+    }
+  }
+
+  return Array.from(uniqueUrls);
+}
+
+async function hydrateStoredBallRecognitionPreview(preview: BallRecognitionPreview): Promise<PendingBallRecognitionPreview | null> {
+  try {
+    const base64 = await FileSystem.readAsStringAsync(preview.uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+
+    return {
+      ...preview,
+      dataUrl: `data:${buildBallRecognitionMimeTypeFromUri(preview.uri)};base64,${base64}`,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function sortBallRecognitionPreviewsByCreatedAt<T extends { createdAt: string }>(previews: T[]) {
+  return [...previews].sort(
+    (left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
+  );
+}
+
+function stripPendingBallRecognitionPreview(preview: PendingBallRecognitionPreview): BallRecognitionPreview {
+  return {
+    id: preview.id,
+    uri: preview.uri,
+    source: preview.source,
+    createdAt: preview.createdAt,
+  };
 }
 
 function isSkillKey(value: unknown): value is SkillKey {
@@ -553,6 +833,7 @@ function sanitizeTransferPayload(value: unknown): AccountTransferPayload | null 
   const ballColors = Array.isArray(dataValue.ballColors)
     ? dataValue.ballColors.filter(isBallColorOption)
     : DEFAULT_BALL_COLORS;
+  const ballRecognitionProfile = sanitizeBallRecognitionProfile(dataValue.ballRecognitionProfile);
   const position = isPositionOption(dataValue.position) ? dataValue.position : DEFAULT_POSITION;
 
   return {
@@ -577,6 +858,7 @@ function sanitizeTransferPayload(value: unknown): AccountTransferPayload | null 
       shotSuccess: sanitizeNumberRecord(dataValue.shotSuccess),
       ballColors: ballColors.length > 0 ? ballColors : DEFAULT_BALL_COLORS,
       ballBrand,
+      ballRecognitionProfile,
       position,
       homework: sanitizeHomeworkStateRecord(dataValue.homework),
     },
@@ -717,7 +999,14 @@ function normalizeLessonRecordEvaluation(value: unknown): LessonRecordEvaluation
 
   return {
     level,
-    summary: value.summary,
+    summary:
+      criteria.length > 0
+        ? buildLessonRecordSummary(
+            level,
+            criteria.reduce((count, criterion) => count + (criterion.isStable ? 1 : 0), 0),
+            criteria.length
+          )
+        : value.summary,
     criteria,
     strengths,
     improvements,
@@ -809,14 +1098,30 @@ function buildDevTestShootBadLessonRecord(date = new Date()): LessonRecord {
       strengths: [],
       improvements: [
         {
-          label: '무릎 각도 보완',
-          detail: '하체를 조금 더 안정적으로 사용해 슛 리듬을 맞춰 보세요.',
+          label: '무릎 각도 보완이 필요합니다.',
+          detail:
+            '슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 152.0도 정도로 120~140도로 굽혀야 합니다. 더 굽혀서 쏴주세요.',
           startAtMs: 0,
           durationMs: 2000,
         },
         {
-          label: '릴리스 타이밍 보완',
-          detail: '공을 놓는 타이밍을 조금 더 일정하게 맞춰 보세요.',
+          label: '슛 타이밍 보완이 필요합니다.',
+          detail:
+            '슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 느립니다. 점프와 동시에 슛을 쏘아야 합니다. 더 빨리 쏴주세요.',
+          startAtMs: 0,
+          durationMs: 2000,
+        },
+        {
+          label: '슛 타점(위치) 보완이 필요합니다.',
+          detail:
+            '슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)가 낮습니다. 머리 위로 좀 더 높여 쏴주세요.',
+          startAtMs: 0,
+          durationMs: 2000,
+        },
+        {
+          label: '릴리즈 속도 보완이 필요합니다.',
+          detail:
+            '수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 0.82초로 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.',
           startAtMs: 0,
           durationMs: 2000,
         },
@@ -932,18 +1237,70 @@ function deriveShotSuccessCounts(records: LessonRecord[]) {
   }, {});
 }
 
-function buildRemoteSnapshot(payload: RemoteAccountSnapshot): RemoteAccountSnapshot {
+function normalizeAccountSnapshot(payload: RemoteAccountSnapshot): RemoteAccountSnapshot {
   return {
     attendance: { ...payload.attendance },
-    lessonRecords: stripLessonRecordVideos(payload.lessonRecords).map((record) => normalizeLessonRecord(record)),
+    lessonRecords: payload.lessonRecords.map((record) => normalizeLessonRecord(record)),
     dribbleCounts: { ...payload.dribbleCounts },
     shotAttempts: { ...payload.shotAttempts },
     shotSuccess: { ...payload.shotSuccess },
     ballColors: payload.ballColors.length > 0 ? [...payload.ballColors] : [...DEFAULT_BALL_COLORS],
     ballBrand: payload.ballBrand,
+    ballRecognitionProfile: sanitizeBallRecognitionProfile(payload.ballRecognitionProfile),
     position: payload.position,
     homework: sanitizeHomeworkStateRecord(payload.homework),
   };
+}
+
+function buildRemoteSnapshot(payload: RemoteAccountSnapshot): RemoteAccountSnapshot {
+  const normalizedSnapshot = normalizeAccountSnapshot(payload);
+
+  return {
+    ...normalizedSnapshot,
+    lessonRecords: stripLessonRecordVideos(normalizedSnapshot.lessonRecords),
+  };
+}
+
+function buildLessonRecordSnapshotFromStoredEntries(
+  scopedKeys: ReturnType<typeof getAccountStorageKeys>,
+  stored: Record<string, string | null>,
+  parsedShotSuccess: Record<string, number>
+) {
+  const parsedLessonRecords = sanitizeLessonRecords(parseStoredJson<unknown>(stored[scopedKeys.lessonRecords], []));
+  const parsedLessonRecordVideos = normalizeLessonRecordVideoMap(
+    parseStoredJson<unknown>(stored[scopedKeys.lessonRecordVideos], {})
+  );
+  const lessonRecordsWithVideos = hydrateLessonRecordVideos(parsedLessonRecords, parsedLessonRecordVideos);
+  return hydrateLegacyShotOutcomes(lessonRecordsWithVideos, parsedShotSuccess);
+}
+
+function mergeLessonRecordVideos(records: LessonRecord[], fallbackRecords: LessonRecord[]) {
+  const fallbackVideoMap = fallbackRecords.reduce<Record<string, string>>((accumulator, record) => {
+    if (record.videoUri) {
+      accumulator[record.id] = record.videoUri;
+    }
+
+    return accumulator;
+  }, {});
+
+  return records.map((record) =>
+    !record.videoUri && fallbackVideoMap[record.id]
+      ? normalizeLessonRecord({
+          ...record,
+          videoUri: fallbackVideoMap[record.id],
+        })
+      : record
+  );
+}
+
+function mergeLessonRecordsWithFallback(records: LessonRecord[], fallbackRecords: LessonRecord[]) {
+  const mergedRecords = mergeLessonRecordVideos(records, fallbackRecords);
+  const mergedRecordIds = new Set(mergedRecords.map((record) => record.id));
+  const fallbackOnlyRecords = fallbackRecords
+    .filter((record) => !mergedRecordIds.has(record.id))
+    .map((record) => normalizeLessonRecord(record));
+
+  return [...mergedRecords, ...fallbackOnlyRecords];
 }
 
 function parseStoredAccountSnapshotFromEntries(
@@ -952,18 +1309,16 @@ function parseStoredAccountSnapshotFromEntries(
 ): RemoteAccountSnapshot {
   const parsedAttendance = sanitizeStringRecord(parseStoredJson<unknown>(stored[scopedKeys.attendance], {}));
   const parsedHomework = sanitizeHomeworkStateRecord(parseStoredJson<unknown>(stored[scopedKeys.homework], {}));
-  const parsedLessonRecords = sanitizeLessonRecords(parseStoredJson<unknown>(stored[scopedKeys.lessonRecords], []));
-  const parsedLessonRecordVideos = normalizeLessonRecordVideoMap(
-    parseStoredJson<unknown>(stored[scopedKeys.lessonRecordVideos], {})
-  );
   const parsedDribbleCounts = sanitizeNumberRecord(parseStoredJson<unknown>(stored[scopedKeys.dribbleCounts], {}));
   const parsedShotAttempts = sanitizeNumberRecord(parseStoredJson<unknown>(stored[scopedKeys.shotAttempts], {}));
   const parsedShotSuccess = sanitizeNumberRecord(parseStoredJson<unknown>(stored[scopedKeys.shotSuccess], {}));
   const parsedBallBrand = parseStoredJson<unknown>(stored[scopedKeys.ballBrand], DEFAULT_BALL_BRAND);
   const parsedBallColors = parseStoredJson<unknown>(stored[scopedKeys.ballColors], DEFAULT_BALL_COLORS);
+  const parsedBallRecognitionProfile = sanitizeBallRecognitionProfile(
+    parseStoredJson<unknown>(stored[scopedKeys.ballRecognitionProfile], null)
+  );
   const parsedPosition = parseStoredJson<unknown>(stored[scopedKeys.position], DEFAULT_POSITION);
-  const lessonRecordsWithVideos = hydrateLessonRecordVideos(parsedLessonRecords, parsedLessonRecordVideos);
-  const hydratedLessonRecords = hydrateLegacyShotOutcomes(lessonRecordsWithVideos, parsedShotSuccess);
+  const hydratedLessonRecords = buildLessonRecordSnapshotFromStoredEntries(scopedKeys, stored, parsedShotSuccess);
   const mergedShotAttempts = { ...parsedShotAttempts };
   const derivedShotSuccess = deriveShotSuccessCounts(hydratedLessonRecords);
   const mergedShotSuccess = { ...parsedShotSuccess };
@@ -984,7 +1339,7 @@ function parseStoredAccountSnapshotFromEntries(
     mergedShotSuccess[dateKey] = Math.max(mergedShotSuccess[dateKey] || 0, count);
   }
 
-  return buildRemoteSnapshot({
+  return normalizeAccountSnapshot({
     attendance: parsedAttendance,
     lessonRecords: hydratedLessonRecords,
     dribbleCounts: parsedDribbleCounts,
@@ -995,6 +1350,7 @@ function parseStoredAccountSnapshotFromEntries(
         ? parsedBallColors.filter(isBallColorOption)
         : DEFAULT_BALL_COLORS,
     ballBrand: isBallBrandOption(parsedBallBrand) ? parsedBallBrand : DEFAULT_BALL_BRAND,
+    ballRecognitionProfile: parsedBallRecognitionProfile,
     position: isPositionOption(parsedPosition) ? parsedPosition : DEFAULT_POSITION,
     homework: parsedHomework,
   });
@@ -1002,53 +1358,81 @@ function parseStoredAccountSnapshotFromEntries(
 
 async function readStoredAccountSnapshot(userId: string): Promise<RemoteAccountSnapshot> {
   const scopedKeys = getAccountStorageKeys(userId);
-  const entries = await withTimeout(
-    AppStorage.multiGet([
-      scopedKeys.attendance,
-      scopedKeys.homework,
-      scopedKeys.lessonRecords,
-      scopedKeys.lessonRecordVideos,
-      scopedKeys.dribbleCounts,
-      scopedKeys.shotAttempts,
-      scopedKeys.shotSuccess,
-      scopedKeys.ballColors,
-      scopedKeys.ballBrand,
-      scopedKeys.position,
-    ]),
-    STORAGE_LOAD_TIMEOUT_MS,
-    [
-      [scopedKeys.attendance, null],
-      [scopedKeys.homework, null],
-      [scopedKeys.lessonRecords, null],
-      [scopedKeys.lessonRecordVideos, null],
-      [scopedKeys.dribbleCounts, null],
-      [scopedKeys.shotAttempts, null],
-      [scopedKeys.shotSuccess, null],
-      [scopedKeys.ballColors, null],
-      [scopedKeys.ballBrand, null],
-      [scopedKeys.position, null],
-    ] as [string, string | null][]
-  );
-  const stored = Object.fromEntries(entries);
+  const [entries, lessonRecordEntries] = await Promise.all([
+    withTimeout(
+      AppStorage.multiGet([
+        scopedKeys.attendance,
+        scopedKeys.homework,
+        scopedKeys.dribbleCounts,
+        scopedKeys.shotAttempts,
+        scopedKeys.shotSuccess,
+        scopedKeys.ballColors,
+        scopedKeys.ballBrand,
+        scopedKeys.ballRecognitionProfile,
+        scopedKeys.position,
+      ]),
+      STORAGE_LOAD_TIMEOUT_MS,
+      [
+        [scopedKeys.attendance, null],
+        [scopedKeys.homework, null],
+        [scopedKeys.dribbleCounts, null],
+        [scopedKeys.shotAttempts, null],
+        [scopedKeys.shotSuccess, null],
+        [scopedKeys.ballColors, null],
+        [scopedKeys.ballBrand, null],
+        [scopedKeys.ballRecognitionProfile, null],
+        [scopedKeys.position, null],
+      ] as [string, string | null][]
+    ),
+    getLessonRecordEntriesWithMigration([scopedKeys.lessonRecords, scopedKeys.lessonRecordVideos]),
+  ]);
+  const stored = Object.fromEntries([...entries, ...lessonRecordEntries]);
   return parseStoredAccountSnapshotFromEntries(scopedKeys, stored);
 }
 
-async function writeStoredAccountSnapshot(userId: string, snapshot: RemoteAccountSnapshot) {
+async function writeStoredAccountSnapshot(
+  userId: string,
+  snapshot: RemoteAccountSnapshot,
+  options?: { preserveExistingLessonRecords?: boolean }
+) {
   const scopedKeys = getAccountStorageKeys(userId);
-  const nextSnapshot = buildRemoteSnapshot(snapshot);
+  const nextSnapshot = normalizeAccountSnapshot(snapshot);
+  const existingLessonRecordEntries = await getLessonRecordEntriesWithMigration([
+    scopedKeys.lessonRecords,
+    scopedKeys.lessonRecordVideos,
+  ]);
+  const existingStoredLessonRecords = buildLessonRecordSnapshotFromStoredEntries(
+    scopedKeys,
+    Object.fromEntries(existingLessonRecordEntries),
+    nextSnapshot.shotSuccess
+  );
+  const shouldPreserveExistingLessonRecords = options?.preserveExistingLessonRecords !== false;
+  const lessonRecordsWithVideos = shouldPreserveExistingLessonRecords
+    ? mergeLessonRecordsWithFallback(nextSnapshot.lessonRecords, existingStoredLessonRecords)
+    : nextSnapshot.lessonRecords;
+  const storedSnapshot = {
+    ...nextSnapshot,
+    lessonRecords: lessonRecordsWithVideos,
+  } satisfies RemoteAccountSnapshot;
+
+  await setLessonRecordEntries([
+    [scopedKeys.lessonRecords, JSON.stringify(stripLessonRecordVideos(storedSnapshot.lessonRecords))],
+    [scopedKeys.lessonRecordVideos, JSON.stringify(buildLessonRecordVideoMap(storedSnapshot.lessonRecords))],
+  ]);
 
   await AppStorage.multiSet([
-    [scopedKeys.attendance, JSON.stringify(nextSnapshot.attendance)],
-    [scopedKeys.homework, JSON.stringify(nextSnapshot.homework)],
-    [scopedKeys.lessonRecords, JSON.stringify(nextSnapshot.lessonRecords)],
-    [scopedKeys.lessonRecordVideos, JSON.stringify(buildLessonRecordVideoMap(nextSnapshot.lessonRecords))],
-    [scopedKeys.dribbleCounts, JSON.stringify(nextSnapshot.dribbleCounts)],
-    [scopedKeys.shotAttempts, JSON.stringify(nextSnapshot.shotAttempts)],
-    [scopedKeys.shotSuccess, JSON.stringify(nextSnapshot.shotSuccess)],
-    [scopedKeys.ballColors, JSON.stringify(nextSnapshot.ballColors)],
-    [scopedKeys.ballBrand, JSON.stringify(nextSnapshot.ballBrand)],
-    [scopedKeys.position, JSON.stringify(nextSnapshot.position)],
+    [scopedKeys.attendance, JSON.stringify(storedSnapshot.attendance)],
+    [scopedKeys.homework, JSON.stringify(storedSnapshot.homework)],
+    [scopedKeys.dribbleCounts, JSON.stringify(storedSnapshot.dribbleCounts)],
+    [scopedKeys.shotAttempts, JSON.stringify(storedSnapshot.shotAttempts)],
+    [scopedKeys.shotSuccess, JSON.stringify(storedSnapshot.shotSuccess)],
+    [scopedKeys.ballColors, JSON.stringify(storedSnapshot.ballColors)],
+    [scopedKeys.ballBrand, JSON.stringify(storedSnapshot.ballBrand)],
+    [scopedKeys.ballRecognitionProfile, JSON.stringify(storedSnapshot.ballRecognitionProfile)],
+    [scopedKeys.position, JSON.stringify(storedSnapshot.position)],
   ]);
+
+  return storedSnapshot;
 }
 
 function parseDateKeyToTime(dateKey: string) {
@@ -1078,18 +1462,18 @@ function buildLessonRecordLevel(stableCount: number, totalCount: number): Lesson
 
 function getLessonRecordLevelLabel(level: LessonRecordLevel) {
   if (level === 'good') {
-    return '醫뗭쓬';
+    return '좋음';
   }
 
   if (level === 'average') {
-    return '蹂댄넻';
+    return '보통';
   }
 
-  return '?섏겏';
+  return '나쁨';
 }
 
 function buildLessonRecordSummary(level: LessonRecordLevel, stableCount: number, totalCount: number) {
-  return `${totalCount}媛吏 湲곗? 以?${stableCount}媛吏媛 ?덉젙?곸씠??${getLessonRecordLevelLabel(level)} 湲곕줉?낅땲??`;
+  return `${totalCount}가지 기준 중 ${stableCount}가지가 안정적이라 ${getLessonRecordLevelLabel(level)} 기록입니다.`;
 }
 
 function clampHighlightDuration(durationMs: number) {
@@ -1165,22 +1549,6 @@ function findLongestHighlightWindow<T>(
   };
 }
 
-function buildShootOutcomeHighlight(
-  shotOutcome: LessonRecord['shotOutcome'],
-  frames: TimedShootAnalysis[],
-  fallbackStartAtMs = 0
-) {
-  const releaseFrame = frames.find((frame) => frame.analysis.releaseDetected) ?? frames[frames.length - 1];
-  const label = shotOutcome === 'success' ? '슛 성공 장면' : '슛 결과 보완';
-  const detail =
-    shotOutcome === 'success'
-      ? '슛이 성공한 장면을 다시 확인할 수 있습니다.'
-      : '슛이 아쉽게 마무리된 장면을 다시 확인할 수 있습니다.';
-  const startAtMs = Math.max(0, (releaseFrame?.atMs ?? fallbackStartAtMs) - 1200);
-
-  return buildRecordHighlight(label, detail, startAtMs, 2600);
-}
-
 function buildShootLegAngleDetail(analysis: ShootAnalysis | null, isStable: boolean) {
   if (!analysis) {
     return isStable
@@ -1225,8 +1593,61 @@ function buildShootTimingDetail(analysis: ShootAnalysis | null, isStable: boolea
   return '릴리스 타이밍을 다시 확인할 수 있도록 동작이 더 선명하게 보이게 촬영해 주세요.';
 }
 
+function formatAngleDegrees(angle: number | null) {
+  return angle !== null ? `${angle.toFixed(1)}도` : null;
+}
+
 function formatReleaseDurationSeconds(durationMs: number | null) {
   return durationMs !== null ? `${(durationMs / 1000).toFixed(2)}초` : '--';
+}
+
+function buildShootLegAngleImprovementReason(analysis: ShootAnalysis | null) {
+  const measuredAngle = analysis?.lowestLegAngle ?? analysis?.legAngle ?? null;
+  const angleText = formatAngleDegrees(measuredAngle);
+
+  if (angleText === null) {
+    return '슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 정확히 확인되지 않았습니다. 120~140도로 굽혀야 합니다. 무릎 각도를 다시 맞춰 주세요.';
+  }
+
+  if (measuredAngle !== null && measuredAngle < 120) {
+    return `슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 ${angleText} 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.`;
+  }
+
+  if (measuredAngle !== null && measuredAngle > 140) {
+    return `슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 ${angleText} 정도로 120~140도로 굽혀야 합니다. 더 굽혀서 쏴주세요.`;
+  }
+
+  return `슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 ${angleText} 정도입니다. 120~140도로 일정하게 유지해 주세요.`;
+}
+
+function buildShootTimingImprovementReason(analysis: ShootAnalysis | null) {
+  if (analysis?.releaseTiming === 'early') {
+    return '슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 빠릅니다. 점프와 동시에 슛을 쏘아야 합니다. 더 늦게 쏴주세요.';
+  }
+
+  if (analysis?.releaseTiming === 'late') {
+    return '슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 느립니다. 점프와 동시에 슛을 쏘아야 합니다. 더 빨리 쏴주세요.';
+  }
+
+  return '슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 정확히 확인되지 않았습니다. 점프와 동시에 슛을 쏘아야 합니다.';
+}
+
+function buildShootReleasePointImprovementReason(analysis: ShootAnalysis | null) {
+  if (analysis?.releasePointState === 'low') {
+    return '슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)가 낮습니다. 머리 위로 좀 더 높여 쏴주세요.';
+  }
+
+  return '슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)를 정확히 확인하지 못했습니다. 머리 위로 좀 더 높여 쏴주세요.';
+}
+
+function buildShootReleaseDurationImprovementReason(analysis: ShootAnalysis | null) {
+  const durationText = formatReleaseDurationSeconds(analysis?.releaseDurationMs ?? null);
+
+  if (analysis?.releaseDurationState === 'slow') {
+    return `수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 ${durationText}로 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.`;
+  }
+
+  return '수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 정확히 확인되지 않았습니다. 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.';
 }
 
 function buildShootReleasePointDetail(analysis: ShootAnalysis | null, isStable: boolean) {
@@ -1312,12 +1733,12 @@ function buildShootRecordEvaluation(
   const strengths: LessonRecordHighlight[] = [];
   const improvements: LessonRecordHighlight[] = [];
 
-  if (releasePointStable) {
-    const window = findLongestHighlightWindow(frames, (item) => item.releasePointState === 'high');
+  if (legAngleStable) {
+    const window = findLongestHighlightWindow(frames, (item) => item.legAngleState === 'balanced');
     strengths.push(
       buildRecordHighlight(
-        '릴리스 높이 안정',
-        buildShootReleasePointDetail(analysis, true),
+        '무릎 각도 안정',
+        buildShootLegAngleDetail(analysis, true),
         window?.startAtMs ?? 0,
         window?.durationMs ?? 2200
       )
@@ -1325,37 +1746,12 @@ function buildShootRecordEvaluation(
   } else {
     const window = findLongestHighlightWindow(
       frames,
-      (item) => item.releasePointState === 'low'
+      (item) => item.legAngleState === 'low' || item.legAngleState === 'high'
     );
     improvements.push(
       buildRecordHighlight(
-        '릴리스 높이 보완',
-        buildShootReleasePointDetail(analysis, false),
-        window?.startAtMs ?? 0,
-        window?.durationMs ?? 2200
-      )
-    );
-  }
-
-  if (releaseDurationStable) {
-    const window = findLongestHighlightWindow(frames, (item) => item.releaseDurationState === 'balanced');
-    strengths.push(
-      buildRecordHighlight(
-        '릴리스 시간 안정',
-        buildShootReleaseDurationDetail(analysis, true),
-        window?.startAtMs ?? 0,
-        window?.durationMs ?? 2200
-      )
-    );
-  } else {
-    const window = findLongestHighlightWindow(
-      frames,
-      (item) => item.releaseDurationState === 'slow'
-    );
-    improvements.push(
-      buildRecordHighlight(
-        '릴리스 시간 보완',
-        buildShootReleaseDurationDetail(analysis, false),
+        '무릎 각도 보완이 필요합니다.',
+        buildShootLegAngleImprovementReason(analysis),
         window?.startAtMs ?? 0,
         window?.durationMs ?? 2200
       )
@@ -1379,20 +1775,20 @@ function buildShootRecordEvaluation(
     );
     improvements.push(
       buildRecordHighlight(
-        '릴리스 타이밍 보완',
-        buildShootTimingDetail(analysis, false),
+        '슛 타이밍 보완이 필요합니다.',
+        buildShootTimingImprovementReason(analysis),
         window?.startAtMs ?? 0,
         window?.durationMs ?? 2200
       )
     );
   }
 
-  if (legAngleStable) {
-    const window = findLongestHighlightWindow(frames, (item) => item.legAngleState === 'balanced');
+  if (releasePointStable) {
+    const window = findLongestHighlightWindow(frames, (item) => item.releasePointState === 'high');
     strengths.push(
       buildRecordHighlight(
-        '무릎 각도 안정',
-        buildShootLegAngleDetail(analysis, true),
+        '릴리스 높이 안정',
+        buildShootReleasePointDetail(analysis, true),
         window?.startAtMs ?? 0,
         window?.durationMs ?? 2200
       )
@@ -1400,22 +1796,41 @@ function buildShootRecordEvaluation(
   } else {
     const window = findLongestHighlightWindow(
       frames,
-      (item) => item.legAngleState === 'low' || item.legAngleState === 'high'
+      (item) => item.releasePointState === 'low'
     );
     improvements.push(
       buildRecordHighlight(
-        '무릎 각도 보완',
-        buildShootLegAngleDetail(analysis, false),
+        '슛 타점(위치) 보완이 필요합니다.',
+        buildShootReleasePointImprovementReason(analysis),
         window?.startAtMs ?? 0,
         window?.durationMs ?? 2200
       )
     );
   }
 
-  if (shotSucceeded) {
-    strengths.push(buildShootOutcomeHighlight(shotOutcome, frames));
+  if (releaseDurationStable) {
+    const window = findLongestHighlightWindow(frames, (item) => item.releaseDurationState === 'balanced');
+    strengths.push(
+      buildRecordHighlight(
+        '릴리스 시간 안정',
+        buildShootReleaseDurationDetail(analysis, true),
+        window?.startAtMs ?? 0,
+        window?.durationMs ?? 2200
+      )
+    );
   } else {
-    improvements.push(buildShootOutcomeHighlight(shotOutcome, frames));
+    const window = findLongestHighlightWindow(
+      frames,
+      (item) => item.releaseDurationState === 'slow'
+    );
+    improvements.push(
+      buildRecordHighlight(
+        '릴리즈 속도 보완이 필요합니다.',
+        buildShootReleaseDurationImprovementReason(analysis),
+        window?.startAtMs ?? 0,
+        window?.durationMs ?? 2200
+      )
+    );
   }
 
   return {
@@ -1423,7 +1838,7 @@ function buildShootRecordEvaluation(
     summary: buildLessonRecordSummary(level, stableCount, 5),
     criteria,
     strengths: strengths.slice(0, 2),
-    improvements: improvements.slice(0, 2),
+    improvements,
   };
 }
 
@@ -1446,22 +1861,8 @@ function updateShootRecordEvaluationForOutcome(
   );
   const stableCount = nextCriteria.filter((criterion) => criterion.isStable).length;
   const level = buildLessonRecordLevel(stableCount, nextCriteria.length || 3);
-  const outcomeHighlight = buildRecordHighlight(
-    nextShotOutcome === 'success' ? '슛 성공 장면' : '슛 결과 보완',
-    nextShotOutcome === 'success'
-      ? '슛이 성공한 장면을 다시 확인할 수 있습니다.'
-      : '슛이 아쉽게 마무리된 장면을 다시 확인할 수 있습니다.',
-    record.reviewStartAtMs ?? 0,
-    record.reviewDurationMs ?? 2600
-  );
   const strengths = record.evaluation.strengths.filter((item) => item.label !== '슛 성공 장면');
   const improvements = record.evaluation.improvements.filter((item) => item.label !== '슛 결과 보완');
-
-  if (nextShotOutcome === 'success') {
-    strengths.push(outcomeHighlight);
-  } else {
-    improvements.push(outcomeHighlight);
-  }
 
   return {
     ...record.evaluation,
@@ -1469,7 +1870,7 @@ function updateShootRecordEvaluationForOutcome(
     summary: buildLessonRecordSummary(level, stableCount, nextCriteria.length || 3),
     criteria: nextCriteria,
     strengths: strengths.slice(0, 2),
-    improvements: improvements.slice(0, 2),
+    improvements,
   };
 }
 
@@ -2080,6 +2481,10 @@ function buildFrontCriterionFeedback(
   }
 }
 
+function buildFrontWeakPointSummary(frontWeakPoint: FrontDribbleWeakPoint) {
+  return `가장 보완이 필요한 기준은 ${frontWeakPoint.criterionNumber}번입니다. ${frontWeakPoint.feedbackText}`;
+}
+
 export function useBasketballCoachApp() {
   const [screen, setScreen] = useState<AppScreen>('home');
   const [authMode, setAuthMode] = useState<AuthMode>('login');
@@ -2099,6 +2504,10 @@ export function useBasketballCoachApp() {
   const [selectedSkillKey, setSelectedSkillKey] = useState<SkillKey | ''>('');
   const [selectedBallBrand, setSelectedBallBrand] = useState<BallBrandOption>(DEFAULT_BALL_BRAND);
   const [selectedBallColors, setSelectedBallColors] = useState<BallColorOption[]>(DEFAULT_BALL_COLORS);
+  const [ballRecognitionProfile, setBallRecognitionProfile] = useState<BallRecognitionProfile | null>(null);
+  const [ballRecognitionPreviews, setBallRecognitionPreviews] = useState<BallRecognitionPreview[]>([]);
+  const [ballRecognitionCalibrationJob, setBallRecognitionCalibrationJob] = useState<BallRecognitionCalibrationJob | null>(null);
+  const [isBallRecognitionTraining, setIsBallRecognitionTraining] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<PositionOption>(DEFAULT_POSITION);
   const [isHomeworkRevealed, setIsHomeworkRevealed] = useState(false);
   const [debugText, setDebugText] = useState(DEFAULT_DEBUG_TEXT);
@@ -2187,6 +2596,7 @@ export function useBasketballCoachApp() {
         shotSuccess: shotSuccessRecords,
         ballColors: selectedBallColors,
         ballBrand: selectedBallBrand,
+        ballRecognitionProfile,
         position: selectedPosition,
         homework: homeworkState,
       }),
@@ -2197,6 +2607,7 @@ export function useBasketballCoachApp() {
       lessonRecords,
       selectedBallBrand,
       selectedBallColors,
+      ballRecognitionProfile,
       selectedPosition,
       shotAttemptRecords,
       shotSuccessRecords,
@@ -2343,7 +2754,7 @@ export function useBasketballCoachApp() {
       const metadataRecords = stripLessonRecordVideos(records);
       const recordVideos = buildLessonRecordVideoMap(records);
 
-      void AppStorage.multiSet([
+      void setLessonRecordEntries([
         [scopedKeys.lessonRecords, JSON.stringify(metadataRecords)],
         [scopedKeys.lessonRecordVideos, JSON.stringify(recordVideos)],
       ]);
@@ -2368,6 +2779,10 @@ export function useBasketballCoachApp() {
     setSelectedSkillKey('');
     setSelectedBallBrand(DEFAULT_BALL_BRAND);
     setSelectedBallColors(DEFAULT_BALL_COLORS);
+    setBallRecognitionProfile(null);
+    setBallRecognitionPreviews([]);
+    setBallRecognitionCalibrationJob(null);
+    setIsBallRecognitionTraining(false);
     setSelectedPosition(DEFAULT_POSITION);
     setIsHomeworkRevealed(false);
     setDebugText(DEFAULT_DEBUG_TEXT);
@@ -2453,12 +2868,12 @@ export function useBasketballCoachApp() {
       baseAccounts?: UserAccount[];
     }) => {
       const nextAccount = buildCachedAccount(account);
-      const nextSnapshot = buildRemoteSnapshot(snapshot ?? createEmptyRemoteSnapshot());
+      const nextSnapshot = normalizeAccountSnapshot(snapshot ?? createEmptyRemoteSnapshot());
       const nextAccounts = mergeCachedAccounts(baseAccounts ?? accounts, nextAccount);
 
       await AppStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(nextAccounts));
-      await writeStoredAccountSnapshot(nextAccount.id, nextSnapshot);
-      lastRemoteSnapshotRef.current = JSON.stringify(nextSnapshot);
+      const storedSnapshot = await writeStoredAccountSnapshot(nextAccount.id, nextSnapshot);
+      lastRemoteSnapshotRef.current = JSON.stringify(buildRemoteSnapshot(storedSnapshot));
       await persistSession(nextAccount.id, keepSignedIn, token);
       setAccounts(nextAccounts);
       setCurrentUser(toAuthUser(nextAccount));
@@ -2473,7 +2888,7 @@ export function useBasketballCoachApp() {
   );
 
   const applyAccountSnapshot = useCallback((snapshot: RemoteAccountSnapshot) => {
-    const nextSnapshot = buildRemoteSnapshot(snapshot);
+    const nextSnapshot = normalizeAccountSnapshot(snapshot);
     const nextTodayKey = formatDateKey(new Date());
     const nextAttendance = {
       ...nextSnapshot.attendance,
@@ -2484,6 +2899,7 @@ export function useBasketballCoachApp() {
       nextSnapshot.ballColors.length > 0
         ? nextSnapshot.ballColors
         : BALL_BRAND_PRESETS[nextBallBrand] ?? DEFAULT_BALL_COLORS;
+    const nextBallRecognitionProfile = sanitizeBallRecognitionProfile(nextSnapshot.ballRecognitionProfile);
     const nextPosition = isPositionOption(nextSnapshot.position) ? nextSnapshot.position : DEFAULT_POSITION;
 
     dailyDribbleRecordsRef.current = nextSnapshot.dribbleCounts;
@@ -2499,6 +2915,7 @@ export function useBasketballCoachApp() {
     setShotSuccessRecords(nextSnapshot.shotSuccess);
     setSelectedBallBrand(nextBallBrand);
     setSelectedBallColors(nextBallColors);
+    setBallRecognitionProfile(nextBallRecognitionProfile);
     setSelectedPosition(nextPosition);
     setSelectedDateKey(nextTodayKey);
     setCurrentDate(new Date());
@@ -2645,7 +3062,7 @@ export function useBasketballCoachApp() {
               nickname: sessionAccount.nickname,
               password: sessionAccount.password,
               createdAt: sessionAccount.createdAt,
-              snapshot: legacySnapshot,
+              snapshot: buildRemoteSnapshot(legacySnapshot),
             });
           }
 
@@ -2723,41 +3140,20 @@ export function useBasketballCoachApp() {
         if (isMounted) {
           setStartupStatusText('계정 데이터를 불러오고 있습니다.');
         }
-        const entries = await withTimeout(
-          AppStorage.multiGet([
-            scopedKeys.attendance,
-            scopedKeys.homework,
-            scopedKeys.lessonRecords,
-            scopedKeys.lessonRecordVideos,
-            scopedKeys.dribbleCounts,
-            scopedKeys.shotAttempts,
-            scopedKeys.shotSuccess,
-            scopedKeys.ballColors,
-            scopedKeys.ballBrand,
-            scopedKeys.position,
-          ]),
-          STORAGE_LOAD_TIMEOUT_MS,
-          [
-            [scopedKeys.attendance, null],
-            [scopedKeys.homework, null],
-            [scopedKeys.lessonRecords, null],
-            [scopedKeys.lessonRecordVideos, null],
-            [scopedKeys.dribbleCounts, null],
-            [scopedKeys.shotAttempts, null],
-            [scopedKeys.shotSuccess, null],
-            [scopedKeys.ballColors, null],
-            [scopedKeys.ballBrand, null],
-            [scopedKeys.position, null],
-          ] as [string, string | null][]
-        );
+        const [snapshot, storedPreviewValue] = await Promise.all([
+          readStoredAccountSnapshot(currentUserId),
+          AppStorage.getItem(scopedKeys.ballRecognitionPreviews),
+        ]);
 
         if (!isMounted) {
           return;
         }
 
-        const stored = Object.fromEntries(entries);
-        const snapshot = parseStoredAccountSnapshotFromEntries(scopedKeys, stored);
+        const storedPreviews = sanitizeBallRecognitionPreviews(
+          parseStoredJson<unknown>(storedPreviewValue, [])
+        );
         const { nextAttendance } = applyAccountSnapshot(snapshot);
+        setBallRecognitionPreviews(storedPreviews);
 
         await AppStorage.setItem(scopedKeys.attendance, JSON.stringify(nextAttendance));
       } catch {
@@ -2770,10 +3166,9 @@ export function useBasketballCoachApp() {
           const remoteResult = await fetchRemoteSession(remoteTokenRef.current);
 
           if (remoteResult.success && remoteResult.snapshot) {
-            const recoveredSnapshot = buildRemoteSnapshot(remoteResult.snapshot);
+            const recoveredSnapshot = await writeStoredAccountSnapshot(currentUserId, remoteResult.snapshot);
             const { nextAttendance } = applyAccountSnapshot(recoveredSnapshot);
 
-            await writeStoredAccountSnapshot(currentUserId, recoveredSnapshot);
             await AppStorage.setItem(scopedKeys.attendance, JSON.stringify(nextAttendance));
             setStartupStatusText('');
             return;
@@ -2823,7 +3218,17 @@ export function useBasketballCoachApp() {
           return;
         }
 
-        if (lessonRecordsRef.current.some((record) => record.id === DEV_TEST_SHOOT_RECORD_ID)) {
+        const existingSeedRecord = lessonRecordsRef.current.find((record) => record.id === DEV_TEST_SHOOT_RECORD_ID);
+
+        if (existingSeedRecord) {
+          const refreshedSeedRecord = buildDevTestShootBadLessonRecord(parseDateKeyToDate(existingSeedRecord.dateKey));
+          const nextLessonRecords = lessonRecordsRef.current.map((record) =>
+            record.id === DEV_TEST_SHOOT_RECORD_ID ? refreshedSeedRecord : record
+          );
+
+          lessonRecordsRef.current = nextLessonRecords;
+          setLessonRecords(nextLessonRecords);
+          persistLessonRecords(nextLessonRecords);
           await AppStorage.setItem(seedStorageKey, 'done');
           return;
         }
@@ -2941,6 +3346,28 @@ export function useBasketballCoachApp() {
 
     void AppStorage.setItem(getAccountStorageKeys(currentUserId).ballBrand, JSON.stringify(selectedBallBrand));
   }, [currentUserId, isAccountDataReady, selectedBallBrand]);
+
+  useEffect(() => {
+    if (!currentUserId || !isAccountDataReady) {
+      return;
+    }
+
+    void AppStorage.setItem(
+      getAccountStorageKeys(currentUserId).ballRecognitionProfile,
+      JSON.stringify(ballRecognitionProfile)
+    );
+  }, [ballRecognitionProfile, currentUserId, isAccountDataReady]);
+
+  useEffect(() => {
+    if (!currentUserId || !isAccountDataReady) {
+      return;
+    }
+
+    void AppStorage.setItem(
+      getAccountStorageKeys(currentUserId).ballRecognitionPreviews,
+      JSON.stringify(ballRecognitionPreviews)
+    );
+  }, [ballRecognitionPreviews, currentUserId, isAccountDataReady]);
 
   useEffect(() => {
     if (!currentUserId || !isAccountDataReady) {
@@ -3923,6 +4350,7 @@ export function useBasketballCoachApp() {
         shotSuccess: shotSuccessRecords,
         ballColors: selectedBallColors,
         ballBrand: selectedBallBrand,
+        ballRecognitionProfile,
         position: selectedPosition,
         homework: homeworkState,
       },
@@ -3976,6 +4404,8 @@ export function useBasketballCoachApp() {
       id: targetAccountId,
     };
     const scopedKeys = getAccountStorageKeys(targetAccountId);
+    const existingPreviewValue = await AppStorage.getItem(scopedKeys.ballRecognitionPreviews);
+    const existingPreviews = sanitizeBallRecognitionPreviews(parseStoredJson<unknown>(existingPreviewValue, []));
     const nextAccounts = [
       ...accounts.filter((account) => {
         if (account.id === targetAccountId) {
@@ -3987,18 +4417,24 @@ export function useBasketballCoachApp() {
       nextAccount,
     ];
 
+    await deleteBallRecognitionPreviewFiles(existingPreviews);
+
     await AppStorage.multiSet([
       [STORAGE_KEYS.accounts, JSON.stringify(nextAccounts)],
-      [scopedKeys.attendance, JSON.stringify(payload.data.attendance)],
-      [scopedKeys.lessonRecords, JSON.stringify(payload.data.lessonRecords)],
-      [scopedKeys.dribbleCounts, JSON.stringify(payload.data.dribbleCounts)],
-      [scopedKeys.shotAttempts, JSON.stringify(payload.data.shotAttempts)],
-      [scopedKeys.shotSuccess, JSON.stringify(payload.data.shotSuccess)],
-      [scopedKeys.ballColors, JSON.stringify(payload.data.ballColors)],
-      [scopedKeys.ballBrand, JSON.stringify(payload.data.ballBrand)],
-      [scopedKeys.position, JSON.stringify(payload.data.position)],
-      [scopedKeys.homework, JSON.stringify(payload.data.homework)],
+      [scopedKeys.ballRecognitionPreviews, JSON.stringify([])],
     ]);
+    await writeStoredAccountSnapshot(targetAccountId, {
+      attendance: payload.data.attendance,
+      lessonRecords: payload.data.lessonRecords,
+      dribbleCounts: payload.data.dribbleCounts,
+      shotAttempts: payload.data.shotAttempts,
+      shotSuccess: payload.data.shotSuccess,
+      ballColors: payload.data.ballColors,
+      ballBrand: payload.data.ballBrand,
+      ballRecognitionProfile: payload.data.ballRecognitionProfile,
+      position: payload.data.position,
+      homework: payload.data.homework,
+    }, { preserveExistingLessonRecords: false });
     await persistSession(targetAccountId, true);
 
     setAccounts(nextAccounts);
@@ -4052,7 +4488,7 @@ export function useBasketballCoachApp() {
         nickname: trimmedNickname,
         password: trimmedPassword,
         createdAt: legacyAccount.createdAt,
-        snapshot: legacySnapshot,
+        snapshot: buildRemoteSnapshot(legacySnapshot),
       });
 
       if (migrateResult.success && migrateResult.account && migrateResult.token) {
@@ -4330,6 +4766,230 @@ export function useBasketballCoachApp() {
     setSelectedPosition(position);
   }
 
+  async function buildExistingPendingBallRecognitionPreviews() {
+    return (
+      await Promise.all(
+        ballRecognitionPreviews.map((preview) => hydrateStoredBallRecognitionPreview(preview))
+      )
+    ).filter((preview): preview is PendingBallRecognitionPreview => Boolean(preview));
+  }
+
+  async function queuePendingBallRecognitionCalibration(
+    newPendingPreviews: PendingBallRecognitionPreview[],
+    mode: 'replace' | 'append'
+  ) {
+    const existingPendingPreviews = mode === 'append' ? await buildExistingPendingBallRecognitionPreviews() : [];
+    const nextPendingPreviews = sortBallRecognitionPreviewsByCreatedAt([
+      ...existingPendingPreviews,
+      ...newPendingPreviews,
+    ]).slice(-BALL_RECOGNITION_PREVIEW_LIMIT);
+
+    if (nextPendingPreviews.length === 0) {
+      setIsBallRecognitionTraining(false);
+      return;
+    }
+
+    setBallRecognitionCalibrationJob({
+      id: `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      previousPreviews: ballRecognitionPreviews,
+      previews: nextPendingPreviews.map((preview) => stripPendingBallRecognitionPreview(preview)),
+      pendingPreviews: nextPendingPreviews,
+    });
+  }
+
+  async function queueBallRecognitionCalibration(
+    assets: ImagePicker.ImagePickerAsset[],
+    source: BallTrainingImageSource,
+    mode: 'replace' | 'append'
+  ) {
+    if (!currentUserId || assets.length === 0 || isBallRecognitionTraining || ballRecognitionCalibrationJob) {
+      return;
+    }
+
+    const limitedAssets = assets.slice(0, BALL_RECOGNITION_PREVIEW_LIMIT);
+    let newPendingPreviews: PendingBallRecognitionPreview[] = [];
+
+    setIsBallRecognitionTraining(true);
+
+    try {
+      newPendingPreviews = await Promise.all(
+        limitedAssets.map((asset) => buildPendingBallRecognitionPreview(currentUserId, asset, source))
+      );
+      await queuePendingBallRecognitionCalibration(newPendingPreviews, mode);
+    } catch {
+      await deleteBallRecognitionPreviewFiles(
+        newPendingPreviews.map((preview) =>
+          stripPendingBallRecognitionPreview(preview)
+        )
+      );
+      setIsBallRecognitionTraining(false);
+      Alert.alert('공 학습 실패', '공 이미지를 준비하는 중 문제가 발생했습니다. 다시 시도해 주세요.');
+    }
+  }
+
+  async function startBallRecognitionTrainingFromLibrary() {
+    if (!currentUserId || isBallRecognitionTraining || ballRecognitionCalibrationJob) {
+      return;
+    }
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert('권한 필요', '공 이미지를 고르려면 사진 보관함 권한이 필요합니다.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      selectionLimit: BALL_RECOGNITION_PREVIEW_LIMIT,
+      quality: 0.5,
+      base64: true,
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    await queueBallRecognitionCalibration(result.assets, 'library', 'replace');
+  }
+
+  async function startBallRecognitionTrainingFromCamera() {
+    if (!currentUserId || isBallRecognitionTraining || ballRecognitionCalibrationJob) {
+      return;
+    }
+
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert('권한 필요', '공 이미지를 촬영하려면 카메라 권한이 필요합니다.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.5,
+      base64: true,
+      cameraType: ImagePicker.CameraType.back,
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    await queueBallRecognitionCalibration(result.assets, 'camera', 'append');
+  }
+
+  async function startBallRecognitionTrainingFromUrls(rawUrls: string) {
+    if (!currentUserId || isBallRecognitionTraining || ballRecognitionCalibrationJob) {
+      return;
+    }
+
+    const parsedUrls = parseBallRecognitionImageUrls(rawUrls).slice(0, BALL_RECOGNITION_PREVIEW_LIMIT);
+
+    if (parsedUrls.length === 0) {
+      Alert.alert('URL 확인', '학습할 이미지 URL을 한 줄에 하나씩 입력해 주세요.');
+      return;
+    }
+
+    const newPendingPreviews: PendingBallRecognitionPreview[] = [];
+    setIsBallRecognitionTraining(true);
+
+    try {
+      const results = await Promise.allSettled(
+        parsedUrls.map((url) => buildPendingBallRecognitionPreviewFromUrl(currentUserId, url))
+      );
+      const failedCount = results.filter((result) => result.status === 'rejected').length;
+
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          newPendingPreviews.push(result.value);
+        }
+      }
+
+      if (newPendingPreviews.length === 0) {
+        throw new Error('remote_ball_images_unavailable');
+      }
+
+      if (failedCount > 0) {
+        Alert.alert(
+          '일부 이미지 생략',
+          `${parsedUrls.length}장 중 ${failedCount}장은 불러오지 못해서, 나머지 이미지로 학습을 이어갑니다.`
+        );
+      }
+
+      await queuePendingBallRecognitionCalibration(newPendingPreviews, 'replace');
+    } catch {
+      await deleteBallRecognitionPreviewFiles(
+        newPendingPreviews.map((preview) => stripPendingBallRecognitionPreview(preview))
+      );
+      setIsBallRecognitionTraining(false);
+      Alert.alert(
+        '공 학습 실패',
+        '인터넷 이미지 URL을 불러오지 못했습니다. 직접 열리는 이미지 주소인지 확인한 뒤 다시 시도해 주세요.'
+      );
+    }
+  }
+
+  async function handleBallRecognitionCalibrationFailure(job: BallRecognitionCalibrationJob, message: string) {
+    const previousPreviewIds = new Set(job.previousPreviews.map((preview) => preview.id));
+    const transientPreviews = job.pendingPreviews
+      .filter((preview) => !previousPreviewIds.has(preview.id))
+      .map((preview) => stripPendingBallRecognitionPreview(preview));
+
+    await deleteBallRecognitionPreviewFiles(transientPreviews);
+    setBallRecognitionCalibrationJob(null);
+    setIsBallRecognitionTraining(false);
+    Alert.alert('공 학습 실패', message);
+  }
+
+  async function handleBallRecognitionCalibrationComplete(jobId: string, nextProfile: BallRecognitionProfile | null) {
+    if (!ballRecognitionCalibrationJob || ballRecognitionCalibrationJob.id !== jobId) {
+      return;
+    }
+
+    const activeJob = ballRecognitionCalibrationJob;
+    const sanitizedProfile = sanitizeBallRecognitionProfile(nextProfile);
+
+    if (!sanitizedProfile) {
+      await handleBallRecognitionCalibrationFailure(activeJob, '공 이미지에서 색상 정보를 충분히 찾지 못했습니다.');
+      return;
+    }
+
+    const nextPreviewIds = new Set(activeJob.previews.map((preview) => preview.id));
+    const obsoletePreviews = activeJob.previousPreviews.filter((preview) => !nextPreviewIds.has(preview.id));
+
+    await deleteBallRecognitionPreviewFiles(obsoletePreviews);
+
+    setBallRecognitionCalibrationJob(null);
+    setBallRecognitionProfile(sanitizedProfile);
+    setBallRecognitionPreviews(activeJob.previews);
+    setSelectedBallColors(
+      sanitizedProfile.learnedColors.length > 0 ? sanitizedProfile.learnedColors : DEFAULT_BALL_COLORS
+    );
+    setIsBallRecognitionTraining(false);
+  }
+
+  async function handleBallRecognitionCalibrationError(jobId: string, message: string) {
+    if (!ballRecognitionCalibrationJob || ballRecognitionCalibrationJob.id !== jobId) {
+      return;
+    }
+
+    await handleBallRecognitionCalibrationFailure(ballRecognitionCalibrationJob, message);
+  }
+
+  async function resetBallRecognitionTraining() {
+    if (!currentUserId || isBallRecognitionTraining) {
+      return;
+    }
+
+    await deleteBallRecognitionPreviewFiles(ballRecognitionPreviews);
+    setBallRecognitionCalibrationJob(null);
+    setBallRecognitionProfile(null);
+    setBallRecognitionPreviews([]);
+    setSelectedBallColors(BALL_BRAND_PRESETS[selectedBallBrand] ?? DEFAULT_BALL_COLORS);
+  }
+
   function revealHomework() {
     setIsHomeworkRevealed(true);
   }
@@ -4575,9 +5235,7 @@ export function useBasketballCoachApp() {
 
       if (!forceClose && lessonModeRef.current === 'dribble' && frontWeakPoint && !frontDribbleSummaryShownRef.current) {
         frontDribbleSummaryShownRef.current = true;
-        setImmediateLessonFeedback(
-          `?ъ슜?먮떂??媛??遺議깊뻽???먯꽭 遺遺꾩? ${frontWeakPoint.criterionNumber}踰덉㎏ 湲곗??댁뿉?? ${frontWeakPoint.feedbackText}`
-        );
+        setImmediateLessonFeedback(buildFrontWeakPointSummary(frontWeakPoint));
         setDebugText('?덉뒯 ?붿빟???뺤씤??二쇱꽭?? ?ㅼ떆 ?꾨Ⅴ硫?移대찓?쇰? 醫낅즺?⑸땲??');
         return;
       }
@@ -4664,7 +5322,7 @@ export function useBasketballCoachApp() {
 
       const frontWeakPoint = finalizeFrontDribbleWeakPoint();
       const finalFeedback = frontWeakPoint
-        ? `${latestFeedbackRef.current}\n\n媛??蹂댁셿???꾩슂??湲곗?? ${frontWeakPoint.criterionNumber}踰덉엯?덈떎. ${frontWeakPoint.feedbackText}`
+        ? `${latestFeedbackRef.current}\n\n${buildFrontWeakPointSummary(frontWeakPoint)}`
         : latestFeedbackRef.current;
       recordFrontDribbleHomeworkData(selectedDribbleViewRef.current === 'front' ? latestDribbleAnalysisRef.current : null);
       const completedDribbleHomework = recordDailyDribbleProgress(dribbleTargetCountRef.current ?? 0);
@@ -4725,7 +5383,7 @@ export function useBasketballCoachApp() {
         videoUri
       );
       const finalFeedback = frontWeakPoint
-        ? `${reviewClip.feedback}\n\n媛??蹂댁셿???꾩슂??湲곗?? ${frontWeakPoint.criterionNumber}踰덉엯?덈떎. ${frontWeakPoint.feedbackText}`
+        ? `${reviewClip.feedback}\n\n${buildFrontWeakPointSummary(frontWeakPoint)}`
         : reviewClip.feedback;
       const finalReviewClip = {
         ...reviewClip,
@@ -5423,6 +6081,10 @@ export function useBasketballCoachApp() {
     selectedSkillKey,
     selectedBallBrand,
     selectedBallColors,
+    ballRecognitionProfile,
+    ballRecognitionPreviews,
+    ballRecognitionCalibrationJob,
+    isBallRecognitionTraining,
     selectedPosition,
     selectedDribbleView,
     isHomeworkRevealed,
@@ -5465,6 +6127,12 @@ export function useBasketballCoachApp() {
     selectSkill,
     selectBallBrand,
     toggleBallColor,
+    startBallRecognitionTrainingFromCamera,
+    startBallRecognitionTrainingFromLibrary,
+    startBallRecognitionTrainingFromUrls,
+    handleBallRecognitionCalibrationComplete,
+    handleBallRecognitionCalibrationError,
+    resetBallRecognitionTraining,
     selectPosition,
     setSelectedDribbleView,
     revealHomework,

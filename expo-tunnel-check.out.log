@@ -1,0 +1,9 @@
+
+> basketball-coach-native@1.0.0 start
+> node ./etc/start-expo-with-auth.js --tunnel --clear
+
+[auth] EXPO_PUBLIC_AUTH_SERVER_URL=http://192.168.219.102:4317
+[auth] Reusing existing auth server at http://192.168.219.102:4317
+Starting project at C:\basketball-coach\basketball-coach-native
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)

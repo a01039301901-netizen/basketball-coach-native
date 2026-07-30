@@ -19,7 +19,14 @@ import type { WebViewMessageEvent } from 'react-native-webview';
 import { InfoBox } from '../components/common/InfoBox';
 import { LessonCamera } from '../components/lesson/LessonCamera';
 import { colors } from '../theme/colors';
-import type { BallBrandOption, BallColorOption, DribbleLessonView, LessonMode, LessonReviewClip } from '../types/app';
+import type {
+  BallBrandOption,
+  BallColorOption,
+  BallRecognitionProfile,
+  DribbleLessonView,
+  LessonMode,
+  LessonReviewClip,
+} from '../types/app';
 import { getDesktopMobileFrameWidth, shouldUseDesktopMobileLayout } from '../utils/layout';
 
 const DRIBBLE_MODE_IMAGE = require('../../assets/lesson-player-silhouette.png');
@@ -30,6 +37,7 @@ interface LessonScreenProps {
   selectedDribbleView: DribbleLessonView;
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
+  ballRecognitionProfile: BallRecognitionProfile | null;
   isCameraActive: boolean;
   isCameraPreviewHidden: boolean;
   isLessonActive: boolean;
@@ -394,6 +402,7 @@ export function LessonScreen({
   selectedDribbleView,
   selectedBallBrand,
   selectedBallColors,
+  ballRecognitionProfile,
   isCameraActive,
   isCameraPreviewHidden,
   isLessonActive,
@@ -467,6 +476,7 @@ export function LessonScreen({
       selectedDribbleView={selectedDribbleView}
       selectedBallBrand={selectedBallBrand}
       selectedBallColors={selectedBallColors}
+      ballRecognitionProfile={ballRecognitionProfile}
       cameraSessionKey={cameraSessionKey}
       isCameraActive={isCameraActive}
       isCameraPreviewHidden={isCameraPreviewHidden}

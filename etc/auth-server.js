@@ -17,6 +17,7 @@ const EMPTY_SNAPSHOT = Object.freeze({
   shotSuccess: {},
   ballColors: ['orange'],
   ballBrand: 'wilson',
+  ballRecognitionProfile: null,
   position: 'none',
   homework: {},
 });
@@ -84,6 +85,7 @@ function sanitizeSnapshot(value) {
     shotSuccess: isRecordObject(value.shotSuccess) ? value.shotSuccess : {},
     ballColors: Array.isArray(value.ballColors) ? value.ballColors : ['orange'],
     ballBrand: typeof value.ballBrand === 'string' ? value.ballBrand : 'wilson',
+    ballRecognitionProfile: isRecordObject(value.ballRecognitionProfile) ? value.ballRecognitionProfile : null,
     position: typeof value.position === 'string' ? value.position : 'none',
     homework: isRecordObject(value.homework) ? value.homework : {},
   };

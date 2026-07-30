@@ -1,93 +1,9 @@
-﻿export const POSE_WEB_BOOTSTRAP_URL = 'https://example.com/';
 
-import { getEffectiveBallRecognitionProfile } from '../../constants/ballRecognition';
-import type { BallRecognitionProfile } from '../../types/app';
-
-export function buildPoseWebHtml(
-  lessonMode: 'dribble' | 'shoot' = 'dribble',
-  selectedDribbleView: 'front' | 'side' = 'front',
-  selectedBallBrand: 'wilson' | 'spalding' | 'molten' = 'wilson',
-  selectedBallColors: string[] = ['orange'],
-  ballRecognitionProfile: BallRecognitionProfile | null = null
-): string {
-  const effectiveBallRecognitionProfile = getEffectiveBallRecognitionProfile(selectedBallBrand, ballRecognitionProfile);
-
-  return `<!DOCTYPE html>
-<html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        height: 100%;
-        background: #0f0f0f;
-        overflow: hidden;
-        font-family: Arial, sans-serif;
-      }
-
-      .wrap {
-        position: relative;
-        width: 100%;
-        height: 100%;
-        background: #0f0f0f;
-        touch-action: none;
-      }
-
-      video,
-      canvas {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-      }
-
-      video {
-        transform: scaleX(-1);
-        opacity: 0;
-      }
-
-      .hud {
-        position: absolute;
-        left: 50%;
-        bottom: calc(env(safe-area-inset-bottom, 0px) + 126px);
-        width: min(calc(100% - 32px), 360px);
-        transform: translateX(-50%);
-        z-index: 5;
-        color: #ffffff;
-        background: rgba(0, 0, 0, 0.5);
-        border-radius: 14px;
-        padding: 10px 12px;
-        font-size: 13px;
-        line-height: 1.45;
-        text-align: center;
-        pointer-events: none;
-      }
-
-      @media (orientation: landscape) {
-        .hud {
-          bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
-          width: min(calc(100% - 168px), 420px);
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="wrap" id="wrap">
-      <video id="video" autoplay playsinline muted webkit-playsinline></video>
-      <canvas id="canvas"></canvas>
-      <div class="hud" id="hud">MediaPipe와 공 인식을 준비하고 있습니다.</div>
-    </div>
-
-    <script type="module">
-      const lessonMode = ${JSON.stringify(lessonMode)};
-      const selectedDribbleView = ${JSON.stringify(selectedDribbleView)};
-      const selectedBallBrand = ${JSON.stringify(selectedBallBrand)};
-      const selectedBallColors = ${JSON.stringify(selectedBallColors)};
-      const selectedBallRecognitionProfile = ${JSON.stringify(effectiveBallRecognitionProfile)};
+      const lessonMode = "dribble";
+      const selectedDribbleView = "front";
+      const selectedBallBrand = "wilson";
+      const selectedBallColors = ["orange"];
+      const selectedBallRecognitionProfile = null;
       const learnedBandByColor = new Map(
         Array.isArray(selectedBallRecognitionProfile?.bands)
           ? selectedBallRecognitionProfile.bands.map((band) => [band.color, band])
@@ -134,14 +50,6 @@ export function buildPoseWebHtml(
       const BALL_TRACK_CIRCLE_COVERAGE_BONUS = 20;
       const BALL_TRACK_PATTERN_BONUS = 76;
       const BALL_TRACK_PATTERN_MIN_RADIUS_PX = 8;
-      const BALL_DETECTION_FULL_WIDTH = 224;
-      const BALL_DETECTION_FULL_HEIGHT = 168;
-      const BALL_DETECTION_FOCUSED_SIZE = 320;
-      const BALL_DETECTION_MIN_ROI_SIDE = 0.28;
-      const BALL_DETECTION_SHOOT_MIN_ROI_SIDE = 0.24;
-      const BALL_DETECTION_ROI_PADDING = 0.18;
-      const BALL_DETECTION_TRACKED_PADDING = 1.15;
-      const BALL_DETECTION_TRACKED_MIN_RADIUS = 0.07;
       const BALL_TRACK_ANY_WRIST_BONUS = 74;
       const BALL_TRACK_SHOOTING_WRIST_BONUS = 120;
       const BALL_TRACK_SUPPORT_WRIST_BONUS = 54;
@@ -951,183 +859,6 @@ export function buildPoseWebHtml(
         };
       }
 
-      function mergeBoxes(...boxes) {
-        const validBoxes = boxes.filter(Boolean);
-
-        if (validBoxes.length === 0) {
-          return null;
-        }
-
-        let minX = 1;
-        let minY = 1;
-        let maxX = 0;
-        let maxY = 0;
-
-        for (const box of validBoxes) {
-          minX = Math.min(minX, box.minX);
-          minY = Math.min(minY, box.minY);
-          maxX = Math.max(maxX, box.maxX);
-          maxY = Math.max(maxY, box.maxY);
-        }
-
-        return {
-          minX: clamp01(minX),
-          minY: clamp01(minY),
-          maxX: clamp01(maxX),
-          maxY: clamp01(maxY)
-        };
-      }
-
-      function createTrackedBallBox(ball) {
-        if (!ball) {
-          return null;
-        }
-
-        const radius = Math.max(BALL_DETECTION_TRACKED_MIN_RADIUS, ball.radius * (BALL_TRACK_RADIUS_MULTIPLIER + BALL_DETECTION_TRACKED_PADDING));
-
-        return {
-          minX: clamp01(ball.x - radius),
-          minY: clamp01(ball.y - radius),
-          maxX: clamp01(ball.x + radius),
-          maxY: clamp01(ball.y + radius)
-        };
-      }
-
-      function createSquareBox(box, minSide, paddingRatio) {
-        if (!box) {
-          return null;
-        }
-
-        const width = Math.max(0.001, box.maxX - box.minX);
-        const height = Math.max(0.001, box.maxY - box.minY);
-        const side = Math.min(1, Math.max(Math.max(width, height) * (1 + paddingRatio * 2), minSide));
-        const centerX = (box.minX + box.maxX) / 2;
-        const centerY = (box.minY + box.maxY) / 2;
-        let minX = centerX - side / 2;
-        let maxX = centerX + side / 2;
-        let minY = centerY - side / 2;
-        let maxY = centerY + side / 2;
-
-        if (minX < 0) {
-          maxX = Math.min(1, maxX - minX);
-          minX = 0;
-        }
-
-        if (maxX > 1) {
-          minX = Math.max(0, minX - (maxX - 1));
-          maxX = 1;
-        }
-
-        if (minY < 0) {
-          maxY = Math.min(1, maxY - minY);
-          minY = 0;
-        }
-
-        if (maxY > 1) {
-          minY = Math.max(0, minY - (maxY - 1));
-          maxY = 1;
-        }
-
-        return {
-          minX: clamp01(minX),
-          minY: clamp01(minY),
-          maxX: clamp01(maxX),
-          maxY: clamp01(maxY)
-        };
-      }
-
-      function getBallDetectionRegion(landmarks) {
-        const trackedBallBox = createTrackedBallBox(trackedBall);
-
-        if (!landmarks) {
-          if (!trackedBallBox) {
-            return {
-              minX: 0,
-              minY: 0,
-              maxX: 1,
-              maxY: 1,
-              width: BALL_DETECTION_FULL_WIDTH,
-              height: BALL_DETECTION_FULL_HEIGHT,
-              focused: false
-            };
-          }
-
-          const focusedTrackedBox = createSquareBox(trackedBallBox, BALL_DETECTION_MIN_ROI_SIDE, 0.08);
-          return {
-            ...focusedTrackedBox,
-            width: BALL_DETECTION_FOCUSED_SIZE,
-            height: BALL_DETECTION_FOCUSED_SIZE,
-            focused: true
-          };
-        }
-
-        const bodyBox =
-          lessonMode === "shoot"
-            ? getBoundingBox(
-                [
-                  landmarks[INDEX.nose],
-                  landmarks[INDEX.leftShoulder],
-                  landmarks[INDEX.rightShoulder],
-                  landmarks[INDEX.leftElbow],
-                  landmarks[INDEX.rightElbow],
-                  landmarks[INDEX.leftWrist],
-                  landmarks[INDEX.rightWrist],
-                  landmarks[INDEX.leftHip],
-                  landmarks[INDEX.rightHip],
-                  landmarks[INDEX.leftKnee],
-                  landmarks[INDEX.rightKnee]
-                ],
-                0.04,
-                0.04
-              )
-            : mergeBoxes(
-                getBoundingBox(
-                  [
-                    landmarks[INDEX.leftElbow],
-                    landmarks[INDEX.rightElbow],
-                    landmarks[INDEX.leftWrist],
-                    landmarks[INDEX.rightWrist]
-                  ],
-                  0.05,
-                  0.06
-                ),
-                getBoundingBox(
-                  [
-                    landmarks[INDEX.leftHip],
-                    landmarks[INDEX.rightHip],
-                    landmarks[INDEX.leftKnee],
-                    landmarks[INDEX.rightKnee],
-                    landmarks[INDEX.leftAnkle],
-                    landmarks[INDEX.rightAnkle]
-                  ],
-                  0.05,
-                  0.05
-                )
-              );
-        const mergedBox = mergeBoxes(bodyBox, trackedBallBox);
-        const minSide = lessonMode === "shoot" ? BALL_DETECTION_SHOOT_MIN_ROI_SIDE : BALL_DETECTION_MIN_ROI_SIDE;
-        const focusedBox = createSquareBox(mergedBox, minSide, BALL_DETECTION_ROI_PADDING);
-
-        if (!focusedBox) {
-          return {
-            minX: 0,
-            minY: 0,
-            maxX: 1,
-            maxY: 1,
-            width: BALL_DETECTION_FULL_WIDTH,
-            height: BALL_DETECTION_FULL_HEIGHT,
-            focused: false
-          };
-        }
-
-        return {
-          ...focusedBox,
-          width: BALL_DETECTION_FOCUSED_SIZE,
-          height: BALL_DETECTION_FOCUSED_SIZE,
-          focused: true
-        };
-      }
-
       function isInsideBox(point, box) {
         if (!point || !box) {
           return false;
@@ -1536,28 +1267,11 @@ export function buildPoseWebHtml(
         }
 
         const profile = getBallDetectionProfile();
-        const region = getBallDetectionRegion(landmarks);
-        const width = region.width;
-        const height = region.height;
+        const width = 224;
+        const height = 168;
         processingCanvas.width = width;
         processingCanvas.height = height;
-        const sourceWidth = video.videoWidth || canvas.width || width;
-        const sourceHeight = video.videoHeight || canvas.height || height;
-        const regionSourceX = Math.round(region.minX * sourceWidth);
-        const regionSourceY = Math.round(region.minY * sourceHeight);
-        const regionSourceWidth = Math.max(1, Math.round((region.maxX - region.minX) * sourceWidth));
-        const regionSourceHeight = Math.max(1, Math.round((region.maxY - region.minY) * sourceHeight));
-        processingContext.drawImage(
-          video,
-          regionSourceX,
-          regionSourceY,
-          regionSourceWidth,
-          regionSourceHeight,
-          0,
-          0,
-          width,
-          height
-        );
+        processingContext.drawImage(video, 0, 0, width, height);
 
         const { data } = processingContext.getImageData(0, 0, width, height);
         const visited = new Uint8Array(width * height);
@@ -1725,13 +1439,9 @@ export function buildPoseWebHtml(
             : null;
 
           const candidate = {
-            x: region.minX + (centerX / width) * (region.maxX - region.minX),
-            y: region.minY + (centerY / height) * (region.maxY - region.minY),
-            radius:
-              Math.max(
-                (blobWidth / width) * (region.maxX - region.minX),
-                (blobHeight / height) * (region.maxY - region.minY)
-              ) / 2,
+            x: centerX / width,
+            y: centerY / height,
+            radius: Math.max(blobWidth, blobHeight) / Math.max(width, height) / 2,
             pixelCount: count,
             color: redCount > orangeCount ? "red" : colorValue === 2 ? "red" : "orange",
             aspectRatio,
@@ -1797,15 +1507,15 @@ export function buildPoseWebHtml(
         const centerX = projectX(ball.x);
         const centerY = projectY(ball.y);
         const radius = ball.radius * Math.max(canvas.width, canvas.height);
-        const stroke = "#2ee66b";
+        const stroke = ball.color === "orange" ? "#ff9f1c" : "#ff4d5a";
 
         ctx.beginPath();
         ctx.arc(centerX, centerY, Math.max(radius, 16), 0, Math.PI * 2);
         ctx.strokeStyle = stroke;
-        ctx.lineWidth = 6;
+        ctx.lineWidth = 4;
         ctx.stroke();
 
-        ctx.fillStyle = "rgba(46,230,107,0.85)";
+        ctx.fillStyle = "rgba(0,0,0,0.55)";
         ctx.fillRect(centerX - 44, centerY - Math.max(radius, 16) - 32, 88, 22);
         ctx.fillStyle = "#ffffff";
         ctx.font = "bold 13px Arial";
@@ -3062,26 +2772,4 @@ export function buildPoseWebHtml(
       window.addEventListener("resize", resizeCanvas);
       bindCameraSwitchGesture();
       start();
-    </script>
-  </body>
-</html>`;
-}
-
-export function buildPoseBootstrapScript(
-  lessonMode: 'dribble' | 'shoot' = 'dribble',
-  selectedDribbleView: 'front' | 'side' = 'front',
-  selectedBallBrand: 'wilson' | 'spalding' | 'molten' = 'wilson',
-  selectedBallColors: string[] = ['orange'],
-  ballRecognitionProfile: BallRecognitionProfile | null = null
-): string {
-  const html = JSON.stringify(
-    buildPoseWebHtml(lessonMode, selectedDribbleView, selectedBallBrand, selectedBallColors, ballRecognitionProfile)
-  );
-
-  return `
-    document.open();
-    document.write(${html});
-    document.close();
-    true;
-  `;
-}
+    

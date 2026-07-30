@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
 import { colors } from '../../theme/colors';
-import type { BallBrandOption, BallColorOption, DribbleLessonView, LessonMode } from '../../types/app';
+import type { BallBrandOption, BallColorOption, BallRecognitionProfile, DribbleLessonView, LessonMode } from '../../types/app';
 import { buildPoseWebHtml } from './poseWebHtml';
 
 interface LessonCameraProps {
@@ -11,6 +11,7 @@ interface LessonCameraProps {
   selectedDribbleView: DribbleLessonView;
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
+  ballRecognitionProfile: BallRecognitionProfile | null;
   cameraSessionKey: number;
   isCameraActive: boolean;
   isCameraPreviewHidden: boolean;
@@ -31,6 +32,7 @@ export function LessonCamera({
   selectedDribbleView,
   selectedBallBrand,
   selectedBallColors,
+  ballRecognitionProfile,
   cameraSessionKey,
   isCameraActive,
   isCameraPreviewHidden,
@@ -131,8 +133,8 @@ export function LessonCamera({
   }, [cameraStopMode, isCameraActive, lessonMode, recordingStopToken]);
 
   const srcDoc = useMemo(
-    () => buildPoseWebHtml(lessonMode, selectedDribbleView, selectedBallBrand, selectedBallColors),
-    [lessonMode, selectedDribbleView, selectedBallBrand, selectedBallColors]
+    () => buildPoseWebHtml(lessonMode, selectedDribbleView, selectedBallBrand, selectedBallColors, ballRecognitionProfile),
+    [ballRecognitionProfile, lessonMode, selectedDribbleView, selectedBallBrand, selectedBallColors]
   );
 
   return (

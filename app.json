@@ -27,7 +27,8 @@
           "cameraPermission": "Allow Basketball Coach AI to use the camera for dribble and shooting analysis.",
           "microphonePermission": "Allow Basketball Coach AI to use the microphone while recording lesson videos."
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "ios": {
       "supportsTablet": true,

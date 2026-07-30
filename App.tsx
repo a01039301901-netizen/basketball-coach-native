@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { setStatusBarBackgroundColor, setStatusBarHidden, StatusBar as ExpoStatusBar, setStatusBarStyle, setStatusBarTranslucent } from 'expo-status-bar';
 import { Animated, AppState, Platform, Pressable, SafeAreaView, ScrollView, StatusBar as NativeStatusBar, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { BallRecognitionCalibrator } from './src/components/ballRecognition/BallRecognitionCalibrator';
 import { SmallButton } from './src/components/common/Buttons';
 import { FireworkBurst } from './src/components/common/FireworkBurst';
 import { Header } from './src/components/common/Header';
@@ -9,7 +10,6 @@ import { useBasketballCoachApp } from './src/hooks/useBasketballCoachApp';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { DiaryScreen } from './src/screens/DiaryScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
-import { LessonScreen } from './src/screens/LessonScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { RulesGuideScreen } from './src/screens/RulesGuideScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
@@ -19,6 +19,7 @@ import { getDesktopMobileFrameWidth, shouldUseDesktopMobileLayout } from './src/
 
 type SideDrawerType = 'settings' | 'profile';
 type NavigationBarModule = typeof import('expo-navigation-bar');
+type LessonScreenComponent = typeof import('./src/screens/LessonScreen').LessonScreen;
 const APP_TOP_OFFSET = 12;
 const APP_SHELL_HORIZONTAL_PADDING = 16;
 const HOME_UTILITY_BAR_HEIGHT = 84;
@@ -43,6 +44,9 @@ export default function App() {
   const isLessonScreen = app.isReady && app.currentUser && app.screen === 'lesson';
   const isHomeScreen = app.isReady && app.currentUser && app.screen === 'home';
   const isDiaryScreen = app.isReady && app.currentUser && app.screen === 'diary';
+  const ActiveLessonScreen = (
+    isLessonScreen ? require('./src/screens/LessonScreen').LessonScreen : null
+  ) as LessonScreenComponent | null;
   const shouldShowHomeUtilityBar = Boolean(app.isReady && app.currentUser && app.screen === 'home');
   const shouldShowHeader = Boolean(app.currentUser) && !isLessonScreen && !isHomeScreen && !isDiaryScreen;
   const shouldShowHeaderProfile =
@@ -88,9 +92,11 @@ export default function App() {
       return;
     }
 
-    void ScreenOrientation.lockAsync(
+    ScreenOrientation.lockAsync(
       isLessonScreen ? ScreenOrientation.OrientationLock.DEFAULT : ScreenOrientation.OrientationLock.PORTRAIT_UP
-    );
+    ).catch((error) => {
+      console.warn('Failed to lock screen orientation.', error);
+    });
   }, [isLessonScreen]);
 
   const toggleDrawer = useCallback((drawer: SideDrawerType) => {
@@ -355,36 +361,39 @@ export default function App() {
         ) : null}
         {isLessonScreen ? (
           <View style={styles.lessonScreenWrap}>
-            <LessonScreen
-              lessonMode={app.lessonMode}
-              selectedDribbleView={app.selectedDribbleView}
-              selectedBallBrand={app.selectedBallBrand}
-              selectedBallColors={app.selectedBallColors}
-              isCameraActive={app.isCameraActive}
-              isCameraPreviewHidden={app.isCameraPreviewHidden}
-              isLessonActive={app.isLessonActive}
-              isCameraReady={app.isCameraReady}
-              cameraSessionKey={app.cameraSessionKey}
-              countdownValue={app.countdownValue}
-              dribbleResetToken={app.dribbleResetToken}
-              shootResetToken={app.shootResetToken}
-              recordingStartToken={app.recordingStartToken}
-              recordingStopToken={app.recordingStopToken}
-              cameraStopMode={app.cameraStopMode}
-              debugText={app.debugText}
-              feedbackText={app.feedbackText}
-              lessonReview={app.lessonReview}
-              currentDribbleCount={app.currentDribbleCount}
-              cameraError={app.cameraError}
-              isShootSuccessButtonVisible={app.isShootSuccessButtonVisible}
-              onSelectMode={app.changeLessonMode}
-              onSelectDribbleView={app.setSelectedDribbleView}
-              onBeginLesson={(dribbleTargetCount, dribbleView) => void app.beginLesson(dribbleTargetCount, dribbleView)}
-              onEndLesson={() => void app.endLesson()}
-              onRegisterSuccessfulShot={app.registerSuccessfulShot}
-              onGoHome={() => void app.navigateTo('home')}
-              onPoseMessage={app.handlePoseMessage}
-            />
+            {ActiveLessonScreen ? (
+              <ActiveLessonScreen
+                lessonMode={app.lessonMode}
+                selectedDribbleView={app.selectedDribbleView}
+                selectedBallBrand={app.selectedBallBrand}
+                selectedBallColors={app.selectedBallColors}
+                ballRecognitionProfile={app.ballRecognitionProfile}
+                isCameraActive={app.isCameraActive}
+                isCameraPreviewHidden={app.isCameraPreviewHidden}
+                isLessonActive={app.isLessonActive}
+                isCameraReady={app.isCameraReady}
+                cameraSessionKey={app.cameraSessionKey}
+                countdownValue={app.countdownValue}
+                dribbleResetToken={app.dribbleResetToken}
+                shootResetToken={app.shootResetToken}
+                recordingStartToken={app.recordingStartToken}
+                recordingStopToken={app.recordingStopToken}
+                cameraStopMode={app.cameraStopMode}
+                debugText={app.debugText}
+                feedbackText={app.feedbackText}
+                lessonReview={app.lessonReview}
+                currentDribbleCount={app.currentDribbleCount}
+                cameraError={app.cameraError}
+                isShootSuccessButtonVisible={app.isShootSuccessButtonVisible}
+                onSelectMode={app.changeLessonMode}
+                onSelectDribbleView={app.setSelectedDribbleView}
+                onBeginLesson={(dribbleTargetCount, dribbleView) => void app.beginLesson(dribbleTargetCount, dribbleView)}
+                onEndLesson={() => void app.endLesson()}
+                onRegisterSuccessfulShot={app.registerSuccessfulShot}
+                onGoHome={() => void app.navigateTo('home')}
+                onPoseMessage={app.handlePoseMessage}
+              />
+            ) : null}
           </View>
         ) : (
           <Animated.ScrollView
@@ -464,9 +473,16 @@ export default function App() {
             <SettingsScreen
               selectedBallBrand={app.selectedBallBrand}
               selectedBallColors={app.selectedBallColors}
+              ballRecognitionProfile={app.ballRecognitionProfile}
+              ballRecognitionPreviews={app.ballRecognitionPreviews}
+              isBallRecognitionTraining={app.isBallRecognitionTraining}
               homeworkTestState={app.homeworkTestState}
               onSelectBallBrand={app.selectBallBrand}
               onToggleBallColor={app.toggleBallColor}
+              onTrainBallRecognitionFromCamera={() => void app.startBallRecognitionTrainingFromCamera()}
+              onTrainBallRecognitionFromLibrary={() => void app.startBallRecognitionTrainingFromLibrary()}
+              onTrainBallRecognitionFromUrls={(rawUrls) => void app.startBallRecognitionTrainingFromUrls(rawUrls)}
+              onResetBallRecognition={() => void app.resetBallRecognitionTraining()}
               onApplyHomeworkTestState={app.applyHomeworkTestState}
             />
           )}
@@ -577,9 +593,16 @@ export default function App() {
                     <SettingsScreen
                       selectedBallBrand={app.selectedBallBrand}
                       selectedBallColors={app.selectedBallColors}
+                      ballRecognitionProfile={app.ballRecognitionProfile}
+                      ballRecognitionPreviews={app.ballRecognitionPreviews}
+                      isBallRecognitionTraining={app.isBallRecognitionTraining}
                       homeworkTestState={app.homeworkTestState}
                       onSelectBallBrand={app.selectBallBrand}
                       onToggleBallColor={app.toggleBallColor}
+                      onTrainBallRecognitionFromCamera={() => void app.startBallRecognitionTrainingFromCamera()}
+                      onTrainBallRecognitionFromLibrary={() => void app.startBallRecognitionTrainingFromLibrary()}
+                      onTrainBallRecognitionFromUrls={(rawUrls) => void app.startBallRecognitionTrainingFromUrls(rawUrls)}
+                      onResetBallRecognition={() => void app.resetBallRecognitionTraining()}
                       onApplyHomeworkTestState={app.applyHomeworkTestState}
                     />
                   )}
@@ -588,6 +611,11 @@ export default function App() {
             </Animated.View>
           </View>
         ) : null}
+        <BallRecognitionCalibrator
+          job={app.ballRecognitionCalibrationJob}
+          onComplete={(jobId, profile) => void app.handleBallRecognitionCalibrationComplete(jobId, profile)}
+          onError={(jobId, message) => void app.handleBallRecognitionCalibrationError(jobId, message)}
+        />
       </View>
       </View>
     </RootContainer>

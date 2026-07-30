@@ -3,6 +3,7 @@ import { NativeModules, Platform } from 'react-native';
 import type {
   BallBrandOption,
   BallColorOption,
+  BallRecognitionProfile,
   HomeworkStateRecord,
   LessonRecord,
   PositionOption,
@@ -11,6 +12,7 @@ import type {
 import { GENERATED_AUTH_SERVER_URL } from '../generated/authServerConfig';
 
 const AUTH_SERVER_PORT = 4317;
+const REMOTE_REQUEST_TIMEOUT_MS = 2500;
 const AUTH_SERVER_OVERRIDE =
   GENERATED_AUTH_SERVER_URL.trim() || process.env.EXPO_PUBLIC_AUTH_SERVER_URL?.trim() || '';
 
@@ -27,6 +29,7 @@ export interface RemoteAccountSnapshot {
   shotSuccess: Record<string, number>;
   ballColors: BallColorOption[];
   ballBrand: BallBrandOption;
+  ballRecognitionProfile: BallRecognitionProfile | null;
   position: PositionOption;
   homework: HomeworkStateRecord;
 }
@@ -58,6 +61,7 @@ export function createEmptyRemoteSnapshot(): RemoteAccountSnapshot {
     shotSuccess: {},
     ballColors: ['orange'],
     ballBrand: 'wilson',
+    ballRecognitionProfile: null,
     position: 'none',
     homework: {},
   };
@@ -77,17 +81,6 @@ function parseHostnameFromUrl(rawUrl: string | null | undefined) {
 
 function getCandidateHostnames() {
   const hosts = new Set<string>();
-
-  if (AUTH_SERVER_OVERRIDE) {
-    try {
-      const overrideUrl = new URL(AUTH_SERVER_OVERRIDE);
-      if (overrideUrl.hostname) {
-        hosts.add(overrideUrl.hostname);
-      }
-    } catch {
-      // Ignore malformed overrides here. The fetch path will surface a clearer error later.
-    }
-  }
 
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname) {
     hosts.add(window.location.hostname);
@@ -110,24 +103,54 @@ function getCandidateHostnames() {
   return [...hosts];
 }
 
-export function resolveAuthServerUrl() {
-  if (AUTH_SERVER_OVERRIDE) {
-    try {
-      return new URL(AUTH_SERVER_OVERRIDE).toString().replace(/\/$/, '');
-    } catch {
-      return null;
-    }
-  }
-
-  const host = getCandidateHostnames().find(
-    (candidate) => candidate && !candidate.endsWith('expo.dev') && !candidate.endsWith('exp.direct')
-  );
-
-  if (!host) {
+function normalizeBaseUrl(rawUrl: string | null | undefined) {
+  if (!rawUrl) {
     return null;
   }
 
-  return `http://${host}:${AUTH_SERVER_PORT}`;
+  try {
+    const parsed = new URL(rawUrl);
+    const protocol = parsed.protocol || 'http:';
+    const host = parsed.hostname;
+    const port = parsed.port || String(AUTH_SERVER_PORT);
+
+    if (!host) {
+      return null;
+    }
+
+    return `${protocol}//${host}:${port}`;
+  } catch {
+    return null;
+  }
+}
+
+function buildCandidateBaseUrls() {
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+
+  function pushCandidate(nextUrl: string | null) {
+    if (!nextUrl || seen.has(nextUrl)) {
+      return;
+    }
+
+    seen.add(nextUrl);
+    candidates.push(nextUrl);
+  }
+
+  for (const host of getCandidateHostnames()) {
+    if (!host || host.endsWith('expo.dev') || host.endsWith('exp.direct')) {
+      continue;
+    }
+
+    pushCandidate(`http://${host}:${AUTH_SERVER_PORT}`);
+  }
+
+  pushCandidate(normalizeBaseUrl(AUTH_SERVER_OVERRIDE));
+  return candidates;
+}
+
+export function resolveAuthServerUrl() {
+  return buildCandidateBaseUrls()[0] ?? null;
 }
 
 async function readJsonResponse(response: Response) {
@@ -142,9 +165,9 @@ async function requestRemote<T extends RemoteActionResult>(
   path: string,
   { body, method = 'GET', token }: RemoteRequestOptions = {}
 ): Promise<T> {
-  const baseUrl = resolveAuthServerUrl();
+  const baseUrls = buildCandidateBaseUrls();
 
-  if (!baseUrl) {
+  if (baseUrls.length === 0) {
     return {
       success: false,
       code: 'server_url_unavailable',
@@ -152,34 +175,50 @@ async function requestRemote<T extends RemoteActionResult>(
     } as T;
   }
 
-  try {
-    const response = await fetch(`${baseUrl}${path}`, {
-      method,
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    const payload = await readJsonResponse(response);
+  let sawNonJsonResponse = false;
 
-    if (payload) {
-      return payload as T;
+  for (const baseUrl of baseUrls) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REMOTE_REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(`${baseUrl}${path}`, {
+        method,
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: controller.signal,
+      });
+      const payload = await readJsonResponse(response);
+
+      if (payload) {
+        return payload as T;
+      }
+
+      sawNonJsonResponse = true;
+    } catch {
+      // Try the next candidate URL before surfacing a failure.
+    } finally {
+      clearTimeout(timeout);
     }
+  }
 
+  if (sawNonJsonResponse) {
     return {
       success: false,
       code: 'invalid_server_response',
       message: '로그인 서버 응답을 해석하지 못했습니다. 서버를 다시 실행해 주세요.',
     } as T;
-  } catch {
-    return {
-      success: false,
-      code: 'server_unavailable',
-      message: REMOTE_SERVER_UNAVAILABLE_MESSAGE,
-    } as T;
   }
+
+  return {
+    success: false,
+    code: 'server_unavailable',
+    message: REMOTE_SERVER_UNAVAILABLE_MESSAGE,
+  } as T;
 }
 
 export function loginRemoteAccount(values: {

@@ -40,6 +40,7 @@ export type SkillKey = 'shoot' | 'crossover' | 'layup' | 'stepback' | 'spin' | '
 export type BallColorOption = 'orange' | 'brown' | 'yellow' | 'white' | 'black' | 'gray' | 'red';
 export type BallBrandOption = 'wilson' | 'spalding' | 'molten';
 export type PositionOption = 'none' | 'defense' | 'offense';
+export type BallTrainingImageSource = 'camera' | 'library' | 'url';
 export type HomeworkStage = 'base' | 'position_followup' | 'correction';
 export type HomeworkSource = 'daily' | 'position' | 'feedback' | 'dribble_balance';
 export type HomeworkFeedbackCategory =
@@ -56,6 +57,41 @@ export interface Skill {
   player: string;
   point: string;
   query: string;
+}
+
+export interface BallRecognitionRange {
+  min: number;
+  max: number;
+}
+
+export interface BallRecognitionPreview {
+  id: string;
+  uri: string;
+  source: BallTrainingImageSource;
+  createdAt: string;
+}
+
+export interface BallRecognitionBand {
+  color: BallColorOption;
+  hueRanges: BallRecognitionRange[];
+  saturationRange: BallRecognitionRange;
+  valueRange: BallRecognitionRange;
+  weight: number;
+}
+
+export interface BallRecognitionPatternProfile {
+  panelLineRatioRange: BallRecognitionRange;
+  edgeDensityRange: BallRecognitionRange;
+  rowCoverageRange: BallRecognitionRange;
+  columnCoverageRange: BallRecognitionRange;
+  weight: number;
+}
+
+export interface BallRecognitionProfile {
+  learnedColors: BallColorOption[];
+  bands: BallRecognitionBand[];
+  patternProfile: BallRecognitionPatternProfile | null;
+  trainedAt: string;
 }
 
 export interface FeedbackMoment {

@@ -10,5 +10,7 @@ export const STORAGE_KEYS = {
   shotSuccess: 'shotSuccessRecords',
   ballColors: 'basketballBallColors',
   ballBrand: 'basketballBallBrand',
+  ballRecognitionProfile: 'basketballBallRecognitionProfile',
+  ballRecognitionPreviews: 'basketballBallRecognitionPreviews',
   position: 'basketballPosition',
 } as const;

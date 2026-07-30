@@ -1,0 +1,39 @@
+
+> basketball-coach-native@1.0.0 start
+> node ./etc/start-expo-with-auth.js --lan --clear --port 8086
+
+[auth] EXPO_PUBLIC_AUTH_SERVER_URL=http://192.168.219.102:4317
+[auth] Reusing existing auth server at http://192.168.219.102:4317
+Starting project at C:\basketball-coach\basketball-coach-native
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Waiting on http://localhost:8086
+Logs for your project will appear below.
+Android .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Android .\index.js ░░░░░░░░░░░░░░░░  1.0% (1/1)
+Android .\index.js ░░░░░░░░░░░░░░░░  1.0% (1/3)
+Android .\index.js ░░░░░░░░░░░░░░░░  4.0% (2/3)
+Android .\index.js ░░░░░░░░░░░░░░░░  4.0% (2/9)
+Android .\index.js ▓░░░░░░░░░░░░░░░  9.0% (3/9)
+Android .\index.js ▓░░░░░░░░░░░░░░░  9.0% ( 5/39)
+Android .\index.js ▓░░░░░░░░░░░░░░░  9.0% ( 6/39)
+Android .\index.js ▓░░░░░░░░░░░░░░░  9.0% ( 12/133)
+Android .\index.js ▓░░░░░░░░░░░░░░░  9.0% ( 18/156)
+Android .\index.js ▓░░░░░░░░░░░░░░░  9.0% ( 38/179)
+Android .\index.js ▓░░░░░░░░░░░░░░░  9.0% ( 49/180)
+Android .\index.js ▓░░░░░░░░░░░░░░░  9.6% ( 70/226)
+Android .\index.js ▓▓░░░░░░░░░░░░░░ 14.2% ( 99/263)
+Android .\index.js ▓▓▓▓░░░░░░░░░░░░ 28.5% (175/328)
+Android .\index.js ▓▓▓▓▓▓░░░░░░░░░░ 37.5% (237/387)
+Android .\index.js ▓▓▓▓▓▓░░░░░░░░░░ 40.9% (305/477)
+Android .\index.js ▓▓▓▓▓▓▓▓▓░░░░░░░ 56.9% (404/537)
+Android .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 80.7% (538/599)
+Android .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 86.7% (606/651)
+Android .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 87.5% (643/689)
+Android .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 95.0% (687/705)
+Android .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.7% (747/772)
+Android .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.7% (786/787)
+Android .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (787/787)
+Android .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (797/797)
+Android Bundled 810693ms index.js (797 modules)
+Android .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (797/797)
