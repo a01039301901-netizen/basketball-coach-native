@@ -93,7 +93,11 @@ export function buildPoseWebHtml(
           ? selectedBallRecognitionProfile.bands.map((band) => [band.color, band])
           : []
       );
-      const selectedBallPatternProfile = selectedBallRecognitionProfile?.patternProfile || null;
+      const selectedBallPatternProfiles = Array.isArray(selectedBallRecognitionProfile?.patternProfiles)
+        ? selectedBallRecognitionProfile.patternProfiles
+        : selectedBallRecognitionProfile?.patternProfile
+          ? [selectedBallRecognitionProfile.patternProfile]
+          : [];
       const wrap = document.getElementById("wrap");
       const video = document.getElementById("video");
       const canvas = document.getElementById("canvas");
@@ -104,17 +108,10 @@ export function buildPoseWebHtml(
       const CAMERA_SWITCH_THRESHOLD_PX = 72;
       const REAR_CAMERA_LABEL_PATTERN = /(back|rear|environment|world|후면|뒤)/i;
       const FRONT_CAMERA_LABEL_PATTERN = /(front|user|face|전면|앞)/i;
-      const DRIBBLE_STABILITY_WINDOW_SIZE = 8;
-      const DRIBBLE_POSITION_MIN_SAMPLES = 6;
-      const DRIBBLE_HEIGHT_MIN_SAMPLES = 6;
-      const DRIBBLE_TEMPO_MIN_SAMPLES = 5;
-      const DRIBBLE_HEIGHT_TOLERANCE_RATIO = 0.15;
-      const DRIBBLE_TEMPO_TOLERANCE_RATIO = 0.18;
-      const DRIBBLE_FRONT_POSITION_TOLERANCE = 0.2;
-      const DRIBBLE_SIDE_POSITION_TOLERANCE = 0.18;
-      const DRIBBLE_FRONT_OUTSIDE_LANE_STABLE_RATIO = 0.8;
-      const DRIBBLE_STABLE_RATIO = 0.7;
-      const DRIBBLE_MIXED_RATIO = 0.5;
+      const DRIBBLE_RHYTHM_BAD_INTERVAL_DIFF_MS = 200;
+      const DRIBBLE_FRONT_EYE_NECK_DOWN_GAP = 0.03;
+      const DRIBBLE_FOOT_COUNT_DISTANCE = 0.12;
+      const DRIBBLE_FOOT_RESET_DISTANCE = 0.17;
       const SHOOT_BALL_HAND_CONTACT_DISTANCE = 0.16;
       const SHOOT_BALL_HAND_SEPARATION_DISTANCE = 0.22;
       const SHOOT_BALL_HAND_SEPARATION_DELTA = 0.045;
@@ -134,18 +131,42 @@ export function buildPoseWebHtml(
       const BALL_TRACK_CIRCLE_COVERAGE_BONUS = 20;
       const BALL_TRACK_PATTERN_BONUS = 76;
       const BALL_TRACK_PATTERN_MIN_RADIUS_PX = 8;
+      const BALL_TRACK_OUTLINE_BIN_COUNT = 18;
+      const BALL_TRACK_OUTLINE_INNER_RADIUS_RATIO = 0.58;
+      const BALL_TRACK_OUTLINE_OUTER_RADIUS_RATIO = 1.18;
+      const BALL_TRACK_OUTLINE_FILL_RELAX_FACTOR = 0.78;
+      const BALL_TRACK_OUTLINE_MIN_COVERAGE_RELAX_FACTOR = 0.72;
+      const BALL_TRACK_OUTLINE_MAX_COVERAGE_RELAX_FACTOR = 1.08;
+      const BALL_TRACK_MOTION_BONUS = 44;
+      const BALL_TRACK_MOTION_MIN_RATIO = 0.08;
+      const BALL_TRACK_MOTION_THRESHOLD = 0.12;
+      const BALL_TRACK_MOTION_LINK_RADIUS = 2;
+      const BALL_TRACK_MOTION_GLOBAL_MIN_RATIO = 0.002;
+      const BALL_TRACK_MOTION_GLOBAL_MAX_RATIO = 0.34;
+      const BALL_TRACK_MOTION_REGION_SHIFT_MAX = 0.12;
+      const BALL_TRACK_MOTION_REGION_AREA_MIN_RATIO = 0.72;
+      const BALL_TRACK_MOTION_REGION_AREA_MAX_RATIO = 1.45;
       const BALL_DETECTION_FULL_WIDTH = 224;
       const BALL_DETECTION_FULL_HEIGHT = 168;
       const BALL_DETECTION_FOCUSED_SIZE = 320;
+      const BALL_DETECTION_SHOOT_FOCUSED_SIZE = 512;
+      const BALL_DETECTION_DRIBBLE_FOCUSED_SIZE = 512;
       const BALL_DETECTION_MIN_ROI_SIDE = 0.28;
       const BALL_DETECTION_SHOOT_MIN_ROI_SIDE = 0.24;
       const BALL_DETECTION_ROI_PADDING = 0.18;
+      const BALL_DETECTION_SHOOT_WRIST_MIN_ROI_SIDE = 0.22;
+      const BALL_DETECTION_SHOOT_WRIST_ROI_PADDING = 0.08;
+      const BALL_DETECTION_DRIBBLE_ROI_PADDING = 0.12;
+      const BALL_DETECTION_DRIBBLE_WRIST_MIN_ROI_SIDE = 0.24;
+      const BALL_DETECTION_DRIBBLE_WRIST_ROI_PADDING = 0.08;
       const BALL_DETECTION_TRACKED_PADDING = 1.15;
       const BALL_DETECTION_TRACKED_MIN_RADIUS = 0.07;
       const BALL_TRACK_ANY_WRIST_BONUS = 74;
       const BALL_TRACK_SHOOTING_WRIST_BONUS = 120;
       const BALL_TRACK_SUPPORT_WRIST_BONUS = 54;
       const BALL_TRACK_WRIST_DISTANCE_SCALE = 360;
+      const BALL_TRACK_DRIBBLE_WRIST_BONUS = 42;
+      const BALL_TRACK_DRIBBLE_WRIST_DISTANCE_SCALE = 240;
       const BALL_TRACK_LOWER_BODY_BONUS = 42;
       const BALL_TRACK_BODY_ALIGNMENT_BONUS = 30;
       const BALL_TRACK_BODY_ALIGNMENT_PENALTY = 18;
@@ -184,6 +205,7 @@ export function buildPoseWebHtml(
 
       const LABELS = {
         head: "머리",
+        eye: "눈",
         neck: "목",
         shoulder: "어깨",
         elbow: "팔꿈치",
@@ -239,19 +261,15 @@ export function buildPoseWebHtml(
       let lowestBounceY = null;
       let lastBounceHand = "unknown";
       let lastDribbleBounceAtMs = null;
-      let dribbleHeightSamples = [];
-      let dribbleTempoSamples = [];
-      let dribbleFrontPositionSamples = [];
-      let dribbleFrontOutsideLaneSamples = [];
-      let dribbleSidePositionSamples = [];
+      let previousDribbleIntervalMs = null;
+      let dribbleRhythmGoodCount = 0;
+      let dribbleRhythmBadCount = 0;
       let shootLowestLegAngle = null;
       let shootLowestLegAngleAtMs = null;
       let shootHeadPeakY = null;
       let shootLatestControlledBallY = null;
       let shootLatestControlledHeadY = null;
       let shootReleaseDetected = false;
-      let shootReleaseDetectedAtMs = null;
-      let shootSuccessGestureEvaluated = false;
       let shootReleaseTiming = "unknown";
       let shootReleasePointY = null;
       let shootReleasePointState = "unknown";
@@ -267,6 +285,10 @@ export function buildPoseWebHtml(
       let shootArmExtensionAtMs = null;
       let trackedBall = null;
       let trackedBallMissingFrames = 0;
+      let previousBallMotionLuminanceMap = null;
+      let previousBallMotionRegion = null;
+      let previousBallMotionWidth = 0;
+      let previousBallMotionHeight = 0;
       let cameraStreamStopped = false;
       let currentCameraFacingMode = "user";
       let isSwitchingCamera = false;
@@ -274,6 +296,8 @@ export function buildPoseWebHtml(
       let dragStartX = null;
       let dragStartY = null;
       let dragTriggered = false;
+      let lastProcessingErrorMessage = "";
+      let lastProcessingErrorAt = 0;
 
       function post(payload) {
         if (window.ReactNativeWebView) {
@@ -296,11 +320,9 @@ export function buildPoseWebHtml(
         lowestBounceY = null;
         lastBounceHand = "unknown";
         lastDribbleBounceAtMs = null;
-        dribbleHeightSamples = [];
-        dribbleTempoSamples = [];
-        dribbleFrontPositionSamples = [];
-        dribbleFrontOutsideLaneSamples = [];
-        dribbleSidePositionSamples = [];
+        previousDribbleIntervalMs = null;
+        dribbleRhythmGoodCount = 0;
+        dribbleRhythmBadCount = 0;
       }
 
       function resetShootTracking() {
@@ -311,8 +333,6 @@ export function buildPoseWebHtml(
         shootLatestControlledBallY = null;
         shootLatestControlledHeadY = null;
         shootReleaseDetected = false;
-        shootReleaseDetectedAtMs = null;
-        shootSuccessGestureEvaluated = false;
         shootReleaseTiming = "unknown";
         shootReleasePointY = null;
         shootReleasePointState = "unknown";
@@ -331,6 +351,10 @@ export function buildPoseWebHtml(
       function resetBallTracking() {
         trackedBall = null;
         trackedBallMissingFrames = 0;
+        previousBallMotionLuminanceMap = null;
+        previousBallMotionRegion = null;
+        previousBallMotionWidth = 0;
+        previousBallMotionHeight = 0;
       }
 
       function resetAnalysisSummaries() {
@@ -339,6 +363,22 @@ export function buildPoseWebHtml(
         lastDribbleSummary = "";
         lastShootSummary = "";
         lastSentAt = 0;
+      }
+
+      function reportProcessingError(scope, error) {
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : typeof error === "string"
+              ? error
+              : "unknown_processing_error";
+        const now = Date.now();
+
+        if (message !== lastProcessingErrorMessage || now - lastProcessingErrorAt > 2000) {
+          console.error("[lesson-camera:" + scope + "]", error);
+          lastProcessingErrorMessage = message;
+          lastProcessingErrorAt = now;
+        }
       }
 
       function stopActiveVideoStream() {
@@ -582,72 +622,30 @@ export function buildPoseWebHtml(
         };
       }
 
+      function averageVisiblePoints(points) {
+        const visiblePoints = points.filter(visible);
+        if (visiblePoints.length === 0) {
+          return null;
+        }
+
+        const total = visiblePoints.reduce(
+          (acc, point) => ({
+            x: acc.x + point.x,
+            y: acc.y + point.y,
+            visibility: Math.min(acc.visibility, point.visibility ?? 1)
+          }),
+          { x: 0, y: 0, visibility: 1 }
+        );
+
+        return {
+          x: total.x / visiblePoints.length,
+          y: total.y / visiblePoints.length,
+          visibility: total.visibility
+        };
+      }
+
       function distanceBetween(a, b) {
         return Math.hypot(a.x - b.x, a.y - b.y);
-      }
-
-      function pushLimitedSample(samples, value) {
-        samples.push(value);
-        if (samples.length > DRIBBLE_STABILITY_WINDOW_SIZE) {
-          samples.shift();
-        }
-      }
-
-      function getMedian(values) {
-        if (!values.length) {
-          return null;
-        }
-
-        const sorted = [...values].sort((left, right) => left - right);
-        const middleIndex = Math.floor(sorted.length / 2);
-        return sorted.length % 2 === 0
-          ? (sorted[middleIndex - 1] + sorted[middleIndex]) / 2
-          : sorted[middleIndex];
-      }
-
-      function buildStabilityStateFromRatio(stableRatio, sampleCount, minSampleCount) {
-        if (sampleCount < minSampleCount || stableRatio === null) {
-          return "unknown";
-        }
-
-        if (stableRatio >= DRIBBLE_STABLE_RATIO) {
-          return "stable";
-        }
-
-        if (stableRatio >= DRIBBLE_MIXED_RATIO) {
-          return "mixed";
-        }
-
-        return "unstable";
-      }
-
-      function calculateRatioWithinTolerance(values, tolerance) {
-        if (!values.length) {
-          return null;
-        }
-
-        const median = getMedian(values);
-        if (median === null) {
-          return null;
-        }
-
-        const stableCount = values.filter((value) => Math.abs(value - median) <= tolerance).length;
-        return stableCount / values.length;
-      }
-
-      function calculateScaledRatioWithinTolerance(values, toleranceRatio) {
-        if (!values.length) {
-          return null;
-        }
-
-        const median = getMedian(values);
-        if (median === null) {
-          return null;
-        }
-
-        const tolerance = Math.abs(median) * toleranceRatio;
-        const stableCount = values.filter((value) => Math.abs(value - median) <= tolerance).length;
-        return stableCount / values.length;
       }
 
       function angleAt(a, b, c) {
@@ -669,53 +667,6 @@ export function buildPoseWebHtml(
 
         const cosine = Math.min(1, Math.max(-1, dot / (magAB * magCB)));
         return Math.acos(cosine) * 180 / Math.PI;
-      }
-
-      function orientation(a, b, c) {
-        return (b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y);
-      }
-
-      function onSegment(a, b, c) {
-        return (
-          Math.min(a.x, c.x) <= b.x &&
-          b.x <= Math.max(a.x, c.x) &&
-          Math.min(a.y, c.y) <= b.y &&
-          b.y <= Math.max(a.y, c.y)
-        );
-      }
-
-      function segmentsIntersect(a, b, c, d) {
-        if (!visible(a) || !visible(b) || !visible(c) || !visible(d)) {
-          return false;
-        }
-
-        const o1 = orientation(a, b, c);
-        const o2 = orientation(a, b, d);
-        const o3 = orientation(c, d, a);
-        const o4 = orientation(c, d, b);
-
-        if (o1 === 0 && onSegment(a, c, b)) return true;
-        if (o2 === 0 && onSegment(a, d, b)) return true;
-        if (o3 === 0 && onSegment(c, a, d)) return true;
-        if (o4 === 0 && onSegment(c, b, d)) return true;
-
-        return (o1 > 0) !== (o2 > 0) && (o3 > 0) !== (o4 > 0);
-      }
-
-      function detectArmsCrossedX(leftShoulder, leftWrist, rightShoulder, rightWrist) {
-        if (!visible(leftShoulder) || !visible(leftWrist) || !visible(rightShoulder) || !visible(rightWrist)) {
-          return false;
-        }
-
-        const shoulderWidth = distanceBetween(leftShoulder, rightShoulder);
-        const wristsDistance = distanceBetween(leftWrist, rightWrist);
-        const wristsAlignedVertically = Math.abs(leftWrist.y - rightWrist.y) <= 0.18;
-
-        return (
-          segmentsIntersect(leftShoulder, leftWrist, rightShoulder, rightWrist) &&
-          wristsDistance <= shoulderWidth * 1.35 &&
-          wristsAlignedVertically
-        );
       }
 
       function rgbToHsv(r, g, b) {
@@ -805,6 +756,11 @@ export function buildPoseWebHtml(
           return 1;
         }
 
+        const learnedRed = allowRed ? learnedBandByColor.get("red") : null;
+        if (learnedRed && matchesLearnedBand(h, s, v, learnedRed)) {
+          return 2;
+        }
+
         const learnedWhite = allowWhite ? learnedBandByColor.get("white") : null;
         if (learnedWhite && matchesLearnedBand(h, s, v, learnedWhite)) {
           return 1;
@@ -818,11 +774,6 @@ export function buildPoseWebHtml(
         const learnedGray = allowGray ? learnedBandByColor.get("gray") : null;
         if (learnedGray && matchesLearnedBand(h, s, v, learnedGray)) {
           return 1;
-        }
-
-        const learnedRed = allowRed ? learnedBandByColor.get("red") : null;
-        if (learnedRed && matchesLearnedBand(h, s, v, learnedRed)) {
-          return 2;
         }
 
         const isOrange = allowOrange && h >= 10 && h <= 42 && s >= 0.45 && v >= 0.25 && r > g && g > b * 0.8;
@@ -874,7 +825,8 @@ export function buildPoseWebHtml(
             minFillRatio: 0.28,
             minCircleCoverage: 0.18,
             maxCircleCoverage: 1.38,
-            minCircleMatch: 0.72
+            minCircleMatch: 0.72,
+            minOutlineMatch: 0.54
           };
         }
 
@@ -888,7 +840,8 @@ export function buildPoseWebHtml(
             minFillRatio: 0.3,
             minCircleCoverage: 0.2,
             maxCircleCoverage: 1.34,
-            minCircleMatch: 0.74
+            minCircleMatch: 0.74,
+            minOutlineMatch: 0.58
           };
         }
 
@@ -901,7 +854,8 @@ export function buildPoseWebHtml(
           minFillRatio: 0.3,
           minCircleCoverage: 0.2,
           maxCircleCoverage: 1.34,
-          minCircleMatch: 0.73
+          minCircleMatch: 0.73,
+          minOutlineMatch: 0.57
         };
       }
 
@@ -1055,8 +1009,8 @@ export function buildPoseWebHtml(
           const focusedTrackedBox = createSquareBox(trackedBallBox, BALL_DETECTION_MIN_ROI_SIDE, 0.08);
           return {
             ...focusedTrackedBox,
-            width: BALL_DETECTION_FOCUSED_SIZE,
-            height: BALL_DETECTION_FOCUSED_SIZE,
+            width: lessonMode === "shoot" ? BALL_DETECTION_SHOOT_FOCUSED_SIZE : BALL_DETECTION_DRIBBLE_FOCUSED_SIZE,
+            height: lessonMode === "shoot" ? BALL_DETECTION_SHOOT_FOCUSED_SIZE : BALL_DETECTION_DRIBBLE_FOCUSED_SIZE,
             focused: true
           };
         }
@@ -1088,8 +1042,18 @@ export function buildPoseWebHtml(
                     landmarks[INDEX.leftWrist],
                     landmarks[INDEX.rightWrist]
                   ],
-                  0.05,
-                  0.06
+                  0.03,
+                  0.1
+                ),
+                getBoundingBox(
+                  [
+                    landmarks[INDEX.leftShoulder],
+                    landmarks[INDEX.rightShoulder],
+                    landmarks[INDEX.leftHip],
+                    landmarks[INDEX.rightHip]
+                  ],
+                  0.03,
+                  0.05
                 ),
                 getBoundingBox(
                   [
@@ -1100,13 +1064,101 @@ export function buildPoseWebHtml(
                     landmarks[INDEX.leftAnkle],
                     landmarks[INDEX.rightAnkle]
                   ],
-                  0.05,
-                  0.05
+                  0.03,
+                  0.03
                 )
               );
-        const mergedBox = mergeBoxes(bodyBox, trackedBallBox);
+        const dribbleWristPriorityBox =
+          lessonMode === "dribble"
+            ? mergeBoxes(
+                getBoundingBox(
+                  [
+                    landmarks[INDEX.leftElbow],
+                    landmarks[INDEX.rightElbow],
+                    landmarks[INDEX.leftWrist],
+                    landmarks[INDEX.rightWrist]
+                  ],
+                  0.03,
+                  0.12
+                ),
+                getBoundingBox(
+                  [
+                    landmarks[INDEX.leftShoulder],
+                    landmarks[INDEX.rightShoulder],
+                    landmarks[INDEX.leftHip],
+                    landmarks[INDEX.rightHip]
+                  ],
+                  0.03,
+                  0.05
+                ),
+                getBoundingBox(
+                  [
+                    landmarks[INDEX.leftHip],
+                    landmarks[INDEX.rightHip],
+                    landmarks[INDEX.leftKnee],
+                    landmarks[INDEX.rightKnee],
+                    landmarks[INDEX.leftAnkle],
+                    landmarks[INDEX.rightAnkle]
+                  ],
+                  0.03,
+                  0.03
+                ),
+                trackedBallBox
+              )
+            : null;
+        const shootWristPriorityBox =
+          lessonMode === "shoot"
+            ? mergeBoxes(
+                getBoundingBox(
+                  [
+                    landmarks[INDEX.nose],
+                    landmarks[INDEX.leftShoulder],
+                    landmarks[INDEX.rightShoulder],
+                    landmarks[INDEX.leftElbow],
+                    landmarks[INDEX.rightElbow],
+                    landmarks[INDEX.leftWrist],
+                    landmarks[INDEX.rightWrist]
+                  ],
+                  0.04,
+                  0.14
+                ),
+                getBoundingBox(
+                  [
+                    landmarks[INDEX.leftShoulder],
+                    landmarks[INDEX.rightShoulder],
+                    landmarks[INDEX.leftHip],
+                    landmarks[INDEX.rightHip]
+                  ],
+                  0.03,
+                  0.06
+                ),
+                trackedBallBox
+              )
+            : null;
+        const mergedBox = mergeBoxes(
+          lessonMode === "shoot" && shootWristPriorityBox
+            ? shootWristPriorityBox
+            : lessonMode === "dribble" && dribbleWristPriorityBox
+              ? dribbleWristPriorityBox
+              : bodyBox,
+          trackedBallBox
+        );
         const minSide = lessonMode === "shoot" ? BALL_DETECTION_SHOOT_MIN_ROI_SIDE : BALL_DETECTION_MIN_ROI_SIDE;
-        const focusedBox = createSquareBox(mergedBox, minSide, BALL_DETECTION_ROI_PADDING);
+        const focusedBox = createSquareBox(
+          mergedBox,
+          lessonMode === "shoot" && shootWristPriorityBox
+            ? BALL_DETECTION_SHOOT_WRIST_MIN_ROI_SIDE
+            : lessonMode === "dribble" && dribbleWristPriorityBox
+            ? BALL_DETECTION_DRIBBLE_WRIST_MIN_ROI_SIDE
+            : minSide,
+          lessonMode === "shoot"
+            ? lessonMode === "shoot" && shootWristPriorityBox
+              ? BALL_DETECTION_SHOOT_WRIST_ROI_PADDING
+              : BALL_DETECTION_ROI_PADDING
+            : lessonMode === "dribble" && dribbleWristPriorityBox
+              ? BALL_DETECTION_DRIBBLE_WRIST_ROI_PADDING
+              : BALL_DETECTION_DRIBBLE_ROI_PADDING
+        );
 
         if (!focusedBox) {
           return {
@@ -1122,8 +1174,8 @@ export function buildPoseWebHtml(
 
         return {
           ...focusedBox,
-          width: BALL_DETECTION_FOCUSED_SIZE,
-          height: BALL_DETECTION_FOCUSED_SIZE,
+          width: lessonMode === "shoot" ? BALL_DETECTION_SHOOT_FOCUSED_SIZE : BALL_DETECTION_DRIBBLE_FOCUSED_SIZE,
+          height: lessonMode === "shoot" ? BALL_DETECTION_SHOOT_FOCUSED_SIZE : BALL_DETECTION_DRIBBLE_FOCUSED_SIZE,
           focused: true
         };
       }
@@ -1188,6 +1240,74 @@ export function buildPoseWebHtml(
         return unionCount > 0 ? intersectionCount / unionCount : 0;
       }
 
+      function calculateCircleOutlineMetrics(componentPixels, width, height, centerX, centerY, radiusPx) {
+        if (!componentPixels.length || radiusPx <= 0) {
+          return {
+            outlineMatchRatio: 0,
+            arcCoverageRatio: 0,
+            radialConsistencyRatio: 0,
+          };
+        }
+
+        const componentPixelSet = new Set(componentPixels);
+        const angleBins = new Uint8Array(BALL_TRACK_OUTLINE_BIN_COUNT);
+        const minRadius = radiusPx * BALL_TRACK_OUTLINE_INNER_RADIUS_RATIO;
+        const maxRadius = radiusPx * BALL_TRACK_OUTLINE_OUTER_RADIUS_RATIO;
+        let boundaryPixelCount = 0;
+        let alignedBoundaryCount = 0;
+
+        for (const index of componentPixels) {
+          const x = index % width;
+          const y = Math.floor(index / width);
+          const neighbors = [index - 1, index + 1, index - width, index + width];
+          let isBoundary = false;
+
+          for (const neighbor of neighbors) {
+            if (neighbor < 0 || neighbor >= width * height) {
+              isBoundary = true;
+              break;
+            }
+
+            const neighborX = neighbor % width;
+            if (Math.abs(neighborX - x) > 1 || !componentPixelSet.has(neighbor)) {
+              isBoundary = true;
+              break;
+            }
+          }
+
+          if (!isBoundary) {
+            continue;
+          }
+
+          boundaryPixelCount += 1;
+          const dx = x + 0.5 - centerX;
+          const dy = y + 0.5 - centerY;
+          const distance = Math.hypot(dx, dy);
+
+          if (distance < minRadius || distance > maxRadius) {
+            continue;
+          }
+
+          alignedBoundaryCount += 1;
+          const angle = Math.atan2(dy, dx);
+          const normalizedAngle = angle < 0 ? angle + Math.PI * 2 : angle;
+          const angleBin = Math.min(
+            BALL_TRACK_OUTLINE_BIN_COUNT - 1,
+            Math.floor((normalizedAngle / (Math.PI * 2)) * BALL_TRACK_OUTLINE_BIN_COUNT)
+          );
+          angleBins[angleBin] = 1;
+        }
+
+        const arcCoverageRatio = countPositive(angleBins) / BALL_TRACK_OUTLINE_BIN_COUNT;
+        const radialConsistencyRatio = boundaryPixelCount > 0 ? alignedBoundaryCount / boundaryPixelCount : 0;
+
+        return {
+          outlineMatchRatio: arcCoverageRatio * 0.68 + radialConsistencyRatio * 0.32,
+          arcCoverageRatio,
+          radialConsistencyRatio,
+        };
+      }
+
       function clampNumber(value, min, max) {
         return Math.min(max, Math.max(min, value));
       }
@@ -1223,13 +1343,84 @@ export function buildPoseWebHtml(
         return count;
       }
 
-      function buildBallPatternMaps(data, width, height) {
+      function getRegionCenter(region) {
+        return {
+          x: (region.minX + region.maxX) / 2,
+          y: (region.minY + region.maxY) / 2,
+        };
+      }
+
+      function getRegionArea(region) {
+        return Math.max(0, region.maxX - region.minX) * Math.max(0, region.maxY - region.minY);
+      }
+
+      function buildBallMotionMaps(data, width, height, region) {
         const luminanceMap = new Float32Array(width * height);
+        let motionMap = null;
+
+        if (
+          previousBallMotionLuminanceMap &&
+          previousBallMotionWidth === width &&
+          previousBallMotionHeight === height &&
+          previousBallMotionRegion
+        ) {
+          const previousCenter = getRegionCenter(previousBallMotionRegion);
+          const currentCenter = getRegionCenter(region);
+          const centerShift = Math.hypot(currentCenter.x - previousCenter.x, currentCenter.y - previousCenter.y);
+          const previousArea = getRegionArea(previousBallMotionRegion);
+          const currentArea = getRegionArea(region);
+          const areaRatio = previousArea > 0 ? currentArea / previousArea : 1;
+
+          if (
+            centerShift <= BALL_TRACK_MOTION_REGION_SHIFT_MAX &&
+            areaRatio >= BALL_TRACK_MOTION_REGION_AREA_MIN_RATIO &&
+            areaRatio <= BALL_TRACK_MOTION_REGION_AREA_MAX_RATIO
+          ) {
+            motionMap = new Uint8Array(width * height);
+          }
+        }
+
+        let motionCount = 0;
 
         for (let index = 0; index < width * height; index += 1) {
           const offset = index * 4;
-          luminanceMap[index] = (data[offset] * 0.299 + data[offset + 1] * 0.587 + data[offset + 2] * 0.114) / 255;
+          const luminance = (data[offset] * 0.299 + data[offset + 1] * 0.587 + data[offset + 2] * 0.114) / 255;
+          luminanceMap[index] = luminance;
+
+          if (
+            motionMap &&
+            Math.abs(luminance - previousBallMotionLuminanceMap[index]) >= BALL_TRACK_MOTION_THRESHOLD
+          ) {
+            motionMap[index] = 1;
+            motionCount += 1;
+          }
         }
+
+        const globalMotionRatio = motionMap ? motionCount / (width * height) : 0;
+        const motionReliable =
+          Boolean(motionMap) &&
+          globalMotionRatio >= BALL_TRACK_MOTION_GLOBAL_MIN_RATIO &&
+          globalMotionRatio <= BALL_TRACK_MOTION_GLOBAL_MAX_RATIO;
+
+        previousBallMotionLuminanceMap = luminanceMap;
+        previousBallMotionWidth = width;
+        previousBallMotionHeight = height;
+        previousBallMotionRegion = {
+          minX: region.minX,
+          minY: region.minY,
+          maxX: region.maxX,
+          maxY: region.maxY,
+        };
+
+        return {
+          luminanceMap,
+          motionMap: motionReliable ? motionMap : null,
+          globalMotionRatio,
+          motionReliable,
+        };
+      }
+
+      function buildBallPatternMaps(luminanceMap, width, height) {
 
         const gradientMap = new Float32Array(width * height);
 
@@ -1251,8 +1442,64 @@ export function buildPoseWebHtml(
         };
       }
 
+      function addMotionSupportToMergedMap(mergedMap, colorMap, motionMap, width, height) {
+        if (!motionMap) {
+          return;
+        }
+
+        for (let index = 0; index < motionMap.length; index += 1) {
+          if (motionMap[index] === 0 || mergedMap[index] !== 0) {
+            continue;
+          }
+
+          const x = index % width;
+          const y = Math.floor(index / width);
+          let linkedToColor = false;
+
+          for (
+            let offsetY = -BALL_TRACK_MOTION_LINK_RADIUS;
+            offsetY <= BALL_TRACK_MOTION_LINK_RADIUS && !linkedToColor;
+            offsetY += 1
+          ) {
+            for (let offsetX = -BALL_TRACK_MOTION_LINK_RADIUS; offsetX <= BALL_TRACK_MOTION_LINK_RADIUS; offsetX += 1) {
+              const nextX = x + offsetX;
+              const nextY = y + offsetY;
+
+              if (nextX < 0 || nextX >= width || nextY < 0 || nextY >= height) {
+                continue;
+              }
+
+              if (colorMap[nextY * width + nextX] !== 0) {
+                linkedToColor = true;
+                break;
+              }
+            }
+          }
+
+          if (linkedToColor) {
+            mergedMap[index] = 1;
+          }
+        }
+      }
+
+      function calculateComponentMapHitRatio(componentPixels, supportMap) {
+        if (!supportMap || !componentPixels.length) {
+          return null;
+        }
+
+        let hitCount = 0;
+
+        for (const index of componentPixels) {
+          if (supportMap[index] > 0) {
+            hitCount += 1;
+          }
+        }
+
+        return hitCount / componentPixels.length;
+      }
+
       function calculateBallPatternMetrics(luminanceMap, gradientMap, width, height, centerX, centerY, radiusPx) {
-        if (!selectedBallPatternProfile || radiusPx < BALL_TRACK_PATTERN_MIN_RADIUS_PX) {
+        if (selectedBallPatternProfiles.length === 0 || radiusPx < BALL_TRACK_PATTERN_MIN_RADIUS_PX) {
           return null;
         }
 
@@ -1363,6 +1610,48 @@ export function buildPoseWebHtml(
         return scores.reduce((sum, value) => sum + value, 0) / scores.length;
       }
 
+      function getSwappedPatternProfile(patternProfile) {
+        if (!patternProfile) {
+          return null;
+        }
+
+        return {
+          ...patternProfile,
+          rowCoverageRange: patternProfile.columnCoverageRange,
+          columnCoverageRange: patternProfile.rowCoverageRange,
+        };
+      }
+
+      function getBestPatternProfileContribution(metrics, patternProfiles) {
+        if (!metrics || !Array.isArray(patternProfiles) || patternProfiles.length === 0) {
+          return null;
+        }
+
+        let bestContribution = null;
+
+        for (const patternProfile of patternProfiles) {
+          const profileVariants = [patternProfile, getSwappedPatternProfile(patternProfile)].filter(Boolean);
+
+          for (const profileVariant of profileVariants) {
+            const patternMatchScore = getPatternProfileMatchScore(metrics, profileVariant);
+            if (typeof patternMatchScore !== "number") {
+              continue;
+            }
+
+            const contribution =
+              (patternMatchScore * 2 - 1) *
+              BALL_TRACK_PATTERN_BONUS *
+              (profileVariant.weight || 1);
+
+            if (bestContribution === null || contribution > bestContribution) {
+              bestContribution = contribution;
+            }
+          }
+        }
+
+        return bestContribution;
+      }
+
       function getBallCandidateGuidance(landmarks) {
         if (!landmarks) {
           return null;
@@ -1419,20 +1708,32 @@ export function buildPoseWebHtml(
 
       function scoreBallCandidate(candidate, lastTrackedBall, guidance) {
         let score = candidate.pixelCount;
+        const effectiveCircleMatchRatio = Math.max(candidate.circleMatchRatio, candidate.outlineMatchRatio || 0);
 
         score += Math.max(0, BALL_TRACK_SHAPE_BONUS - Math.abs(1 - candidate.aspectRatio) * 80);
-        score += candidate.circleMatchRatio * BALL_TRACK_CIRCLE_MATCH_BONUS;
+        score += effectiveCircleMatchRatio * BALL_TRACK_CIRCLE_MATCH_BONUS;
         score += Math.max(0, BALL_TRACK_FILL_RATIO_BONUS - Math.abs(0.52 - candidate.fillRatio) * 120);
         score += Math.max(0, BALL_TRACK_CIRCLE_COVERAGE_BONUS - Math.abs(0.72 - candidate.circleCoverage) * 42);
 
-        if (selectedBallPatternProfile && candidate.patternMetrics) {
-          const patternMatchScore = getPatternProfileMatchScore(candidate.patternMetrics, selectedBallPatternProfile);
-          if (typeof patternMatchScore === "number") {
-            score +=
-              (patternMatchScore * 2 - 1) *
-              BALL_TRACK_PATTERN_BONUS *
-              (selectedBallPatternProfile.weight || 1);
+        if (selectedBallPatternProfiles.length > 0 && candidate.patternMetrics) {
+          const patternContribution = getBestPatternProfileContribution(
+            candidate.patternMetrics,
+            selectedBallPatternProfiles
+          );
+          if (typeof patternContribution === "number") {
+            score += selectedBallBrand === "molten"
+              ? Math.max(0, patternContribution)
+              : patternContribution;
           }
+        }
+
+        if (typeof candidate.motionRatio === "number" && candidate.motionRatio > BALL_TRACK_MOTION_MIN_RATIO) {
+          const normalizedMotionRatio = clampNumber(
+            (candidate.motionRatio - BALL_TRACK_MOTION_MIN_RATIO) / (0.42 - BALL_TRACK_MOTION_MIN_RATIO),
+            0,
+            1
+          );
+          score += normalizedMotionRatio * BALL_TRACK_MOTION_BONUS;
         }
 
         if (!lastTrackedBall) {
@@ -1486,6 +1787,14 @@ export function buildPoseWebHtml(
           }
 
           if (lessonMode === "dribble") {
+            if (nearestWristDistance !== null) {
+              score += Math.max(
+                0,
+                BALL_TRACK_DRIBBLE_WRIST_BONUS -
+                  nearestWristDistance * BALL_TRACK_DRIBBLE_WRIST_DISTANCE_SCALE
+              );
+            }
+
             const lowerBodyDistance = getMinDistanceToPoints(candidate, [...guidance.knees, ...guidance.ankles]);
 
             if (lowerBodyDistance !== null) {
@@ -1563,7 +1872,11 @@ export function buildPoseWebHtml(
         const visited = new Uint8Array(width * height);
         const colorMap = new Uint8Array(width * height);
         const mergedMap = new Uint8Array(width * height);
-        const patternMaps = selectedBallPatternProfile ? buildBallPatternMaps(data, width, height) : null;
+        const motionMaps = buildBallMotionMaps(data, width, height, region);
+        const patternMaps =
+          selectedBallPatternProfiles.length > 0
+            ? buildBallPatternMaps(motionMaps.luminanceMap, width, height)
+            : null;
 
         for (let index = 0; index < width * height; index += 1) {
           const offset = index * 4;
@@ -1590,6 +1903,10 @@ export function buildPoseWebHtml(
                 mergedMap[nextY * width + nextX] = 1;
               }
             }
+          }
+
+          if (motionMaps.motionReliable) {
+            addMotionSupportToMergedMap(mergedMap, colorMap, motionMaps.motionMap, width, height);
           }
         }
 
@@ -1682,21 +1999,41 @@ export function buildPoseWebHtml(
             continue;
           }
 
-          const boundingArea = blobWidth * blobHeight;
-          const fillRatio = (profile.mergeColors ? mergedCount : count) / boundingArea;
-          if (fillRatio < profile.minFillRatio) {
-            continue;
-          }
-
-          const radiusPx = Math.max(blobWidth, blobHeight) / 2;
-          const estimatedCircleArea = Math.PI * radiusPx * radiusPx;
-          const circleCoverage = (profile.mergeColors ? mergedCount : count) / estimatedCircleArea;
-          if (circleCoverage < profile.minCircleCoverage || circleCoverage > profile.maxCircleCoverage) {
-            continue;
-          }
-
           const centerX = sumX / mergedCount;
           const centerY = sumY / mergedCount;
+          const boundingArea = blobWidth * blobHeight;
+          const fillRatio = (profile.mergeColors ? mergedCount : count) / boundingArea;
+          const radiusPx = Math.max(blobWidth, blobHeight) / 2;
+          const outlineMetrics = calculateCircleOutlineMetrics(
+            componentPixels,
+            width,
+            height,
+            centerX,
+            centerY,
+            radiusPx
+          );
+          const strongOutline = outlineMetrics.outlineMatchRatio >= profile.minOutlineMatch;
+          const minFillRatio = strongOutline
+            ? profile.minFillRatio * BALL_TRACK_OUTLINE_FILL_RELAX_FACTOR
+            : profile.minFillRatio;
+
+          if (fillRatio < minFillRatio) {
+            continue;
+          }
+
+          const estimatedCircleArea = Math.PI * radiusPx * radiusPx;
+          const circleCoverage = (profile.mergeColors ? mergedCount : count) / estimatedCircleArea;
+          const minCircleCoverage = strongOutline
+            ? profile.minCircleCoverage * BALL_TRACK_OUTLINE_MIN_COVERAGE_RELAX_FACTOR
+            : profile.minCircleCoverage;
+          const maxCircleCoverage = strongOutline
+            ? profile.maxCircleCoverage * BALL_TRACK_OUTLINE_MAX_COVERAGE_RELAX_FACTOR
+            : profile.maxCircleCoverage;
+
+          if (circleCoverage < minCircleCoverage || circleCoverage > maxCircleCoverage) {
+            continue;
+          }
+
           const circleMatchRatio = calculateCircleMatchRatio(
             componentPixels,
             width,
@@ -1708,7 +2045,7 @@ export function buildPoseWebHtml(
             centerY,
             radiusPx
           );
-          if (circleMatchRatio < profile.minCircleMatch) {
+          if (circleMatchRatio < profile.minCircleMatch && !strongOutline) {
             continue;
           }
 
@@ -1722,6 +2059,9 @@ export function buildPoseWebHtml(
                 centerY,
                 radiusPx
               )
+            : null;
+          const motionRatio = motionMaps.motionReliable
+            ? calculateComponentMapHitRatio(componentPixels, motionMaps.motionMap)
             : null;
 
           const candidate = {
@@ -1738,6 +2078,9 @@ export function buildPoseWebHtml(
             fillRatio,
             circleCoverage,
             circleMatchRatio,
+            outlineMatchRatio: outlineMetrics.outlineMatchRatio,
+            arcCoverageRatio: outlineMetrics.arcCoverageRatio,
+            motionRatio,
             patternMetrics
           };
 
@@ -1815,30 +2158,73 @@ export function buildPoseWebHtml(
       }
 
       function classifyEyeFocus(landmarks, neck) {
+        if (lessonMode === "shoot") {
+          return "unknown";
+        }
+
         const nose = landmarks[INDEX.nose];
         const leftEar = landmarks[INDEX.leftEar];
         const rightEar = landmarks[INDEX.rightEar];
         const leftEye = landmarks[INDEX.leftEye];
         const rightEye = landmarks[INDEX.rightEye];
+        const leftShoulder = landmarks[INDEX.leftShoulder];
+        const rightShoulder = landmarks[INDEX.rightShoulder];
+        const isFrontDribbleView = selectedDribbleView === "front";
+        const visibleEyeCount = [leftEye, rightEye].filter(visible).length;
 
-        if (!visible(nose) || !neck) {
+        if (!neck) {
           return "unknown";
         }
 
-        const headBase =
-          visible(leftEar) && visible(rightEar)
-            ? midpoint(leftEar, rightEar)
-            : visible(leftEye) && visible(rightEye)
-              ? midpoint(leftEye, rightEye)
-              : null;
+        if (isFrontDribbleView && visibleEyeCount === 0) {
+          return "ball";
+        }
 
-        if (!headBase) {
+        const eyeAnchor = averageVisiblePoints([leftEye, rightEye]);
+        if (isFrontDribbleView) {
+          if (!eyeAnchor) {
+            return "ball";
+          }
+
+          const eyeNeckGap = Math.abs(neck.y - eyeAnchor.y);
+          return eyeNeckGap <= DRIBBLE_FRONT_EYE_NECK_DOWN_GAP ? "ball" : "forward";
+        }
+
+        const earAnchor = averageVisiblePoints([leftEar, rightEar]);
+        const faceAnchor = eyeAnchor || earAnchor;
+
+        if (!faceAnchor) {
+          return isFrontDribbleView ? "ball" : "unknown";
+        }
+
+        const shoulderWidth =
+          visible(leftShoulder) && visible(rightShoulder)
+            ? distanceBetween(leftShoulder, rightShoulder)
+            : null;
+
+        if (!visible(nose)) {
           return "unknown";
         }
 
-        const noseDrop = nose.y - headBase.y;
+        const faceScaleCandidates = [Math.abs(neck.y - faceAnchor.y)];
+        if (shoulderWidth !== null) {
+          faceScaleCandidates.push(shoulderWidth * 0.55);
+        }
+        if (visible(leftEar) && visible(rightEar)) {
+          faceScaleCandidates.push(distanceBetween(leftEar, rightEar) * 1.1);
+        }
+
+        const faceScale = Math.max(...faceScaleCandidates, 0.05);
+        const noseDrop = nose.y - faceAnchor.y;
         const neckGap = neck.y - nose.y;
-        return noseDrop > 0.055 || neckGap < 0.11 ? "ball" : "forward";
+        const noseDropRatio = noseDrop / faceScale;
+        const neckGapRatio = neckGap / faceScale;
+        const lookingDown =
+          noseDrop >= 0.02 &&
+          noseDropRatio >= 0.4 &&
+          neckGapRatio <= 0.58;
+
+        return lookingDown ? "ball" : "forward";
       }
 
       function classifyDribbleHeight(landmarks, neck, hipMid) {
@@ -2041,12 +2427,50 @@ export function buildPoseWebHtml(
         return "balanced";
       }
 
+      function detectFrontDribbleSide(landmarks, ball) {
+        const leftAnkle = landmarks[INDEX.leftAnkle];
+        const rightAnkle = landmarks[INDEX.rightAnkle];
+
+        if (!ball || !visible(leftAnkle) || !visible(rightAnkle)) {
+          return "unknown";
+        }
+
+        const footCenterX = (leftAnkle.x + rightAnkle.x) / 2;
+        const footSpan = Math.abs(leftAnkle.x - rightAnkle.x);
+
+        if (footSpan < 0.001) {
+          return "unknown";
+        }
+
+        const ballOffsetFromCenter = ball.x - footCenterX;
+
+        if (Math.abs(ballOffsetFromCenter) < footSpan * 0.04) {
+          const leftDistance = Math.abs(ball.x - leftAnkle.x);
+          const rightDistance = Math.abs(ball.x - rightAnkle.x);
+          return rightDistance <= leftDistance ? "right" : "left";
+        }
+
+        const rightSideDirection = Math.sign(rightAnkle.x - footCenterX);
+        if (rightSideDirection === 0) {
+          return "unknown";
+        }
+
+        return ballOffsetFromCenter * rightSideDirection >= 0 ? "right" : "left";
+      }
+
       function detectControllingHand(landmarks, ball) {
         const leftWrist = landmarks[INDEX.leftWrist];
         const rightWrist = landmarks[INDEX.rightWrist];
 
         if (!ball) {
           return "unknown";
+        }
+
+        if (selectedDribbleView === "front") {
+          const frontSide = detectFrontDribbleSide(landmarks, ball);
+          if (frontSide !== "unknown") {
+            return frontSide;
+          }
         }
 
         if (visible(leftWrist) && visible(rightWrist)) {
@@ -2066,117 +2490,44 @@ export function buildPoseWebHtml(
         return "unknown";
       }
 
-      function recordDribbleStabilitySample(landmarks, ball, now) {
-        if (!ball) {
-          return;
-        }
-
-        if (dribbleCount <= 0) {
+      function recordDribbleRhythmSample(now) {
+        if (lastDribbleBounceAtMs === null) {
           lastDribbleBounceAtMs = now;
           return;
         }
 
-        if (highestBounceY !== null && lowestBounceY !== null) {
-          pushLimitedSample(dribbleHeightSamples, Math.max(0, lowestBounceY - highestBounceY));
-        }
+        const currentIntervalMs = Math.max(0, now - lastDribbleBounceAtMs);
 
-        if (lastDribbleBounceAtMs !== null) {
-          pushLimitedSample(dribbleTempoSamples, Math.max(0, now - lastDribbleBounceAtMs));
-        }
-
-        if (selectedDribbleView === "front") {
-          const leftAnkle = landmarks[INDEX.leftAnkle];
-          const rightAnkle = landmarks[INDEX.rightAnkle];
-
-          if (visible(leftAnkle) && visible(rightAnkle)) {
-            const footWidth = Math.abs(leftAnkle.x - rightAnkle.x);
-            if (footWidth > 0.0001) {
-              const ankleMidX = (leftAnkle.x + rightAnkle.x) / 2;
-              pushLimitedSample(dribbleFrontPositionSamples, Math.abs(ball.x - ankleMidX) / footWidth);
-              pushLimitedSample(
-                dribbleFrontOutsideLaneSamples,
-                classifyFrontBallLaneState(landmarks, ball) === "outside_legs" ? 1 : 0
-              );
-            }
-          }
-        } else {
-          const leftShoulder = landmarks[INDEX.leftShoulder];
-          const rightShoulder = landmarks[INDEX.rightShoulder];
-          const leftHip = landmarks[INDEX.leftHip];
-          const rightHip = landmarks[INDEX.rightHip];
-          const shoulderMid = visible(leftShoulder) && visible(rightShoulder) ? midpoint(leftShoulder, rightShoulder) : null;
-          const hipMid = visible(leftHip) && visible(rightHip) ? midpoint(leftHip, rightHip) : null;
-          const torsoCenterX =
-            shoulderMid && hipMid
-              ? (shoulderMid.x + hipMid.x) / 2
-              : shoulderMid
-                ? shoulderMid.x
-                : hipMid
-                  ? hipMid.x
-                  : null;
-
-          if (torsoCenterX !== null) {
-            pushLimitedSample(dribbleSidePositionSamples, Math.abs(ball.x - torsoCenterX));
+        if (previousDribbleIntervalMs !== null) {
+          if (Math.abs(currentIntervalMs - previousDribbleIntervalMs) >= DRIBBLE_RHYTHM_BAD_INTERVAL_DIFF_MS) {
+            dribbleRhythmBadCount += 1;
+          } else {
+            dribbleRhythmGoodCount += 1;
           }
         }
 
+        previousDribbleIntervalMs = currentIntervalMs;
         lastDribbleBounceAtMs = now;
       }
 
-      function getDribbleStabilityMetrics() {
-        const heightStableRatio = calculateScaledRatioWithinTolerance(dribbleHeightSamples, DRIBBLE_HEIGHT_TOLERANCE_RATIO);
-        const tempoStableRatio = calculateScaledRatioWithinTolerance(dribbleTempoSamples, DRIBBLE_TEMPO_TOLERANCE_RATIO);
-        const positionSamples = selectedDribbleView === "front" ? dribbleFrontPositionSamples : dribbleSidePositionSamples;
-
-        let positionStableRatio =
-          selectedDribbleView === "front"
-            ? calculateRatioWithinTolerance(dribbleFrontPositionSamples, DRIBBLE_FRONT_POSITION_TOLERANCE)
-            : calculateRatioWithinTolerance(dribbleSidePositionSamples, DRIBBLE_SIDE_POSITION_TOLERANCE);
-
-        let positionStabilityState = buildStabilityStateFromRatio(
-          positionStableRatio,
-          positionSamples.length,
-          DRIBBLE_POSITION_MIN_SAMPLES
-        );
-
-        if (selectedDribbleView === "front" && dribbleFrontOutsideLaneSamples.length > 0 && positionStableRatio !== null) {
-          const outsideLaneStableRatio =
-            dribbleFrontOutsideLaneSamples.reduce((sum, value) => sum + value, 0) / dribbleFrontOutsideLaneSamples.length;
-          positionStableRatio = Math.min(positionStableRatio, outsideLaneStableRatio);
-          positionStabilityState = buildStabilityStateFromRatio(
-            positionStableRatio,
-            dribbleFrontPositionSamples.length,
-            DRIBBLE_POSITION_MIN_SAMPLES
-          );
-
-          if (
-            positionStabilityState === "stable" &&
-            outsideLaneStableRatio < DRIBBLE_FRONT_OUTSIDE_LANE_STABLE_RATIO
-          ) {
-            positionStabilityState = outsideLaneStableRatio >= DRIBBLE_MIXED_RATIO ? "mixed" : "unstable";
-          }
-        }
+      function getDribbleRhythmMetrics() {
+        const dribbleRhythmComparisonCount = dribbleRhythmGoodCount + dribbleRhythmBadCount;
+        const dribbleRhythmBadRatio =
+          dribbleRhythmComparisonCount > 0
+            ? dribbleRhythmBadCount / dribbleRhythmComparisonCount
+            : null;
 
         return {
-          positionStableRatio: positionStableRatio ?? undefined,
-          positionStabilityState,
-          heightStableRatio: heightStableRatio ?? undefined,
-          heightStabilityState: buildStabilityStateFromRatio(
-            heightStableRatio,
-            dribbleHeightSamples.length,
-            DRIBBLE_HEIGHT_MIN_SAMPLES
-          ),
-          tempoStableRatio: tempoStableRatio ?? undefined,
-          tempoStabilityState: buildStabilityStateFromRatio(
-            tempoStableRatio,
-            dribbleTempoSamples.length,
-            DRIBBLE_TEMPO_MIN_SAMPLES
-          ),
-          stabilitySampleCount: Math.max(
-            positionSamples.length,
-            dribbleHeightSamples.length,
-            dribbleTempoSamples.length
-          ),
+          dribbleRhythmState:
+            dribbleRhythmComparisonCount <= 0
+              ? "unknown"
+              : dribbleRhythmBadRatio !== null && dribbleRhythmBadRatio >= 0.5
+                ? "needs_improvement"
+                : "good",
+          dribbleRhythmGoodCount,
+          dribbleRhythmBadCount,
+          dribbleRhythmBadRatio: dribbleRhythmBadRatio ?? undefined,
+          dribbleRhythmComparisonCount,
         };
       }
 
@@ -2187,17 +2538,26 @@ export function buildPoseWebHtml(
         const rightKnee = landmarks[INDEX.rightKnee];
         const visibleKnees = [leftKnee, rightKnee].filter(visible);
 
-        if (!ball || !visible(leftAnkle) || !visible(rightAnkle) || visibleKnees.length === 0) {
+        if (!ball || !visible(leftAnkle) || !visible(rightAnkle)) {
           wasBallNearFoot = false;
           wasBallBelowKnee = false;
           return;
         }
 
-        const footY = (leftAnkle.y + rightAnkle.y) / 2;
-        const kneeY = visibleKnees.reduce((sum, point) => sum + point.y, 0) / visibleKnees.length;
-        const nearFoot = ball.y >= footY - 0.07;
-        const belowKnee = ball.y >= kneeY;
-        const aboveResetLine = ball.y <= kneeY - 0.04;
+        const ballPoint = { x: ball.x, y: ball.y, visibility: 1 };
+        const footMid = midpoint(leftAnkle, rightAnkle);
+        const nearestFootDistance = Math.min(
+          distanceBetween(ballPoint, leftAnkle),
+          distanceBetween(ballPoint, rightAnkle),
+          distanceBetween(ballPoint, footMid)
+        );
+        const kneeY =
+          visibleKnees.length > 0
+            ? visibleKnees.reduce((sum, point) => sum + point.y, 0) / visibleKnees.length
+            : null;
+        const nearFoot = nearestFootDistance <= DRIBBLE_FOOT_COUNT_DISTANCE;
+        const movedAwayFromFoot = nearestFootDistance >= DRIBBLE_FOOT_RESET_DISTANCE;
+        const aboveResetLine = kneeY !== null ? ball.y <= kneeY - 0.04 : movedAwayFromFoot;
 
         if (highestBounceY === null || ball.y < highestBounceY) {
           highestBounceY = ball.y;
@@ -2207,15 +2567,15 @@ export function buildPoseWebHtml(
           lowestBounceY = ball.y;
         }
 
-        const enteredBounceZone = (belowKnee && !wasBallBelowKnee) || (nearFoot && !wasBallNearFoot);
+        const enteredBounceZone = nearFoot && !wasBallNearFoot;
 
-        if (aboveResetLine) {
+        if (aboveResetLine || movedAwayFromFoot) {
           dribbleBounceLocked = false;
         }
 
         if (enteredBounceZone && !dribbleBounceLocked) {
           const now = performance.now();
-          recordDribbleStabilitySample(landmarks, ball, now);
+          recordDribbleRhythmSample(now);
           dribbleCount += 1;
           lastBounceHand = detectControllingHand(landmarks, ball);
 
@@ -2231,7 +2591,7 @@ export function buildPoseWebHtml(
         }
 
         wasBallNearFoot = nearFoot;
-        wasBallBelowKnee = belowKnee;
+        wasBallBelowKnee = kneeY !== null ? ball.y >= kneeY : nearFoot;
       }
 
       function classifyBounceStates(shoulderMid, hipMid) {
@@ -2278,7 +2638,7 @@ export function buildPoseWebHtml(
             ? "balanced"
             : "unknown";
         const bounceStates = classifyBounceStates(shoulderMid, hipMid);
-        const stabilityMetrics = getDribbleStabilityMetrics();
+        const dribbleRhythmMetrics = getDribbleRhythmMetrics();
 
         return {
           dribbleStarted,
@@ -2300,13 +2660,11 @@ export function buildPoseWebHtml(
           footSpacingState,
           highestBounceY,
           lowestBounceY,
-          positionStabilityState: stabilityMetrics.positionStabilityState,
-          positionStableRatio: stabilityMetrics.positionStableRatio,
-          heightStabilityState: stabilityMetrics.heightStabilityState,
-          heightStableRatio: stabilityMetrics.heightStableRatio,
-          tempoStabilityState: stabilityMetrics.tempoStabilityState,
-          tempoStableRatio: stabilityMetrics.tempoStableRatio,
-          stabilitySampleCount: stabilityMetrics.stabilitySampleCount,
+          dribbleRhythmState: dribbleRhythmMetrics.dribbleRhythmState,
+          dribbleRhythmGoodCount: dribbleRhythmMetrics.dribbleRhythmGoodCount,
+          dribbleRhythmBadCount: dribbleRhythmMetrics.dribbleRhythmBadCount,
+          dribbleRhythmBadRatio: dribbleRhythmMetrics.dribbleRhythmBadRatio,
+          dribbleRhythmComparisonCount: dribbleRhythmMetrics.dribbleRhythmComparisonCount,
           summary: [
             "??:" + bodyFacing,
             "???:" + (dribbleStarted ? "??" : "??"),
@@ -2348,7 +2706,6 @@ export function buildPoseWebHtml(
         const shootingShoulder = shootingSide === "left" ? leftShoulder : shootingSide === "right" ? rightShoulder : null;
         const shootingWrist = shootingSide === "left" ? leftWrist : shootingSide === "right" ? rightWrist : null;
         const ballPoint = ball ? { x: ball.x, y: ball.y, visibility: 1 } : null;
-        const armsCrossedX = detectArmsCrossedX(leftShoulder, leftWrist, rightShoulder, rightWrist);
         const now = performance.now();
         const previousArmAngle = shootPreviousArmAngle;
         const previousArmAngleAtMs = shootPreviousArmAngleAtMs;
@@ -2486,8 +2843,6 @@ export function buildPoseWebHtml(
 
         if (releaseDetectedNow) {
           shootReleaseDetected = true;
-          shootReleaseDetectedAtMs = performance.now();
-          shootSuccessGestureEvaluated = false;
 
           if (shootKneeExtensionAtMs !== null && shootArmExtensionAtMs !== null) {
             const timingDeltaMs = shootArmExtensionAtMs - shootKneeExtensionAtMs;
@@ -2517,19 +2872,6 @@ export function buildPoseWebHtml(
           } else {
             shootReleaseDurationMs = null;
             shootReleaseDurationState = "unknown";
-          }
-        }
-
-        if (
-          shootReleaseDetected &&
-          !shootSuccessGestureEvaluated &&
-          shootReleaseDetectedAtMs !== null &&
-          performance.now() - shootReleaseDetectedAtMs >= 1000
-        ) {
-          shootSuccessGestureEvaluated = true;
-
-          if (armsCrossedX) {
-            post({ type: "shoot_success_gesture" });
           }
         }
 
@@ -2571,6 +2913,8 @@ export function buildPoseWebHtml(
         if (lessonMode === "dribble") {
           if (dribbleAnalysis.eyeFocus === "ball") {
             problemJoints.add("head");
+            problemJoints.add("leftEye");
+            problemJoints.add("rightEye");
             problemJoints.add("neck");
           }
 
@@ -2673,7 +3017,14 @@ export function buildPoseWebHtml(
         }
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         ctx.restore();
-        const ball = detectBall(landmarks);
+        let ball = null;
+
+        try {
+          ball = detectBall(landmarks);
+        } catch (error) {
+          resetBallTracking();
+          reportProcessingError("ball-detect", error);
+        }
 
         if (!landmarks) {
           if (ball) {
@@ -2690,6 +3041,8 @@ export function buildPoseWebHtml(
         }
 
         const head = landmarks[INDEX.nose];
+        const leftEye = landmarks[INDEX.leftEye];
+        const rightEye = landmarks[INDEX.rightEye];
         const leftShoulder = landmarks[INDEX.leftShoulder];
         const rightShoulder = landmarks[INDEX.rightShoulder];
         const leftElbow = landmarks[INDEX.leftElbow];
@@ -2702,6 +3055,7 @@ export function buildPoseWebHtml(
         const rightKnee = landmarks[INDEX.rightKnee];
         const leftAnkle = landmarks[INDEX.leftAnkle];
         const rightAnkle = landmarks[INDEX.rightAnkle];
+        const showEyeLandmarks = lessonMode !== "shoot";
         const neck = visible(leftShoulder) && visible(rightShoulder) ? midpoint(leftShoulder, rightShoulder) : null;
         const hipMid = visible(leftHip) && visible(rightHip) ? midpoint(leftHip, rightHip) : null;
 
@@ -2716,6 +3070,8 @@ export function buildPoseWebHtml(
         const joints = {
           head,
           neck,
+          leftEye,
+          rightEye,
           leftShoulder,
           rightShoulder,
           leftElbow,
@@ -2732,6 +3088,8 @@ export function buildPoseWebHtml(
 
         drawPoseSkeleton(joints, problemJointKeys);
         if (visible(head)) drawPoint(head, LABELS.head, getJointColor(problemJointKeys, "head", "#ff6b6b"));
+        if (showEyeLandmarks && visible(leftEye)) drawPoint(leftEye, UI.left + LABELS.eye, getJointColor(problemJointKeys, "leftEye", "#ff8fab"));
+        if (showEyeLandmarks && visible(rightEye)) drawPoint(rightEye, UI.right + LABELS.eye, getJointColor(problemJointKeys, "rightEye", "#ff8fab"));
         if (neck && visible(neck)) drawPoint(neck, LABELS.neck, getJointColor(problemJointKeys, "neck", "#f7b267"));
         if (visible(leftShoulder)) drawPoint(leftShoulder, UI.left + LABELS.shoulder, getJointColor(problemJointKeys, "leftShoulder", "#ffd166"));
         if (visible(rightShoulder)) drawPoint(rightShoulder, UI.right + LABELS.shoulder, getJointColor(problemJointKeys, "rightShoulder", "#ffd166"));
@@ -2751,6 +3109,7 @@ export function buildPoseWebHtml(
 
         const detected = [];
         if (visible(head)) detected.push(LABELS.head);
+        if (showEyeLandmarks && (visible(leftEye) || visible(rightEye))) detected.push(LABELS.eye);
         if (neck && visible(neck)) detected.push(LABELS.neck);
         if (visible(leftShoulder) || visible(rightShoulder)) detected.push(LABELS.shoulder);
         if (visible(leftElbow) || visible(rightElbow)) detected.push(LABELS.elbow);
@@ -2962,16 +3321,16 @@ export function buildPoseWebHtml(
           return;
         }
 
-        if (!poseLandmarker || video.readyState < 2) {
-          requestAnimationFrame(loop);
-          return;
-        }
-
-        if (video.currentTime !== lastVideoTime) {
-          lastVideoTime = video.currentTime;
-          const result = poseLandmarker.detectForVideo(video, performance.now());
-          const landmarks = result.landmarks && result.landmarks.length > 0 ? result.landmarks[0] : null;
-          renderPose(landmarks);
+        try {
+          if (poseLandmarker && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+            lastVideoTime = video.currentTime;
+            const result = poseLandmarker.detectForVideo(video, performance.now());
+            const landmarks = result.landmarks && result.landmarks.length > 0 ? result.landmarks[0] : null;
+            renderPose(landmarks);
+          }
+        } catch (error) {
+          resetBallTracking();
+          reportProcessingError("render-loop", error);
         }
 
         requestAnimationFrame(loop);

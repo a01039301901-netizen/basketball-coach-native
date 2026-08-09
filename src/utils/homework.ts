@@ -8,7 +8,6 @@ import type {
   HomeworkUnlockSnapshot,
   LessonRecord,
   PositionOption,
-  SkillKey,
 } from '../types/app';
 
 export const DAILY_DRIBBLE_HOMEWORK_TITLE = '드리블 50회 튀기기';
@@ -22,9 +21,7 @@ export const POSITION_FEEDBACK_RETRY_TARGET = 1;
 export const CORRECTION_DRIBBLE_TARGET = 10;
 export const FRONT_DRIBBLE_CORRECTION_MIN_TOTAL = 20;
 export const FRONT_DRIBBLE_CORRECTION_MIN_GAP = 6;
-
-export const DEFENSE_FOLLOWUP_SKILL_KEYS: SkillKey[] = ['defense', 'crossover'];
-export const OFFENSE_FOLLOWUP_SKILL_KEYS: SkillKey[] = ['layup', 'shoot'];
+const DAILY_HOMEWORK_REASON_TEXT = '하루 레슨 분석을 위한 하루 연습량';
 
 const POSITIVE_FEEDBACK_KEYWORDS = ['좋습니다', '좋아요', '안정적', '균형이 좋습니다', '타이밍이 안정적', '준비 자세가 좋습니다'];
 
@@ -35,6 +32,12 @@ interface BuildHomeworkProgressInput {
   shotSuccessCount: number;
   lessonRecords: LessonRecord[];
   dailyState: DailyHomeworkState;
+}
+
+interface HomeworkProgressItemOptions {
+  reasonText?: HomeworkProgressItem['reasonText'];
+  detailToggleText?: HomeworkProgressItem['detailToggleText'];
+  detailText?: HomeworkProgressItem['detailText'];
 }
 
 function clampProgress(current: number, target: number) {
@@ -61,7 +64,8 @@ function buildProgressItem(
   stage: HomeworkProgressItem['stage'],
   source: HomeworkProgressItem['source'],
   current: number,
-  target: number
+  target: number,
+  options: HomeworkProgressItemOptions = {}
 ): HomeworkProgressItem {
   const { progress, progressPercent, isCompleted } = clampProgress(current, target);
 
@@ -77,21 +81,14 @@ function buildProgressItem(
     isCompleted,
     progressText: `${progressPercent}% (${progress}/${target})`,
     completionText: isCompleted ? '숙제 완수' : '진행 중',
+    reasonText: options.reasonText,
+    detailToggleText: options.detailToggleText,
+    detailText: options.detailText,
   };
 }
 
 function getTodayLessonCount(dateKey: string, lessonRecords: LessonRecord[]) {
   return lessonRecords.filter((record) => record.dateKey === dateKey).length;
-}
-
-function countRelevantSkillVideoEvents(
-  dailyState: DailyHomeworkState,
-  skillKeys: SkillKey[],
-  unlockedAt: string
-) {
-  return dailyState.skillVideoEvents.filter(
-    (event) => skillKeys.includes(event.skillKey) && event.openedAt >= unlockedAt
-  ).length;
 }
 
 function isPositiveFeedbackText(text: string) {
@@ -171,6 +168,13 @@ export function getMostFrequentHomeworkFeedbackCategory(
   lessonRecords: LessonRecord[],
   recentLimit = 3
 ): HomeworkFeedbackCategory | null {
+  return getMostFrequentHomeworkFeedbackSummary(lessonRecords, recentLimit).category;
+}
+
+function getMostFrequentHomeworkFeedbackSummary(
+  lessonRecords: LessonRecord[],
+  recentLimit = 3
+) {
   const counts = new Map<HomeworkFeedbackCategory, number>();
   const recentRecords = lessonRecords.slice(-recentLimit);
 
@@ -184,91 +188,59 @@ export function getMostFrequentHomeworkFeedbackCategory(
     counts.set(category, (counts.get(category) || 0) + 1);
   }
 
-  return [...counts.entries()]
+  const topEntry = [...counts.entries()]
     .sort((left, right) => {
       if (right[1] !== left[1]) {
         return right[1] - left[1];
       }
 
       return left[0].localeCompare(right[0]);
-    })[0]?.[0] ?? null;
+    })[0] ?? null;
+
+  return {
+    category: topEntry?.[0] ?? null,
+    count: topEntry?.[1] ?? 0,
+  };
 }
 
-function buildNoPositionFollowupTitle(category: HomeworkFeedbackCategory | null) {
-  if (!category) {
-    return '최근 3회 레슨에서 가장 자주 나온 약점 고쳐 레슨 다시 해보기';
+function buildStage2FeedbackDetailText(category: HomeworkFeedbackCategory | null, count: number) {
+  if (!category || count <= 0) {
+    return '최근 3회 레슨에서 반복된 약점 피드백은 아직 많지 않아요.';
   }
 
-  return `최근 3회 레슨에서 가장 자주 나온 약점인 ${getHomeworkFeedbackCategoryLabel(category)} 고쳐 레슨 다시 해보기`;
+  return `최근 3회 레슨에서 ${getHomeworkFeedbackCategoryLabel(category)} 피드백이 ${count}번 나왔어요.`;
 }
 
 function buildBaseHomeworkItems(dribbleCount: number, shootAttemptCount: number) {
   return [
-    buildProgressItem('base-dribble', DAILY_DRIBBLE_HOMEWORK_TITLE, 'base', 'daily', dribbleCount, DAILY_DRIBBLE_TARGET),
-    buildProgressItem('base-shoot', DAILY_SHOOT_HOMEWORK_TITLE, 'base', 'daily', shootAttemptCount, DAILY_SHOOT_TARGET),
+    buildProgressItem('base-dribble', DAILY_DRIBBLE_HOMEWORK_TITLE, 'base', 'daily', dribbleCount, DAILY_DRIBBLE_TARGET, {
+      reasonText: DAILY_HOMEWORK_REASON_TEXT,
+    }),
+    buildProgressItem('base-shoot', DAILY_SHOOT_HOMEWORK_TITLE, 'base', 'daily', shootAttemptCount, DAILY_SHOOT_TARGET, {
+      reasonText: DAILY_HOMEWORK_REASON_TEXT,
+    }),
   ];
 }
 
-function buildPositionFollowupHomeworkItems(
+function buildStage2FollowupHomeworkItems(
   input: BuildHomeworkProgressInput,
   stage2Unlock: HomeworkUnlockSnapshot
 ) {
-  const followupDribbleCount = Math.max(0, input.dailyDribbleCount - stage2Unlock.dribbleCount);
-  const followupShotSuccessCount = Math.max(0, input.shotSuccessCount - stage2Unlock.shotSuccessCount);
   const followupLessonCount = Math.max(0, getTodayLessonCount(input.dateKey, input.lessonRecords) - stage2Unlock.lessonCount);
-
-  if (stage2Unlock.position === 'defense') {
-    return [
-      buildProgressItem(
-        'position-defense-dribble',
-        '드리블 50회 더 해보기',
-        'position_followup',
-        'position',
-        followupDribbleCount,
-        POSITION_DRIBBLE_TARGET
-      ),
-      buildProgressItem(
-        'position-defense-skill',
-        '새로운 기술 배우기에서 수비자세 또는 크로스오버 배워보기',
-        'position_followup',
-        'position',
-        countRelevantSkillVideoEvents(input.dailyState, DEFENSE_FOLLOWUP_SKILL_KEYS, stage2Unlock.unlockedAt),
-        POSITION_SKILL_VIDEO_TARGET
-      ),
-    ];
-  }
-
-  if (stage2Unlock.position === 'offense') {
-    return [
-      buildProgressItem(
-        'position-offense-shoot-success',
-        '슛 성공 10회 도전하기',
-        'position_followup',
-        'position',
-        followupShotSuccessCount,
-        POSITION_SHOOT_SUCCESS_TARGET
-      ),
-      buildProgressItem(
-        'position-offense-skill',
-        '새로운 기술 배우기에서 레이업 또는 슛폼 배우기',
-        'position_followup',
-        'position',
-        countRelevantSkillVideoEvents(input.dailyState, OFFENSE_FOLLOWUP_SKILL_KEYS, stage2Unlock.unlockedAt),
-        POSITION_SKILL_VIDEO_TARGET
-      ),
-    ];
-  }
-
-  const weakCategory = getMostFrequentHomeworkFeedbackCategory(input.lessonRecords, 3);
+  const weakFeedbackSummary = getMostFrequentHomeworkFeedbackSummary(input.lessonRecords, 3);
 
   return [
     buildProgressItem(
-      'position-none-feedback',
-      buildNoPositionFollowupTitle(weakCategory),
+      'stage2-feedback',
+      '가장 많이 나온 피드백 부분 고치기',
       'position_followup',
       'feedback',
       followupLessonCount,
-      POSITION_FEEDBACK_RETRY_TARGET
+      POSITION_FEEDBACK_RETRY_TARGET,
+      {
+        detailToggleText: '자세히 보기',
+        detailText: buildStage2FeedbackDetailText(weakFeedbackSummary.category, weakFeedbackSummary.count),
+      }
     ),
   ];
 }
@@ -305,7 +277,7 @@ export function buildDailyHomeworkProgress(input: BuildHomeworkProgressInput): H
     return correctionItem ? [...baseItems, correctionItem] : baseItems;
   }
 
-  const followupItems = buildPositionFollowupHomeworkItems(input, stage2Unlock);
+  const followupItems = buildStage2FollowupHomeworkItems(input, stage2Unlock);
   return correctionItem ? [...followupItems, correctionItem] : followupItems;
 }
 

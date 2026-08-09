@@ -231,7 +231,7 @@ export function SettingsScreen({
           <View style={styles.trainingSection}>
             <Text style={styles.sectionTitle}>공 이미지 학습</Text>
             <Text style={styles.trainingLead}>
-              공 사진을 1~3장 등록하면 현재 공 색상에 맞춘 보정 밴드를 만들어 레슨 공 인식에 먼저 반영합니다.
+              공 사진을 1~3장 등록하면 현재 공 색상에 맞춘 보정 밴드와 줄무늬 패턴 변형을 만들어 레슨 공 인식에 먼저 반영합니다. 세로 줄무늬가 보이는 사진, 가로 줄무늬가 보이는 사진, 비스듬한 사진을 함께 넣으면 여러 방향에서 더 안정적으로 인식할 수 있습니다.
             </Text>
 
             <View style={styles.trainingActionStack}>
@@ -258,7 +258,7 @@ export function SettingsScreen({
                   autoCorrect={false}
                   textAlignVertical="top"
                 />
-                <Text style={styles.urlTrainingHint}>인터넷 이미지 주소를 한 줄에 하나씩 넣으면 최대 3장까지 학습합니다.</Text>
+                <Text style={styles.urlTrainingHint}>인터넷 이미지 주소를 한 줄에 하나씩 넣으면 최대 3장까지 학습합니다. 세로, 가로, 비스듬한 방향 사진을 함께 넣을수록 방향별 학습이 좋아집니다.</Text>
                 <SmallButton
                   title={isBallRecognitionTraining ? '인터넷 이미지 준비 중' : '인터넷 이미지 학습'}
                   onPress={() => onTrainBallRecognitionFromUrls(ballRecognitionUrlInput)}

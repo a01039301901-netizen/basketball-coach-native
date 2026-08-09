@@ -45,6 +45,15 @@ export async function getLessonRecordEntriesWithMigration(keys: string[]): Promi
 
   if (legacyEntriesToPersist.length > 0) {
     await lessonRecordStorage.multiSet(legacyEntriesToPersist);
+    await Promise.all(
+      legacyEntriesToPersist.map(async ([key]) => {
+        try {
+          await AppStorage.removeItem(key);
+        } catch {
+          // Ignore legacy cleanup failures after the values were copied into SQLite.
+        }
+      })
+    );
   }
 
   const mergedEntryMap = {

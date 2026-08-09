@@ -90,7 +90,7 @@ export interface BallRecognitionPatternProfile {
 export interface BallRecognitionProfile {
   learnedColors: BallColorOption[];
   bands: BallRecognitionBand[];
-  patternProfile: BallRecognitionPatternProfile | null;
+  patternProfiles: BallRecognitionPatternProfile[];
   trainedAt: string;
 }
 
@@ -197,6 +197,9 @@ export interface HomeworkProgressItem {
   isCompleted: boolean;
   progressText: string;
   completionText: string;
+  reasonText?: string;
+  detailToggleText?: string;
+  detailText?: string;
 }
 
 export interface SkillVideoOpenEvent {
@@ -249,7 +252,7 @@ export type TorsoPostureState = 'high' | 'low' | 'balanced' | 'unknown';
 export type DribbleStanceState = 'ready' | 'too_upright' | 'too_low' | 'unknown';
 export type BounceHeightState = 'too_high' | 'too_low' | 'balanced' | 'unknown';
 export type BodyFacingState = 'front' | 'side' | 'unknown';
-export type DribbleStabilityState = 'stable' | 'mixed' | 'unstable' | 'unknown';
+export type DribbleRhythmState = 'good' | 'needs_improvement' | 'unknown';
 export type FrontBallLaneState = 'between_legs' | 'outside_legs' | 'unknown';
 export type HandBalanceState = 'balanced' | 'unbalanced' | 'unknown';
 export type FootSpacingState = 'narrow' | 'wide' | 'balanced' | 'unknown';
@@ -274,13 +277,11 @@ export interface DribbleAnalysis {
   footSpacingState: FootSpacingState;
   highestBounceY: number | null;
   lowestBounceY: number | null;
-  positionStabilityState: DribbleStabilityState;
-  positionStableRatio?: number;
-  heightStabilityState: DribbleStabilityState;
-  heightStableRatio?: number;
-  tempoStabilityState: DribbleStabilityState;
-  tempoStableRatio?: number;
-  stabilitySampleCount: number;
+  dribbleRhythmState: DribbleRhythmState;
+  dribbleRhythmGoodCount: number;
+  dribbleRhythmBadCount: number;
+  dribbleRhythmBadRatio?: number;
+  dribbleRhythmComparisonCount: number;
   summary: string;
 }
 

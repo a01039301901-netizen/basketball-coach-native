@@ -1,4 +1,8 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import {
+  expandBallRecognitionPatternProfiles,
+  MAX_EFFECTIVE_BALL_PATTERN_PROFILES,
+} from '../constants/ballRecognition';
 import type {
   BallColorOption,
   BallRecognitionBand,
@@ -91,6 +95,17 @@ function sanitizePatternProfile(value: unknown): BallRecognitionPatternProfile |
   };
 }
 
+function sanitizePatternProfiles(value: unknown): BallRecognitionPatternProfile[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => sanitizePatternProfile(entry))
+    .filter((entry): entry is BallRecognitionPatternProfile => Boolean(entry))
+    .slice(0, MAX_EFFECTIVE_BALL_PATTERN_PROFILES);
+}
+
 export function sanitizeBallRecognitionProfile(value: unknown): BallRecognitionProfile | null {
   if (!isRecordObject(value)) {
     return null;
@@ -121,9 +136,17 @@ export function sanitizeBallRecognitionProfile(value: unknown): BallRecognitionP
         })
         .filter((entry): entry is BallRecognitionBand => Boolean(entry))
     : [];
-  const patternProfile = sanitizePatternProfile(value.patternProfile);
+  const legacyPatternProfile = sanitizePatternProfile(value.patternProfile);
+  const patternProfiles = sanitizePatternProfiles(value.patternProfiles);
+  const normalizedPatternProfiles =
+    patternProfiles.length > 0
+      ? patternProfiles
+      : legacyPatternProfile
+        ? [legacyPatternProfile]
+        : [];
+  const expandedPatternProfiles = expandBallRecognitionPatternProfiles(normalizedPatternProfiles);
 
-  if (bands.length === 0 && !patternProfile) {
+  if (bands.length === 0 && expandedPatternProfiles.length === 0) {
     return null;
   }
 
@@ -137,7 +160,7 @@ export function sanitizeBallRecognitionProfile(value: unknown): BallRecognitionP
   return {
     learnedColors: uniqueLearnedColors.length > 0 ? uniqueLearnedColors : bands.slice(0, BALL_RECOGNITION_PREVIEW_LIMIT).map((band) => band.color),
     bands,
-    patternProfile,
+    patternProfiles: expandedPatternProfiles,
     trainedAt,
   };
 }

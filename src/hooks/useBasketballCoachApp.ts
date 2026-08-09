@@ -90,6 +90,8 @@ const STARTUP_RECOVERY_TIMEOUT_MS = 8000;
 const DEV_TEST_SHOOT_RECORD_ID = '__dev-test-shoot-bad-no-video-v1';
 const DEV_TEST_SHOOT_RECORD_SEED_KEY = 'basketballDevSeedShootBadNoVideoV3';
 const DEFAULT_DEBUG_TEXT = '移대찓?쇱? MediaPipe瑜?以鍮꾪븯怨??덉뒿?덈떎.';
+const LESSON_RECORD_VIDEO_DIRECTORY_NAME = 'lesson-record-videos';
+const DEFAULT_LESSON_RECORD_VIDEO_EXTENSION = 'webm';
 const COUNTDOWN_CUE_BASE64 =
   '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';
 
@@ -252,6 +254,76 @@ function getAccountStorageKeys(userId: string) {
     ballRecognitionPreviews: buildAccountStorageKey(STORAGE_KEYS.ballRecognitionPreviews, userId),
     position: buildAccountStorageKey(STORAGE_KEYS.position, userId),
   } as const;
+}
+
+function buildLessonRecordVideoDirectory(userId: string) {
+  if (Platform.OS === 'web' || !FileSystem.documentDirectory) {
+    return null;
+  }
+
+  const safeUserId = userId.replace(/[^a-z0-9_-]/gi, '_') || 'local';
+  return `${FileSystem.documentDirectory}${LESSON_RECORD_VIDEO_DIRECTORY_NAME}/${safeUserId}/`;
+}
+
+function sanitizeLessonRecordVideoFileToken(value: string) {
+  return value.replace(/[^a-z0-9_-]/gi, '_') || 'record';
+}
+
+function parseLessonRecordVideoDataUrl(videoUri: string) {
+  if (!videoUri.startsWith('data:')) {
+    return null;
+  }
+
+  const separatorIndex = videoUri.indexOf(',');
+
+  if (separatorIndex <= 5) {
+    return null;
+  }
+
+  const metadata = videoUri.slice(5, separatorIndex);
+  const [mimeType] = metadata.split(';');
+  const normalizedMimeType = mimeType?.trim().toLowerCase() || '';
+
+  if (!metadata.includes(';base64') || !normalizedMimeType.startsWith('video/')) {
+    return null;
+  }
+
+  const base64 = videoUri.slice(separatorIndex + 1);
+
+  if (!base64) {
+    return null;
+  }
+
+  return {
+    mimeType: normalizedMimeType,
+    base64,
+  };
+}
+
+function getLessonRecordVideoExtension(videoUri: string, mimeType?: string) {
+  if (mimeType === 'video/mp4') {
+    return 'mp4';
+  }
+
+  if (mimeType === 'video/quicktime') {
+    return 'mov';
+  }
+
+  if (mimeType === 'video/x-m4v') {
+    return 'm4v';
+  }
+
+  if (mimeType === 'video/webm') {
+    return 'webm';
+  }
+
+  const extensionMatch = /\.([a-z0-9]+)(?:[?#].*)?$/i.exec(videoUri);
+  return extensionMatch?.[1]?.toLowerCase() || DEFAULT_LESSON_RECORD_VIDEO_EXTENSION;
+}
+
+function buildManagedLessonRecordVideoUri(directory: string, recordId: string, extension: string) {
+  const safeRecordId = sanitizeLessonRecordVideoFileToken(recordId);
+  return `${directory}${safeRecordId}.${extension}`;
 }
 
 function toAuthUser(account: UserAccount): AuthUser {
@@ -996,15 +1068,22 @@ function normalizeLessonRecordEvaluation(value: unknown): LessonRecordEvaluation
   const criteria = normalizeLessonRecordCriteria(value.criteria);
   const strengths = normalizeLessonRecordHighlights(value.strengths);
   const improvements = normalizeLessonRecordHighlights(value.improvements);
+  const shootCriteriaTotal = getShootEvaluationCriteriaTotal(criteria);
+  const isShootEvaluation = shootCriteriaTotal > 0 && shootCriteriaTotal !== criteria.length;
+  const stableCount = isShootEvaluation
+    ? getShootEvaluationStableCount(criteria)
+    : criteria.reduce((count, criterion) => count + (criterion.isStable ? 1 : 0), 0);
+  const totalCount = isShootEvaluation ? shootCriteriaTotal : criteria.length;
+  const normalizedLevel = isShootEvaluation ? buildShootLessonRecordLevel(stableCount) : level;
 
   return {
-    level,
+    level: normalizedLevel,
     summary:
       criteria.length > 0
         ? buildLessonRecordSummary(
-            level,
-            criteria.reduce((count, criterion) => count + (criterion.isStable ? 1 : 0), 0),
-            criteria.length
+            normalizedLevel,
+            stableCount,
+            totalCount
           )
         : value.summary,
     criteria,
@@ -1154,6 +1233,119 @@ function buildLessonRecordVideoMap(records: LessonRecord[]) {
     accumulator[record.id] = record.videoUri;
     return accumulator;
   }, {});
+}
+
+function buildStoredLessonRecordEntries(
+  scopedKeys: ReturnType<typeof getAccountStorageKeys>,
+  records: LessonRecord[]
+): Array<[string, string]> {
+  return [
+    [scopedKeys.lessonRecords, JSON.stringify(stripLessonRecordVideos(records))],
+    [scopedKeys.lessonRecordVideos, JSON.stringify(buildLessonRecordVideoMap(records))],
+  ];
+}
+
+async function persistLessonRecordVideoToFile(userId: string, recordId: string, videoUri: string) {
+  const normalizedVideoUri = videoUri.trim();
+
+  if (!normalizedVideoUri || Platform.OS === 'web') {
+    return normalizedVideoUri;
+  }
+
+  const directory = buildLessonRecordVideoDirectory(userId);
+
+  if (!directory) {
+    return normalizedVideoUri;
+  }
+
+  const dataUrl = parseLessonRecordVideoDataUrl(normalizedVideoUri);
+  const extension = getLessonRecordVideoExtension(normalizedVideoUri, dataUrl?.mimeType);
+  const targetUri = buildManagedLessonRecordVideoUri(directory, recordId, extension);
+
+  if (normalizedVideoUri === targetUri) {
+    return targetUri;
+  }
+
+  try {
+    await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+
+    if (dataUrl) {
+      const existingTarget = await FileSystem.getInfoAsync(targetUri);
+
+      if (!existingTarget.exists) {
+        await FileSystem.writeAsStringAsync(targetUri, dataUrl.base64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      }
+
+      return targetUri;
+    }
+
+    if (!normalizedVideoUri.startsWith('file://')) {
+      return normalizedVideoUri;
+    }
+
+    const [sourceInfo, targetInfo] = await Promise.all([
+      FileSystem.getInfoAsync(normalizedVideoUri),
+      FileSystem.getInfoAsync(targetUri),
+    ]);
+
+    if (!sourceInfo.exists) {
+      return normalizedVideoUri;
+    }
+
+    if (!targetInfo.exists) {
+      await FileSystem.copyAsync({
+        from: normalizedVideoUri,
+        to: targetUri,
+      });
+
+      if (FileSystem.cacheDirectory && normalizedVideoUri.startsWith(FileSystem.cacheDirectory)) {
+        await FileSystem.deleteAsync(normalizedVideoUri, { idempotent: true }).catch(() => {
+          // Ignore cleanup failures after promoting the cached video to a persisted file.
+        });
+      }
+    }
+
+    return targetUri;
+  } catch {
+    return normalizedVideoUri;
+  }
+}
+
+async function localizeLessonRecordVideos(userId: string, records: LessonRecord[]) {
+  const localizedResults = await Promise.all(
+    records.map(async (record) => {
+      if (!record.videoUri) {
+        return {
+          record,
+          changed: false,
+        };
+      }
+
+      const nextVideoUri = await persistLessonRecordVideoToFile(userId, record.id, record.videoUri);
+
+      if (nextVideoUri === record.videoUri) {
+        return {
+          record,
+          changed: false,
+        };
+      }
+
+      return {
+        record: normalizeLessonRecord({
+          ...record,
+          videoUri: nextVideoUri,
+        }),
+        changed: true,
+      };
+    })
+  );
+
+  return {
+    records: localizedResults.map((result) => result.record),
+    didChange: localizedResults.some((result) => result.changed),
+  };
 }
 
 function stripLessonRecordVideos(records: LessonRecord[]) {
@@ -1387,7 +1579,23 @@ async function readStoredAccountSnapshot(userId: string): Promise<RemoteAccountS
     getLessonRecordEntriesWithMigration([scopedKeys.lessonRecords, scopedKeys.lessonRecordVideos]),
   ]);
   const stored = Object.fromEntries([...entries, ...lessonRecordEntries]);
-  return parseStoredAccountSnapshotFromEntries(scopedKeys, stored);
+  const parsedSnapshot = parseStoredAccountSnapshotFromEntries(scopedKeys, stored);
+  const localizedLessonRecords = await localizeLessonRecordVideos(userId, parsedSnapshot.lessonRecords);
+
+  if (!localizedLessonRecords.didChange) {
+    return parsedSnapshot;
+  }
+
+  const migratedSnapshot = {
+    ...parsedSnapshot,
+    lessonRecords: localizedLessonRecords.records,
+  } satisfies RemoteAccountSnapshot;
+
+  await setLessonRecordEntries(buildStoredLessonRecordEntries(scopedKeys, migratedSnapshot.lessonRecords)).catch(() => {
+    // Ignore storage rewrite failures here and keep the in-memory migrated file paths.
+  });
+
+  return migratedSnapshot;
 }
 
 async function writeStoredAccountSnapshot(
@@ -1410,15 +1618,13 @@ async function writeStoredAccountSnapshot(
   const lessonRecordsWithVideos = shouldPreserveExistingLessonRecords
     ? mergeLessonRecordsWithFallback(nextSnapshot.lessonRecords, existingStoredLessonRecords)
     : nextSnapshot.lessonRecords;
+  const localizedLessonRecords = await localizeLessonRecordVideos(userId, lessonRecordsWithVideos);
   const storedSnapshot = {
     ...nextSnapshot,
-    lessonRecords: lessonRecordsWithVideos,
+    lessonRecords: localizedLessonRecords.records,
   } satisfies RemoteAccountSnapshot;
 
-  await setLessonRecordEntries([
-    [scopedKeys.lessonRecords, JSON.stringify(stripLessonRecordVideos(storedSnapshot.lessonRecords))],
-    [scopedKeys.lessonRecordVideos, JSON.stringify(buildLessonRecordVideoMap(storedSnapshot.lessonRecords))],
-  ]);
+  await setLessonRecordEntries(buildStoredLessonRecordEntries(scopedKeys, storedSnapshot.lessonRecords));
 
   await AppStorage.multiSet([
     [scopedKeys.attendance, JSON.stringify(storedSnapshot.attendance)],
@@ -1449,11 +1655,61 @@ function parseDateKeyToTime(dateKey: string) {
 }
 
 function buildLessonRecordLevel(stableCount: number, totalCount: number): LessonRecordLevel {
+  if (totalCount >= 5) {
+    if (stableCount >= 4) {
+      return 'good';
+    }
+
+    if (stableCount >= 2) {
+      return 'average';
+    }
+
+    return 'bad';
+  }
+
+  if (totalCount >= 4) {
+    if (stableCount >= 3) {
+      return 'good';
+    }
+
+    if (stableCount >= 2) {
+      return 'average';
+    }
+
+    return 'bad';
+  }
+
   if (stableCount >= totalCount) {
     return 'good';
   }
 
   if (stableCount >= Math.max(1, totalCount - 1)) {
+    return 'average';
+  }
+
+  return 'bad';
+}
+
+function getShootEvaluationStableCount(criteria: LessonRecordCriterion[]) {
+  return criteria.reduce((count, criterion) => {
+    if (criterion.key === 'shoot-result') {
+      return count;
+    }
+
+    return count + (criterion.isStable ? 1 : 0);
+  }, 0);
+}
+
+function getShootEvaluationCriteriaTotal(criteria: LessonRecordCriterion[]) {
+  return criteria.filter((criterion) => criterion.key !== 'shoot-result').length;
+}
+
+function buildShootLessonRecordLevel(stableCount: number): LessonRecordLevel {
+  if (stableCount >= 3) {
+    return 'good';
+  }
+
+  if (stableCount >= 2) {
     return 'average';
   }
 
@@ -1696,8 +1952,8 @@ function buildShootRecordEvaluation(
   const releasePointStable = analysis?.releasePointState === 'high';
   const releaseDurationStable = analysis?.releaseDurationState === 'balanced';
   const shotSucceeded = shotOutcome === 'success';
-  const stableCount = [legAngleStable, releaseTimingStable, releasePointStable, releaseDurationStable, shotSucceeded].filter(Boolean).length;
-  const level = buildLessonRecordLevel(stableCount, 5);
+  const stableCount = [legAngleStable, releaseTimingStable, releasePointStable, releaseDurationStable].filter(Boolean).length;
+  const level = buildShootLessonRecordLevel(stableCount);
   const criteria: LessonRecordCriterion[] = [
     {
       key: 'shoot-leg-angle',
@@ -1835,7 +2091,7 @@ function buildShootRecordEvaluation(
 
   return {
     level,
-    summary: buildLessonRecordSummary(level, stableCount, 5),
+    summary: buildLessonRecordSummary(level, stableCount, 4),
     criteria,
     strengths: strengths.slice(0, 2),
     improvements,
@@ -1859,15 +2115,16 @@ function updateShootRecordEvaluationForOutcome(
         }
       : criterion
   );
-  const stableCount = nextCriteria.filter((criterion) => criterion.isStable).length;
-  const level = buildLessonRecordLevel(stableCount, nextCriteria.length || 3);
+  const stableCount = getShootEvaluationStableCount(nextCriteria);
+  const criteriaTotal = getShootEvaluationCriteriaTotal(nextCriteria);
+  const level = buildShootLessonRecordLevel(stableCount);
   const strengths = record.evaluation.strengths.filter((item) => item.label !== '슛 성공 장면');
   const improvements = record.evaluation.improvements.filter((item) => item.label !== '슛 결과 보완');
 
   return {
     ...record.evaluation,
     level,
-    summary: buildLessonRecordSummary(level, stableCount, nextCriteria.length || 3),
+    summary: buildLessonRecordSummary(level, stableCount, criteriaTotal || 4),
     criteria: nextCriteria,
     strengths: strengths.slice(0, 2),
     improvements,
@@ -1890,92 +2147,243 @@ function formatStableRatioText(ratio: number) {
   return String(Math.round(ratio * 100)) + '%';
 }
 
-function buildDribblePositionStabilityDetail(analysis: DribbleAnalysis | null, isStable: boolean) {
-  const ratioText =
-    typeof analysis?.positionStableRatio === 'number' ? formatStableRatioText(analysis.positionStableRatio) : '--';
+function buildDribbleRhythmDetail(analysis: DribbleAnalysis | null, isStable: boolean) {
+  if (!analysis || analysis.dribbleRhythmState === 'unknown' || analysis.dribbleRhythmComparisonCount <= 0) {
+    return '드리블 리듬을 판단할 만큼 드리블 간격 데이터가 충분하지 않습니다.';
+  }
 
-  if (!analysis || analysis.positionStabilityState === 'unknown' || typeof analysis.positionStableRatio !== 'number') {
-    return analysis?.dribbleView === 'side'
-      ? '공의 앞뒤 위치 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.'
-      : '공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.';
+  const comparisonCount = analysis.dribbleRhythmComparisonCount;
+  const goodCount = analysis.dribbleRhythmGoodCount;
+  const badCount = analysis.dribbleRhythmBadCount;
+  const badRatioText =
+    typeof analysis.dribbleRhythmBadRatio === 'number' ? formatStableRatioText(analysis.dribbleRhythmBadRatio) : '--';
+
+  if (isStable) {
+    return `드리블 간격 비교 ${comparisonCount}회 중 ${goodCount}회가 0.2초 이하 차이로 유지되었습니다.`;
+  }
+
+  return `드리블 간격 비교 ${comparisonCount}회 중 ${badCount}회(${badRatioText})에서 0.2초 이상 차이가 났습니다. 리듬 보완이 필요합니다.`;
+}
+
+function buildFrontDribbleStanceDetail(analysis: DribbleAnalysis | null, isStable: boolean) {
+  if (!analysis || analysis.frontStanceAngle === null) {
+    return '무릎 각도를 판단할 만큼 하체 데이터가 충분하지 않습니다.';
   }
 
   if (isStable) {
-    return analysis.dribbleView === 'side'
-      ? `공이 ${ratioText} 구간에서 비슷한 앞뒤 위치를 유지했습니다.`
-      : `공이 ${ratioText} 구간에서 비슷한 좌우 라인을 유지했습니다.`;
+    return `무릎 각도가 ${analysis.frontStanceAngle.toFixed(1)}도로 안정적입니다. 140~170도 범위를 잘 유지했습니다.`;
   }
 
-  if (analysis.positionStabilityState === 'mixed') {
-    return analysis.dribbleView === 'side'
-      ? `공이 ${ratioText} 구간에서만 비슷한 앞뒤 위치를 유지했습니다. 흔들림을 조금 더 줄여 주세요.`
-      : `공이 ${ratioText} 구간에서만 비슷한 좌우 라인을 유지했습니다. 좌우 흔들림을 조금 더 줄여 주세요.`;
-  }
-
-  return analysis.dribbleView === 'side'
-    ? `공이 ${ratioText} 구간에서만 비슷한 위치를 유지했습니다. 앞뒤 위치를 더 일정하게 맞춰 주세요.`
-    : `공이 ${ratioText} 구간에서만 비슷한 라인을 유지했습니다. 드리블 라인을 더 일정하게 맞춰 주세요.`;
+  return `무릎 각도가 ${analysis.frontStanceAngle.toFixed(1)}도입니다. 140~170도에 가깝게 다시 맞춰 주세요.`;
 }
 
-function buildDribbleHeightConsistencyDetail(analysis: DribbleAnalysis | null, isStable: boolean) {
-  const ratioText =
-    typeof analysis?.heightStableRatio === 'number' ? formatStableRatioText(analysis.heightStableRatio) : '--';
-
-  if (!analysis || analysis.heightStabilityState === 'unknown' || typeof analysis.heightStableRatio !== 'number') {
-    return '드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.';
+function buildFrontDribbleBallLaneDetail(analysis: DribbleAnalysis | null, isStable: boolean) {
+  if (!analysis || analysis.frontBallLaneState === 'unknown') {
+    return '공 라인을 판단할 만큼 정면 드리블 데이터가 충분하지 않습니다.';
   }
 
   if (isStable) {
-    return `드리블 높이가 ${ratioText} 구간에서 일정하게 유지되었습니다.`;
+    return '공이 다리 바깥쪽 라인에서 드리블되었습니다. 공 라인이 안정적입니다.';
   }
 
-  if (analysis.heightStabilityState === 'mixed') {
-    return `드리블 높이가 ${ratioText} 구간에서만 일정했습니다. 같은 높이로 반복해 주세요.`;
-  }
-
-  return `드리블 높이가 ${ratioText} 구간에서만 일정했습니다. 높이 편차를 조금 더 줄여 주세요.`;
+  return '공이 다리 사이로 들어가는 장면이 보입니다. 공을 몸 바깥쪽 라인에서 드리블해 주세요.';
 }
 
-function buildDribbleTempoStabilityDetail(analysis: DribbleAnalysis | null, isStable: boolean) {
-  const ratioText =
-    typeof analysis?.tempoStableRatio === 'number' ? formatStableRatioText(analysis.tempoStableRatio) : '--';
+function buildFrontDribbleHandBalanceDetail(analysis: DribbleAnalysis | null, isStable: boolean) {
+  const leftCount = Math.max(0, analysis?.leftHandDribbleCount ?? 0);
+  const rightCount = Math.max(0, analysis?.rightHandDribbleCount ?? 0);
+  const totalCount = leftCount + rightCount;
 
-  if (!analysis || analysis.tempoStabilityState === 'unknown' || typeof analysis.tempoStableRatio !== 'number') {
-    return '드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.';
+  if (!analysis || totalCount <= 0) {
+    return '양손 균형을 판단할 만큼 드리블 횟수 데이터가 충분하지 않습니다.';
   }
 
   if (isStable) {
-    return `드리블 리듬이 ${ratioText} 구간에서 일정하게 유지되었습니다.`;
+    return `왼손 ${leftCount}번, 오른손 ${rightCount}번으로 양손 균형이 좋습니다.`;
   }
 
-  if (analysis.tempoStabilityState === 'mixed') {
-    return `드리블 리듬이 ${ratioText} 구간에서만 일정했습니다. 리듬을 조금 더 고르게 맞춰 주세요.`;
-  }
-
-  return `드리블 리듬이 ${ratioText} 구간에서만 일정했습니다. 같은 리듬으로 반복해 주세요.`;
+  return `왼손 ${leftCount}번, 오른손 ${rightCount}번으로 차이가 있습니다. 양손 균형을 맞춰 주세요.`;
 }
 
-function buildDribbleRecordEvaluation(frames: TimedDribbleAnalysis[]): LessonRecordEvaluation {
+function buildFrontDribbleFootSpacingDetail(analysis: DribbleAnalysis | null, isStable: boolean) {
+  if (!analysis || analysis.footSpacingState === 'unknown') {
+    return '발 간격을 판단할 만큼 하체 데이터가 충분하지 않습니다.';
+  }
+
+  if (isStable) {
+    return '발 간격이 안정적입니다. 지금 간격을 유지해 주세요.';
+  }
+
+  if (analysis.footSpacingState === 'narrow') {
+    return '발 간격이 어깨보다 좁습니다. 조금 더 벌려 주세요.';
+  }
+
+  return '발 간격이 너무 넓습니다. 조금만 좁혀 주세요.';
+}
+
+function buildFrontDribbleRecordEvaluation(
+  frames: TimedDribbleAnalysis[],
+  latestAnalysis: DribbleAnalysis | null
+): LessonRecordEvaluation {
   const activeFrames = frames.filter((frame) => frame.analysis.dribbleStarted);
-  const latestAnalysis = activeFrames[activeFrames.length - 1]?.analysis ?? null;
+  const stanceStableRatio = calculateStableRatio(
+    activeFrames,
+    (analysis) => analysis.frontStanceAngle !== null && analysis.frontStanceAngle >= 140 && analysis.frontStanceAngle <= 170
+  );
+  const ballLaneStableRatio = calculateStableRatio(
+    activeFrames,
+    (analysis) => analysis.frontBallLaneState === 'outside_legs'
+  );
+  const eyeStableRatio = calculateStableRatio(
+    activeFrames,
+    (analysis) => analysis.eyeFocus === 'forward'
+  );
+  const footSpacingStableRatio = calculateStableRatio(
+    activeFrames,
+    (analysis) => analysis.footSpacingState === 'balanced'
+  );
+  const stanceStable = stanceStableRatio >= 0.5;
+  const ballLaneStable = ballLaneStableRatio >= 0.5;
+  const eyeStable = eyeStableRatio >= 0.5;
+  const rhythmStable = latestAnalysis?.dribbleRhythmState === 'good';
+  const rhythmGoodRatio =
+    latestAnalysis && typeof latestAnalysis.dribbleRhythmBadRatio === 'number'
+      ? Math.max(0, 1 - latestAnalysis.dribbleRhythmBadRatio)
+      : undefined;
+  const footSpacingStable = footSpacingStableRatio >= 0.5;
+  const criteria: LessonRecordCriterion[] = [
+    {
+      key: 'dribble-front-stance-angle',
+      label: '무릎 각도',
+      isStable: stanceStable,
+      stableRatio: stanceStableRatio,
+      detail: buildFrontDribbleStanceDetail(latestAnalysis, stanceStable),
+    },
+    {
+      key: 'dribble-front-ball-lane',
+      label: '공 라인',
+      isStable: ballLaneStable,
+      stableRatio: ballLaneStableRatio,
+      detail: buildFrontDribbleBallLaneDetail(latestAnalysis, ballLaneStable),
+    },
+    {
+      key: 'dribble-eye-focus',
+      label: '시선 처리',
+      isStable: eyeStable,
+      stableRatio: eyeStableRatio,
+      detail: eyeStable
+        ? `시선이 ${formatStableRatioText(eyeStableRatio)} 구간에서 앞을 향했습니다.`
+        : `시선이 앞을 본 구간은 ${formatStableRatioText(eyeStableRatio)}였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요.`,
+    },
+    {
+      key: 'dribble-rhythm',
+      label: '드리블 리듬',
+      isStable: rhythmStable,
+      stableRatio: rhythmGoodRatio,
+      detail: buildDribbleRhythmDetail(latestAnalysis, rhythmStable),
+    },
+    {
+      key: 'dribble-front-foot-spacing',
+      label: '발 간격',
+      isStable: footSpacingStable,
+      stableRatio: footSpacingStableRatio,
+      detail: buildFrontDribbleFootSpacingDetail(latestAnalysis, footSpacingStable),
+    },
+  ];
+  const stableCount = criteria.filter((criterion) => criterion.isStable).length;
+  const level = buildLessonRecordLevel(stableCount, criteria.length || 3);
+  const strengths: LessonRecordHighlight[] = [];
+  const improvements: LessonRecordHighlight[] = [];
+
+  if (stanceStable) {
+    const window = findLongestHighlightWindow(
+      activeFrames,
+      (analysis) => analysis.frontStanceAngle !== null && analysis.frontStanceAngle >= 140 && analysis.frontStanceAngle <= 170
+    );
+    strengths.push(buildRecordHighlight('무릎 각도 안정', criteria[0].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
+  } else {
+    const window = findLongestHighlightWindow(
+      activeFrames,
+      (analysis) => analysis.frontStanceAngle !== null && (analysis.frontStanceAngle < 140 || analysis.frontStanceAngle > 170)
+    );
+    improvements.push(buildRecordHighlight('무릎 각도 보완', criteria[0].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
+  }
+
+  if (ballLaneStable) {
+    const window = findLongestHighlightWindow(activeFrames, (analysis) => analysis.frontBallLaneState === 'outside_legs');
+    strengths.push(buildRecordHighlight('공 라인 안정', criteria[1].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
+  } else {
+    const window = findLongestHighlightWindow(
+      activeFrames,
+      (analysis) => analysis.frontBallLaneState === 'between_legs'
+    );
+    improvements.push(buildRecordHighlight('공 라인 보완', criteria[1].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
+  }
+
+  if (eyeStable) {
+    const window = findLongestHighlightWindow(activeFrames, (analysis) => analysis.eyeFocus === 'forward');
+    strengths.push(buildRecordHighlight('시선 처리 안정', criteria[2].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
+  } else {
+    const window = findLongestHighlightWindow(activeFrames, (analysis) => analysis.eyeFocus === 'ball');
+    improvements.push(buildRecordHighlight('시선 처리 보완', criteria[2].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
+  }
+
+  if (rhythmStable) {
+    const window = findLongestHighlightWindow(activeFrames, (analysis) => analysis.dribbleRhythmState === 'good');
+    strengths.push(buildRecordHighlight('리듬 유지', criteria[3].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
+  } else {
+    const window = findLongestHighlightWindow(
+      activeFrames,
+      (analysis) => analysis.dribbleRhythmState === 'needs_improvement'
+    );
+    improvements.push(buildRecordHighlight('리듬 보완', criteria[3].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
+  }
+
+  if (footSpacingStable) {
+    const window = findLongestHighlightWindow(activeFrames, (analysis) => analysis.footSpacingState === 'balanced');
+    strengths.push(buildRecordHighlight('발 간격 안정', criteria[4].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
+  } else {
+    const window = findLongestHighlightWindow(
+      activeFrames,
+      (analysis) => analysis.footSpacingState === 'narrow' || analysis.footSpacingState === 'wide'
+    );
+    improvements.push(buildRecordHighlight('발 간격 보완', criteria[4].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
+  }
+
+  return {
+    level,
+    summary: buildLessonRecordSummary(level, stableCount, criteria.length || 5),
+    criteria,
+    strengths: strengths.slice(0, 2),
+    improvements,
+  };
+}
+
+function buildSideDribbleRecordEvaluation(
+  frames: TimedDribbleAnalysis[],
+  latestAnalysis: DribbleAnalysis | null
+): LessonRecordEvaluation {
+  const activeFrames = frames.filter((frame) => frame.analysis.dribbleStarted);
   const torsoStableRatio = calculateStableRatio(activeFrames, (analysis) => analysis.torsoPosture === 'balanced');
   const heightAppropriateStableRatio = calculateStableRatio(activeFrames, (analysis) => analysis.dribbleHeight === 'balanced');
   const eyeStableRatio = calculateStableRatio(activeFrames, (analysis) => analysis.eyeFocus === 'forward');
   const torsoStable = torsoStableRatio >= 0.5;
   const heightAppropriateStable = heightAppropriateStableRatio >= 0.5;
   const eyeStable = eyeStableRatio >= 0.5;
-  const positionStable = latestAnalysis?.positionStabilityState === 'stable';
-  const heightConsistencyStable = latestAnalysis?.heightStabilityState === 'stable';
-  const tempoStable = latestAnalysis?.tempoStabilityState === 'stable';
+  const rhythmStable = latestAnalysis?.dribbleRhythmState === 'good';
+  const rhythmGoodRatio =
+    latestAnalysis && typeof latestAnalysis.dribbleRhythmBadRatio === 'number'
+      ? Math.max(0, 1 - latestAnalysis.dribbleRhythmBadRatio)
+      : undefined;
   const criteria: LessonRecordCriterion[] = [
     {
       key: 'dribble-torso-posture',
-      label: '상체 자세',
+      label: '상체 기울기',
       isStable: torsoStable,
       stableRatio: torsoStableRatio,
       detail: torsoStable
-        ? `상체 자세가 ${formatStableRatioText(torsoStableRatio)} 구간에서 안정적으로 유지되었습니다.`
-        : `상체 자세가 안정적이었던 구간은 ${formatStableRatioText(torsoStableRatio)}였습니다. 자세를 조금 더 일정하게 유지해 주세요.`,
+        ? `상체 기울기가 ${formatStableRatioText(torsoStableRatio)} 구간에서 안정적으로 유지되었습니다.`
+        : `상체 기울기가 안정적이었던 구간은 ${formatStableRatioText(torsoStableRatio)}였습니다. 자세를 조금 더 일정하게 유지해 주세요.`,
     },
     {
       key: 'dribble-height-appropriate',
@@ -1996,25 +2404,11 @@ function buildDribbleRecordEvaluation(frames: TimedDribbleAnalysis[]): LessonRec
         : `시선이 앞을 본 구간은 ${formatStableRatioText(eyeStableRatio)}였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요.`,
     },
     {
-      key: 'dribble-position-stability',
-      label: '드리블 위치 안정성',
-      isStable: positionStable,
-      stableRatio: latestAnalysis?.positionStableRatio,
-      detail: buildDribblePositionStabilityDetail(latestAnalysis, positionStable),
-    },
-    {
-      key: 'dribble-height-stability',
-      label: '드리블 높이 안정성',
-      isStable: heightConsistencyStable,
-      stableRatio: latestAnalysis?.heightStableRatio,
-      detail: buildDribbleHeightConsistencyDetail(latestAnalysis, heightConsistencyStable),
-    },
-    {
-      key: 'dribble-tempo-stability',
-      label: '드리블 리듬 안정성',
-      isStable: tempoStable,
-      stableRatio: latestAnalysis?.tempoStableRatio,
-      detail: buildDribbleTempoStabilityDetail(latestAnalysis, tempoStable),
+      key: 'dribble-rhythm',
+      label: '드리블 리듬',
+      isStable: rhythmStable,
+      stableRatio: rhythmGoodRatio,
+      detail: buildDribbleRhythmDetail(latestAnalysis, rhythmStable),
     },
   ];
   const stableCount = criteria.filter((criterion) => criterion.isStable).length;
@@ -2024,13 +2418,13 @@ function buildDribbleRecordEvaluation(frames: TimedDribbleAnalysis[]): LessonRec
 
   if (torsoStable) {
     const window = findLongestHighlightWindow(activeFrames, (analysis) => analysis.torsoPosture === 'balanced');
-    strengths.push(buildRecordHighlight('상체 자세 안정', criteria[0].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
+    strengths.push(buildRecordHighlight('상체 기울기 안정', criteria[0].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
   } else {
     const window = findLongestHighlightWindow(
       activeFrames,
       (analysis) => analysis.torsoPosture === 'high' || analysis.torsoPosture === 'low'
     );
-    improvements.push(buildRecordHighlight('상체 자세 보완', criteria[0].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
+    improvements.push(buildRecordHighlight('상체 기울기 보완', criteria[0].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
   }
 
   if (heightAppropriateStable) {
@@ -2052,51 +2446,36 @@ function buildDribbleRecordEvaluation(frames: TimedDribbleAnalysis[]): LessonRec
     improvements.push(buildRecordHighlight('시선 처리 보완', criteria[2].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
   }
 
-  if (positionStable) {
-    const window = findLongestHighlightWindow(activeFrames, (analysis) => analysis.positionStabilityState === 'stable');
-    strengths.push(
-      buildRecordHighlight(
-        latestAnalysis?.dribbleView === 'side' ? '공 위치 안정' : '공 라인 안정',
-        criteria[3].detail,
-        window?.startAtMs ?? 0,
-        window?.durationMs ?? 2200
-      )
+  if (rhythmStable) {
+    const window = findLongestHighlightWindow(activeFrames, (analysis) => analysis.dribbleRhythmState === 'good');
+    strengths.push(buildRecordHighlight('리듬 유지', criteria[3].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
+  } else {
+    const window = findLongestHighlightWindow(
+      activeFrames,
+      (analysis) => analysis.dribbleRhythmState === 'needs_improvement'
     );
-  } else {
-    const window = findLongestHighlightWindow(activeFrames, (analysis) => analysis.positionStabilityState !== 'stable');
-    improvements.push(
-      buildRecordHighlight(
-        latestAnalysis?.dribbleView === 'side' ? '공 위치 보완' : '공 라인 보완',
-        criteria[3].detail,
-        window?.startAtMs ?? 0,
-        window?.durationMs ?? 2200
-      )
-    );
-  }
-
-  if (heightConsistencyStable) {
-    const window = findLongestHighlightWindow(activeFrames, (analysis) => analysis.heightStabilityState === 'stable');
-    strengths.push(buildRecordHighlight('높이 안정', criteria[4].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
-  } else {
-    const window = findLongestHighlightWindow(activeFrames, (analysis) => analysis.heightStabilityState !== 'stable');
-    improvements.push(buildRecordHighlight('높이 안정성 보완', criteria[4].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
-  }
-
-  if (tempoStable) {
-    const window = findLongestHighlightWindow(activeFrames, (analysis) => analysis.tempoStabilityState === 'stable');
-    strengths.push(buildRecordHighlight('리듬 안정', criteria[5].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
-  } else {
-    const window = findLongestHighlightWindow(activeFrames, (analysis) => analysis.tempoStabilityState !== 'stable');
-    improvements.push(buildRecordHighlight('리듬 보완', criteria[5].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
+    improvements.push(buildRecordHighlight('리듬 보완', criteria[3].detail, window?.startAtMs ?? 0, window?.durationMs ?? 2200));
   }
 
   return {
     level,
-    summary: buildLessonRecordSummary(level, stableCount, criteria.length || 3),
+    summary: buildLessonRecordSummary(level, stableCount, criteria.length || 4),
     criteria,
     strengths: strengths.slice(0, 2),
-    improvements: improvements.slice(0, 2),
+    improvements,
   };
+}
+
+function buildDribbleRecordEvaluation(frames: TimedDribbleAnalysis[]): LessonRecordEvaluation {
+  const latestActiveAnalysis = frames.filter((frame) => frame.analysis.dribbleStarted).at(-1)?.analysis ?? null;
+  const latestAnalysis = latestActiveAnalysis ?? frames.at(-1)?.analysis ?? null;
+  const dribbleView = latestAnalysis?.dribbleView ?? 'front';
+
+  if (dribbleView === 'front') {
+    return buildFrontDribbleRecordEvaluation(frames, latestAnalysis);
+  }
+
+  return buildSideDribbleRecordEvaluation(frames, latestAnalysis);
 }
 
 function buildDiarySkillInsight(
@@ -2544,6 +2923,7 @@ export function useBasketballCoachApp() {
   const shootRecordingStartedRef = useRef(false);
   const dribbleTargetCountRef = useRef<number | null>(null);
   const dribbleAutoEndingRef = useRef(false);
+  const lessonCompletionCuePlayedRef = useRef(false);
   const stanceCountdownStartedAtRef = useRef<number | null>(null);
   const feedbackTimelineRef = useRef<FeedbackMoment[]>([]);
   const pendingStopSaveRef = useRef(false);
@@ -2560,6 +2940,7 @@ export function useBasketballCoachApp() {
   const latestDribbleAnalysisRef = useRef<DribbleAnalysis | null>(null);
   const latestShootAnalysisRef = useRef<ShootAnalysis | null>(null);
   const dribbleAnalysisFramesRef = useRef<TimedDribbleAnalysis[]>([]);
+  const completedDribbleCountRef = useRef(0);
   const dailyDribbleRecordsRef = useRef<Record<string, number>>({});
   const homeworkStateRef = useRef<HomeworkStateRecord>({});
   const lessonRecordsRef = useRef<LessonRecord[]>([]);
@@ -2580,6 +2961,17 @@ export function useBasketballCoachApp() {
 
   const currentUserId = currentUser?.id ?? '';
   const isReady = isAuthReady && (!currentUser || isAccountDataReady);
+
+  function getCumulativeDribbleCount(roundDribbleCount: number) {
+    return completedDribbleCountRef.current + Math.max(0, Math.trunc(roundDribbleCount));
+  }
+
+  function buildCumulativeDribbleAnalysis(analysis: DribbleAnalysis): DribbleAnalysis {
+    return {
+      ...analysis,
+      dribbleCount: getCumulativeDribbleCount(analysis.dribbleCount),
+    };
+  }
   const selectedSkill = selectedSkillKey ? SKILLS[selectedSkillKey] : null;
   const todayKey = formatDateKey(new Date());
   const todayDribbleCount = dailyDribbleRecords[todayKey] || 0;
@@ -2751,13 +3143,7 @@ export function useBasketballCoachApp() {
       }
 
       const scopedKeys = getAccountStorageKeys(currentUserId);
-      const metadataRecords = stripLessonRecordVideos(records);
-      const recordVideos = buildLessonRecordVideoMap(records);
-
-      void setLessonRecordEntries([
-        [scopedKeys.lessonRecords, JSON.stringify(metadataRecords)],
-        [scopedKeys.lessonRecordVideos, JSON.stringify(recordVideos)],
-      ]);
+      void setLessonRecordEntries(buildStoredLessonRecordEntries(scopedKeys, records));
     },
     [currentUserId, isAccountDataReady]
   );
@@ -2789,6 +3175,7 @@ export function useBasketballCoachApp() {
     setFeedbackText(DEFAULT_DRIBBLE_FEEDBACK);
     setLessonReview(null);
     setSelectedDribbleView('front');
+    completedDribbleCountRef.current = 0;
     setCurrentDribbleCount(0);
     setIsLessonActive(false);
     setIsCameraActive(false);
@@ -2817,6 +3204,7 @@ export function useBasketballCoachApp() {
     shootRecordingStartedRef.current = false;
     dribbleTargetCountRef.current = null;
     dribbleAutoEndingRef.current = false;
+    lessonCompletionCuePlayedRef.current = false;
     stanceCountdownStartedAtRef.current = null;
     feedbackTimelineRef.current = [];
     pendingStopSaveRef.current = false;
@@ -3952,6 +4340,15 @@ export function useBasketballCoachApp() {
     })();
   }, [ensureStartCueSound, ensureWebStartCueContext]);
 
+  const playLessonCompletionCueOnce = useCallback(() => {
+    if (lessonCompletionCuePlayedRef.current) {
+      return;
+    }
+
+    lessonCompletionCuePlayedRef.current = true;
+    playStartCue();
+  }, [playStartCue]);
+
   useEffect(() => {
     if (!isLessonActive || countdownValue === null) {
       lastCountdownCueValueRef.current = null;
@@ -4199,7 +4596,7 @@ export function useBasketballCoachApp() {
     [setFeedbackAndRemember, updateShotSuccessCount]
   );
 
-  const saveLessonRecord = useCallback((videoUri: string, reviewClip?: LessonReviewClip | null) => {
+  const saveLessonRecord = useCallback(async (videoUri: string, reviewClip?: LessonReviewClip | null) => {
     const normalizedVideoUri = videoUri.trim();
 
     if (!normalizedVideoUri) {
@@ -4214,14 +4611,16 @@ export function useBasketballCoachApp() {
       mode === 'shoot'
         ? buildShootRecordEvaluation(latestShootAnalysisRef.current, [...shootAnalysisFramesRef.current], shotOutcome)
         : buildDribbleRecordEvaluation([...dribbleAnalysisFramesRef.current]);
+    const recordId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const persistedVideoUri = await persistLessonRecordVideoToFile(currentUserId ?? 'local', recordId, normalizedVideoUri);
     const nextRecord = normalizeLessonRecord({
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: recordId,
       dateKey,
       mode,
       shotOutcome,
       feedback: latestFeedbackRef.current,
       feedbackTimeline: [...feedbackTimelineRef.current],
-      videoUri: normalizedVideoUri,
+      videoUri: persistedVideoUri,
       createdAt: new Date().toLocaleString(),
       reviewFeedback: reviewClip?.feedback,
       reviewStartAtMs: reviewClip?.startAtMs,
@@ -4246,7 +4645,7 @@ export function useBasketballCoachApp() {
 
     setSelectedDateKey(dateKey);
     return true;
-  }, [persistLessonRecords]);
+  }, [currentUserId, persistLessonRecords]);
 
   const finalizeLessonSession = useCallback(
     async (shouldSaveRecord: boolean, videoUri: string) => {
@@ -4266,7 +4665,7 @@ export function useBasketballCoachApp() {
 
       const didSaveLessonRecord =
         shouldSaveRecord && shouldPersistShootRecord
-          ? saveLessonRecord(videoUri)
+          ? await saveLessonRecord(videoUri)
           : false;
 
       if (didSaveLessonRecord && lessonModeRef.current === 'shoot') {
@@ -4287,6 +4686,7 @@ export function useBasketballCoachApp() {
       feedbackTimelineRef.current = [];
       pendingFeedbackRef.current = null;
       resetFrontDribbleTrackingSummary();
+      completedDribbleCountRef.current = 0;
       setCurrentDribbleCount(0);
       setCountdownValue(null);
       setDribbleResetToken(0);
@@ -5002,9 +5402,11 @@ export function useBasketballCoachApp() {
     resetShootAnalysisTracking();
     dribbleTargetCountRef.current = null;
     dribbleAutoEndingRef.current = false;
+    lessonCompletionCuePlayedRef.current = false;
     pendingReviewStopRef.current = false;
     clearShootAutoEnd();
     resetFrontDribbleTrackingSummary();
+    completedDribbleCountRef.current = 0;
     setCurrentDribbleCount(0);
     stanceCountdownStartedAtRef.current = null;
     setCountdownValue(null);
@@ -5056,10 +5458,10 @@ export function useBasketballCoachApp() {
             footSpacingState: 'unknown',
             highestBounceY: null,
             lowestBounceY: null,
-            positionStabilityState: 'unknown',
-            heightStabilityState: 'unknown',
-            tempoStabilityState: 'unknown',
-            stabilitySampleCount: 0,
+            dribbleRhythmState: 'unknown',
+            dribbleRhythmGoodCount: 0,
+            dribbleRhythmBadCount: 0,
+            dribbleRhythmComparisonCount: 0,
             summary: '',
           }, selectedDribbleViewRef.current)
     );
@@ -5076,12 +5478,12 @@ export function useBasketballCoachApp() {
     dribbleLessonPhaseRef.current = 'stance_setup';
     shootLessonStartedRef.current = false;
     resetShootAnalysisTracking();
-    dribbleTargetCountRef.current = null;
     dribbleAutoEndingRef.current = false;
+    lessonCompletionCuePlayedRef.current = false;
     pendingReviewStopRef.current = false;
     clearShootAutoEnd();
     resetFrontDribbleTrackingSummary();
-    setCurrentDribbleCount(0);
+    setCurrentDribbleCount(mode === 'dribble' ? completedDribbleCountRef.current : 0);
     stanceCountdownStartedAtRef.current = null;
     setCountdownValue(null);
     setDribbleResetToken(0);
@@ -5112,10 +5514,10 @@ export function useBasketballCoachApp() {
         footSpacingState: 'unknown',
         highestBounceY: null,
         lowestBounceY: null,
-        positionStabilityState: 'unknown',
-        heightStabilityState: 'unknown',
-        tempoStabilityState: 'unknown',
-        stabilitySampleCount: 0,
+        dribbleRhythmState: 'unknown',
+        dribbleRhythmGoodCount: 0,
+        dribbleRhythmBadCount: 0,
+        dribbleRhythmComparisonCount: 0,
         summary: '',
       }, selectedDribbleViewRef.current));
     } else {
@@ -5190,10 +5592,12 @@ export function useBasketballCoachApp() {
         ? dribbleTargetCount
         : null;
     dribbleAutoEndingRef.current = false;
+    lessonCompletionCuePlayedRef.current = false;
     pendingReviewStopRef.current = false;
     stanceCountdownStartedAtRef.current = null;
     feedbackTimelineRef.current = [];
     resetFrontDribbleTrackingSummary();
+    completedDribbleCountRef.current = 0;
     setCurrentDribbleCount(0);
     setCountdownValue(null);
     setDribbleResetToken(0);
@@ -5251,6 +5655,7 @@ export function useBasketballCoachApp() {
       stanceCountdownStartedAtRef.current = null;
       feedbackTimelineRef.current = [];
       resetFrontDribbleTrackingSummary();
+      completedDribbleCountRef.current = 0;
       setCurrentDribbleCount(0);
       setDribbleResetToken(0);
       setShootResetToken(0);
@@ -5293,6 +5698,25 @@ export function useBasketballCoachApp() {
     }, 5000);
   }, [clearShootAutoEnd, isLessonActive]);
 
+  const resumeDribbleLessonCycle = useCallback(
+    (debugMessage: string, reviewClip?: LessonReviewClip | null) => {
+      clearRecordingWait();
+      pendingReviewStopRef.current = false;
+      lessonStartedAtRef.current = null;
+      setIsLessonActive(true);
+      setIsCameraActive(true);
+      setIsCameraReady(true);
+      setCameraError('');
+      startFeedbackLoop('dribble');
+      if (reviewClip) {
+        setLessonReview(reviewClip);
+      }
+      setCurrentDribbleCount(completedDribbleCountRef.current);
+      setDebugText(debugMessage);
+    },
+    [clearRecordingWait]
+  );
+
 
   const finishDribbleRecordingForReview = useCallback(() => {
     if (feedbackIntervalRef.current) {
@@ -5307,8 +5731,8 @@ export function useBasketballCoachApp() {
     setCountdownValue(null);
     setIsLessonActive(false);
     setIsCameraReady(false);
-    setIsCameraPreviewHidden(true);
-    setCameraStopMode('disconnect');
+    setIsCameraPreviewHidden(false);
+    setCameraStopMode('review');
     setRecordingStopToken(Date.now());
     setDebugText('紐⑺몴 ?쒕━釉??잛닔???꾨떖?덉뒿?덈떎. 醫낅즺 ?몃（?쇨린瑜??몃━怨?移대찓???곌껐???꾨뒗 以묒엯?덈떎.');
 
@@ -5326,36 +5750,7 @@ export function useBasketballCoachApp() {
         : latestFeedbackRef.current;
       recordFrontDribbleHomeworkData(selectedDribbleViewRef.current === 'front' ? latestDribbleAnalysisRef.current : null);
       const completedDribbleHomework = recordDailyDribbleProgress(dribbleTargetCountRef.current ?? 0);
-      const completedFeedback = completedDribbleHomework
-        ? `${finalFeedback}\n\n${getHomeworkCompletionMessage('dribble')}`
-        : finalFeedback;
-
-      lessonStartedAtRef.current = null;
-      dribbleLessonPhaseRef.current = 'stance_setup';
-      shootLessonStartedRef.current = false;
-      resetShootAnalysisTracking();
-      dribbleTargetCountRef.current = null;
-      dribbleAutoEndingRef.current = false;
-      stanceCountdownStartedAtRef.current = null;
-      feedbackTimelineRef.current = [];
-      pendingFeedbackRef.current = null;
-      setCurrentDribbleCount(0);
-      setCountdownValue(null);
-      setDribbleResetToken(0);
-      setShootResetToken(0);
-      setRecordingStartToken(0);
-      setRecordingStopToken(0);
-      setCameraStopMode(null);
-      setIsCameraPreviewHidden(false);
-      latestFeedbackRef.current = completedFeedback;
-      setFeedbackText(completedFeedback);
-      setLessonReview(null);
-      playStartCue();
-      setIsLessonActive(false);
-      setIsCameraActive(false);
-      setIsCameraReady(false);
-      setCameraError('');
-      setDebugText('紐⑺몴 ?쒕━釉??잛닔瑜?紐⑤몢 梨꾩썙 ?덉뒯???먮룞?쇰줈 醫낅즺?섏뿀?듬땲??');
+      resumeDribbleLessonCycle('紐⑺몴 ?쒕━釉??잛닔瑜?紐⑤몢 梨꾩썙 ?덉뒯???앹꽦?섏뒿?덈떎. ?ㅼ떆 以鍮??먯꽭瑜?留욎떠 媛숈? ?잛닔濡??쒕━釉??덉뒯???붾컮濡??쒖옉???덉뒿?덈떎.');
       if (completedDribbleHomework) {
         celebrateHomeworkCompletion();
       }
@@ -5365,14 +5760,14 @@ export function useBasketballCoachApp() {
     clearRecordingWait,
     clearShootAutoEnd,
     finalizeFrontDribbleWeakPoint,
-    playStartCue,
     recordDailyDribbleProgress,
     recordFrontDribbleHomeworkData,
+    resumeDribbleLessonCycle,
     resetShootAnalysisTracking,
   ]);
 
   const completeDribbleReview = useCallback(
-    (videoUri: string) => {
+    async (videoUri: string) => {
       clearRecordingWait();
       pendingReviewStopRef.current = false;
       const frontWeakPoint = finalizeFrontDribbleWeakPoint();
@@ -5392,38 +5787,12 @@ export function useBasketballCoachApp() {
 
       recordFrontDribbleHomeworkData(selectedDribbleViewRef.current === 'front' ? latestDribbleAnalysisRef.current : null);
       const completedDribbleHomework = recordDailyDribbleProgress(dribbleTargetCountRef.current ?? 0);
-      saveLessonRecord(videoUri, finalReviewClip);
+      await saveLessonRecord(videoUri, finalReviewClip);
 
-      const completedFeedback = completedDribbleHomework
-        ? `${finalFeedback}\n\n${getHomeworkCompletionMessage('dribble')}`
-        : finalFeedback;
-
-      lessonStartedAtRef.current = null;
-      dribbleLessonPhaseRef.current = 'stance_setup';
-      shootLessonStartedRef.current = false;
-      resetShootAnalysisTracking();
-      dribbleTargetCountRef.current = null;
-      dribbleAutoEndingRef.current = false;
-      stanceCountdownStartedAtRef.current = null;
-      feedbackTimelineRef.current = [];
-      pendingFeedbackRef.current = null;
-      setCurrentDribbleCount(0);
-      setCountdownValue(null);
-      setDribbleResetToken(0);
-      setShootResetToken(0);
-      setRecordingStartToken(0);
-      setRecordingStopToken(0);
-      setCameraStopMode(null);
-      setIsCameraPreviewHidden(false);
-      latestFeedbackRef.current = completedFeedback;
-      setFeedbackText(completedFeedback);
-      setLessonReview(finalReviewClip);
-      playStartCue();
-      setIsLessonActive(false);
-      setIsCameraActive(false);
-      setIsCameraReady(false);
-      setCameraError('');
-      setDebugText('紐⑺몴 ?쒕━釉??잛닔瑜?紐⑤몢 梨꾩썙 ?덉뒯???먮룞?쇰줈 醫낅즺?섏뿀?듬땲??');
+      resumeDribbleLessonCycle(
+        '紐⑺몴 ?쒕━釉??잛닔瑜?紐⑤몢 梨꾩썙 ?덉뒯???앹꽦?섏뒿?덈떎. ?ㅼ떆 以鍮??먯꽭瑜?留욎떠 媛숈? ?잛닔濡??쒕━釉??덉뒯???붾컮濡??쒖옉???덉뒿?덈떎.',
+        finalReviewClip
+      );
       if (completedDribbleHomework) {
         celebrateHomeworkCompletion();
       }
@@ -5432,16 +5801,16 @@ export function useBasketballCoachApp() {
       celebrateHomeworkCompletion,
       clearRecordingWait,
       finalizeFrontDribbleWeakPoint,
-      playStartCue,
       recordDailyDribbleProgress,
       recordFrontDribbleHomeworkData,
+      resumeDribbleLessonCycle,
       resetShootAnalysisTracking,
       saveLessonRecord,
     ]
   );
 
   const completeShootReview = useCallback(
-    (videoUri: string) => {
+    async (videoUri: string) => {
       clearRecordingWait();
       pendingShootReviewRef.current = false;
 
@@ -5458,7 +5827,7 @@ export function useBasketballCoachApp() {
       setLessonReview(null);
 
       const completedShootHomework = recordDailyShootAttempt();
-      saveLessonRecord(videoUri);
+      await saveLessonRecord(videoUri);
 
       lessonStartedAtRef.current = null;
       dribbleLessonPhaseRef.current = 'stance_setup';
@@ -5466,9 +5835,11 @@ export function useBasketballCoachApp() {
       resetShootAnalysisTracking();
       dribbleTargetCountRef.current = null;
       dribbleAutoEndingRef.current = false;
+      lessonCompletionCuePlayedRef.current = false;
       stanceCountdownStartedAtRef.current = null;
       feedbackTimelineRef.current = [];
       pendingFeedbackRef.current = null;
+      completedDribbleCountRef.current = 0;
       setCurrentDribbleCount(0);
       setCountdownValue(null);
       setDribbleResetToken(0);
@@ -5508,7 +5879,7 @@ export function useBasketballCoachApp() {
     dribbleLessonPhaseRef.current = 'active';
     stanceCountdownStartedAtRef.current = null;
     setCountdownValue(null);
-    setCurrentDribbleCount(0);
+    setCurrentDribbleCount(completedDribbleCountRef.current);
     dribbleAnalysisFramesRef.current = [];
     setDribbleResetToken(Date.now());
     playStartCue();
@@ -5553,20 +5924,21 @@ export function useBasketballCoachApp() {
         return;
       }
 
-      latestDribbleAnalysisRef.current = analysis;
-
       const phase = dribbleLessonPhaseRef.current;
       const targetView = selectedDribbleViewRef.current;
       const stanceReady = isDribbleStanceReadyForView(analysis, targetView);
+      const cumulativeAnalysis = buildCumulativeDribbleAnalysis(analysis);
+      latestDribbleAnalysisRef.current = cumulativeAnalysis;
 
       if (phase === 'active') {
+        const roundDribbleCount = Math.max(0, Math.trunc(analysis.dribbleCount));
         const effectiveAnalysis =
           targetView === 'front' && analysis.bodyFacing === 'front'
             ? {
-                ...analysis,
+                ...cumulativeAnalysis,
                 dribbleStarted: true,
               }
-            : analysis;
+            : cumulativeAnalysis;
         const startedAt = lessonStartedAtRef.current;
 
         if (startedAt !== null) {
@@ -5583,8 +5955,10 @@ export function useBasketballCoachApp() {
         const nextFeedback = buildDribbleFeedbackText(effectiveAnalysis);
         pendingFeedbackRef.current = nextFeedback;
         const targetCount = dribbleTargetCountRef.current;
-        if (targetCount && effectiveAnalysis.dribbleCount >= targetCount && !dribbleAutoEndingRef.current) {
+        if (targetCount && roundDribbleCount >= targetCount && !dribbleAutoEndingRef.current) {
           dribbleAutoEndingRef.current = true;
+          completedDribbleCountRef.current = effectiveAnalysis.dribbleCount;
+          playLessonCompletionCueOnce();
           setImmediateLessonFeedback(nextFeedback);
           setDebugText(`紐⑺몴 ?쒕━釉?${targetCount}?뚯뿉 ?꾨떖???덉뒯??留덈Т由ы빀?덈떎.`);
           finishDribbleRecordingForReview();
@@ -5598,9 +5972,9 @@ export function useBasketballCoachApp() {
         dribbleLessonPhaseRef.current = 'active';
         stanceCountdownStartedAtRef.current = null;
         setCountdownValue(null);
-        setCurrentDribbleCount(analysis.dribbleCount);
-        pendingFeedbackRef.current = buildDribbleFeedbackText(analysis);
-        setDebugText(`?쒕━釉??쒖옉 媛먯?: ${analysis.summary}`);
+        setCurrentDribbleCount(cumulativeAnalysis.dribbleCount);
+        pendingFeedbackRef.current = buildDribbleFeedbackText(cumulativeAnalysis);
+        setDebugText(`?쒕━釉??쒖옉 媛먯?: ${cumulativeAnalysis.summary}`);
         return;
       }
 
@@ -5785,7 +6159,6 @@ export function useBasketballCoachApp() {
           | { type: 'ready' }
           | { type: 'stream_started' }
           | { type: 'recording_started' }
-          | { type: 'shoot_success_gesture' }
           | { type: 'status'; message: string }
           | { type: 'points'; summary: string }
           | { type: 'dribble_analysis'; analysis: DribbleAnalysis }
@@ -5809,7 +6182,7 @@ export function useBasketballCoachApp() {
         if (payload.type === 'recording_started') {
           lessonStartedAtRef.current = Date.now();
           feedbackTimelineRef.current = [];
-          setCurrentDribbleCount(0);
+          setCurrentDribbleCount(lessonModeRef.current === 'dribble' ? completedDribbleCountRef.current : 0);
           dribbleAnalysisFramesRef.current = [];
           latestShootAnalysisRef.current = null;
           shootAnalysisHistoryRef.current = [];
@@ -5821,18 +6194,6 @@ export function useBasketballCoachApp() {
             });
           }
           setDebugText('?곸긽 ?뱁솕瑜??쒖옉?덉뒿?덈떎.');
-          return;
-        }
-
-        if (payload.type === 'shoot_success_gesture') {
-          if (lessonModeRef.current !== 'shoot') {
-            return;
-          }
-
-          recordSuccessfulShot({
-            preserveFeedback: true,
-            debugMessage: '??諛쒖궗 1珥???X?????숈옉???뺤씤?????깃났 1?뚮? ?먮룞 湲곕줉?덉뒿?덈떎.',
-          });
           return;
         }
 
@@ -5873,12 +6234,12 @@ export function useBasketballCoachApp() {
 
         if (payload.type === 'recording_ready') {
           if (pendingReviewStopRef.current) {
-            completeDribbleReview(payload.videoUri);
+            void completeDribbleReview(payload.videoUri);
             return;
           }
 
           if (pendingShootReviewRef.current || pendingShootRecordingStopRef.current) {
-            completeShootReview(payload.videoUri);
+            void completeShootReview(payload.videoUri);
             return;
           }
 
@@ -5890,34 +6251,9 @@ export function useBasketballCoachApp() {
           setDebugText(payload.message || '?곸긽 ??μ뿉 ?ㅽ뙣?덉뒿?덈떎. ?쇰뱶諛깅쭔 ?좎????곹깭濡?醫낅즺?⑸땲??');
 
           if (pendingReviewStopRef.current) {
-            clearRecordingWait();
-            pendingReviewStopRef.current = false;
-            lessonStartedAtRef.current = null;
-            dribbleLessonPhaseRef.current = 'stance_setup';
-            shootLessonStartedRef.current = false;
-            resetShootAnalysisTracking();
-            dribbleTargetCountRef.current = null;
-            dribbleAutoEndingRef.current = false;
-            stanceCountdownStartedAtRef.current = null;
-            feedbackTimelineRef.current = [];
-            pendingFeedbackRef.current = null;
-            setCurrentDribbleCount(0);
-            setCountdownValue(null);
-            setDribbleResetToken(0);
-            setShootResetToken(0);
-            setRecordingStartToken(0);
-            setRecordingStopToken(0);
-            setCameraStopMode(null);
-            setIsCameraPreviewHidden(false);
-            playStartCue();
-            setIsLessonActive(false);
-            setIsCameraActive(false);
-            setIsCameraReady(false);
-            setCameraError('');
-            setIsShootSuccessButtonVisible(false);
-            latestFeedbackRef.current = `${latestFeedbackRef.current}\n\n?곸긽 ??μ뿉???ㅽ뙣?덉?留?紐⑺몴 ?쒕━釉??잛닔瑜?梨꾩썙 ?덉뒯? 醫낅즺?섏뿀?듬땲??`;
-            setFeedbackText(latestFeedbackRef.current);
-            setDebugText('紐⑺몴 ?쒕━釉??잛닔瑜?紐⑤몢 梨꾩썙 ?덉뒯??醫낅즺?섏뿀?듬땲?? 移대찓???곌껐??爰쇱죱?듬땲??');
+            resumeDribbleLessonCycle(
+              '녹화 저장에는 문제가 있었지만 목표 드리블 횟수는 채웠습니다. 다시 준비 자세를 잡으면 같은 횟수로 다음 레슨을 바로 시작합니다.'
+            );
             return;
           }
 

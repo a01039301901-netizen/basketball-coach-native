@@ -30,6 +30,7 @@ export function buildBallRecognitionCalibrationHtml(
       const MIN_PATTERN_SAMPLE_PIXELS = 180;
       const MIN_PATTERN_GRADIENT_PIXELS = 80;
       const MIN_PANEL_LINE_RATIO = 0.006;
+      const PATTERN_ORIENTATION_DELTA = 0.12;
 
       function post(payload) {
         if (window.ReactNativeWebView) {
@@ -353,6 +354,51 @@ export function buildBallRecognitionCalibrationHtml(
         };
       }
 
+      function createEmptyPatternBuckets() {
+        return {
+          vertical: [],
+          horizontal: [],
+          mixed: [],
+        };
+      }
+
+      function classifyPatternOrientation(patternMetrics) {
+        if (!patternMetrics) {
+          return null;
+        }
+
+        const coverageDelta = patternMetrics.columnCoverage - patternMetrics.rowCoverage;
+
+        if (coverageDelta >= PATTERN_ORIENTATION_DELTA) {
+          return "vertical";
+        }
+
+        if (coverageDelta <= -PATTERN_ORIENTATION_DELTA) {
+          return "horizontal";
+        }
+
+        return "mixed";
+      }
+
+      function buildPatternProfileFromSamples(patternSamples) {
+        if (!patternSamples.length) {
+          return null;
+        }
+
+        const panelLineRatios = patternSamples.map((sample) => sample.panelLineRatio);
+        const edgeDensities = patternSamples.map((sample) => sample.edgeDensity);
+        const rowCoverageValues = patternSamples.map((sample) => sample.rowCoverage);
+        const columnCoverageValues = patternSamples.map((sample) => sample.columnCoverage);
+
+        return {
+          panelLineRatioRange: buildMetricRange(panelLineRatios, { padding: 0.01, minWidth: 0.02 }),
+          edgeDensityRange: buildMetricRange(edgeDensities, { padding: 0.03, minWidth: 0.06 }),
+          rowCoverageRange: buildMetricRange(rowCoverageValues, { padding: 0.04, minWidth: 0.08 }),
+          columnCoverageRange: buildMetricRange(columnCoverageValues, { padding: 0.04, minWidth: 0.08 }),
+          weight: clamp(0.58 + patternSamples.length * 0.08 + percentile(panelLineRatios, 0.5) * 6, 0.58, 0.92),
+        };
+      }
+
       async function loadImage(dataUrl) {
         return new Promise((resolve, reject) => {
           const image = new Image();
@@ -362,7 +408,7 @@ export function buildBallRecognitionCalibrationHtml(
         });
       }
 
-      async function processSample(sample, buckets, patternSamples) {
+      async function processSample(sample, buckets, patternBuckets) {
         const image = await loadImage(sample.dataUrl);
         const scale = Math.min(MAX_SIZE / image.naturalWidth, MAX_SIZE / image.naturalHeight, 1);
         const width = Math.max(1, Math.round(image.naturalWidth * scale));
@@ -386,7 +432,10 @@ export function buildBallRecognitionCalibrationHtml(
         const patternMetrics = extractPatternMetrics(data, cropWidth, cropHeight);
 
         if (patternMetrics) {
-          patternSamples.push(patternMetrics);
+          const orientation = classifyPatternOrientation(patternMetrics);
+          if (orientation) {
+            patternBuckets[orientation].push(patternMetrics);
+          }
         }
 
         for (let index = 0; index < data.length; index += 4) {
@@ -419,10 +468,10 @@ export function buildBallRecognitionCalibrationHtml(
             gray: createEmptyBucket(),
             red: createEmptyBucket(),
           };
-          const patternSamples = [];
+          const patternBuckets = createEmptyPatternBuckets();
 
           for (const sample of samples) {
-            await processSample(sample, buckets, patternSamples);
+            await processSample(sample, buckets, patternBuckets);
           }
 
           const rankedEntries = Object.entries(buckets)
@@ -449,27 +498,16 @@ export function buildBallRecognitionCalibrationHtml(
             },
             weight: clamp(bucket.count / totalCount, 0, 1),
           }));
-          const panelLineRatios = patternSamples.map((sample) => sample.panelLineRatio);
-          const edgeDensities = patternSamples.map((sample) => sample.edgeDensity);
-          const rowCoverageValues = patternSamples.map((sample) => sample.rowCoverage);
-          const columnCoverageValues = patternSamples.map((sample) => sample.columnCoverage);
-          const patternProfile =
-            patternSamples.length > 0
-              ? {
-                  panelLineRatioRange: buildMetricRange(panelLineRatios, { padding: 0.01, minWidth: 0.02 }),
-                  edgeDensityRange: buildMetricRange(edgeDensities, { padding: 0.03, minWidth: 0.06 }),
-                  rowCoverageRange: buildMetricRange(rowCoverageValues, { padding: 0.04, minWidth: 0.08 }),
-                  columnCoverageRange: buildMetricRange(columnCoverageValues, { padding: 0.04, minWidth: 0.08 }),
-                  weight: clamp(0.58 + patternSamples.length * 0.08 + percentile(panelLineRatios, 0.5) * 6, 0.58, 0.92),
-                }
-              : null;
+          const patternProfiles = ["vertical", "horizontal", "mixed"]
+            .map((orientation) => buildPatternProfileFromSamples(patternBuckets[orientation]))
+            .filter(Boolean);
 
           post({
             type: "complete",
             profile: {
               learnedColors: rankedEntries.map(([color]) => color),
               bands,
-              patternProfile,
+              patternProfiles,
               trainedAt: new Date().toISOString(),
             },
           });

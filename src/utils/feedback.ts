@@ -6,7 +6,7 @@ export function buildFeedbackText(mode: LessonMode, lines: [string, string, stri
 }
 
 export function buildDribbleFeedbackText(analysis: DribbleAnalysis): string {
-  const stabilityLine = getDribbleStabilityFeedback(analysis);
+  const rhythmLine = getDribbleRhythmFeedback(analysis);
 
   if (analysis.dribbleView === 'front') {
     const stanceLine =
@@ -37,7 +37,7 @@ export function buildDribbleFeedbackText(analysis: DribbleAnalysis): string {
             ? '발 간격은 안정적입니다.'
             : '발 간격을 확인하는 중입니다.';
 
-    return `드리블 피드백\n1. ${stanceLine}\n2. ${laneLine}\n3. ${stabilityLine ?? `${balanceLine} ${footLine}`}`;
+    return `드리블 피드백\n1. ${stanceLine}\n2. ${laneLine}\n3. ${rhythmLine ?? `${balanceLine} ${footLine}`}`;
   }
 
   const stanceLine =
@@ -65,7 +65,7 @@ export function buildDribbleFeedbackText(analysis: DribbleAnalysis): string {
           ? `공 최저 높이가 엉덩이보다 위에 머물고 있습니다. 공을 조금 더 높게 튀겨 주세요. 현재 드리블 ${analysis.dribbleCount}회입니다.`
           : `공의 간격은 안정적입니다. 지금 리듬을 유지해 보세요. 현재 드리블 ${analysis.dribbleCount}회입니다.`;
 
-  return `드리블 피드백\n1. ${stanceLine}\n2. ${eyeLine}\n3. ${stabilityLine ?? bounceLine}`;
+  return `드리블 피드백\n1. ${stanceLine}\n2. ${eyeLine}\n3. ${rhythmLine ?? bounceLine}`;
 }
 
 export function buildShootFeedbackText(analysis: ShootAnalysis): string {
@@ -115,72 +115,10 @@ export function buildShootFeedbackText(analysis: ShootAnalysis): string {
   return `슛 피드백\n1. ${armLine}\n2. ${legLine}\n3. ${timingLine}\n4. ${releasePointLine}\n5. ${releaseDurationLine}`;
 }
 
-function getStabilitySeverity(state: DribbleAnalysis['positionStabilityState']) {
-  if (state === 'unstable') {
-    return 2;
-  }
-
-  if (state === 'mixed') {
-    return 1;
-  }
-
-  return 0;
-}
-
-function getDribbleStabilityFeedback(analysis: DribbleAnalysis) {
-  if (analysis.stabilitySampleCount <= 0) {
+function getDribbleRhythmFeedback(analysis: DribbleAnalysis) {
+  if (analysis.dribbleRhythmState !== 'needs_improvement' || analysis.dribbleRhythmComparisonCount <= 0) {
     return null;
   }
 
-  const candidates = [
-    {
-      key: 'position',
-      severity: getStabilitySeverity(analysis.positionStabilityState),
-      text:
-        analysis.positionStabilityState === 'unstable'
-          ? analysis.dribbleView === 'front'
-            ? '공 위치가 매번 달라집니다. 같은 레인에서 반복해 주세요.'
-            : '공이 몸 앞뒤로 흔들립니다. 몸통 옆 같은 위치에서 반복해 주세요.'
-          : analysis.positionStabilityState === 'mixed'
-            ? analysis.dribbleView === 'front'
-              ? '공 위치가 조금씩 달라집니다. 같은 레인에서 반복해 주세요.'
-              : '공 위치가 조금씩 흔들립니다. 몸통 옆 같은 위치를 유지해 주세요.'
-            : null,
-    },
-    {
-      key: 'height',
-      severity: getStabilitySeverity(analysis.heightStabilityState),
-      text:
-        analysis.heightStabilityState === 'unstable'
-          ? '드리블 높이가 들쭉날쭉합니다. 같은 높이로 반복해 주세요.'
-          : analysis.heightStabilityState === 'mixed'
-            ? '드리블 높이가 조금씩 달라집니다. 같은 높이로 반복해 주세요.'
-            : null,
-    },
-    {
-      key: 'tempo',
-      severity: getStabilitySeverity(analysis.tempoStabilityState),
-      text:
-        analysis.tempoStabilityState === 'unstable'
-          ? '드리블 리듬이 흔들립니다. 같은 속도로 반복해 주세요.'
-          : analysis.tempoStabilityState === 'mixed'
-            ? '드리블 속도가 조금씩 흔들립니다. 같은 리듬을 유지해 주세요.'
-            : null,
-    },
-  ].filter((candidate) => candidate.text && candidate.severity > 0);
-
-  if (candidates.length === 0) {
-    return null;
-  }
-
-  candidates.sort((left, right) => {
-    if (right.severity !== left.severity) {
-      return right.severity - left.severity;
-    }
-
-    const priorityOrder = ['position', 'height', 'tempo'];
-    return priorityOrder.indexOf(left.key) - priorityOrder.indexOf(right.key);
-  });
-
-  return candidates[0]?.text ?? null;
+  return `드리블 간격 비교 ${analysis.dribbleRhythmComparisonCount}회 중 ${analysis.dribbleRhythmBadCount}회에서 0.2초 이상 차이가 났습니다. 같은 리듬으로 반복해 주세요.`;
 }

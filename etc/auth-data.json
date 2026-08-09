@@ -7,14 +7,16 @@
       "nicknameKey": "개발자",
       "passwordHash": "e596227f96d1f993278e5af747bc6963:7952f1edb3529255cee286bca91de44e190a5d8aaeba7f3d8ae9e26ae294219253e959ef982d7a225e1e1c7bd98b5e468f78ebf189abc8514c56a0f17d85cbf9",
       "createdAt": "2026-07-17T23:14:47.268Z",
-      "updatedAt": "2026-07-29T09:15:51.287Z",
+      "updatedAt": "2026-08-07T12:11:04.577Z",
       "snapshot": {
         "attendance": {
           "2026-7-18": "attended",
           "2026-7-19": "attended",
           "2026-7-26": "attended",
           "2026-7-28": "attended",
-          "2026-7-29": "attended"
+          "2026-7-29": "attended",
+          "2026-7-30": "attended",
+          "2026-8-7": "attended"
         },
         "lessonRecords": [
           {
@@ -34,7 +36,7 @@
             "representativeFeedbackCategory": "leg_angle",
             "evaluation": {
               "level": "bad",
-              "summary": "5가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "summary": "4가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
               "criteria": [
                 {
                   "key": "shoot-leg-angle",
@@ -113,7 +115,7 @@
             "representativeFeedbackCategory": "shoot_release_timing",
             "evaluation": {
               "level": "bad",
-              "summary": "5가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "summary": "4가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
               "criteria": [
                 {
                   "key": "shoot-leg-angle",
@@ -192,7 +194,7 @@
             "representativeFeedbackCategory": "shoot_release_timing",
             "evaluation": {
               "level": "bad",
-              "summary": "5가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "summary": "4가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
               "criteria": [
                 {
                   "key": "shoot-leg-angle",
@@ -275,7 +277,7 @@
             "representativeFeedbackCategory": "shoot_arm_angle",
             "evaluation": {
               "level": "bad",
-              "summary": "5가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "summary": "4가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
               "criteria": [
                 {
                   "key": "shoot-leg-angle",
@@ -354,7 +356,7 @@
             "representativeFeedbackCategory": "shoot_release_timing",
             "evaluation": {
               "level": "bad",
-              "summary": "5가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "summary": "4가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
               "criteria": [
                 {
                   "key": "shoot-leg-angle",
@@ -415,24 +417,3439 @@
                 }
               ]
             }
+          },
+          {
+            "id": "1785393336927-2ptm0u",
+            "dateKey": "2026-7-30",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "슛 피드백\n1. 준비 자세에서 팔 각도가 넓습니다. 팔을 조금 더 모아 80~120도로 맞춰 주세요.\n2. 점프 준비 자세의 하체 각도가 145.8도로 너무 높습니다. 자세를 더 낮춰 점프해 주세요.\n3. 무릎이 먼저 펴지고 난 뒤 팔이 늦게 따라 나왔습니다. 하체와 팔이 더 함께 펴지도록 맞춰 보세요.\n4. 발사 직전 가장 최근 공의 위치가 머리보다 위에 있어 슛 타점이 좋습니다.\n5. 가장 많이 굽힌 무릎 이후 2.17초 뒤에 릴리즈되어 0.6초 기준보다 늦었습니다. 조금 더 빠르게 공을 놓아 보세요.\n\n??諛쒖궗瑜??뺤씤?덉뒿?덈떎. 3珥????뱁솕瑜?留덉튂怨???湲곗???遺꾩꽍?⑸땲??",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? ?댁젣 ?쏆쓣 諛쒖궗??二쇱꽭?? 珥ъ쁺???앸굹硫???湲곗? 寃곌낵瑜??뚮젮?쒕┰?덈떎."
+              },
+              {
+                "atMs": 2749,
+                "text": "슛 피드백\n1. 준비 자세에서 팔 각도가 넓습니다. 팔을 조금 더 모아 80~120도로 맞춰 주세요.\n2. 점프 준비 자세의 하체 각도가 145.8도로 너무 높습니다. 자세를 더 낮춰 점프해 주세요.\n3. 무릎이 먼저 펴지고 난 뒤 팔이 늦게 따라 나왔습니다. 하체와 팔이 더 함께 펴지도록 맞춰 보세요.\n4. 발사 직전 가장 최근 공의 위치가 머리보다 위에 있어 슛 타점이 좋습니다.\n5. 가장 많이 굽힌 무릎 이후 2.17초 뒤에 릴리즈되어 0.6초 기준보다 늦었습니다. 조금 더 빠르게 공을 놓아 보세요.\n\n??諛쒖궗瑜??뺤씤?덉뒿?덈떎. 3珥????뱁솕瑜?留덉튂怨???湲곗???遺꾩꽍?⑸땲??"
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 3:35:36",
+            "evaluation": {
+              "level": "bad",
+              "summary": "4가지 기준 중 1가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎이 너무 많이 접혀 있습니다. 상체와 하체 균형을 다시 맞춰 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": true,
+                  "detail": "릴리스 직전 공의 위치가 머리 위쪽에서 유지되어 높이가 좋습니다."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": false,
+                  "detail": "릴리스까지 2.17초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [
+                {
+                  "label": "릴리스 높이 안정",
+                  "detail": "릴리스 직전 공의 위치가 머리 위쪽에서 유지되어 높이가 좋습니다.",
+                  "startAtMs": 2299,
+                  "durationMs": 1500
+                }
+              ],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 145.8도 정도로 120~140도로 굽혀야 합니다. 더 굽혀서 쏴주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "슛 타이밍 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 느립니다. 점프와 동시에 슛을 쏘아야 합니다. 더 빨리 쏴주세요.",
+                  "startAtMs": 2299,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "릴리즈 속도 보완이 필요합니다.",
+                  "detail": "수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 2.17초로 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.",
+                  "startAtMs": 2299,
+                  "durationMs": 1500
+                }
+              ]
+            }
+          },
+          {
+            "id": "1785393417851-gt64a5",
+            "dateKey": "2026-7-30",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "슛 피드백\n1. 준비 자세에서 팔 각도가 넓습니다. 팔을 조금 더 모아 80~120도로 맞춰 주세요.\n2. 점프 준비 자세의 하체 각도가 73.7도로 너무 낮습니다. 무릎을 조금 더 펴서 점프해 주세요.\n3. 무릎이 먼저 펴지고 난 뒤 팔이 늦게 따라 나왔습니다. 하체와 팔이 더 함께 펴지도록 맞춰 보세요.\n4. 발사 직전 가장 최근 공의 위치가 머리보다 아래에 있습니다. 공을 조금 더 높게 끌어올려 슛해 주세요.\n5. 가장 많이 굽힌 무릎 이후 8.02초 뒤에 릴리즈되어 0.6초 기준보다 늦었습니다. 조금 더 빠르게 공을 놓아 보세요.\n\n??諛쒖궗瑜??뺤씤?덉뒿?덈떎. 3珥????뱁솕瑜?留덉튂怨???湲곗???遺꾩꽍?⑸땲??",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? ?댁젣 ?쏆쓣 諛쒖궗??二쇱꽭?? 珥ъ쁺???앸굹硫???湲곗? 寃곌낵瑜??뚮젮?쒕┰?덈떎."
+              },
+              {
+                "atMs": 9025,
+                "text": "슛 피드백\n1. 준비 자세에서 팔 각도가 넓습니다. 팔을 조금 더 모아 80~120도로 맞춰 주세요.\n2. 점프 준비 자세의 하체 각도가 73.7도로 너무 낮습니다. 무릎을 조금 더 펴서 점프해 주세요.\n3. 무릎이 먼저 펴지고 난 뒤 팔이 늦게 따라 나왔습니다. 하체와 팔이 더 함께 펴지도록 맞춰 보세요.\n4. 발사 직전 가장 최근 공의 위치가 머리보다 아래에 있습니다. 공을 조금 더 높게 끌어올려 슛해 주세요.\n5. 가장 많이 굽힌 무릎 이후 8.02초 뒤에 릴리즈되어 0.6초 기준보다 늦었습니다. 조금 더 빠르게 공을 놓아 보세요.\n\n??諛쒖궗瑜??뺤씤?덉뒿?덈떎. 3珥????뱁솕瑜?留덉튂怨???湲곗???遺꾩꽍?⑸땲??"
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 3:36:57",
+            "representativeFeedbackCategory": "shoot_arm_angle",
+            "evaluation": {
+              "level": "bad",
+              "summary": "4가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": false,
+                  "detail": "릴리스 직전 공의 위치가 머리보다 낮습니다. 공을 조금 더 높게 밀어 올려 주세요."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": false,
+                  "detail": "릴리스까지 8.02초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 73.7도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 408,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "슛 타이밍 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 느립니다. 점프와 동시에 슛을 쏘아야 합니다. 더 빨리 쏴주세요.",
+                  "startAtMs": 8574,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "슛 타점(위치) 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)가 낮습니다. 머리 위로 좀 더 높여 쏴주세요.",
+                  "startAtMs": 8574,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "릴리즈 속도 보완이 필요합니다.",
+                  "detail": "수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 8.02초로 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.",
+                  "startAtMs": 8574,
+                  "durationMs": 1500
+                }
+              ]
+            }
+          },
+          {
+            "id": "1785393773927-4zr7vg",
+            "dateKey": "2026-7-30",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 59.0도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 5.57초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 59.0도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 5.57초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 3:42:53",
+            "representativeFeedbackCategory": "shoot_release_timing",
+            "evaluation": {
+              "level": "bad",
+              "summary": "4가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": false,
+                  "detail": "릴리스 직전 공의 위치가 머리보다 낮습니다. 공을 조금 더 높게 밀어 올려 주세요."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": false,
+                  "detail": "릴리스까지 5.57초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 59.0도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 1197,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "슛 타이밍 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 느립니다. 점프와 동시에 슛을 쏘아야 합니다. 더 빨리 쏴주세요.",
+                  "startAtMs": 7004,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "슛 타점(위치) 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)가 낮습니다. 머리 위로 좀 더 높여 쏴주세요.",
+                  "startAtMs": 7004,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "릴리즈 속도 보완이 필요합니다.",
+                  "detail": "수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 5.57초로 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.",
+                  "startAtMs": 7004,
+                  "durationMs": 1500
+                }
+              ]
+            }
+          },
+          {
+            "id": "1785393835425-w2cjf7",
+            "dateKey": "2026-7-30",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 61.8도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 5.34초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 61.8도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 5.34초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 3:43:55",
+            "representativeFeedbackCategory": "shoot_release_timing",
+            "evaluation": {
+              "level": "bad",
+              "summary": "4가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": false,
+                  "detail": "릴리스 직전 공의 위치가 머리보다 낮습니다. 공을 조금 더 높게 밀어 올려 주세요."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": false,
+                  "detail": "릴리스까지 5.34초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 61.8도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 573,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "슛 타이밍 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 느립니다. 점프와 동시에 슛을 쏘아야 합니다. 더 빨리 쏴주세요.",
+                  "startAtMs": 11821,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "슛 타점(위치) 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)가 낮습니다. 머리 위로 좀 더 높여 쏴주세요.",
+                  "startAtMs": 11821,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "릴리즈 속도 보완이 필요합니다.",
+                  "detail": "수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 5.34초로 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.",
+                  "startAtMs": 11821,
+                  "durationMs": 1500
+                }
+              ]
+            }
+          },
+          {
+            "id": "1785393846803-x0db8f",
+            "dateKey": "2026-7-30",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 80.8도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스 타이밍을 충분히 확인하지 못했습니다. 공과 손목이 보이도록 다시 촬영해 주세요.\n3. 릴리스 높이를 충분히 확인하지 못했습니다. 머리와 공이 함께 보이도록 다시 촬영해 주세요.\n4. 릴리스 시간을 충분히 확인하지 못했습니다. 동작이 끊기지 않게 다시 촬영해 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 80.8도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스 타이밍을 충분히 확인하지 못했습니다. 공과 손목이 보이도록 다시 촬영해 주세요.\n3. 릴리스 높이를 충분히 확인하지 못했습니다. 머리와 공이 함께 보이도록 다시 촬영해 주세요.\n4. 릴리스 시간을 충분히 확인하지 못했습니다. 동작이 끊기지 않게 다시 촬영해 주세요."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 3:44:06",
+            "representativeFeedbackCategory": "shoot_release_timing",
+            "evaluation": {
+              "level": "bad",
+              "summary": "4가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스 타이밍을 다시 확인할 수 있도록 동작이 더 선명하게 보이게 촬영해 주세요."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": false,
+                  "detail": "릴리스 높이를 충분히 확인하지 못했습니다. 머리와 공이 함께 보이도록 다시 촬영해 주세요."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": false,
+                  "detail": "릴리스 시간을 충분히 확인하지 못했습니다. 손목과 공이 끝까지 보이도록 다시 촬영해 주세요."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 80.8도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 2200
+                },
+                {
+                  "label": "슛 타이밍 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 정확히 확인되지 않았습니다. 점프와 동시에 슛을 쏘아야 합니다.",
+                  "startAtMs": 0,
+                  "durationMs": 2200
+                },
+                {
+                  "label": "슛 타점(위치) 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)를 정확히 확인하지 못했습니다. 머리 위로 좀 더 높여 쏴주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 2200
+                },
+                {
+                  "label": "릴리즈 속도 보완이 필요합니다.",
+                  "detail": "수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 정확히 확인되지 않았습니다. 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.",
+                  "startAtMs": 0,
+                  "durationMs": 2200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1785393890531-0iu2km",
+            "dateKey": "2026-7-30",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 72.4도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 5.53초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 72.4도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 5.53초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 3:44:50",
+            "representativeFeedbackCategory": "shoot_release_timing",
+            "evaluation": {
+              "level": "bad",
+              "summary": "4가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": false,
+                  "detail": "릴리스 직전 공의 위치가 머리보다 낮습니다. 공을 조금 더 높게 밀어 올려 주세요."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": false,
+                  "detail": "릴리스까지 5.53초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 72.4도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "슛 타이밍 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 느립니다. 점프와 동시에 슛을 쏘아야 합니다. 더 빨리 쏴주세요.",
+                  "startAtMs": 6325,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "슛 타점(위치) 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)가 낮습니다. 머리 위로 좀 더 높여 쏴주세요.",
+                  "startAtMs": 6325,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "릴리즈 속도 보완이 필요합니다.",
+                  "detail": "수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 5.53초로 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.",
+                  "startAtMs": 6325,
+                  "durationMs": 1500
+                }
+              ]
+            }
+          },
+          {
+            "id": "1785393900409-3apqwk",
+            "dateKey": "2026-7-30",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 67.2도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 1.94초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 67.2도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 1.94초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 3:45:00",
+            "representativeFeedbackCategory": "shoot_release_timing",
+            "evaluation": {
+              "level": "bad",
+              "summary": "4가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": false,
+                  "detail": "릴리스 직전 공의 위치가 머리보다 낮습니다. 공을 조금 더 높게 밀어 올려 주세요."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": false,
+                  "detail": "릴리스까지 1.94초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 67.2도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 4,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "슛 타이밍 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 느립니다. 점프와 동시에 슛을 쏘아야 합니다. 더 빨리 쏴주세요.",
+                  "startAtMs": 2301,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "슛 타점(위치) 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)가 낮습니다. 머리 위로 좀 더 높여 쏴주세요.",
+                  "startAtMs": 2301,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "릴리즈 속도 보완이 필요합니다.",
+                  "detail": "수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 1.94초로 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.",
+                  "startAtMs": 2301,
+                  "durationMs": 1500
+                }
+              ]
+            }
+          },
+          {
+            "id": "1785394088500-82tkb8",
+            "dateKey": "2026-7-30",
+            "mode": "dribble",
+            "feedback": "드리블 피드백\n1. 상체 기울기가 33.2도라서 조금 더 숙여 주세요.\n2. 시선 처리는 좋습니다. 계속 앞을 보고 드리블해 주세요.\n3. 드리블 높이가 들쭉날쭉합니다. 같은 높이로 반복해 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? ?댁젣 ?쒕━釉붿쓣 吏꾪뻾??二쇱꽭?? 怨??믪씠? ?쒖꽑, ?먯꽭瑜?怨꾩냽 遺꾩꽍?⑸땲??"
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 3:48:08",
+            "dribbleView": "side",
+            "evaluation": {
+              "level": "bad",
+              "summary": "6가지 기준 중 2가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "dribble-torso-posture",
+                  "label": "상체 자세",
+                  "isStable": true,
+                  "stableRatio": 0.6,
+                  "detail": "상체 자세가 60% 구간에서 안정적으로 유지되었습니다."
+                },
+                {
+                  "key": "dribble-height-appropriate",
+                  "label": "드리블 높이",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-eye-focus",
+                  "label": "시선 처리",
+                  "isStable": false,
+                  "stableRatio": 0.2,
+                  "detail": "시선이 앞을 본 구간은 20%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요."
+                },
+                {
+                  "key": "dribble-position-stability",
+                  "label": "드리블 위치 안정성",
+                  "isStable": true,
+                  "stableRatio": 1,
+                  "detail": "공이 100% 구간에서 비슷한 앞뒤 위치를 유지했습니다."
+                },
+                {
+                  "key": "dribble-height-stability",
+                  "label": "드리블 높이 안정성",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이가 0% 구간에서만 일정했습니다. 높이 편차를 조금 더 줄여 주세요."
+                },
+                {
+                  "key": "dribble-tempo-stability",
+                  "label": "드리블 리듬 안정성",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 리듬이 0% 구간에서만 일정했습니다. 같은 리듬으로 반복해 주세요."
+                }
+              ],
+              "strengths": [
+                {
+                  "label": "상체 자세 안정",
+                  "detail": "상체 자세가 60% 구간에서 안정적으로 유지되었습니다.",
+                  "startAtMs": 24885,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "공 위치 안정",
+                  "detail": "공이 100% 구간에서 비슷한 앞뒤 위치를 유지했습니다.",
+                  "startAtMs": 46959,
+                  "durationMs": 3200
+                }
+              ],
+              "improvements": [
+                {
+                  "label": "드리블 높이 조절",
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 775,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "시선 처리 보완",
+                  "detail": "시선이 앞을 본 구간은 20%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요.",
+                  "startAtMs": 22960,
+                  "durationMs": 3200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1785394839735-gcm3l3",
+            "dateKey": "2026-7-30",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "슛 피드백\n1. 준비 자세에서 팔 각도가 넓습니다. 팔을 조금 더 모아 80~120도로 맞춰 주세요.\n2. 점프 준비 자세의 하체 각도가 77.5도로 너무 낮습니다. 무릎을 조금 더 펴서 점프해 주세요.\n3. 무릎이 먼저 펴지고 난 뒤 팔이 늦게 따라 나왔습니다. 하체와 팔이 더 함께 펴지도록 맞춰 보세요.\n4. 발사 직전 가장 최근 공의 위치가 머리보다 위에 있어 슛 타점이 좋습니다.\n5. 가장 많이 굽힌 무릎 이후 0.72초 뒤에 릴리즈되어 0.6초 기준보다 늦었습니다. 조금 더 빠르게 공을 놓아 보세요.\n\n??諛쒖궗瑜??뺤씤?덉뒿?덈떎. 3珥????뱁솕瑜?留덉튂怨???湲곗???遺꾩꽍?⑸땲??",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? ?댁젣 ?쏆쓣 諛쒖궗??二쇱꽭?? 珥ъ쁺???앸굹硫???湲곗? 寃곌낵瑜??뚮젮?쒕┰?덈떎."
+              },
+              {
+                "atMs": 3808,
+                "text": "슛 피드백\n1. 준비 자세에서 팔 각도가 넓습니다. 팔을 조금 더 모아 80~120도로 맞춰 주세요.\n2. 점프 준비 자세의 하체 각도가 77.5도로 너무 낮습니다. 무릎을 조금 더 펴서 점프해 주세요.\n3. 무릎이 먼저 펴지고 난 뒤 팔이 늦게 따라 나왔습니다. 하체와 팔이 더 함께 펴지도록 맞춰 보세요.\n4. 발사 직전 가장 최근 공의 위치가 머리보다 위에 있어 슛 타점이 좋습니다.\n5. 가장 많이 굽힌 무릎 이후 0.72초 뒤에 릴리즈되어 0.6초 기준보다 늦었습니다. 조금 더 빠르게 공을 놓아 보세요.\n\n??諛쒖궗瑜??뺤씤?덉뒿?덈떎. 3珥????뱁솕瑜?留덉튂怨???湲곗???遺꾩꽍?⑸땲??"
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 4:00:39",
+            "evaluation": {
+              "level": "bad",
+              "summary": "4가지 기준 중 1가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": true,
+                  "detail": "릴리스 직전 공의 위치가 머리 위쪽에서 유지되어 높이가 좋습니다."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": false,
+                  "detail": "릴리스까지 0.72초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [
+                {
+                  "label": "릴리스 높이 안정",
+                  "detail": "릴리스 직전 공의 위치가 머리 위쪽에서 유지되어 높이가 좋습니다.",
+                  "startAtMs": 3357,
+                  "durationMs": 1500
+                }
+              ],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 77.5도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 2404,
+                  "durationMs": 2303
+                },
+                {
+                  "label": "슛 타이밍 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 느립니다. 점프와 동시에 슛을 쏘아야 합니다. 더 빨리 쏴주세요.",
+                  "startAtMs": 3357,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "릴리즈 속도 보완이 필요합니다.",
+                  "detail": "수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 0.72초로 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.",
+                  "startAtMs": 3357,
+                  "durationMs": 1500
+                }
+              ]
+            }
+          },
+          {
+            "id": "1785403697929-kzi32n",
+            "dateKey": "2026-7-30",
+            "mode": "dribble",
+            "feedback": "드리블 피드백\n1. 상체 기울기가 32.2도라서 조금 더 숙여 주세요.\n2. 시선이 공으로 내려가 있습니다. 공이 아니라 앞을 보고 드리블해 주세요.\n3. 공의 간격은 안정적입니다. 지금 리듬을 유지해 보세요. 현재 드리블 3회입니다.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? ?댁젣 ?쒕━釉붿쓣 吏꾪뻾??二쇱꽭?? 怨??믪씠? ?쒖꽑, ?먯꽭瑜?怨꾩냽 遺꾩꽍?⑸땲??"
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 6:28:17",
+            "dribbleView": "side",
+            "evaluation": {
+              "level": "bad",
+              "summary": "6가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "dribble-torso-posture",
+                  "label": "상체 자세",
+                  "isStable": false,
+                  "stableRatio": 0.46153846153846156,
+                  "detail": "상체 자세가 안정적이었던 구간은 46%였습니다. 자세를 조금 더 일정하게 유지해 주세요."
+                },
+                {
+                  "key": "dribble-height-appropriate",
+                  "label": "드리블 높이",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-eye-focus",
+                  "label": "시선 처리",
+                  "isStable": false,
+                  "stableRatio": 0.23076923076923078,
+                  "detail": "시선이 앞을 본 구간은 23%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요."
+                },
+                {
+                  "key": "dribble-position-stability",
+                  "label": "드리블 위치 안정성",
+                  "isStable": false,
+                  "stableRatio": 1,
+                  "detail": "공의 앞뒤 위치 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-height-stability",
+                  "label": "드리블 높이 안정성",
+                  "isStable": false,
+                  "stableRatio": 1,
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-tempo-stability",
+                  "label": "드리블 리듬 안정성",
+                  "isStable": false,
+                  "stableRatio": 1,
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "상체 자세 보완",
+                  "detail": "상체 자세가 안정적이었던 구간은 46%였습니다. 자세를 조금 더 일정하게 유지해 주세요.",
+                  "startAtMs": 11650,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "드리블 높이 조절",
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 3654,
+                  "durationMs": 3200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1785403828765-08uitg",
+            "dateKey": "2026-7-30",
+            "mode": "dribble",
+            "feedback": "드리블 피드백\n1. 발-무릎-엉덩이 각도가 176.6도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.\n2. 공 위치는 좋습니다. 다리 사이가 아니라 옆쪽에서 드리블하고 있습니다.\n3. 왼손 2회, 오른손 3회로 균형이 좋습니다. 발 간격이 어깨보다 좁습니다. 조금 더 벌려 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??"
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 6:30:28",
+            "dribbleView": "front",
+            "leftHandDribbleCount": 2,
+            "rightHandDribbleCount": 3,
+            "evaluation": {
+              "level": "bad",
+              "summary": "6가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "dribble-torso-posture",
+                  "label": "상체 자세",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "상체 자세가 안정적이었던 구간은 0%였습니다. 자세를 조금 더 일정하게 유지해 주세요."
+                },
+                {
+                  "key": "dribble-height-appropriate",
+                  "label": "드리블 높이",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-eye-focus",
+                  "label": "시선 처리",
+                  "isStable": false,
+                  "stableRatio": 0.36363636363636365,
+                  "detail": "시선이 앞을 본 구간은 36%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요."
+                },
+                {
+                  "key": "dribble-position-stability",
+                  "label": "드리블 위치 안정성",
+                  "isStable": false,
+                  "stableRatio": 0.25,
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-height-stability",
+                  "label": "드리블 높이 안정성",
+                  "isStable": false,
+                  "stableRatio": 0.5,
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-tempo-stability",
+                  "label": "드리블 리듬 안정성",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "상체 자세 보완",
+                  "detail": "상체 자세가 안정적이었던 구간은 0%였습니다. 자세를 조금 더 일정하게 유지해 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "드리블 높이 조절",
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1785403884993-4r4adi",
+            "dateKey": "2026-7-30",
+            "mode": "dribble",
+            "feedback": "드리블 피드백\n1. 발-무릎-엉덩이 각도가 171.5도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.\n2. 공 위치는 좋습니다. 다리 사이가 아니라 옆쪽에서 드리블하고 있습니다.\n3. 왼손 1회, 오른손 3회로 차이가 있습니다. 양손 숙련도가 불균형할 수 있어요. 발 간격이 어깨보다 좁습니다. 조금 더 벌려 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??"
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 6:31:24",
+            "dribbleView": "front",
+            "leftHandDribbleCount": 1,
+            "rightHandDribbleCount": 3,
+            "evaluation": {
+              "level": "bad",
+              "summary": "6가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "dribble-torso-posture",
+                  "label": "상체 자세",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "상체 자세가 안정적이었던 구간은 0%였습니다. 자세를 조금 더 일정하게 유지해 주세요."
+                },
+                {
+                  "key": "dribble-height-appropriate",
+                  "label": "드리블 높이",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-eye-focus",
+                  "label": "시선 처리",
+                  "isStable": false,
+                  "stableRatio": 0.38961038961038963,
+                  "detail": "시선이 앞을 본 구간은 39%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요."
+                },
+                {
+                  "key": "dribble-position-stability",
+                  "label": "드리블 위치 안정성",
+                  "isStable": false,
+                  "stableRatio": 1,
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-height-stability",
+                  "label": "드리블 높이 안정성",
+                  "isStable": false,
+                  "stableRatio": 1,
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-tempo-stability",
+                  "label": "드리블 리듬 안정성",
+                  "isStable": false,
+                  "stableRatio": 0.3333333333333333,
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "상체 자세 보완",
+                  "detail": "상체 자세가 안정적이었던 구간은 0%였습니다. 자세를 조금 더 일정하게 유지해 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "드리블 높이 조절",
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1785403920521-czgviv",
+            "dateKey": "2026-7-30",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 74.5도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 6.89초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 74.5도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 6.89초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 6:32:00",
+            "representativeFeedbackCategory": "shoot_release_timing",
+            "evaluation": {
+              "level": "bad",
+              "summary": "4가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": false,
+                  "detail": "릴리스 직전 공의 위치가 머리보다 낮습니다. 공을 조금 더 높게 밀어 올려 주세요."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": false,
+                  "detail": "릴리스까지 6.89초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 74.5도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 1298,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "슛 타이밍 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 느립니다. 점프와 동시에 슛을 쏘아야 합니다. 더 빨리 쏴주세요.",
+                  "startAtMs": 8393,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "슛 타점(위치) 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)가 낮습니다. 머리 위로 좀 더 높여 쏴주세요.",
+                  "startAtMs": 8393,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "릴리즈 속도 보완이 필요합니다.",
+                  "detail": "수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 6.89초로 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.",
+                  "startAtMs": 8393,
+                  "durationMs": 1500
+                }
+              ]
+            }
+          },
+          {
+            "id": "1785403943471-kd6ocq",
+            "dateKey": "2026-7-30",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 67.8도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 걸린 시간은 0.44초로 안정적입니다.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 67.8도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 걸린 시간은 0.44초로 안정적입니다."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 6:32:23",
+            "evaluation": {
+              "level": "bad",
+              "summary": "4가지 기준 중 1가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": false,
+                  "detail": "릴리스 직전 공의 위치가 머리보다 낮습니다. 공을 조금 더 높게 밀어 올려 주세요."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": true,
+                  "detail": "릴리스까지 0.44초가 걸렸고, 0.6초 기준 안에서 안정적입니다."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [
+                {
+                  "label": "릴리스 시간 안정",
+                  "detail": "릴리스까지 0.44초가 걸렸고, 0.6초 기준 안에서 안정적입니다.",
+                  "startAtMs": 13522,
+                  "durationMs": 1500
+                }
+              ],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 67.8도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 851,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "슛 타이밍 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 느립니다. 점프와 동시에 슛을 쏘아야 합니다. 더 빨리 쏴주세요.",
+                  "startAtMs": 13522,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "슛 타점(위치) 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)가 낮습니다. 머리 위로 좀 더 높여 쏴주세요.",
+                  "startAtMs": 13522,
+                  "durationMs": 1500
+                }
+              ]
+            }
+          },
+          {
+            "id": "1785403957710-w5ofy5",
+            "dateKey": "2026-7-30",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 75.1도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스 타이밍이 안정적입니다.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 1.81초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 75.1도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스 타이밍이 안정적입니다.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 1.81초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 6:32:37",
+            "evaluation": {
+              "level": "bad",
+              "summary": "4가지 기준 중 1가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": true,
+                  "detail": "무릎과 팔이 함께 올라오며 릴리스 타이밍이 안정적으로 맞았습니다."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": false,
+                  "detail": "릴리스 직전 공의 위치가 머리보다 낮습니다. 공을 조금 더 높게 밀어 올려 주세요."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": false,
+                  "detail": "릴리스까지 1.81초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [
+                {
+                  "label": "릴리스 타이밍 안정",
+                  "detail": "무릎과 팔이 함께 올라오며 릴리스 타이밍이 안정적으로 맞았습니다.",
+                  "startAtMs": 2649,
+                  "durationMs": 1500
+                }
+              ],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 75.1도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 724,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "슛 타점(위치) 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)가 낮습니다. 머리 위로 좀 더 높여 쏴주세요.",
+                  "startAtMs": 2649,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "릴리즈 속도 보완이 필요합니다.",
+                  "detail": "수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 1.81초로 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.",
+                  "startAtMs": 2649,
+                  "durationMs": 1500
+                }
+              ]
+            }
+          },
+          {
+            "id": "1785403972825-kjg5gq",
+            "dateKey": "2026-7-30",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 76.0도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 5.04초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 76.0도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 5.04초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 6:32:52",
+            "representativeFeedbackCategory": "shoot_release_timing",
+            "evaluation": {
+              "level": "bad",
+              "summary": "4가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": false,
+                  "detail": "릴리스 직전 공의 위치가 머리보다 낮습니다. 공을 조금 더 높게 밀어 올려 주세요."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": false,
+                  "detail": "릴리스까지 5.04초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 76.0도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "슛 타이밍 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 느립니다. 점프와 동시에 슛을 쏘아야 합니다. 더 빨리 쏴주세요.",
+                  "startAtMs": 6246,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "슛 타점(위치) 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)가 낮습니다. 머리 위로 좀 더 높여 쏴주세요.",
+                  "startAtMs": 6246,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "릴리즈 속도 보완이 필요합니다.",
+                  "detail": "수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 5.04초로 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.",
+                  "startAtMs": 6246,
+                  "durationMs": 1500
+                }
+              ]
+            }
+          },
+          {
+            "id": "1785403989191-1xzp4l",
+            "dateKey": "2026-7-30",
+            "mode": "shoot",
+            "shotOutcome": "success",
+            "feedback": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 62.5도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 3.44초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 62.5도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 3.44초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 6:33:09",
+            "representativeFeedbackCategory": "shoot_release_timing",
+            "evaluation": {
+              "level": "bad",
+              "summary": "4가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": false,
+                  "detail": "릴리스 직전 공의 위치가 머리보다 낮습니다. 공을 조금 더 높게 밀어 올려 주세요."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": false,
+                  "detail": "릴리스까지 3.44초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": true,
+                  "detail": "슛이 성공했습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 62.5도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "슛 타이밍 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 느립니다. 점프와 동시에 슛을 쏘아야 합니다. 더 빨리 쏴주세요.",
+                  "startAtMs": 8533,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "슛 타점(위치) 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)가 낮습니다. 머리 위로 좀 더 높여 쏴주세요.",
+                  "startAtMs": 8533,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "릴리즈 속도 보완이 필요합니다.",
+                  "detail": "수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 3.44초로 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.",
+                  "startAtMs": 8533,
+                  "durationMs": 1500
+                }
+              ]
+            }
+          },
+          {
+            "id": "1785404010747-3wcvic",
+            "dateKey": "2026-7-30",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 89.0도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스 타이밍이 안정적입니다.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 걸린 시간은 0.58초로 안정적입니다.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 89.0도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스 타이밍이 안정적입니다.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 걸린 시간은 0.58초로 안정적입니다."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 6:33:30",
+            "evaluation": {
+              "level": "average",
+              "summary": "4가지 기준 중 2가지가 안정적이라 보통 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": true,
+                  "detail": "무릎과 팔이 함께 올라오며 릴리스 타이밍이 안정적으로 맞았습니다."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": false,
+                  "detail": "릴리스 직전 공의 위치가 머리보다 낮습니다. 공을 조금 더 높게 밀어 올려 주세요."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": true,
+                  "detail": "릴리스까지 0.58초가 걸렸고, 0.6초 기준 안에서 안정적입니다."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [
+                {
+                  "label": "릴리스 타이밍 안정",
+                  "detail": "무릎과 팔이 함께 올라오며 릴리스 타이밍이 안정적으로 맞았습니다.",
+                  "startAtMs": 8291,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "릴리스 시간 안정",
+                  "detail": "릴리스까지 0.58초가 걸렸고, 0.6초 기준 안에서 안정적입니다.",
+                  "startAtMs": 8291,
+                  "durationMs": 1500
+                }
+              ],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 89.0도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "슛 타점(위치) 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)가 낮습니다. 머리 위로 좀 더 높여 쏴주세요.",
+                  "startAtMs": 8291,
+                  "durationMs": 1500
+                }
+              ]
+            }
+          },
+          {
+            "id": "1785406180801-hl95a1",
+            "dateKey": "2026-7-30",
+            "mode": "dribble",
+            "feedback": "드리블 피드백\n1. 발-무릎-엉덩이 각도가 81.8도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.\n2. 공 위치를 확인하는 중입니다. 공과 다리가 함께 보이도록 맞춰 주세요.\n3. 공 위치가 매번 달라집니다. 같은 레인에서 반복해 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??"
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 7. 30. 오후 7:09:40",
+            "dribbleView": "front",
+            "leftHandDribbleCount": 6,
+            "rightHandDribbleCount": 5,
+            "representativeFeedbackCategory": "leg_angle",
+            "evaluation": {
+              "level": "bad",
+              "summary": "6가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "dribble-torso-posture",
+                  "label": "상체 자세",
+                  "isStable": false,
+                  "stableRatio": 0.14450867052023122,
+                  "detail": "상체 자세가 안정적이었던 구간은 14%였습니다. 자세를 조금 더 일정하게 유지해 주세요."
+                },
+                {
+                  "key": "dribble-height-appropriate",
+                  "label": "드리블 높이",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-eye-focus",
+                  "label": "시선 처리",
+                  "isStable": false,
+                  "stableRatio": 0.2658959537572254,
+                  "detail": "시선이 앞을 본 구간은 27%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요."
+                },
+                {
+                  "key": "dribble-position-stability",
+                  "label": "드리블 위치 안정성",
+                  "isStable": false,
+                  "stableRatio": 0.375,
+                  "detail": "공이 38% 구간에서만 비슷한 라인을 유지했습니다. 드리블 라인을 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-height-stability",
+                  "label": "드리블 높이 안정성",
+                  "isStable": false,
+                  "stableRatio": 0.25,
+                  "detail": "드리블 높이가 25% 구간에서만 일정했습니다. 높이 편차를 조금 더 줄여 주세요."
+                },
+                {
+                  "key": "dribble-tempo-stability",
+                  "label": "드리블 리듬 안정성",
+                  "isStable": false,
+                  "stableRatio": 0.25,
+                  "detail": "드리블 리듬이 25% 구간에서만 일정했습니다. 같은 리듬으로 반복해 주세요."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "상체 자세 보완",
+                  "detail": "상체 자세가 안정적이었던 구간은 14%였습니다. 자세를 조금 더 일정하게 유지해 주세요.",
+                  "startAtMs": 14206,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "드리블 높이 조절",
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786098792758-pbrs2a",
+            "dateKey": "2026-8-7",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 74.4도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 걸린 시간은 0.48초로 안정적입니다.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 74.4도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 걸린 시간은 0.48초로 안정적입니다."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 7:33:12",
+            "evaluation": {
+              "level": "bad",
+              "summary": "4가지 기준 중 1가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": false,
+                  "detail": "릴리스 직전 공의 위치가 머리보다 낮습니다. 공을 조금 더 높게 밀어 올려 주세요."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": true,
+                  "detail": "릴리스까지 0.48초가 걸렸고, 0.6초 기준 안에서 안정적입니다."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [
+                {
+                  "label": "릴리스 시간 안정",
+                  "detail": "릴리스까지 0.48초가 걸렸고, 0.6초 기준 안에서 안정적입니다.",
+                  "startAtMs": 1691,
+                  "durationMs": 1500
+                }
+              ],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 74.4도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 966,
+                  "durationMs": 2075
+                },
+                {
+                  "label": "슛 타이밍 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 느립니다. 점프와 동시에 슛을 쏘아야 합니다. 더 빨리 쏴주세요.",
+                  "startAtMs": 1691,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "슛 타점(위치) 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)가 낮습니다. 머리 위로 좀 더 높여 쏴주세요.",
+                  "startAtMs": 1691,
+                  "durationMs": 1500
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786098803945-goqijc",
+            "dateKey": "2026-8-7",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 81.3도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스 타이밍을 충분히 확인하지 못했습니다. 공과 손목이 보이도록 다시 촬영해 주세요.\n3. 릴리스 높이를 충분히 확인하지 못했습니다. 머리와 공이 함께 보이도록 다시 촬영해 주세요.\n4. 릴리스 시간을 충분히 확인하지 못했습니다. 동작이 끊기지 않게 다시 촬영해 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 81.3도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스 타이밍을 충분히 확인하지 못했습니다. 공과 손목이 보이도록 다시 촬영해 주세요.\n3. 릴리스 높이를 충분히 확인하지 못했습니다. 머리와 공이 함께 보이도록 다시 촬영해 주세요.\n4. 릴리스 시간을 충분히 확인하지 못했습니다. 동작이 끊기지 않게 다시 촬영해 주세요."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 7:33:24",
+            "representativeFeedbackCategory": "shoot_release_timing",
+            "evaluation": {
+              "level": "bad",
+              "summary": "4가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스 타이밍을 다시 확인할 수 있도록 동작이 더 선명하게 보이게 촬영해 주세요."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": false,
+                  "detail": "릴리스 높이를 충분히 확인하지 못했습니다. 머리와 공이 함께 보이도록 다시 촬영해 주세요."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": false,
+                  "detail": "릴리스 시간을 충분히 확인하지 못했습니다. 손목과 공이 끝까지 보이도록 다시 촬영해 주세요."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 81.3도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 2200
+                },
+                {
+                  "label": "슛 타이밍 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 정확히 확인되지 않았습니다. 점프와 동시에 슛을 쏘아야 합니다.",
+                  "startAtMs": 0,
+                  "durationMs": 2200
+                },
+                {
+                  "label": "슛 타점(위치) 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)를 정확히 확인하지 못했습니다. 머리 위로 좀 더 높여 쏴주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 2200
+                },
+                {
+                  "label": "릴리즈 속도 보완이 필요합니다.",
+                  "detail": "수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 정확히 확인되지 않았습니다. 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.",
+                  "startAtMs": 0,
+                  "durationMs": 2200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786098961820-cqhfsh",
+            "dateKey": "2026-8-7",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 62.5도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스 타이밍이 안정적입니다.\n3. 릴리스 높이가 좋습니다. 지금처럼 머리 위쪽에서 공을 놓아 주세요.\n4. 릴리스까지 걸린 시간은 0.15초로 안정적입니다.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 62.5도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스 타이밍이 안정적입니다.\n3. 릴리스 높이가 좋습니다. 지금처럼 머리 위쪽에서 공을 놓아 주세요.\n4. 릴리스까지 걸린 시간은 0.15초로 안정적입니다."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 7:36:01",
+            "evaluation": {
+              "level": "average",
+              "summary": "4가지 기준 중 3가지가 안정적이라 보통 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": true,
+                  "detail": "무릎과 팔이 함께 올라오며 릴리스 타이밍이 안정적으로 맞았습니다."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": true,
+                  "detail": "릴리스 직전 공의 위치가 머리 위쪽에서 유지되어 높이가 좋습니다."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": true,
+                  "detail": "릴리스까지 0.15초가 걸렸고, 0.6초 기준 안에서 안정적입니다."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [
+                {
+                  "label": "릴리스 타이밍 안정",
+                  "detail": "무릎과 팔이 함께 올라오며 릴리스 타이밍이 안정적으로 맞았습니다.",
+                  "startAtMs": 1090,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "릴리스 높이 안정",
+                  "detail": "릴리스 직전 공의 위치가 머리 위쪽에서 유지되어 높이가 좋습니다.",
+                  "startAtMs": 1090,
+                  "durationMs": 1500
+                }
+              ],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 62.5도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 1830
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786098981240-n2x04x",
+            "dateKey": "2026-8-7",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 54.3도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 0.86초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 54.3도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 0.86초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 7:36:21",
+            "representativeFeedbackCategory": "shoot_release_timing",
+            "evaluation": {
+              "level": "bad",
+              "summary": "4가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": false,
+                  "detail": "릴리스 직전 공의 위치가 머리보다 낮습니다. 공을 조금 더 높게 밀어 올려 주세요."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": false,
+                  "detail": "릴리스까지 0.86초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 54.3도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "슛 타이밍 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 느립니다. 점프와 동시에 슛을 쏘아야 합니다. 더 빨리 쏴주세요.",
+                  "startAtMs": 1891,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "슛 타점(위치) 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)가 낮습니다. 머리 위로 좀 더 높여 쏴주세요.",
+                  "startAtMs": 1891,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "릴리즈 속도 보완이 필요합니다.",
+                  "detail": "수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 0.86초로 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.",
+                  "startAtMs": 1891,
+                  "durationMs": 1500
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786098997949-l3sy9s",
+            "dateKey": "2026-8-7",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "feedback": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 62.4도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 6.91초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 62.4도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 낮습니다. 공을 조금 더 높게 뻗어 주세요.\n4. 릴리스까지 6.91초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 7:36:38",
+            "representativeFeedbackCategory": "shoot_release_timing",
+            "evaluation": {
+              "level": "bad",
+              "summary": "4가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": false,
+                  "detail": "릴리스 직전 공의 위치가 머리보다 낮습니다. 공을 조금 더 높게 밀어 올려 주세요."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": false,
+                  "detail": "릴리스까지 6.91초가 걸렸습니다. 손목 스냅을 조금 더 빠르게 가져가 주세요."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "슛이 성공까지 이어지지 않았습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 62.4도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "슛 타이밍 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 느립니다. 점프와 동시에 슛을 쏘아야 합니다. 더 빨리 쏴주세요.",
+                  "startAtMs": 7803,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "슛 타점(위치) 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)가 낮습니다. 머리 위로 좀 더 높여 쏴주세요.",
+                  "startAtMs": 7803,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "릴리즈 속도 보완이 필요합니다.",
+                  "detail": "수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 6.91초로 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.",
+                  "startAtMs": 7803,
+                  "durationMs": 1500
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786099009863-jue453",
+            "dateKey": "2026-8-7",
+            "mode": "shoot",
+            "shotOutcome": "success",
+            "feedback": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 63.6도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 좋습니다. 지금처럼 머리 위쪽에서 공을 놓아 주세요.\n4. 릴리스까지 걸린 시간은 0.36초로 안정적입니다.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "슛 촬영 분석 결과\n1. 준비 자세의 다리 각도가 63.6도로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.\n2. 릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요.\n3. 릴리스 높이가 좋습니다. 지금처럼 머리 위쪽에서 공을 놓아 주세요.\n4. 릴리스까지 걸린 시간은 0.36초로 안정적입니다."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 7:36:49",
+            "evaluation": {
+              "level": "average",
+              "summary": "4가지 기준 중 2가지가 안정적이라 보통 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "릴리스 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스가 조금 늦습니다. 최고점에 가까워질 때 공을 놓아 주세요."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "릴리스 높이",
+                  "isStable": true,
+                  "detail": "릴리스 직전 공의 위치가 머리 위쪽에서 유지되어 높이가 좋습니다."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": true,
+                  "detail": "릴리스까지 0.36초가 걸렸고, 0.6초 기준 안에서 안정적입니다."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": true,
+                  "detail": "슛이 성공했습니다."
+                }
+              ],
+              "strengths": [
+                {
+                  "label": "릴리스 높이 안정",
+                  "detail": "릴리스 직전 공의 위치가 머리 위쪽에서 유지되어 높이가 좋습니다.",
+                  "startAtMs": 903,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "릴리스 시간 안정",
+                  "detail": "릴리스까지 0.36초가 걸렸고, 0.6초 기준 안에서 안정적입니다.",
+                  "startAtMs": 903,
+                  "durationMs": 1500
+                }
+              ],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 63.6도 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 1500
+                },
+                {
+                  "label": "슛 타이밍 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 느립니다. 점프와 동시에 슛을 쏘아야 합니다. 더 빨리 쏴주세요.",
+                  "startAtMs": 903,
+                  "durationMs": 1500
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786099242846-kqup98",
+            "dateKey": "2026-8-7",
+            "mode": "dribble",
+            "feedback": "드리블 피드백\n1. 발-무릎-엉덩이 각도가 --도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.\n2. 공 위치를 확인하는 중입니다. 공과 다리가 함께 보이도록 맞춰 주세요.\n3. 왼손 0회, 오른손 1회로 균형이 좋습니다. 발 간격을 확인하는 중입니다.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??"
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 7:40:42",
+            "dribbleView": "front",
+            "leftHandDribbleCount": 0,
+            "rightHandDribbleCount": 1,
+            "evaluation": {
+              "level": "bad",
+              "summary": "6가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "dribble-torso-posture",
+                  "label": "상체 자세",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "상체 자세가 안정적이었던 구간은 0%였습니다. 자세를 조금 더 일정하게 유지해 주세요."
+                },
+                {
+                  "key": "dribble-height-appropriate",
+                  "label": "드리블 높이",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-eye-focus",
+                  "label": "시선 처리",
+                  "isStable": false,
+                  "stableRatio": 0.2641509433962264,
+                  "detail": "시선이 앞을 본 구간은 26%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요."
+                },
+                {
+                  "key": "dribble-position-stability",
+                  "label": "드리블 위치 안정성",
+                  "isStable": false,
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-height-stability",
+                  "label": "드리블 높이 안정성",
+                  "isStable": false,
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-tempo-stability",
+                  "label": "드리블 리듬 안정성",
+                  "isStable": false,
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "상체 자세 보완",
+                  "detail": "상체 자세가 안정적이었던 구간은 0%였습니다. 자세를 조금 더 일정하게 유지해 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "드리블 높이 조절",
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "시선 처리 보완",
+                  "detail": "시선이 앞을 본 구간은 26%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "공 라인 보완",
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "높이 안정성 보완",
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "리듬 보완",
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786101377679-a0o3jf",
+            "dateKey": "2026-8-7",
+            "mode": "dribble",
+            "feedback": "드리블 피드백\n1. 발-무릎-엉덩이 각도가 --도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.\n2. 공 위치를 확인하는 중입니다. 공과 다리가 함께 보이도록 맞춰 주세요.\n3. 공 위치가 매번 달라집니다. 같은 레인에서 반복해 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??"
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 8:16:17",
+            "dribbleView": "front",
+            "leftHandDribbleCount": 8,
+            "rightHandDribbleCount": 4,
+            "representativeFeedbackCategory": "leg_angle",
+            "evaluation": {
+              "level": "bad",
+              "summary": "6가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "dribble-torso-posture",
+                  "label": "상체 자세",
+                  "isStable": false,
+                  "stableRatio": 0.01996007984031936,
+                  "detail": "상체 자세가 안정적이었던 구간은 2%였습니다. 자세를 조금 더 일정하게 유지해 주세요."
+                },
+                {
+                  "key": "dribble-height-appropriate",
+                  "label": "드리블 높이",
+                  "isStable": false,
+                  "stableRatio": 0.03592814371257485,
+                  "detail": "드리블 높이가 적절했던 구간은 4%였습니다. 높이를 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-eye-focus",
+                  "label": "시선 처리",
+                  "isStable": false,
+                  "stableRatio": 0.34331337325349304,
+                  "detail": "시선이 앞을 본 구간은 34%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요."
+                },
+                {
+                  "key": "dribble-position-stability",
+                  "label": "드리블 위치 안정성",
+                  "isStable": false,
+                  "stableRatio": 0.125,
+                  "detail": "공이 13% 구간에서만 비슷한 라인을 유지했습니다. 드리블 라인을 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-height-stability",
+                  "label": "드리블 높이 안정성",
+                  "isStable": false,
+                  "stableRatio": 0.25,
+                  "detail": "드리블 높이가 25% 구간에서만 일정했습니다. 높이 편차를 조금 더 줄여 주세요."
+                },
+                {
+                  "key": "dribble-tempo-stability",
+                  "label": "드리블 리듬 안정성",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 리듬이 0% 구간에서만 일정했습니다. 같은 리듬으로 반복해 주세요."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "상체 자세 보완",
+                  "detail": "상체 자세가 안정적이었던 구간은 2%였습니다. 자세를 조금 더 일정하게 유지해 주세요.",
+                  "startAtMs": 52971,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "드리블 높이 조절",
+                  "detail": "드리블 높이가 적절했던 구간은 4%였습니다. 높이를 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 115838,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "시선 처리 보완",
+                  "detail": "시선이 앞을 본 구간은 34%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요.",
+                  "startAtMs": 101071,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "공 라인 보완",
+                  "detail": "공이 13% 구간에서만 비슷한 라인을 유지했습니다. 드리블 라인을 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "높이 안정성 보완",
+                  "detail": "드리블 높이가 25% 구간에서만 일정했습니다. 높이 편차를 조금 더 줄여 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "리듬 보완",
+                  "detail": "드리블 리듬이 0% 구간에서만 일정했습니다. 같은 리듬으로 반복해 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786101418269-ysw76k",
+            "dateKey": "2026-8-7",
+            "mode": "dribble",
+            "feedback": "드리블 피드백\n1. 발-무릎-엉덩이 각도 164.7도로 준비 자세가 잘 잡혔습니다.\n2. 공 위치를 확인하는 중입니다. 공과 다리가 함께 보이도록 맞춰 주세요.\n3. 왼손 2회, 오른손 1회로 균형이 좋습니다. 발 간격을 확인하는 중입니다.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??"
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 8:16:58",
+            "dribbleView": "front",
+            "leftHandDribbleCount": 2,
+            "rightHandDribbleCount": 1,
+            "evaluation": {
+              "level": "bad",
+              "summary": "6가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "dribble-torso-posture",
+                  "label": "상체 자세",
+                  "isStable": false,
+                  "stableRatio": 0.029411764705882353,
+                  "detail": "상체 자세가 안정적이었던 구간은 3%였습니다. 자세를 조금 더 일정하게 유지해 주세요."
+                },
+                {
+                  "key": "dribble-height-appropriate",
+                  "label": "드리블 높이",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-eye-focus",
+                  "label": "시선 처리",
+                  "isStable": false,
+                  "stableRatio": 0.08823529411764706,
+                  "detail": "시선이 앞을 본 구간은 9%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요."
+                },
+                {
+                  "key": "dribble-position-stability",
+                  "label": "드리블 위치 안정성",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-height-stability",
+                  "label": "드리블 높이 안정성",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-tempo-stability",
+                  "label": "드리블 리듬 안정성",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "상체 자세 보완",
+                  "detail": "상체 자세가 안정적이었던 구간은 3%였습니다. 자세를 조금 더 일정하게 유지해 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "드리블 높이 조절",
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "시선 처리 보완",
+                  "detail": "시선이 앞을 본 구간은 9%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "공 라인 보완",
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "높이 안정성 보완",
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "리듬 보완",
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786101786936-u3yvo7",
+            "dateKey": "2026-8-7",
+            "mode": "dribble",
+            "feedback": "드리블 피드백\n1. 발-무릎-엉덩이 각도가 131.3도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.\n2. 공 위치는 좋습니다. 다리 사이가 아니라 옆쪽에서 드리블하고 있습니다.\n3. 왼손 1회, 오른손 2회로 균형이 좋습니다. 발 간격은 안정적입니다.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??"
+              },
+              {
+                "atMs": 28345,
+                "text": "드리블 피드백\n1. 발-무릎-엉덩이 각도가 131.3도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.\n2. 공 위치는 좋습니다. 다리 사이가 아니라 옆쪽에서 드리블하고 있습니다.\n3. 왼손 1회, 오른손 2회로 균형이 좋습니다. 발 간격은 안정적입니다."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 8:23:07",
+            "reviewFeedback": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??\n\n가장 보완이 필요한 기준은 1번입니다. 발-무릎-엉덩이 각도가 131.3도입니다. 140~170도에 가깝게 자세를 다시 맞춰 주세요.",
+            "reviewStartAtMs": 0,
+            "reviewDurationMs": 3000,
+            "dribbleView": "front",
+            "leftHandDribbleCount": 1,
+            "rightHandDribbleCount": 2,
+            "representativeFeedbackCategory": "leg_angle",
+            "evaluation": {
+              "level": "bad",
+              "summary": "6가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "dribble-torso-posture",
+                  "label": "상체 자세",
+                  "isStable": false,
+                  "stableRatio": 0.07692307692307693,
+                  "detail": "상체 자세가 안정적이었던 구간은 8%였습니다. 자세를 조금 더 일정하게 유지해 주세요."
+                },
+                {
+                  "key": "dribble-height-appropriate",
+                  "label": "드리블 높이",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-eye-focus",
+                  "label": "시선 처리",
+                  "isStable": false,
+                  "stableRatio": 0.27692307692307694,
+                  "detail": "시선이 앞을 본 구간은 28%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요."
+                },
+                {
+                  "key": "dribble-position-stability",
+                  "label": "드리블 위치 안정성",
+                  "isStable": false,
+                  "stableRatio": 1,
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-height-stability",
+                  "label": "드리블 높이 안정성",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-tempo-stability",
+                  "label": "드리블 리듬 안정성",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "상체 자세 보완",
+                  "detail": "상체 자세가 안정적이었던 구간은 8%였습니다. 자세를 조금 더 일정하게 유지해 주세요.",
+                  "startAtMs": 431,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "드리블 높이 조절",
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 431,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "시선 처리 보완",
+                  "detail": "시선이 앞을 본 구간은 28%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요.",
+                  "startAtMs": 14690,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "공 라인 보완",
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 431,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "높이 안정성 보완",
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 431,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "리듬 보완",
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 431,
+                  "durationMs": 3200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786102347190-482o1w",
+            "dateKey": "2026-8-7",
+            "mode": "dribble",
+            "feedback": "드리블 피드백\n1. 발-무릎-엉덩이 각도가 171.5도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.\n2. 공이 다리 사이로 들어가 있습니다. 다리 사이가 아니라 옆쪽에서 드리블해 주세요.\n3. 드리블 리듬이 흔들립니다. 같은 속도로 반복해 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??"
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 8:32:27",
+            "dribbleView": "front",
+            "leftHandDribbleCount": 6,
+            "rightHandDribbleCount": 1,
+            "representativeFeedbackCategory": "leg_angle",
+            "evaluation": {
+              "level": "bad",
+              "summary": "6가지 기준 중 1가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "dribble-torso-posture",
+                  "label": "상체 자세",
+                  "isStable": false,
+                  "stableRatio": 0.15079365079365079,
+                  "detail": "상체 자세가 안정적이었던 구간은 15%였습니다. 자세를 조금 더 일정하게 유지해 주세요."
+                },
+                {
+                  "key": "dribble-height-appropriate",
+                  "label": "드리블 높이",
+                  "isStable": false,
+                  "stableRatio": 0.007936507936507936,
+                  "detail": "드리블 높이가 적절했던 구간은 1%였습니다. 높이를 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-eye-focus",
+                  "label": "시선 처리",
+                  "isStable": false,
+                  "stableRatio": 0.373015873015873,
+                  "detail": "시선이 앞을 본 구간은 37%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요."
+                },
+                {
+                  "key": "dribble-position-stability",
+                  "label": "드리블 위치 안정성",
+                  "isStable": true,
+                  "stableRatio": 1,
+                  "detail": "공이 100% 구간에서 비슷한 좌우 라인을 유지했습니다."
+                },
+                {
+                  "key": "dribble-height-stability",
+                  "label": "드리블 높이 안정성",
+                  "isStable": false,
+                  "stableRatio": 0.6666666666666666,
+                  "detail": "드리블 높이가 67% 구간에서만 일정했습니다. 같은 높이로 반복해 주세요."
+                },
+                {
+                  "key": "dribble-tempo-stability",
+                  "label": "드리블 리듬 안정성",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 리듬이 0% 구간에서만 일정했습니다. 같은 리듬으로 반복해 주세요."
+                }
+              ],
+              "strengths": [
+                {
+                  "label": "공 라인 안정",
+                  "detail": "공이 100% 구간에서 비슷한 좌우 라인을 유지했습니다.",
+                  "startAtMs": 21291,
+                  "durationMs": 3200
+                }
+              ],
+              "improvements": [
+                {
+                  "label": "상체 자세 보완",
+                  "detail": "상체 자세가 안정적이었던 구간은 15%였습니다. 자세를 조금 더 일정하게 유지해 주세요.",
+                  "startAtMs": 19509,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "드리블 높이 조절",
+                  "detail": "드리블 높이가 적절했던 구간은 1%였습니다. 높이를 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 3181,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "시선 처리 보완",
+                  "detail": "시선이 앞을 본 구간은 37%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요.",
+                  "startAtMs": 3181,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "높이 안정성 보완",
+                  "detail": "드리블 높이가 67% 구간에서만 일정했습니다. 같은 높이로 반복해 주세요.",
+                  "startAtMs": 3181,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "리듬 보완",
+                  "detail": "드리블 리듬이 0% 구간에서만 일정했습니다. 같은 리듬으로 반복해 주세요.",
+                  "startAtMs": 3181,
+                  "durationMs": 3200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786102812560-cpu4e3",
+            "dateKey": "2026-8-7",
+            "mode": "dribble",
+            "feedback": "드리블 피드백\n1. 발-무릎-엉덩이 각도 142.4도로 준비 자세가 잘 잡혔습니다.\n2. 공 위치는 좋습니다. 다리 사이가 아니라 옆쪽에서 드리블하고 있습니다.\n3. 왼손 2회, 오른손 1회로 균형이 좋습니다. 발 간격은 안정적입니다.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??"
+              },
+              {
+                "atMs": 131353,
+                "text": "드리블 피드백\n1. 발-무릎-엉덩이 각도 142.4도로 준비 자세가 잘 잡혔습니다.\n2. 공 위치는 좋습니다. 다리 사이가 아니라 옆쪽에서 드리블하고 있습니다.\n3. 왼손 2회, 오른손 1회로 균형이 좋습니다. 발 간격은 안정적입니다."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 8:40:12",
+            "reviewFeedback": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??\n\n가장 보완이 필요한 기준은 1번입니다. 발-무릎-엉덩이 각도가 142.4도입니다. 140~170도에 가깝게 자세를 다시 맞춰 주세요.",
+            "reviewStartAtMs": 0,
+            "reviewDurationMs": 3000,
+            "dribbleView": "front",
+            "leftHandDribbleCount": 2,
+            "rightHandDribbleCount": 1,
+            "representativeFeedbackCategory": "leg_angle",
+            "evaluation": {
+              "level": "bad",
+              "summary": "6가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "dribble-torso-posture",
+                  "label": "상체 자세",
+                  "isStable": false,
+                  "stableRatio": 0.030927835051546393,
+                  "detail": "상체 자세가 안정적이었던 구간은 3%였습니다. 자세를 조금 더 일정하게 유지해 주세요."
+                },
+                {
+                  "key": "dribble-height-appropriate",
+                  "label": "드리블 높이",
+                  "isStable": false,
+                  "stableRatio": 0.015463917525773196,
+                  "detail": "드리블 높이가 적절했던 구간은 2%였습니다. 높이를 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-eye-focus",
+                  "label": "시선 처리",
+                  "isStable": false,
+                  "stableRatio": 0.37628865979381443,
+                  "detail": "시선이 앞을 본 구간은 38%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요."
+                },
+                {
+                  "key": "dribble-position-stability",
+                  "label": "드리블 위치 안정성",
+                  "isStable": false,
+                  "stableRatio": 0.5,
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-height-stability",
+                  "label": "드리블 높이 안정성",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-tempo-stability",
+                  "label": "드리블 리듬 안정성",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "상체 자세 보완",
+                  "detail": "상체 자세가 안정적이었던 구간은 3%였습니다. 자세를 조금 더 일정하게 유지해 주세요.",
+                  "startAtMs": 77987,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "드리블 높이 조절",
+                  "detail": "드리블 높이가 적절했던 구간은 2%였습니다. 높이를 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 77987,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "시선 처리 보완",
+                  "detail": "시선이 앞을 본 구간은 38%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요.",
+                  "startAtMs": 78472,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "공 라인 보완",
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "높이 안정성 보완",
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "리듬 보완",
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786102834208-kxsgbv",
+            "dateKey": "2026-8-7",
+            "mode": "dribble",
+            "feedback": "드리블 피드백\n1. 발-무릎-엉덩이 각도가 133.5도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.\n2. 공 위치는 좋습니다. 다리 사이가 아니라 옆쪽에서 드리블하고 있습니다.\n3. 왼손 1회, 오른손 2회로 균형이 좋습니다. 발 간격은 안정적입니다.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??"
+              },
+              {
+                "atMs": 3140,
+                "text": "드리블 피드백\n1. 발-무릎-엉덩이 각도가 133.5도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.\n2. 공 위치는 좋습니다. 다리 사이가 아니라 옆쪽에서 드리블하고 있습니다.\n3. 왼손 1회, 오른손 2회로 균형이 좋습니다. 발 간격은 안정적입니다."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 8:40:34",
+            "reviewFeedback": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??\n\n가장 보완이 필요한 기준은 1번입니다. 발-무릎-엉덩이 각도가 133.5도입니다. 140~170도에 가깝게 자세를 다시 맞춰 주세요.",
+            "reviewStartAtMs": 0,
+            "reviewDurationMs": 3000,
+            "dribbleView": "front",
+            "leftHandDribbleCount": 1,
+            "rightHandDribbleCount": 2,
+            "representativeFeedbackCategory": "leg_angle",
+            "evaluation": {
+              "level": "bad",
+              "summary": "6가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "dribble-torso-posture",
+                  "label": "상체 자세",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "상체 자세가 안정적이었던 구간은 0%였습니다. 자세를 조금 더 일정하게 유지해 주세요."
+                },
+                {
+                  "key": "dribble-height-appropriate",
+                  "label": "드리블 높이",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-eye-focus",
+                  "label": "시선 처리",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "시선이 앞을 본 구간은 0%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요."
+                },
+                {
+                  "key": "dribble-position-stability",
+                  "label": "드리블 위치 안정성",
+                  "isStable": false,
+                  "stableRatio": 1,
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-height-stability",
+                  "label": "드리블 높이 안정성",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-tempo-stability",
+                  "label": "드리블 리듬 안정성",
+                  "isStable": false,
+                  "stableRatio": 1,
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "상체 자세 보완",
+                  "detail": "상체 자세가 안정적이었던 구간은 0%였습니다. 자세를 조금 더 일정하게 유지해 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "드리블 높이 조절",
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "시선 처리 보완",
+                  "detail": "시선이 앞을 본 구간은 0%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "공 라인 보완",
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "높이 안정성 보완",
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "리듬 보완",
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786102843683-mnsdj5",
+            "dateKey": "2026-8-7",
+            "mode": "dribble",
+            "feedback": "드리블 피드백\n1. 발-무릎-엉덩이 각도 141.6도로 준비 자세가 잘 잡혔습니다.\n2. 공 위치는 좋습니다. 다리 사이가 아니라 옆쪽에서 드리블하고 있습니다.\n3. 왼손 0회, 오른손 3회로 차이가 있습니다. 양손 숙련도가 불균형할 수 있어요. 발 간격은 안정적입니다.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??"
+              },
+              {
+                "atMs": 2327,
+                "text": "드리블 피드백\n1. 발-무릎-엉덩이 각도 141.6도로 준비 자세가 잘 잡혔습니다.\n2. 공 위치는 좋습니다. 다리 사이가 아니라 옆쪽에서 드리블하고 있습니다.\n3. 왼손 0회, 오른손 3회로 차이가 있습니다. 양손 숙련도가 불균형할 수 있어요. 발 간격은 안정적입니다."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 8:40:43",
+            "reviewFeedback": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??\n\n가장 보완이 필요한 기준은 1번입니다. 발-무릎-엉덩이 각도가 141.6도입니다. 140~170도에 가깝게 자세를 다시 맞춰 주세요.",
+            "reviewStartAtMs": 0,
+            "reviewDurationMs": 3000,
+            "dribbleView": "front",
+            "leftHandDribbleCount": 0,
+            "rightHandDribbleCount": 3,
+            "representativeFeedbackCategory": "leg_angle",
+            "evaluation": {
+              "level": "bad",
+              "summary": "6가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "dribble-torso-posture",
+                  "label": "상체 자세",
+                  "isStable": false,
+                  "stableRatio": 0.3333333333333333,
+                  "detail": "상체 자세가 안정적이었던 구간은 33%였습니다. 자세를 조금 더 일정하게 유지해 주세요."
+                },
+                {
+                  "key": "dribble-height-appropriate",
+                  "label": "드리블 높이",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-eye-focus",
+                  "label": "시선 처리",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "시선이 앞을 본 구간은 0%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요."
+                },
+                {
+                  "key": "dribble-position-stability",
+                  "label": "드리블 위치 안정성",
+                  "isStable": false,
+                  "stableRatio": 1,
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-height-stability",
+                  "label": "드리블 높이 안정성",
+                  "isStable": false,
+                  "stableRatio": 1,
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-tempo-stability",
+                  "label": "드리블 리듬 안정성",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "상체 자세 보완",
+                  "detail": "상체 자세가 안정적이었던 구간은 33%였습니다. 자세를 조금 더 일정하게 유지해 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 2080
+                },
+                {
+                  "label": "드리블 높이 조절",
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "시선 처리 보완",
+                  "detail": "시선이 앞을 본 구간은 0%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "공 라인 보완",
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "높이 안정성 보완",
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "리듬 보완",
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786102876101-fpb40e",
+            "dateKey": "2026-8-7",
+            "mode": "dribble",
+            "feedback": "드리블 피드백\n1. 발-무릎-엉덩이 각도가 138.1도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.\n2. 공이 다리 사이로 들어가 있습니다. 다리 사이가 아니라 옆쪽에서 드리블해 주세요.\n3. 왼손 0회, 오른손 3회로 차이가 있습니다. 양손 숙련도가 불균형할 수 있어요. 발 간격은 안정적입니다.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??"
+              },
+              {
+                "atMs": 4020,
+                "text": "드리블 피드백\n1. 발-무릎-엉덩이 각도가 138.1도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.\n2. 공이 다리 사이로 들어가 있습니다. 다리 사이가 아니라 옆쪽에서 드리블해 주세요.\n3. 왼손 0회, 오른손 3회로 차이가 있습니다. 양손 숙련도가 불균형할 수 있어요. 발 간격은 안정적입니다."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 8:41:16",
+            "reviewFeedback": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??\n\n가장 보완이 필요한 기준은 3번입니다. 왼손 0번, 오른손 3번으로 차이가 있습니다. 양손 균형을 맞춰 주세요.",
+            "reviewStartAtMs": 0,
+            "reviewDurationMs": 3000,
+            "dribbleView": "front",
+            "leftHandDribbleCount": 0,
+            "rightHandDribbleCount": 3,
+            "representativeFeedbackCategory": "dribble_balance",
+            "evaluation": {
+              "level": "bad",
+              "summary": "6가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "dribble-torso-posture",
+                  "label": "상체 자세",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "상체 자세가 안정적이었던 구간은 0%였습니다. 자세를 조금 더 일정하게 유지해 주세요."
+                },
+                {
+                  "key": "dribble-height-appropriate",
+                  "label": "드리블 높이",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-eye-focus",
+                  "label": "시선 처리",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "시선이 앞을 본 구간은 0%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요."
+                },
+                {
+                  "key": "dribble-position-stability",
+                  "label": "드리블 위치 안정성",
+                  "isStable": false,
+                  "stableRatio": 0.5,
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-height-stability",
+                  "label": "드리블 높이 안정성",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-tempo-stability",
+                  "label": "드리블 리듬 안정성",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "상체 자세 보완",
+                  "detail": "상체 자세가 안정적이었던 구간은 0%였습니다. 자세를 조금 더 일정하게 유지해 주세요.",
+                  "startAtMs": 808,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "드리블 높이 조절",
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 808,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "시선 처리 보완",
+                  "detail": "시선이 앞을 본 구간은 0%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요.",
+                  "startAtMs": 808,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "공 라인 보완",
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 808,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "높이 안정성 보완",
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 808,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "리듬 보완",
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 808,
+                  "durationMs": 3200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786102890013-cpdk0s",
+            "dateKey": "2026-8-7",
+            "mode": "dribble",
+            "feedback": "드리블 피드백\n1. 발-무릎-엉덩이 각도가 134.4도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.\n2. 공이 다리 사이로 들어가 있습니다. 다리 사이가 아니라 옆쪽에서 드리블해 주세요.\n3. 왼손 1회, 오른손 2회로 균형이 좋습니다. 발 간격은 안정적입니다.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??"
+              },
+              {
+                "atMs": 2428,
+                "text": "드리블 피드백\n1. 발-무릎-엉덩이 각도가 134.4도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.\n2. 공이 다리 사이로 들어가 있습니다. 다리 사이가 아니라 옆쪽에서 드리블해 주세요.\n3. 왼손 1회, 오른손 2회로 균형이 좋습니다. 발 간격은 안정적입니다."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 8:41:30",
+            "reviewFeedback": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??\n\n가장 보완이 필요한 기준은 1번입니다. 발-무릎-엉덩이 각도가 134.4도입니다. 140~170도에 가깝게 자세를 다시 맞춰 주세요.",
+            "reviewStartAtMs": 0,
+            "reviewDurationMs": 3000,
+            "dribbleView": "front",
+            "leftHandDribbleCount": 1,
+            "rightHandDribbleCount": 2,
+            "representativeFeedbackCategory": "leg_angle",
+            "evaluation": {
+              "level": "bad",
+              "summary": "6가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "dribble-torso-posture",
+                  "label": "상체 자세",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "상체 자세가 안정적이었던 구간은 0%였습니다. 자세를 조금 더 일정하게 유지해 주세요."
+                },
+                {
+                  "key": "dribble-height-appropriate",
+                  "label": "드리블 높이",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-eye-focus",
+                  "label": "시선 처리",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "시선이 앞을 본 구간은 0%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요."
+                },
+                {
+                  "key": "dribble-position-stability",
+                  "label": "드리블 위치 안정성",
+                  "isStable": false,
+                  "stableRatio": 0.5,
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-height-stability",
+                  "label": "드리블 높이 안정성",
+                  "isStable": false,
+                  "stableRatio": 1,
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-tempo-stability",
+                  "label": "드리블 리듬 안정성",
+                  "isStable": false,
+                  "stableRatio": 1,
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "상체 자세 보완",
+                  "detail": "상체 자세가 안정적이었던 구간은 0%였습니다. 자세를 조금 더 일정하게 유지해 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "드리블 높이 조절",
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "시선 처리 보완",
+                  "detail": "시선이 앞을 본 구간은 0%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "공 라인 보완",
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "높이 안정성 보완",
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "리듬 보완",
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 0,
+                  "durationMs": 3200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786103012390-hx7udi",
+            "dateKey": "2026-8-7",
+            "mode": "dribble",
+            "feedback": "드리블 피드백\n1. 발-무릎-엉덩이 각도가 130.1도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.\n2. 공 위치는 좋습니다. 다리 사이가 아니라 옆쪽에서 드리블하고 있습니다.\n3. 왼손 1회, 오른손 2회로 균형이 좋습니다. 발 간격은 안정적입니다.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??"
+              },
+              {
+                "atMs": 10324,
+                "text": "드리블 피드백\n1. 발-무릎-엉덩이 각도가 130.1도예요. 140~170도가 되도록 자세를 다시 맞춰 주세요.\n2. 공 위치는 좋습니다. 다리 사이가 아니라 옆쪽에서 드리블하고 있습니다.\n3. 왼손 1회, 오른손 2회로 균형이 좋습니다. 발 간격은 안정적입니다."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 8:43:32",
+            "reviewFeedback": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??\n\n가장 보완이 필요한 기준은 1번입니다. 발-무릎-엉덩이 각도가 130.1도입니다. 140~170도에 가깝게 자세를 다시 맞춰 주세요.",
+            "reviewStartAtMs": 0,
+            "reviewDurationMs": 3000,
+            "dribbleView": "front",
+            "leftHandDribbleCount": 1,
+            "rightHandDribbleCount": 2,
+            "representativeFeedbackCategory": "leg_angle",
+            "evaluation": {
+              "level": "bad",
+              "summary": "6가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "dribble-torso-posture",
+                  "label": "상체 자세",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "상체 자세가 안정적이었던 구간은 0%였습니다. 자세를 조금 더 일정하게 유지해 주세요."
+                },
+                {
+                  "key": "dribble-height-appropriate",
+                  "label": "드리블 높이",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-eye-focus",
+                  "label": "시선 처리",
+                  "isStable": false,
+                  "stableRatio": 0.037037037037037035,
+                  "detail": "시선이 앞을 본 구간은 4%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요."
+                },
+                {
+                  "key": "dribble-position-stability",
+                  "label": "드리블 위치 안정성",
+                  "isStable": false,
+                  "stableRatio": 1,
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-height-stability",
+                  "label": "드리블 높이 안정성",
+                  "isStable": false,
+                  "stableRatio": 1,
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-tempo-stability",
+                  "label": "드리블 리듬 안정성",
+                  "isStable": false,
+                  "stableRatio": 1,
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "상체 자세 보완",
+                  "detail": "상체 자세가 안정적이었던 구간은 0%였습니다. 자세를 조금 더 일정하게 유지해 주세요.",
+                  "startAtMs": 189,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "드리블 높이 조절",
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 189,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "시선 처리 보완",
+                  "detail": "시선이 앞을 본 구간은 4%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요.",
+                  "startAtMs": 189,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "공 라인 보완",
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 189,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "높이 안정성 보완",
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 189,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "리듬 보완",
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 189,
+                  "durationMs": 3200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786104301035-q5mxld",
+            "dateKey": "2026-8-7",
+            "mode": "dribble",
+            "feedback": "드리블 피드백\n1. 발-무릎-엉덩이 각도 159.3도로 준비 자세가 잘 잡혔습니다.\n2. 공이 다리 사이로 들어가 있습니다. 다리 사이가 아니라 옆쪽에서 드리블해 주세요.\n3. 공 위치가 매번 달라집니다. 같은 레인에서 반복해 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??"
+              },
+              {
+                "atMs": 19514,
+                "text": "드리블 피드백\n1. 발-무릎-엉덩이 각도 159.3도로 준비 자세가 잘 잡혔습니다.\n2. 공이 다리 사이로 들어가 있습니다. 다리 사이가 아니라 옆쪽에서 드리블해 주세요.\n3. 공 위치가 매번 달라집니다. 같은 레인에서 반복해 주세요."
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 9:05:01",
+            "reviewFeedback": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??\n\n가장 보완이 필요한 기준은 2번입니다. 공이 다리 사이로 들어가 있습니다. 공을 몸 바깥쪽 라인에서 드리블해 주세요.",
+            "reviewStartAtMs": 0,
+            "reviewDurationMs": 3000,
+            "dribbleView": "front",
+            "leftHandDribbleCount": 4,
+            "rightHandDribbleCount": 6,
+            "representativeFeedbackCategory": "torso_posture",
+            "evaluation": {
+              "level": "bad",
+              "summary": "6가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "dribble-torso-posture",
+                  "label": "상체 자세",
+                  "isStable": false,
+                  "stableRatio": 0.020833333333333332,
+                  "detail": "상체 자세가 안정적이었던 구간은 2%였습니다. 자세를 조금 더 일정하게 유지해 주세요."
+                },
+                {
+                  "key": "dribble-height-appropriate",
+                  "label": "드리블 높이",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-eye-focus",
+                  "label": "시선 처리",
+                  "isStable": false,
+                  "stableRatio": 0,
+                  "detail": "시선이 앞을 본 구간은 0%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요."
+                },
+                {
+                  "key": "dribble-position-stability",
+                  "label": "드리블 위치 안정성",
+                  "isStable": false,
+                  "stableRatio": 0.25,
+                  "detail": "공이 25% 구간에서만 비슷한 라인을 유지했습니다. 드리블 라인을 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-height-stability",
+                  "label": "드리블 높이 안정성",
+                  "isStable": false,
+                  "stableRatio": 0.25,
+                  "detail": "드리블 높이가 25% 구간에서만 일정했습니다. 높이 편차를 조금 더 줄여 주세요."
+                },
+                {
+                  "key": "dribble-tempo-stability",
+                  "label": "드리블 리듬 안정성",
+                  "isStable": false,
+                  "stableRatio": 0.5,
+                  "detail": "드리블 리듬이 50% 구간에서만 일정했습니다. 리듬을 조금 더 고르게 맞춰 주세요."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "상체 자세 보완",
+                  "detail": "상체 자세가 안정적이었던 구간은 2%였습니다. 자세를 조금 더 일정하게 유지해 주세요.",
+                  "startAtMs": 7875,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "드리블 높이 조절",
+                  "detail": "드리블 높이가 적절했던 구간은 0%였습니다. 높이를 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 2312,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "시선 처리 보완",
+                  "detail": "시선이 앞을 본 구간은 0%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요.",
+                  "startAtMs": 2312,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "공 라인 보완",
+                  "detail": "공이 25% 구간에서만 비슷한 라인을 유지했습니다. 드리블 라인을 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 2312,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "높이 안정성 보완",
+                  "detail": "드리블 높이가 25% 구간에서만 일정했습니다. 높이 편차를 조금 더 줄여 주세요.",
+                  "startAtMs": 2312,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "리듬 보완",
+                  "detail": "드리블 리듬이 50% 구간에서만 일정했습니다. 리듬을 조금 더 고르게 맞춰 주세요.",
+                  "startAtMs": 2312,
+                  "durationMs": 3200
+                }
+              ]
+            }
+          },
+          {
+            "id": "1786104660626-kmpcfv",
+            "dateKey": "2026-8-7",
+            "mode": "dribble",
+            "feedback": "드리블 피드백\n1. 발-무릎-엉덩이 각도 140.5도로 준비 자세가 잘 잡혔습니다.\n2. 공 위치를 확인하는 중입니다. 공과 다리가 함께 보이도록 맞춰 주세요.\n3. 양손 드리블 횟수를 세는 중입니다. 발 간격이 어깨보다 좁습니다. 조금 더 벌려 주세요.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??"
+              }
+            ],
+            "videoUri": "",
+            "createdAt": "2026. 8. 7. 오후 9:11:00",
+            "dribbleView": "front",
+            "leftHandDribbleCount": 0,
+            "rightHandDribbleCount": 0,
+            "representativeFeedbackCategory": "dribble_balance",
+            "evaluation": {
+              "level": "bad",
+              "summary": "6가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "dribble-torso-posture",
+                  "label": "상체 자세",
+                  "isStable": false,
+                  "stableRatio": 0.0625,
+                  "detail": "상체 자세가 안정적이었던 구간은 6%였습니다. 자세를 조금 더 일정하게 유지해 주세요."
+                },
+                {
+                  "key": "dribble-height-appropriate",
+                  "label": "드리블 높이",
+                  "isStable": false,
+                  "stableRatio": 0.08333333333333333,
+                  "detail": "드리블 높이가 적절했던 구간은 8%였습니다. 높이를 더 일정하게 맞춰 주세요."
+                },
+                {
+                  "key": "dribble-eye-focus",
+                  "label": "시선 처리",
+                  "isStable": false,
+                  "stableRatio": 0.25,
+                  "detail": "시선이 앞을 본 구간은 25%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요."
+                },
+                {
+                  "key": "dribble-position-stability",
+                  "label": "드리블 위치 안정성",
+                  "isStable": false,
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-height-stability",
+                  "label": "드리블 높이 안정성",
+                  "isStable": false,
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                },
+                {
+                  "key": "dribble-tempo-stability",
+                  "label": "드리블 리듬 안정성",
+                  "isStable": false,
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "상체 자세 보완",
+                  "detail": "상체 자세가 안정적이었던 구간은 6%였습니다. 자세를 조금 더 일정하게 유지해 주세요.",
+                  "startAtMs": 859,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "드리블 높이 조절",
+                  "detail": "드리블 높이가 적절했던 구간은 8%였습니다. 높이를 더 일정하게 맞춰 주세요.",
+                  "startAtMs": 46347,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "시선 처리 보완",
+                  "detail": "시선이 앞을 본 구간은 25%였습니다. 공보다 앞을 보는 시간을 더 늘려 주세요.",
+                  "startAtMs": 859,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "공 라인 보완",
+                  "detail": "공의 좌우 라인 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 859,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "높이 안정성 보완",
+                  "detail": "드리블 높이 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 859,
+                  "durationMs": 3200
+                },
+                {
+                  "label": "리듬 보완",
+                  "detail": "드리블 리듬 안정성을 판단할 만큼 드리블 데이터가 충분하지 않습니다.",
+                  "startAtMs": 859,
+                  "durationMs": 3200
+                }
+              ]
+            }
           }
         ],
         "dribbleCounts": {
-          "2026-7-26": 100
+          "2026-7-26": 100,
+          "2026-7-30": 103,
+          "2026-8-7": 31
         },
         "shotAttempts": {
           "2026-7-26": 20,
-          "2026-7-29": 4
+          "2026-7-29": 4,
+          "2026-7-30": 20,
+          "2026-8-7": 20
         },
         "shotSuccess": {
-          "2026-7-26": 2
+          "2026-7-26": 2,
+          "2026-7-30": 1,
+          "2026-8-7": 1
         },
         "ballColors": [
-          "red",
-          "white",
-          "black"
+          "red"
         ],
         "ballBrand": "molten",
+        "ballRecognitionProfile": null,
         "position": "none",
         "homework": {
           "2026-7-26": {
@@ -448,6 +3865,31 @@
             "handDribbleTotals": {
               "left": 77,
               "right": 23
+            },
+            "correctionTask": null
+          },
+          "2026-7-30": {
+            "stage2Unlock": {
+              "unlockedAt": "2026-07-30T12:14:09.028Z",
+              "position": "none",
+              "dribbleCount": 103,
+              "shootAttemptCount": 20,
+              "shotSuccessCount": 1,
+              "lessonCount": 19
+            },
+            "skillVideoEvents": [],
+            "handDribbleTotals": {
+              "left": 52,
+              "right": 51
+            },
+            "correctionTask": null
+          },
+          "2026-8-7": {
+            "stage2Unlock": null,
+            "skillVideoEvents": [],
+            "handDribbleTotals": {
+              "left": 10,
+              "right": 21
             },
             "correctionTask": null
           }
@@ -489,7 +3931,7 @@
     "b9d30ee50acdcb142d265a2718f1cb5ef004f9e522c925b2a9cdfa93465e1d73": {
       "userId": "8c7ec6fc-a199-4351-b765-f52d8928eb1b",
       "createdAt": "2026-07-26T05:58:42.242Z",
-      "lastUsedAt": "2026-07-29T09:15:51.287Z"
+      "lastUsedAt": "2026-08-07T12:11:04.577Z"
     }
   }
 }

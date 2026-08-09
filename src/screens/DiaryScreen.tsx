@@ -1,5 +1,5 @@
 import { type AVPlaybackStatus, ResizeMode, Video } from 'expo-av';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
@@ -41,6 +41,25 @@ interface SelectedImprovementInsight {
   detail: string;
 }
 
+interface RankedDiaryRecordInsight {
+  record: LessonRecord;
+  level: NonNullable<LessonRecord['evaluation']>['level'];
+  stableCount: number;
+  totalCount: number;
+  scoreRatio: number;
+  ratioValuesDesc: number[];
+  ratioValuesAsc: number[];
+  createdAtTime: number;
+}
+
+interface RecordEvaluationVideoPlayerProps {
+  recordId: string;
+  source: { uri: string };
+  height: number;
+  videoRef: MutableRefObject<Video | null>;
+  onPlaybackStatusUpdate: (status: AVPlaybackStatus) => void;
+}
+
 const SUCCESS_RATE_COMPARE_TRACK_HEIGHT = 126;
 const SUCCESS_RATE_COMPARE_BAR_MIN_HEIGHT = 12;
 const SUCCESS_RATE_COMPARE_EMPTY_HEIGHT = 8;
@@ -51,6 +70,12 @@ const DIARY_NEUTRAL_SURFACE_ALT = '#23262a';
 const DIARY_NEUTRAL_SURFACE_SOFT = '#1d2024';
 const DIARY_NEUTRAL_ACTIVE = 'rgba(255,255,255,0.08)';
 const DIARY_NEUTRAL_BORDER = 'rgba(255,255,255,0.1)';
+const DIARY_RECORD_GOOD_SURFACE = 'rgba(76,175,80,0.18)';
+const DIARY_RECORD_GOOD_BORDER = 'rgba(76,175,80,0.46)';
+const DIARY_RECORD_AVERAGE_SURFACE = 'rgba(217,161,110,0.18)';
+const DIARY_RECORD_AVERAGE_BORDER = 'rgba(217,161,110,0.46)';
+const DIARY_RECORD_BAD_SURFACE = 'rgba(191,80,88,0.18)';
+const DIARY_RECORD_BAD_BORDER = 'rgba(191,80,88,0.46)';
 
 interface SuccessRateComparisonFrame {
   label: string;
@@ -222,6 +247,34 @@ function getSyncedFeedback(timeline: FeedbackMoment[], fallback: string, positio
   return activeText || fallback;
 }
 
+const RecordEvaluationVideoPlayer = memo(function RecordEvaluationVideoPlayer({
+  recordId: _recordId,
+  source,
+  height,
+  videoRef,
+  onPlaybackStatusUpdate,
+}: RecordEvaluationVideoPlayerProps) {
+  return (
+    <Video
+      ref={(instance) => {
+        videoRef.current = instance;
+      }}
+      source={source}
+      useNativeControls
+      shouldPlay={false}
+      isLooping={false}
+      progressUpdateIntervalMillis={200}
+      resizeMode={ResizeMode.CONTAIN}
+      style={[styles.recordEvaluationVideo, { height }]}
+      onPlaybackStatusUpdate={onPlaybackStatusUpdate}
+    />
+  );
+}, (prevProps, nextProps) => (
+  prevProps.recordId === nextProps.recordId &&
+  prevProps.source.uri === nextProps.source.uri &&
+  prevProps.height === nextProps.height
+));
+
 function isAllowedDiaryTextCodePoint(codePoint: number) {
   return (
     (codePoint >= 0x20 && codePoint <= 0x7e) ||
@@ -267,9 +320,14 @@ function isBrokenDiaryText(text: string) {
 }
 
 function buildDiaryFeedbackFallback(record: LessonRecord) {
-  const unstableCriteria = (record.evaluation?.criteria ?? [])
+  const visibleCriteria = record.evaluation
+    ? record.mode === 'dribble'
+      ? getDisplayedDribbleCriteria(record, record.evaluation)
+      : record.evaluation.criteria
+    : [];
+  const unstableCriteria = visibleCriteria
     .filter((criterion) => !criterion.isStable)
-    .map((criterion) => criterion.label);
+    .map((criterion) => getDiaryCriterionDisplayLabel(criterion));
 
   if (unstableCriteria.length > 0) {
     return `${getRecordModeLabel(record.mode)} \uD53C\uB4DC\uBC31\n\uBCF4\uC644\uC774 \uD544\uC694\uD55C \uAE30\uC900: ${unstableCriteria.join(', ')}\n\uAE30\uB85D \uD3C9\uAC00\uC5D0\uC11C \uC790\uC138\uD55C \uB0B4\uC6A9\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.`;
@@ -627,6 +685,45 @@ function getDailySummaryEvaluationCountText(insight: DiarySkillInsight) {
   return `\uB098\uC068 : ${bad}\uAC1C   \uBCF4\uD1B5 : ${average}\uAC1C   \uC88B\uC74C : ${good}\uAC1C`;
 }
 
+function getRecordCardLevelStyle(level?: NonNullable<LessonRecord['evaluation']>['level']) {
+  if (level === 'good') {
+    return {
+      backgroundColor: DIARY_RECORD_GOOD_SURFACE,
+      borderColor: DIARY_RECORD_GOOD_BORDER,
+    };
+  }
+
+  if (level === 'average') {
+    return {
+      backgroundColor: DIARY_RECORD_AVERAGE_SURFACE,
+      borderColor: DIARY_RECORD_AVERAGE_BORDER,
+    };
+  }
+
+  if (level === 'bad') {
+    return {
+      backgroundColor: DIARY_RECORD_BAD_SURFACE,
+      borderColor: DIARY_RECORD_BAD_BORDER,
+    };
+  }
+
+  return null;
+}
+
+function renderEvaluationCountSummary(insight: DiarySkillInsight) {
+  const { good, average, bad } = insight.evaluationCounts;
+
+  return (
+    <Text style={styles.recordFilterCountsText}>
+      <Text style={styles.recordFilterCountBad}>{`\uB098\uC068 : ${bad}\uAC1C`}</Text>
+      <Text style={styles.recordFilterCountsSpacer}>{'   '}</Text>
+      <Text style={styles.recordFilterCountAverage}>{`\uBCF4\uD1B5 : ${average}\uAC1C`}</Text>
+      <Text style={styles.recordFilterCountsSpacer}>{'   '}</Text>
+      <Text style={styles.recordFilterCountGood}>{`\uC88B\uC74C : ${good}\uAC1C`}</Text>
+    </Text>
+  );
+}
+
 function getDailySummaryToggleHeadline(insight: DiarySkillInsight) {
   const { good, average, bad } = insight.evaluationCounts;
   const totalEvaluatedCount = good + average + bad;
@@ -671,16 +768,48 @@ function getDiaryCriterionDisplayLabel(criterion: LessonRecordCriterion) {
     return '\uC131\uACF5 \uC5EC\uBD80';
   }
 
+  if (criterion.key === 'dribble-front-stance-angle') {
+    return '\uBB34\uB98E \uAC01\uB3C4';
+  }
+
+  if (criterion.key === 'dribble-front-ball-lane') {
+    return '\uACF5 \uB77C\uC778';
+  }
+
+  if (criterion.key === 'dribble-front-hand-balance') {
+    return '\uC591\uC190 \uADE0\uD615';
+  }
+
+  if (criterion.key === 'dribble-front-foot-spacing') {
+    return '\uBC1C \uAC04\uACA9';
+  }
+
   if (criterion.key === 'dribble-torso-posture') {
     return '\uC0C1\uCCB4 \uAE30\uC6B8\uAE30';
   }
 
-  if (criterion.key === 'dribble-height') {
+  if (criterion.key === 'dribble-height' || criterion.key === 'dribble-height-appropriate') {
     return '\uB4DC\uB9AC\uBE14 \uB192\uC774';
   }
 
   if (criterion.key === 'dribble-eye-focus') {
     return '\uC2DC\uC120 \uCC98\uB9AC';
+  }
+
+  if (criterion.key === 'dribble-rhythm') {
+    return '\uB4DC\uB9AC\uBE14 \uB9AC\uB4EC';
+  }
+
+  if (criterion.key === 'dribble-position-stability') {
+    return '\uB4DC\uB9AC\uBE14 \uC704\uCE58 \uC548\uC815\uC131';
+  }
+
+  if (criterion.key === 'dribble-height-stability') {
+    return '\uB4DC\uB9AC\uBE14 \uB192\uC774 \uC548\uC815\uC131';
+  }
+
+  if (criterion.key === 'dribble-tempo-stability') {
+    return '\uB4DC\uB9AC\uBE14 \uB9AC\uB4EC \uC548\uC815\uC131';
   }
 
   return criterion.label;
@@ -762,6 +891,287 @@ function getShootImprovementHighlights(evaluation: NonNullable<LessonRecord['eva
   }, []);
 }
 
+function getDribbleImprovementTitle(criterionKey: string, dribbleView?: LessonRecord['dribbleView']) {
+  if (criterionKey === 'dribble-front-stance-angle') {
+    return '\uBB34\uB98E \uAC01\uB3C4 \uBCF4\uC644';
+  }
+
+  if (criterionKey === 'dribble-front-ball-lane') {
+    return '\uACF5 \uB77C\uC778 \uBCF4\uC644';
+  }
+
+  if (criterionKey === 'dribble-front-hand-balance') {
+    return '\uC591\uC190 \uADE0\uD615 \uBCF4\uC644';
+  }
+
+  if (criterionKey === 'dribble-front-foot-spacing') {
+    return '\uBC1C \uAC04\uACA9 \uBCF4\uC644';
+  }
+
+  if (criterionKey === 'dribble-torso-posture') {
+    return '\uC0C1\uCCB4 \uAE30\uC6B8\uAE30 \uBCF4\uC644';
+  }
+
+  if (criterionKey === 'dribble-height-appropriate') {
+    return '\uB4DC\uB9AC\uBE14 \uB192\uC774 \uC870\uC808';
+  }
+
+  if (criterionKey === 'dribble-eye-focus') {
+    return '\uC2DC\uC120 \uCC98\uB9AC \uBCF4\uC644';
+  }
+
+  if (criterionKey === 'dribble-rhythm') {
+    return '\uB9AC\uB4EC \uBCF4\uC644';
+  }
+
+  if (criterionKey === 'dribble-position-stability') {
+    return dribbleView === 'side' ? '\uACF5 \uC704\uCE58 \uBCF4\uC644' : '\uACF5 \uB77C\uC778 \uBCF4\uC644';
+  }
+
+  if (criterionKey === 'dribble-height-stability') {
+    return '\uB192\uC774 \uC548\uC815\uC131 \uBCF4\uC644';
+  }
+
+  if (criterionKey === 'dribble-tempo-stability') {
+    return '\uB9AC\uB4EC \uBCF4\uC644';
+  }
+
+  return '';
+}
+
+function findMatchingDribbleImprovementHighlight(
+  improvements: LessonRecordHighlight[],
+  criterionKey: string,
+  dribbleView?: LessonRecord['dribbleView']
+) {
+  return improvements.find((highlight) => {
+    const label = highlight.label;
+
+    if (criterionKey === 'dribble-front-stance-angle') {
+      return label.includes('\uBB34\uB98E');
+    }
+
+    if (criterionKey === 'dribble-front-ball-lane') {
+      return label.includes('\uACF5 \uB77C\uC778') || label.includes('\uACF5 \uC704\uCE58');
+    }
+
+    if (criterionKey === 'dribble-front-hand-balance') {
+      return label.includes('\uC591\uC190') || label.includes('\uADE0\uD615');
+    }
+
+    if (criterionKey === 'dribble-front-foot-spacing') {
+      return label.includes('\uBC1C \uAC04\uACA9');
+    }
+
+    if (criterionKey === 'dribble-torso-posture') {
+      return label.includes('\uC0C1\uCCB4');
+    }
+
+    if (criterionKey === 'dribble-height-appropriate') {
+      return label.includes('\uB4DC\uB9AC\uBE14 \uB192\uC774');
+    }
+
+    if (criterionKey === 'dribble-eye-focus') {
+      return label.includes('\uC2DC\uC120');
+    }
+
+    if (criterionKey === 'dribble-rhythm') {
+      return label.includes('\uB9AC\uB4EC');
+    }
+
+    if (criterionKey === 'dribble-position-stability') {
+      return dribbleView === 'side'
+        ? label.includes('\uACF5 \uC704\uCE58')
+        : label.includes('\uACF5 \uB77C\uC778') || label.includes('\uC704\uCE58');
+    }
+
+    if (criterionKey === 'dribble-height-stability') {
+      return label.includes('\uB192\uC774 \uC548\uC815');
+    }
+
+    if (criterionKey === 'dribble-tempo-stability') {
+      return label.includes('\uB9AC\uB4EC');
+    }
+
+    return false;
+  });
+}
+
+function buildLegacyDribbleImprovementDetail(criterionKey: string, dribbleView?: LessonRecord['dribbleView']) {
+  if (criterionKey === 'dribble-front-stance-angle') {
+    return '\uC608\uC804 \uAE30\uB85D\uC774\uB77C \uBB34\uB98E \uAC01\uB3C4 \uAE30\uC900 \uB370\uC774\uD130\uAC00 \uCDA9\uBD84\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB2E4\uC74C \uC55E\uBAA8\uC2B5 \uB4DC\uB9AC\uBE14 \uAE30\uB85D\uBD80\uD130 \uC790\uC138\uD788 \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.';
+  }
+
+  if (criterionKey === 'dribble-front-ball-lane') {
+    return '\uC608\uC804 \uAE30\uB85D\uC774\uB77C \uACF5 \uB77C\uC778 \uAE30\uC900 \uB370\uC774\uD130\uAC00 \uCDA9\uBD84\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB2E4\uC74C \uC55E\uBAA8\uC2B5 \uB4DC\uB9AC\uBE14 \uAE30\uB85D\uBD80\uD130 \uC790\uC138\uD788 \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.';
+  }
+
+  if (criterionKey === 'dribble-front-hand-balance') {
+    return '\uC608\uC804 \uAE30\uB85D\uC774\uB77C \uC591\uC190 \uADE0\uD615 \uAE30\uC900 \uB370\uC774\uD130\uAC00 \uCDA9\uBD84\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB2E4\uC74C \uC55E\uBAA8\uC2B5 \uB4DC\uB9AC\uBE14 \uAE30\uB85D\uBD80\uD130 \uC790\uC138\uD788 \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.';
+  }
+
+  if (criterionKey === 'dribble-front-foot-spacing') {
+    return '\uC608\uC804 \uAE30\uB85D\uC774\uB77C \uBC1C \uAC04\uACA9 \uAE30\uC900 \uB370\uC774\uD130\uAC00 \uCDA9\uBD84\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB2E4\uC74C \uC55E\uBAA8\uC2B5 \uB4DC\uB9AC\uBE14 \uAE30\uB85D\uBD80\uD130 \uC790\uC138\uD788 \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.';
+  }
+
+  if (criterionKey === 'dribble-torso-posture') {
+    return '\uC608\uC804 \uAE30\uB85D\uC774\uB77C \uC0C1\uCCB4 \uC790\uC138 \uAE30\uC900 \uB370\uC774\uD130\uAC00 \uCDA9\uBD84\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB2E4\uC74C \uB4DC\uB9AC\uBE14 \uAE30\uB85D\uBD80\uD130 \uC790\uC138\uD788 \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.';
+  }
+
+  if (criterionKey === 'dribble-height-appropriate') {
+    return '\uC608\uC804 \uAE30\uB85D\uC774\uB77C \uB4DC\uB9AC\uBE14 \uB192\uC774 \uAE30\uC900 \uB370\uC774\uD130\uAC00 \uCDA9\uBD84\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB2E4\uC74C \uB4DC\uB9AC\uBE14 \uAE30\uB85D\uBD80\uD130 \uC790\uC138\uD788 \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.';
+  }
+
+  if (criterionKey === 'dribble-eye-focus') {
+    return '\uC608\uC804 \uAE30\uB85D\uC774\uB77C \uC2DC\uC120 \uCC98\uB9AC \uAE30\uC900 \uB370\uC774\uD130\uAC00 \uCDA9\uBD84\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB2E4\uC74C \uB4DC\uB9AC\uBE14 \uAE30\uB85D\uBD80\uD130 \uC790\uC138\uD788 \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.';
+  }
+
+  if (criterionKey === 'dribble-rhythm') {
+    return '\uC608\uC804 \uAE30\uB85D\uC774\uB77C \uB4DC\uB9AC\uBE14 \uB9AC\uB4EC \uAE30\uC900 \uB370\uC774\uD130\uAC00 \uCDA9\uBD84\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB2E4\uC74C \uB4DC\uB9AC\uBE14 \uAE30\uB85D\uBD80\uD130 \uC790\uC138\uD788 \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.';
+  }
+
+  if (criterionKey === 'dribble-position-stability') {
+    return dribbleView === 'side'
+      ? '\uC608\uC804 \uAE30\uB85D\uC774\uB77C \uACF5 \uC55E\uB4A4 \uC704\uCE58 \uC548\uC815\uC131 \uAE30\uC900 \uB370\uC774\uD130\uAC00 \uCDA9\uBD84\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB2E4\uC74C \uC606\uBAA8\uC2B5 \uB4DC\uB9AC\uBE14 \uAE30\uB85D\uBD80\uD130 \uC790\uC138\uD788 \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.'
+      : '\uC608\uC804 \uAE30\uB85D\uC774\uB77C \uACF5 \uC88C\uC6B0 \uB77C\uC778 \uC548\uC815\uC131 \uAE30\uC900 \uB370\uC774\uD130\uAC00 \uCDA9\uBD84\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB2E4\uC74C \uC55E\uBAA8\uC2B5 \uB4DC\uB9AC\uBE14 \uAE30\uB85D\uBD80\uD130 \uC790\uC138\uD788 \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.';
+  }
+
+  if (criterionKey === 'dribble-height-stability') {
+    return '\uC608\uC804 \uAE30\uB85D\uC774\uB77C \uB4DC\uB9AC\uBE14 \uB192\uC774 \uC548\uC815\uC131 \uAE30\uC900 \uB370\uC774\uD130\uAC00 \uCDA9\uBD84\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB2E4\uC74C \uB4DC\uB9AC\uBE14 \uAE30\uB85D\uBD80\uD130 \uC790\uC138\uD788 \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.';
+  }
+
+  if (criterionKey === 'dribble-tempo-stability') {
+    return '\uC608\uC804 \uAE30\uB85D\uC774\uB77C \uB4DC\uB9AC\uBE14 \uB9AC\uB4EC \uC548\uC815\uC131 \uAE30\uC900 \uB370\uC774\uD130\uAC00 \uCDA9\uBD84\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uB2E4\uC74C \uB4DC\uB9AC\uBE14 \uAE30\uB85D\uBD80\uD130 \uC790\uC138\uD788 \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.';
+  }
+
+  return '\uC608\uC804 \uAE30\uB85D\uC774\uB77C \uC790\uC138\uD55C \uAE30\uC900 \uB370\uC774\uD130\uAC00 \uBD80\uC871\uD569\uB2C8\uB2E4.';
+}
+
+function getDribbleImprovementHighlights(
+  record: LessonRecord,
+  evaluation: NonNullable<LessonRecord['evaluation']>
+) {
+  const orderedCriteria: Array<{ key: string; legacyKeys: string[] }> = record.dribbleView === 'front'
+    ? [
+        {
+          key: 'dribble-front-stance-angle',
+          legacyKeys: ['dribble-front-stance-angle'],
+        },
+        {
+          key: 'dribble-front-ball-lane',
+          legacyKeys: ['dribble-front-ball-lane'],
+        },
+        {
+          key: 'dribble-eye-focus',
+          legacyKeys: ['dribble-eye-focus'],
+        },
+        {
+          key: 'dribble-rhythm',
+          legacyKeys: ['dribble-rhythm'],
+        },
+        {
+          key: 'dribble-front-foot-spacing',
+          legacyKeys: ['dribble-front-foot-spacing'],
+        },
+      ]
+    : [
+        {
+          key: 'dribble-torso-posture',
+          legacyKeys: ['dribble-torso-posture'],
+        },
+        {
+          key: 'dribble-height-appropriate',
+          legacyKeys: ['dribble-height-appropriate', 'dribble-height'],
+        },
+        {
+          key: 'dribble-eye-focus',
+          legacyKeys: ['dribble-eye-focus'],
+        },
+        {
+          key: 'dribble-rhythm',
+          legacyKeys: ['dribble-rhythm'],
+        },
+      ];
+
+  return orderedCriteria.reduce<LessonRecordHighlight[]>((accumulator, entry) => {
+    const criterion = evaluation.criteria.find((item) => entry.legacyKeys.includes(item.key));
+
+    if (criterion?.isStable) {
+      return accumulator;
+    }
+
+    const existingHighlight = findMatchingDribbleImprovementHighlight(
+      evaluation.improvements,
+      entry.key,
+      record.dribbleView
+    );
+    const title = getDribbleImprovementTitle(entry.key, record.dribbleView);
+
+    accumulator.push({
+      label: title || criterion?.label || entry.key,
+      detail:
+        existingHighlight?.detail ||
+        criterion?.detail ||
+        buildLegacyDribbleImprovementDetail(entry.key, record.dribbleView),
+      startAtMs: existingHighlight?.startAtMs ?? 0,
+      durationMs: existingHighlight?.durationMs ?? 2200,
+    });
+
+    return accumulator;
+  }, []);
+}
+
+function getDisplayedDribbleCriteria(
+  record: LessonRecord,
+  evaluation: NonNullable<LessonRecord['evaluation']>
+) {
+  const orderedCriteria: Array<{ key: string; legacyKeys: string[] }> = record.dribbleView === 'front'
+    ? [
+        {
+          key: 'dribble-front-stance-angle',
+          legacyKeys: ['dribble-front-stance-angle'],
+        },
+        {
+          key: 'dribble-front-ball-lane',
+          legacyKeys: ['dribble-front-ball-lane'],
+        },
+        {
+          key: 'dribble-eye-focus',
+          legacyKeys: ['dribble-eye-focus'],
+        },
+        {
+          key: 'dribble-rhythm',
+          legacyKeys: ['dribble-rhythm'],
+        },
+        {
+          key: 'dribble-front-foot-spacing',
+          legacyKeys: ['dribble-front-foot-spacing'],
+        },
+      ]
+    : [
+        {
+          key: 'dribble-torso-posture',
+          legacyKeys: ['dribble-torso-posture'],
+        },
+        {
+          key: 'dribble-height-appropriate',
+          legacyKeys: ['dribble-height-appropriate', 'dribble-height'],
+        },
+        {
+          key: 'dribble-eye-focus',
+          legacyKeys: ['dribble-eye-focus'],
+        },
+        {
+          key: 'dribble-rhythm',
+          legacyKeys: ['dribble-rhythm'],
+        },
+      ];
+
+  return orderedCriteria
+    .map((entry) => evaluation.criteria.find((criterion) => entry.legacyKeys.includes(criterion.key)) ?? null)
+    .filter((criterion): criterion is LessonRecordCriterion => Boolean(criterion));
+}
+
 function getDiaryCorrectionCategoryLabel(record: LessonRecord) {
   if (record.mode === 'shoot') {
     return '\uC29B';
@@ -783,7 +1193,11 @@ function getDailySummaryCorrectionText(records: LessonRecord[]) {
   let hasEvaluation = false;
 
   for (const record of records) {
-    const criteria = record.evaluation?.criteria ?? [];
+    const criteria = record.evaluation
+      ? record.mode === 'dribble'
+        ? getDisplayedDribbleCriteria(record, record.evaluation)
+        : record.evaluation.criteria
+      : [];
 
     if (criteria.length > 0) {
       hasEvaluation = true;
@@ -857,6 +1271,157 @@ function getDailySummaryDribbleText(insight: DiarySkillInsight, selectedDateDrib
   return `\uB4DC\uB9AC\uBE14 ${selectedDateDribbleCount}\uD68C`;
 }
 
+function getRankableRecordCriteria(record: LessonRecord) {
+  if (!record.evaluation) {
+    return [] as LessonRecordCriterion[];
+  }
+
+  if (record.mode === 'shoot') {
+    return record.evaluation.criteria.filter((criterion) => criterion.key !== 'shoot-result');
+  }
+
+  return getDisplayedDribbleCriteria(record, record.evaluation);
+}
+
+function getRankedRecordCategoryLabel(record: LessonRecord) {
+  if (record.mode === 'shoot') {
+    return '\uC29B';
+  }
+
+  if (record.dribbleView === 'side') {
+    return '\uC606 \uB4DC\uB9AC\uBE14';
+  }
+
+  if (record.dribbleView === 'front') {
+    return '\uC55E \uB4DC\uB9AC\uBE14';
+  }
+
+  return '\uB4DC\uB9AC\uBE14';
+}
+
+function getRecordLevelWeight(level: NonNullable<LessonRecord['evaluation']>['level']) {
+  if (level === 'good') {
+    return 3;
+  }
+
+  if (level === 'average') {
+    return 2;
+  }
+
+  return 1;
+}
+
+function compareRatioValueLists(
+  leftValues: number[],
+  rightValues: number[],
+  direction: 'best' | 'worst'
+) {
+  const maxLength = Math.max(leftValues.length, rightValues.length);
+
+  for (let index = 0; index < maxLength; index += 1) {
+    const leftValue = leftValues[index];
+    const rightValue = rightValues[index];
+
+    if (leftValue === undefined && rightValue === undefined) {
+      return 0;
+    }
+
+    if (leftValue === undefined) {
+      return 1;
+    }
+
+    if (rightValue === undefined) {
+      return -1;
+    }
+
+    if (leftValue === rightValue) {
+      continue;
+    }
+
+    return direction === 'best' ? rightValue - leftValue : leftValue - rightValue;
+  }
+
+  return 0;
+}
+
+function buildRankedDiaryRecordInsight(record: LessonRecord): RankedDiaryRecordInsight | null {
+  const level = record.evaluation?.level;
+  const criteria = getRankableRecordCriteria(record);
+
+  if (!level || criteria.length === 0) {
+    return null;
+  }
+
+  const stableCount = criteria.reduce((count, criterion) => count + (criterion.isStable ? 1 : 0), 0);
+  const ratioValues = criteria
+    .map((criterion) =>
+      typeof criterion.stableRatio === 'number' && Number.isFinite(criterion.stableRatio)
+        ? Math.max(0, Math.min(1, criterion.stableRatio))
+        : null
+    )
+    .filter((ratio): ratio is number => ratio !== null);
+  const createdAtTime = new Date(record.createdAt).getTime();
+
+  return {
+    record,
+    level,
+    stableCount,
+    totalCount: criteria.length,
+    scoreRatio: criteria.length > 0 ? stableCount / criteria.length : 0,
+    ratioValuesDesc: [...ratioValues].sort((left, right) => right - left),
+    ratioValuesAsc: [...ratioValues].sort((left, right) => left - right),
+    createdAtTime: Number.isFinite(createdAtTime) ? createdAtTime : 0,
+  };
+}
+
+function compareRankedDiaryRecordsForBest(left: RankedDiaryRecordInsight, right: RankedDiaryRecordInsight) {
+  const levelDelta = getRecordLevelWeight(right.level) - getRecordLevelWeight(left.level);
+
+  if (levelDelta !== 0) {
+    return levelDelta;
+  }
+
+  if (right.stableCount !== left.stableCount) {
+    return right.stableCount - left.stableCount;
+  }
+
+  const ratioDelta = compareRatioValueLists(left.ratioValuesDesc, right.ratioValuesDesc, 'best');
+
+  if (ratioDelta !== 0) {
+    return ratioDelta;
+  }
+
+  if (right.scoreRatio !== left.scoreRatio) {
+    return right.scoreRatio - left.scoreRatio;
+  }
+
+  return right.createdAtTime - left.createdAtTime;
+}
+
+function compareRankedDiaryRecordsForWorst(left: RankedDiaryRecordInsight, right: RankedDiaryRecordInsight) {
+  const levelDelta = getRecordLevelWeight(left.level) - getRecordLevelWeight(right.level);
+
+  if (levelDelta !== 0) {
+    return levelDelta;
+  }
+
+  if (left.stableCount !== right.stableCount) {
+    return left.stableCount - right.stableCount;
+  }
+
+  const ratioDelta = compareRatioValueLists(left.ratioValuesAsc, right.ratioValuesAsc, 'worst');
+
+  if (ratioDelta !== 0) {
+    return ratioDelta;
+  }
+
+  if (left.scoreRatio !== right.scoreRatio) {
+    return left.scoreRatio - right.scoreRatio;
+  }
+
+  return right.createdAtTime - left.createdAtTime;
+}
+
 function getSuccessRateHeadline(
   comparisonData: Array<{ label: string; attempts: number; successRate: number }>
 ) {
@@ -901,6 +1466,7 @@ export function DiaryScreen({
   const recordCardWidth = isWide
     ? Math.min(420, Math.max(360, Math.floor(layoutWidth * 0.34)))
     : Math.max(280, Math.min(layoutWidth - 40, 336));
+  const recordEvaluationVideoHeight = isCompactMobile ? 320 : isWide ? 420 : 360;
   const [playbackFeedback, setPlaybackFeedback] = useState<Record<string, string>>({});
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [recordFilter, setRecordFilter] = useState<RecordFilter>('all');
@@ -911,7 +1477,8 @@ export function DiaryScreen({
   const [openedEvaluationRecordId, setOpenedEvaluationRecordId] = useState<string | null>(null);
   const [selectedImprovementInsight, setSelectedImprovementInsight] = useState<SelectedImprovementInsight | null>(null);
   const [pendingDeleteRecordId, setPendingDeleteRecordId] = useState<string | null>(null);
-  const videoRefs = useRef<Record<string, Video | null>>({});
+  const inlineVideoRefs = useRef<Record<string, Video | null>>({});
+  const evaluationVideoRef = useRef<Video | null>(null);
   const playbackPollersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
   const menuOpenSpacerHeight = showSuccessRateRangeMenu ? 220 : 0;
   const dribbleGraphTotal = Math.max(
@@ -1001,9 +1568,52 @@ export function DiaryScreen({
     () => getDailySummaryCorrectionText(selectedDateRecords),
     [selectedDateRecords]
   );
+  const dailyRecordRanking = useMemo(() => {
+    const rankedRecords = filteredDateRecords
+      .map((record) => buildRankedDiaryRecordInsight(record))
+      .filter((record): record is RankedDiaryRecordInsight => Boolean(record));
+    const sortedForBest = [...rankedRecords].sort(compareRankedDiaryRecordsForBest);
+    const best = sortedForBest[0] ?? null;
+    const sortedForWorst = [...rankedRecords].sort(compareRankedDiaryRecordsForWorst);
+    const worst =
+      sortedForWorst.find((record) => record.record.id !== best?.record.id) ??
+      (rankedRecords.length > 1 ? sortedForWorst[0] ?? null : null);
+
+    return {
+      totalCount: rankedRecords.length,
+      best,
+      worst,
+    };
+  }, [filteredDateRecords]);
   const openedEvaluationRecord = useMemo(
     () => (openedEvaluationRecordId ? selectedDateRecords.find((record) => record.id === openedEvaluationRecordId) ?? null : null),
     [openedEvaluationRecordId, selectedDateRecords]
+  );
+  const recordVideoSources = useMemo(() => {
+    const next: Record<string, { uri: string }> = {};
+
+    for (const record of selectedDateRecords) {
+      if (record.videoUri) {
+        next[record.id] = { uri: record.videoUri };
+      }
+    }
+
+    return next;
+  }, [selectedDateRecords]);
+  const openedEvaluationVideoSource = useMemo(
+    () => (openedEvaluationRecord?.videoUri ? { uri: openedEvaluationRecord.videoUri } : null),
+    [openedEvaluationRecord?.videoUri]
+  );
+
+  const getPlaybackVideoRef = useCallback(
+    (record: LessonRecord) => {
+      if (openedEvaluationRecordId === record.id && evaluationVideoRef.current) {
+        return evaluationVideoRef.current;
+      }
+
+      return inlineVideoRefs.current[record.id] ?? null;
+    },
+    [openedEvaluationRecordId]
   );
 
   const moveSelectedDate = useCallback(
@@ -1087,7 +1697,7 @@ export function DiaryScreen({
       }
 
       playbackPollersRef.current[record.id] = setInterval(() => {
-        const video = videoRefs.current[record.id];
+        const video = getPlaybackVideoRef(record);
 
         if (!video) {
           return;
@@ -1107,18 +1717,18 @@ export function DiaryScreen({
         });
       }, 200);
     },
-    [stopPlaybackPolling, syncFeedbackFromPosition]
+    [getPlaybackVideoRef, stopPlaybackPolling, syncFeedbackFromPosition]
   );
 
-  function handlePlaybackStatus(record: LessonRecord, status: AVPlaybackStatus) {
+  const handlePlaybackStatus = useCallback((record: LessonRecord, status: AVPlaybackStatus) => {
     if (!status.isLoaded) {
       return;
     }
 
     const positionMillis = typeof status.positionMillis === 'number' ? status.positionMillis : 0;
-    syncFeedbackFromPosition(record, positionMillis);
 
     if (status.isPlaying) {
+      syncFeedbackFromPosition(record, positionMillis);
       startPlaybackPolling(record);
     } else {
       stopPlaybackPolling(record.id);
@@ -1127,11 +1737,11 @@ export function DiaryScreen({
     if (status.didJustFinish) {
       syncFeedbackFromPosition(record, 0);
     }
-  }
+  }, [startPlaybackPolling, stopPlaybackPolling, syncFeedbackFromPosition]);
 
   const jumpToHighlight = useCallback(
     async (record: LessonRecord, startAtMs: number) => {
-      const video = videoRefs.current[record.id];
+      const video = getPlaybackVideoRef(record);
 
       if (!video) {
         return;
@@ -1141,7 +1751,7 @@ export function DiaryScreen({
       await video.playFromPositionAsync(Math.max(0, startAtMs));
       startPlaybackPolling(record);
     },
-    [startPlaybackPolling, syncFeedbackFromPosition]
+    [getPlaybackVideoRef, startPlaybackPolling, syncFeedbackFromPosition]
   );
 
   const openRecordEvaluation = useCallback((recordId: string) => {
@@ -1152,6 +1762,33 @@ export function DiaryScreen({
     setSelectedImprovementInsight(null);
     setOpenedEvaluationRecordId(null);
   }, []);
+
+  const handleOpenedEvaluationPlaybackStatus = useCallback(
+    (status: AVPlaybackStatus) => {
+      if (!openedEvaluationRecord) {
+        return;
+      }
+
+      handlePlaybackStatus(openedEvaluationRecord, status);
+    },
+    [handlePlaybackStatus, openedEvaluationRecord]
+  );
+
+  useEffect(() => {
+    if (!openedEvaluationRecordId) {
+      evaluationVideoRef.current = null;
+      return;
+    }
+
+    for (const recordId of Object.keys(playbackPollersRef.current)) {
+      stopPlaybackPolling(recordId);
+    }
+
+    return () => {
+      stopPlaybackPolling(openedEvaluationRecordId);
+      evaluationVideoRef.current = null;
+    };
+  }, [openedEvaluationRecordId, stopPlaybackPolling]);
 
   const openDeleteConfirm = useCallback((recordId: string) => {
     setPendingDeleteRecordId(recordId);
@@ -1347,13 +1984,40 @@ export function DiaryScreen({
     const strengthHighlights =
       record.mode === 'shoot'
         ? evaluation.strengths.filter((highlight) => highlight.label !== '\uC29B \uC131\uACF5 \uC7A5\uBA74')
-        : evaluation.strengths;
+        : evaluation.strengths.filter(
+            (highlight) =>
+              !(
+                record.dribbleView === 'front' &&
+                (highlight.label.includes('\uC591\uC190 \uADE0\uD615') ||
+                  (highlight.label.includes('\uC591\uC190') && highlight.label.includes('\uADE0\uD615')))
+              )
+          );
     const improvementHighlights =
-      record.mode === 'shoot' ? getShootImprovementHighlights(evaluation) : evaluation.improvements;
+      record.mode === 'shoot'
+        ? getShootImprovementHighlights(evaluation)
+        : getDribbleImprovementHighlights(record, evaluation);
+    const displayedDribbleCriteria = record.mode === 'dribble' ? getDisplayedDribbleCriteria(record, evaluation) : [];
 
     return (
       <View style={styles.evaluationBox}>
         <Text style={styles.evaluationTitle}>{'\uAE30\uB85D \uD3C9\uAC00'}</Text>
+
+        {record.mode === 'dribble' && displayedDribbleCriteria.length > 0 ? (
+          <View style={styles.criteriaRow}>
+            {displayedDribbleCriteria.map((criterion) => (
+              <View
+                key={`${record.id}-${criterion.key}`}
+                style={[
+                  styles.criterionChip,
+                  criterion.isStable ? styles.criterionChipStable : styles.criterionChipUnstable,
+                ]}
+              >
+                <Text style={styles.criterionChipLabel}>{getDiaryCriterionDisplayLabel(criterion)}</Text>
+                <Text style={styles.criterionChipValue}>{criterion.isStable ? '\uC548\uC815' : '\uBCF4\uC644'}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         <View style={styles.highlightGroup}>
           <Text style={styles.highlightGroupTitle}>{'\uC798\uD55C \uC810'}</Text>
@@ -1407,6 +2071,9 @@ export function DiaryScreen({
   function renderRecordCard(record: LessonRecord) {
     const syncedFeedback = getReadableDiaryFeedback(record, playbackFeedback[record.id] || record.feedback);
     const evaluation = record.evaluation;
+    const recordCardLevelStyle = getRecordCardLevelStyle(evaluation?.level);
+    const isBestRecord = dailyRecordRanking.best?.record.id === record.id;
+    const isWorstRecord = dailyRecordRanking.worst?.record.id === record.id;
 
     return (
       <View
@@ -1415,6 +2082,7 @@ export function DiaryScreen({
           styles.recordCard,
           styles.recordCardHorizontal,
           record.mode === 'shoot' ? styles.recordCardShoot : styles.recordCardDribble,
+          recordCardLevelStyle,
           { width: recordCardWidth },
         ]}
       >
@@ -1425,20 +2093,11 @@ export function DiaryScreen({
           >
             <View style={styles.recordTitleRow}>
               <Text style={styles.recordTitle}>{getRecordTitle(record.mode)}</Text>
-
-              {evaluation ? (
-                <View
-                  style={[
-                    styles.recordLevelBadge,
-                    evaluation.level === 'good'
-                      ? styles.recordLevelBadgeGood
-                      : evaluation.level === 'average'
-                        ? styles.recordLevelBadgeAverage
-                        : styles.recordLevelBadgeBad,
-                  ]}
-                >
-                  <Text style={styles.recordLevelBadgeText}>{getRecordLevelLabel(evaluation.level)}</Text>
-                </View>
+              {isBestRecord ? (
+                <Text style={[styles.recordRankingMarker, styles.recordRankingMarkerBest]}>{'BEST'}</Text>
+              ) : null}
+              {isWorstRecord ? (
+                <Text style={[styles.recordRankingMarker, styles.recordRankingMarkerWorst]}>{'WORST'}</Text>
               ) : null}
             </View>
           </Pressable>
@@ -1466,12 +2125,12 @@ export function DiaryScreen({
         >
           <Text style={styles.recordMeta}>{record.createdAt}</Text>
 
-          {record.videoUri ? (
+          {!openedEvaluationRecordId && record.videoUri ? (
             <Video
               ref={(instance) => {
-                videoRefs.current[record.id] = instance;
+                inlineVideoRefs.current[record.id] = instance;
               }}
-              source={{ uri: record.videoUri }}
+              source={recordVideoSources[record.id]}
               useNativeControls
               shouldPlay={false}
               isLooping={false}
@@ -1914,9 +2573,7 @@ export function DiaryScreen({
                 ) : null}
               </View>
 
-              {selectedDateKey ? (
-                <Text style={styles.recordFilterCountsText}>{getDailySummaryEvaluationCountText(diarySkillInsight)}</Text>
-              ) : null}
+              {selectedDateKey ? renderEvaluationCountSummary(diarySkillInsight) : null}
             </View>
 
             {isWide ? (
@@ -1974,6 +2631,8 @@ export function DiaryScreen({
         visible={openedEvaluationRecord !== null}
         transparent
         animationType="slide"
+        hardwareAccelerated
+        statusBarTranslucent
         onRequestClose={closeRecordEvaluation}
       >
         <View style={styles.modalOverlay}>
@@ -1995,32 +2654,11 @@ export function DiaryScreen({
             </View>
 
             {openedEvaluationRecord ? (
-              <ScrollView
-                style={styles.recordEvaluationScroll}
-                contentContainerStyle={styles.recordEvaluationScrollContent}
-                showsVerticalScrollIndicator={false}
-              >
-                <View style={styles.recordEvaluationBody}>
+              <View style={styles.recordEvaluationLayout}>
+                <View style={styles.recordEvaluationMediaSection}>
                   <View style={styles.recordHeader}>
                     <View style={styles.recordTitleRow}>
                       <Text style={styles.recordTitle}>{getRecordTitle(openedEvaluationRecord.mode)}</Text>
-
-                      {openedEvaluationRecord.evaluation ? (
-                        <View
-                          style={[
-                            styles.recordLevelBadge,
-                            openedEvaluationRecord.evaluation.level === 'good'
-                              ? styles.recordLevelBadgeGood
-                              : openedEvaluationRecord.evaluation.level === 'average'
-                                ? styles.recordLevelBadgeAverage
-                                : styles.recordLevelBadgeBad,
-                          ]}
-                        >
-                          <Text style={styles.recordLevelBadgeText}>
-                            {getRecordLevelLabel(openedEvaluationRecord.evaluation.level)}
-                          </Text>
-                        </View>
-                      ) : null}
                     </View>
 
                     {openedEvaluationRecord.mode === 'shoot' ? (
@@ -2044,50 +2682,53 @@ export function DiaryScreen({
 
                   <Text style={styles.recordMeta}>{openedEvaluationRecord.createdAt}</Text>
 
-                  {openedEvaluationRecord.videoUri ? (
-                    <Video
-                      ref={(instance) => {
-                        videoRefs.current[openedEvaluationRecord.id] = instance;
-                      }}
-                      source={{ uri: openedEvaluationRecord.videoUri }}
-                      useNativeControls
-                      shouldPlay={false}
-                      isLooping={false}
-                      progressUpdateIntervalMillis={200}
-                      resizeMode={ResizeMode.COVER}
-                      style={styles.recordEvaluationVideo}
-                      onPlaybackStatusUpdate={(status) => handlePlaybackStatus(openedEvaluationRecord, status)}
+                  {openedEvaluationVideoSource ? (
+                    <RecordEvaluationVideoPlayer
+                      recordId={openedEvaluationRecord.id}
+                      source={openedEvaluationVideoSource}
+                      height={recordEvaluationVideoHeight}
+                      videoRef={evaluationVideoRef}
+                      onPlaybackStatusUpdate={handleOpenedEvaluationPlaybackStatus}
                     />
                   ) : null}
 
-                  {selectedImprovementInsight?.recordId === openedEvaluationRecord.id ? (
-                    <View style={styles.selectedImprovementBox}>
-                      <Text style={[styles.selectedImprovementLabel, styles.highlightButtonLabelBad]}>
-                        {selectedImprovementInsight.label}
-                      </Text>
-                      <Text style={styles.selectedImprovementDetail}>{selectedImprovementInsight.detail}</Text>
-                    </View>
-                  ) : null}
-
-                  {renderRecordEvaluationContent(openedEvaluationRecord)}
-
-                  <View style={styles.liveFeedbackBox}>
-                    <Text style={styles.liveFeedbackLabel}>{'\uC2E4\uC2DC\uAC04 \uD53C\uB4DC\uBC31'}</Text>
-                    <Text style={styles.liveFeedbackText}>
-                      {getReadableDiaryFeedback(
-                        openedEvaluationRecord,
-                        playbackFeedback[openedEvaluationRecord.id] || openedEvaluationRecord.feedback
-                      )}
-                    </Text>
-                  </View>
-
-                  <SmallButton
-                    title={'\uAE30\uB85D \uC0AD\uC81C'}
-                    onPress={() => openDeleteConfirm(openedEvaluationRecord.id)}
-                    variant="red"
-                  />
                 </View>
-              </ScrollView>
+
+                <ScrollView
+                  style={styles.recordEvaluationScroll}
+                  contentContainerStyle={styles.recordEvaluationScrollContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <View style={styles.recordEvaluationDetailSection}>
+                    {selectedImprovementInsight?.recordId === openedEvaluationRecord.id ? (
+                      <View style={styles.selectedImprovementBox}>
+                        <Text style={[styles.selectedImprovementLabel, styles.highlightButtonLabelBad]}>
+                          {selectedImprovementInsight.label}
+                        </Text>
+                        <Text style={styles.selectedImprovementDetail}>{selectedImprovementInsight.detail}</Text>
+                      </View>
+                    ) : null}
+
+                    {renderRecordEvaluationContent(openedEvaluationRecord)}
+
+                    <View style={styles.liveFeedbackBox}>
+                      <Text style={styles.liveFeedbackLabel}>{'\uC2E4\uC2DC\uAC04 \uD53C\uB4DC\uBC31'}</Text>
+                      <Text style={styles.liveFeedbackText}>
+                        {getReadableDiaryFeedback(
+                          openedEvaluationRecord,
+                          playbackFeedback[openedEvaluationRecord.id] || openedEvaluationRecord.feedback
+                        )}
+                      </Text>
+                    </View>
+
+                    <SmallButton
+                      title={'\uAE30\uB85D \uC0AD\uC81C'}
+                      onPress={() => openDeleteConfirm(openedEvaluationRecord.id)}
+                      variant="red"
+                    />
+                  </View>
+                </ScrollView>
+              </View>
             ) : null}
           </View>
         </View>
@@ -2948,6 +3589,18 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     flexShrink: 1,
   },
+  recordFilterCountsSpacer: {
+    color: colors.textMuted,
+  },
+  recordFilterCountBad: {
+    color: '#d46d75',
+  },
+  recordFilterCountAverage: {
+    color: '#d9a16e',
+  },
+  recordFilterCountGood: {
+    color: '#57c26a',
+  },
   recordFilterChipRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -3269,21 +3922,83 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 22,
   },
-  recordEvaluationScroll: {
+  recordEvaluationLayout: {
     marginTop: 16,
+    gap: 16,
+    flexShrink: 1,
+  },
+  recordEvaluationMediaSection: {
+    gap: 14,
+  },
+  recordEvaluationScroll: {
+    flexShrink: 1,
   },
   recordEvaluationScrollContent: {
     paddingBottom: 8,
+  },
+  recordEvaluationDetailSection: {
+    gap: 14,
   },
   recordEvaluationBody: {
     gap: 14,
   },
   recordEvaluationVideo: {
     width: '100%',
-    aspectRatio: 16 / 9,
-    borderRadius: 14,
+    height: 260,
+    borderRadius: 0,
     backgroundColor: '#000',
-    overflow: 'hidden',
+  },
+  recordEvaluationVideoSection: {
+    gap: 10,
+  },
+  recordEvaluationControls: {
+    gap: 8,
+  },
+  recordEvaluationControlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  recordEvaluationPlayButton: {
+    backgroundColor: DIARY_NEUTRAL_SURFACE_SOFT,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  recordEvaluationPlayButtonText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  recordEvaluationTimeText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  recordEvaluationSeekTrackWrap: {
+    paddingVertical: 6,
+  },
+  recordEvaluationSeekTrack: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    overflow: 'visible',
+  },
+  recordEvaluationSeekTrackFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: colors.textAccent,
+  },
+  recordEvaluationSeekThumb: {
+    position: 'absolute',
+    top: '50%',
+    width: 16,
+    height: 16,
+    marginLeft: -8,
+    marginTop: -8,
+    borderRadius: 999,
+    backgroundColor: colors.textAccent,
   },
   modalDescription: {
     color: colors.textMuted,
@@ -3411,6 +4126,8 @@ const styles = StyleSheet.create({
     backgroundColor: DIARY_NEUTRAL_SURFACE,
     borderRadius: 0,
     padding: 14,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   recordCardHorizontal: {
     flexShrink: 0,
@@ -3442,6 +4159,18 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     paddingRight: 4,
+  },
+  recordRankingMarker: {
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+  },
+  recordRankingMarkerBest: {
+    color: '#57c26a',
+  },
+  recordRankingMarkerWorst: {
+    color: '#d46d75',
   },
   recordLevelBadge: {
     borderRadius: 999,

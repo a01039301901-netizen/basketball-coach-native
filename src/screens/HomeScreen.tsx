@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { colors } from '../theme/colors';
 import type { HomeworkProgressItem } from '../types/app';
@@ -163,6 +164,7 @@ export function HomeScreen({
   const { width } = useWindowDimensions();
   const layoutWidth = shouldUseDesktopMobileLayout(width) ? getDesktopMobileFrameWidth(width) : width;
   const isWide = layoutWidth >= 860;
+  const [openedHomeworkDetailIds, setOpenedHomeworkDetailIds] = useState<Record<string, boolean>>({});
 
   const menuButtons = [
     {
@@ -244,21 +246,51 @@ export function HomeScreen({
 
         {isHomeworkVisible ? (
           <View style={styles.homeworkList}>
-            {homeworkToShow.map((item) => (
-              <View key={item.id} style={styles.homeworkItem}>
-                <View style={styles.homeworkHeader}>
-                  <View style={[styles.homeworkBullet, item.isCompleted && styles.homeworkBulletCompleted]} />
-                  <Text style={styles.homeworkText}>{item.title}</Text>
+            {homeworkToShow.map((item) => {
+              const hasDetail = Boolean(item.detailText);
+              const isDetailOpened = Boolean(openedHomeworkDetailIds[item.id]);
+
+              return (
+                <View key={item.id} style={styles.homeworkItem}>
+                  {item.reasonText ? (
+                    <Text style={styles.homeworkReasonText}>{item.reasonText}</Text>
+                  ) : null}
+
+                  <View style={styles.homeworkHeader}>
+                    <View style={[styles.homeworkBullet, item.isCompleted && styles.homeworkBulletCompleted]} />
+                    <Text style={styles.homeworkText}>{item.title}</Text>
+                  </View>
+
+                  {hasDetail ? (
+                    <Pressable
+                      onPress={() =>
+                        setOpenedHomeworkDetailIds((current) => ({
+                          ...current,
+                          [item.id]: !current[item.id],
+                        }))
+                      }
+                      style={({ pressed }) => [styles.homeworkDetailToggleButton, pressed && styles.pressed]}
+                    >
+                      <Text style={styles.homeworkDetailToggleText}>
+                        {isDetailOpened ? '접기' : item.detailToggleText || '자세히 보기'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+
+                  {hasDetail && isDetailOpened ? (
+                    <Text style={styles.homeworkDetailText}>{item.detailText}</Text>
+                  ) : null}
+
+                  <View style={styles.homeworkMetaRow}>
+                    <Text style={styles.homeworkStatus}>{item.completionText}</Text>
+                    <Text style={styles.homeworkProgress}>{item.progressText}</Text>
+                  </View>
+                  <View style={styles.progressTrack}>
+                    <View style={[styles.progressFill, { width: `${item.progressPercent}%` }]} />
+                  </View>
                 </View>
-                <View style={styles.homeworkMetaRow}>
-                  <Text style={styles.homeworkStatus}>{item.completionText}</Text>
-                  <Text style={styles.homeworkProgress}>{item.progressText}</Text>
-                </View>
-                <View style={styles.progressTrack}>
-                  <View style={[styles.progressFill, { width: `${item.progressPercent}%` }]} />
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         ) : (
           <Pressable onPress={onRevealHomework} style={({ pressed }) => [styles.homeworkHiddenCard, pressed && styles.pressed]}>
@@ -577,6 +609,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
+  homeworkReasonText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
   homeworkHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -597,6 +635,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '700',
+  },
+  homeworkDetailToggleButton: {
+    alignSelf: 'flex-start',
+  },
+  homeworkDetailToggleText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
+  homeworkDetailText: {
+    color: colors.textSoft,
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: '600',
   },
   homeworkMetaRow: {
     flexDirection: 'row',
