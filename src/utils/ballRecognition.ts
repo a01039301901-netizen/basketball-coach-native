@@ -6,6 +6,7 @@ import {
 import type {
   BallColorOption,
   BallRecognitionBand,
+  BallRecognitionPatternOrientation,
   BallRecognitionPatternProfile,
   BallRecognitionPreview,
   BallRecognitionProfile,
@@ -26,6 +27,10 @@ function clampNumber(value: number, min: number, max: number) {
 
 function isBallColorOption(value: unknown): value is BallColorOption {
   return value === 'orange' || value === 'brown' || value === 'yellow' || value === 'white' || value === 'black' || value === 'gray' || value === 'red';
+}
+
+function isPatternOrientation(value: unknown): value is BallRecognitionPatternOrientation {
+  return value === 'vertical' || value === 'horizontal' || value === 'mixed';
 }
 
 function sanitizeRange(
@@ -92,6 +97,7 @@ function sanitizePatternProfile(value: unknown): BallRecognitionPatternProfile |
       typeof value.weight === 'number' && Number.isFinite(value.weight)
         ? clampNumber(value.weight, 0, 1)
         : 0.72,
+    orientation: isPatternOrientation(value.orientation) ? value.orientation : undefined,
   };
 }
 

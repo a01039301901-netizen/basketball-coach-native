@@ -380,7 +380,7 @@ export function buildBallRecognitionCalibrationHtml(
         return "mixed";
       }
 
-      function buildPatternProfileFromSamples(patternSamples) {
+      function buildPatternProfileFromSamples(patternSamples, orientation) {
         if (!patternSamples.length) {
           return null;
         }
@@ -396,6 +396,45 @@ export function buildBallRecognitionCalibrationHtml(
           rowCoverageRange: buildMetricRange(rowCoverageValues, { padding: 0.04, minWidth: 0.08 }),
           columnCoverageRange: buildMetricRange(columnCoverageValues, { padding: 0.04, minWidth: 0.08 }),
           weight: clamp(0.58 + patternSamples.length * 0.08 + percentile(panelLineRatios, 0.5) * 6, 0.58, 0.92),
+          orientation,
+        };
+      }
+
+      function pushPatternMetrics(data, width, height, patternBuckets) {
+        const patternMetrics = extractPatternMetrics(data, width, height);
+        if (!patternMetrics) {
+          return;
+        }
+
+        const orientation = classifyPatternOrientation(patternMetrics);
+        if (orientation) {
+          patternBuckets[orientation].push(patternMetrics);
+        }
+      }
+
+      function rotateImageDataQuarterTurn(data, width, height) {
+        const rotatedWidth = height;
+        const rotatedHeight = width;
+        const rotatedData = new Uint8ClampedArray(data.length);
+
+        for (let y = 0; y < height; y += 1) {
+          for (let x = 0; x < width; x += 1) {
+            const sourceIndex = (y * width + x) * 4;
+            const rotatedX = height - 1 - y;
+            const rotatedY = x;
+            const targetIndex = (rotatedY * rotatedWidth + rotatedX) * 4;
+
+            rotatedData[targetIndex] = data[sourceIndex];
+            rotatedData[targetIndex + 1] = data[sourceIndex + 1];
+            rotatedData[targetIndex + 2] = data[sourceIndex + 2];
+            rotatedData[targetIndex + 3] = data[sourceIndex + 3];
+          }
+        }
+
+        return {
+          data: rotatedData,
+          width: rotatedWidth,
+          height: rotatedHeight,
         };
       }
 
@@ -429,14 +468,9 @@ export function buildBallRecognitionCalibrationHtml(
         const cropX = Math.max(0, Math.floor((width - cropWidth) / 2));
         const cropY = Math.max(0, Math.floor((height - cropHeight) / 2));
         const { data } = context.getImageData(cropX, cropY, cropWidth, cropHeight);
-        const patternMetrics = extractPatternMetrics(data, cropWidth, cropHeight);
-
-        if (patternMetrics) {
-          const orientation = classifyPatternOrientation(patternMetrics);
-          if (orientation) {
-            patternBuckets[orientation].push(patternMetrics);
-          }
-        }
+        pushPatternMetrics(data, cropWidth, cropHeight, patternBuckets);
+        const quarterTurnImage = rotateImageDataQuarterTurn(data, cropWidth, cropHeight);
+        pushPatternMetrics(quarterTurnImage.data, quarterTurnImage.width, quarterTurnImage.height, patternBuckets);
 
         for (let index = 0; index < data.length; index += 4) {
           if (data[index + 3] < 140) {
@@ -499,7 +533,7 @@ export function buildBallRecognitionCalibrationHtml(
             weight: clamp(bucket.count / totalCount, 0, 1),
           }));
           const patternProfiles = ["vertical", "horizontal", "mixed"]
-            .map((orientation) => buildPatternProfileFromSamples(patternBuckets[orientation]))
+            .map((orientation) => buildPatternProfileFromSamples(patternBuckets[orientation], orientation))
             .filter(Boolean);
 
           post({

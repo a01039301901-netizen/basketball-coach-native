@@ -98,6 +98,7 @@ export function buildPoseWebHtml(
         : selectedBallRecognitionProfile?.patternProfile
           ? [selectedBallRecognitionProfile.patternProfile]
           : [];
+      const shouldUseBallPatternMatch = false;
       const wrap = document.getElementById("wrap");
       const video = document.getElementById("video");
       const canvas = document.getElementById("canvas");
@@ -130,6 +131,12 @@ export function buildPoseWebHtml(
       const BALL_TRACK_FILL_RATIO_BONUS = 22;
       const BALL_TRACK_CIRCLE_COVERAGE_BONUS = 20;
       const BALL_TRACK_PATTERN_BONUS = 76;
+      const BALL_TRACK_PATTERN_PRIMARY_MATCH_SCORE = 0.56;
+      const BALL_TRACK_PATTERN_STRONG_MATCH_SCORE = 0.72;
+      const BALL_TRACK_PATTERN_FILL_RELAX_FACTOR = 0.82;
+      const BALL_TRACK_PATTERN_MIN_COVERAGE_RELAX_FACTOR = 0.74;
+      const BALL_TRACK_PATTERN_MAX_COVERAGE_RELAX_FACTOR = 1.12;
+      const BALL_TRACK_PATTERN_CIRCLE_MATCH_RELAX = 0.08;
       const BALL_TRACK_PATTERN_MIN_RADIUS_PX = 8;
       const BALL_TRACK_OUTLINE_BIN_COUNT = 18;
       const BALL_TRACK_OUTLINE_INNER_RADIUS_RATIO = 0.58;
@@ -1499,7 +1506,7 @@ export function buildPoseWebHtml(
       }
 
       function calculateBallPatternMetrics(luminanceMap, gradientMap, width, height, centerX, centerY, radiusPx) {
-        if (selectedBallPatternProfiles.length === 0 || radiusPx < BALL_TRACK_PATTERN_MIN_RADIUS_PX) {
+        if (!shouldUseBallPatternMatch || selectedBallPatternProfiles.length === 0 || radiusPx < BALL_TRACK_PATTERN_MIN_RADIUS_PX) {
           return null;
         }
 
@@ -1610,15 +1617,63 @@ export function buildPoseWebHtml(
         return scores.reduce((sum, value) => sum + value, 0) / scores.length;
       }
 
-      function getSwappedPatternProfile(patternProfile) {
+      function getPatternProfileOrientation(patternProfile) {
         if (!patternProfile) {
+          return "mixed";
+        }
+
+        if (patternProfile.orientation === "vertical" || patternProfile.orientation === "horizontal" || patternProfile.orientation === "mixed") {
+          return patternProfile.orientation;
+        }
+
+        const rowMid = (patternProfile.rowCoverageRange.min + patternProfile.rowCoverageRange.max) / 2;
+        const columnMid = (patternProfile.columnCoverageRange.min + patternProfile.columnCoverageRange.max) / 2;
+        const coverageDelta = columnMid - rowMid;
+
+        if (coverageDelta >= 0.12) {
+          return "vertical";
+        }
+
+        if (coverageDelta <= -0.12) {
+          return "horizontal";
+        }
+
+        return "mixed";
+      }
+
+      function getBestPatternMatchFromProfiles(metrics, patternProfiles) {
+        if (!metrics || !Array.isArray(patternProfiles) || patternProfiles.length === 0) {
+          return null;
+        }
+
+        let bestMatchScore = null;
+        let bestWeight = 1;
+
+        for (const patternProfile of patternProfiles) {
+          const patternMatchScore = getPatternProfileMatchScore(metrics, patternProfile);
+          if (typeof patternMatchScore !== "number") {
+            continue;
+          }
+
+          const nextWeight = patternProfile.weight || 1;
+
+          if (
+            bestMatchScore === null ||
+            patternMatchScore > bestMatchScore ||
+            (patternMatchScore === bestMatchScore && nextWeight > bestWeight)
+          ) {
+            bestMatchScore = patternMatchScore;
+            bestWeight = nextWeight;
+          }
+        }
+
+        if (bestMatchScore === null) {
           return null;
         }
 
         return {
-          ...patternProfile,
-          rowCoverageRange: patternProfile.columnCoverageRange,
-          columnCoverageRange: patternProfile.rowCoverageRange,
+          matchScore: bestMatchScore,
+          contribution: (bestMatchScore * 2 - 1) * BALL_TRACK_PATTERN_BONUS * bestWeight
         };
       }
 
@@ -1627,29 +1682,37 @@ export function buildPoseWebHtml(
           return null;
         }
 
-        let bestContribution = null;
+        const verticalProfiles = [];
+        const horizontalProfiles = [];
+        const mixedProfiles = [];
 
         for (const patternProfile of patternProfiles) {
-          const profileVariants = [patternProfile, getSwappedPatternProfile(patternProfile)].filter(Boolean);
-
-          for (const profileVariant of profileVariants) {
-            const patternMatchScore = getPatternProfileMatchScore(metrics, profileVariant);
-            if (typeof patternMatchScore !== "number") {
-              continue;
-            }
-
-            const contribution =
-              (patternMatchScore * 2 - 1) *
-              BALL_TRACK_PATTERN_BONUS *
-              (profileVariant.weight || 1);
-
-            if (bestContribution === null || contribution > bestContribution) {
-              bestContribution = contribution;
-            }
+          const orientation = getPatternProfileOrientation(patternProfile);
+          if (orientation === "vertical") {
+            verticalProfiles.push(patternProfile);
+          } else if (orientation === "horizontal") {
+            horizontalProfiles.push(patternProfile);
+          } else {
+            mixedProfiles.push(patternProfile);
           }
         }
 
-        return bestContribution;
+        const primaryVerticalLookMatch = getBestPatternMatchFromProfiles(metrics, horizontalProfiles);
+        if (primaryVerticalLookMatch && primaryVerticalLookMatch.matchScore >= BALL_TRACK_PATTERN_PRIMARY_MATCH_SCORE) {
+          return primaryVerticalLookMatch.contribution;
+        }
+
+        const fallbackHorizontalLookMatch = getBestPatternMatchFromProfiles(metrics, verticalProfiles);
+        if (fallbackHorizontalLookMatch) {
+          return fallbackHorizontalLookMatch.contribution;
+        }
+
+        if (primaryVerticalLookMatch) {
+          return primaryVerticalLookMatch.contribution;
+        }
+
+        const mixedMatch = getBestPatternMatchFromProfiles(metrics, mixedProfiles);
+        return mixedMatch ? mixedMatch.contribution : null;
       }
 
       function getBallCandidateGuidance(landmarks) {
@@ -1715,16 +1778,10 @@ export function buildPoseWebHtml(
         score += Math.max(0, BALL_TRACK_FILL_RATIO_BONUS - Math.abs(0.52 - candidate.fillRatio) * 120);
         score += Math.max(0, BALL_TRACK_CIRCLE_COVERAGE_BONUS - Math.abs(0.72 - candidate.circleCoverage) * 42);
 
-        if (selectedBallPatternProfiles.length > 0 && candidate.patternMetrics) {
-          const patternContribution = getBestPatternProfileContribution(
-            candidate.patternMetrics,
-            selectedBallPatternProfiles
-          );
-          if (typeof patternContribution === "number") {
-            score += selectedBallBrand === "molten"
-              ? Math.max(0, patternContribution)
-              : patternContribution;
-          }
+        if (shouldUseBallPatternMatch && typeof candidate.patternContribution === "number") {
+          score += selectedBallBrand === "molten"
+            ? Math.max(0, candidate.patternContribution)
+            : candidate.patternContribution;
         }
 
         if (typeof candidate.motionRatio === "number" && candidate.motionRatio > BALL_TRACK_MOTION_MIN_RATIO) {
@@ -1874,7 +1931,7 @@ export function buildPoseWebHtml(
         const mergedMap = new Uint8Array(width * height);
         const motionMaps = buildBallMotionMaps(data, width, height, region);
         const patternMaps =
-          selectedBallPatternProfiles.length > 0
+          shouldUseBallPatternMatch && selectedBallPatternProfiles.length > 0
             ? buildBallPatternMaps(motionMaps.luminanceMap, width, height)
             : null;
 
@@ -2013,11 +2070,33 @@ export function buildPoseWebHtml(
             radiusPx
           );
           const strongOutline = outlineMetrics.outlineMatchRatio >= profile.minOutlineMatch;
+          const patternMetrics = patternMaps
+            ? calculateBallPatternMetrics(
+                patternMaps.luminanceMap,
+                patternMaps.gradientMap,
+                width,
+                height,
+                centerX,
+                centerY,
+                radiusPx
+              )
+            : null;
+          const patternContribution =
+            shouldUseBallPatternMatch && patternMetrics && selectedBallPatternProfiles.length > 0
+              ? getBestPatternProfileContribution(patternMetrics, selectedBallPatternProfiles)
+              : null;
+          const strongPatternSupport =
+            typeof patternContribution === "number" &&
+            patternContribution >=
+              (BALL_TRACK_PATTERN_STRONG_MATCH_SCORE * 2 - 1) * BALL_TRACK_PATTERN_BONUS * 0.7;
           const minFillRatio = strongOutline
             ? profile.minFillRatio * BALL_TRACK_OUTLINE_FILL_RELAX_FACTOR
             : profile.minFillRatio;
+          const effectiveMinFillRatio = strongPatternSupport
+            ? minFillRatio * BALL_TRACK_PATTERN_FILL_RELAX_FACTOR
+            : minFillRatio;
 
-          if (fillRatio < minFillRatio) {
+          if (fillRatio < effectiveMinFillRatio) {
             continue;
           }
 
@@ -2029,8 +2108,14 @@ export function buildPoseWebHtml(
           const maxCircleCoverage = strongOutline
             ? profile.maxCircleCoverage * BALL_TRACK_OUTLINE_MAX_COVERAGE_RELAX_FACTOR
             : profile.maxCircleCoverage;
+          const effectiveMinCircleCoverage = strongPatternSupport
+            ? minCircleCoverage * BALL_TRACK_PATTERN_MIN_COVERAGE_RELAX_FACTOR
+            : minCircleCoverage;
+          const effectiveMaxCircleCoverage = strongPatternSupport
+            ? maxCircleCoverage * BALL_TRACK_PATTERN_MAX_COVERAGE_RELAX_FACTOR
+            : maxCircleCoverage;
 
-          if (circleCoverage < minCircleCoverage || circleCoverage > maxCircleCoverage) {
+          if (circleCoverage < effectiveMinCircleCoverage || circleCoverage > effectiveMaxCircleCoverage) {
             continue;
           }
 
@@ -2045,21 +2130,12 @@ export function buildPoseWebHtml(
             centerY,
             radiusPx
           );
-          if (circleMatchRatio < profile.minCircleMatch && !strongOutline) {
+          const effectiveMinCircleMatch = strongPatternSupport
+            ? Math.max(0, profile.minCircleMatch - BALL_TRACK_PATTERN_CIRCLE_MATCH_RELAX)
+            : profile.minCircleMatch;
+          if (circleMatchRatio < effectiveMinCircleMatch && !strongOutline) {
             continue;
           }
-
-          const patternMetrics = patternMaps
-            ? calculateBallPatternMetrics(
-                patternMaps.luminanceMap,
-                patternMaps.gradientMap,
-                width,
-                height,
-                centerX,
-                centerY,
-                radiusPx
-              )
-            : null;
           const motionRatio = motionMaps.motionReliable
             ? calculateComponentMapHitRatio(componentPixels, motionMaps.motionMap)
             : null;
@@ -2081,7 +2157,8 @@ export function buildPoseWebHtml(
             outlineMatchRatio: outlineMetrics.outlineMatchRatio,
             arcCoverageRatio: outlineMetrics.arcCoverageRatio,
             motionRatio,
-            patternMetrics
+            patternMetrics,
+            patternContribution
           };
 
           candidates.push(candidate);

@@ -69,6 +69,7 @@ import {
   getLessonRecordEntriesWithMigration,
   setLessonRecordEntries,
 } from '../utils/lessonRecordStorage';
+import { generateLessonRecordThumbnail } from '../utils/lessonRecordThumbnail';
 import {
   buildCorrectionHomeworkState,
   buildDailyHomeworkProgress,
@@ -91,7 +92,9 @@ const DEV_TEST_SHOOT_RECORD_ID = '__dev-test-shoot-bad-no-video-v1';
 const DEV_TEST_SHOOT_RECORD_SEED_KEY = 'basketballDevSeedShootBadNoVideoV3';
 const DEFAULT_DEBUG_TEXT = '移대찓?쇱? MediaPipe瑜?以鍮꾪븯怨??덉뒿?덈떎.';
 const LESSON_RECORD_VIDEO_DIRECTORY_NAME = 'lesson-record-videos';
+const LESSON_RECORD_THUMBNAIL_DIRECTORY_NAME = 'lesson-record-thumbnails';
 const DEFAULT_LESSON_RECORD_VIDEO_EXTENSION = 'webm';
+const DEFAULT_LESSON_RECORD_THUMBNAIL_EXTENSION = 'jpg';
 const COUNTDOWN_CUE_BASE64 =
   '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';
 
@@ -245,6 +248,7 @@ function getAccountStorageKeys(userId: string) {
     homework: buildAccountStorageKey(STORAGE_KEYS.homework, userId),
     lessonRecords: buildAccountStorageKey(STORAGE_KEYS.lessonRecords, userId),
     lessonRecordVideos: buildAccountStorageKey(STORAGE_KEYS.lessonRecordVideos, userId),
+    lessonRecordThumbnails: buildAccountStorageKey(STORAGE_KEYS.lessonRecordThumbnails, userId),
     dribbleCounts: buildAccountStorageKey(STORAGE_KEYS.dribbleCounts, userId),
     shotAttempts: buildAccountStorageKey(STORAGE_KEYS.shotAttempts, userId),
     shotSuccess: buildAccountStorageKey(STORAGE_KEYS.shotSuccess, userId),
@@ -263,6 +267,15 @@ function buildLessonRecordVideoDirectory(userId: string) {
 
   const safeUserId = userId.replace(/[^a-z0-9_-]/gi, '_') || 'local';
   return `${FileSystem.documentDirectory}${LESSON_RECORD_VIDEO_DIRECTORY_NAME}/${safeUserId}/`;
+}
+
+function buildLessonRecordThumbnailDirectory(userId: string) {
+  if (Platform.OS === 'web' || !FileSystem.documentDirectory) {
+    return null;
+  }
+
+  const safeUserId = userId.replace(/[^a-z0-9_-]/gi, '_') || 'local';
+  return `${FileSystem.documentDirectory}${LESSON_RECORD_THUMBNAIL_DIRECTORY_NAME}/${safeUserId}/`;
 }
 
 function sanitizeLessonRecordVideoFileToken(value: string) {
@@ -324,6 +337,11 @@ function getLessonRecordVideoExtension(videoUri: string, mimeType?: string) {
 function buildManagedLessonRecordVideoUri(directory: string, recordId: string, extension: string) {
   const safeRecordId = sanitizeLessonRecordVideoFileToken(recordId);
   return `${directory}${safeRecordId}.${extension}`;
+}
+
+function buildManagedLessonRecordThumbnailUri(directory: string, recordId: string) {
+  const safeRecordId = sanitizeLessonRecordVideoFileToken(recordId);
+  return `${directory}${safeRecordId}.${DEFAULT_LESSON_RECORD_THUMBNAIL_EXTENSION}`;
 }
 
 function toAuthUser(account: UserAccount): AuthUser {
@@ -834,6 +852,7 @@ function sanitizeLessonRecords(value: unknown): LessonRecord[] {
         entry.shotOutcome === 'success' ? 'success' : entry.shotOutcome === 'failure' ? 'failure' : undefined;
       const feedback = typeof entry.feedback === 'string' ? entry.feedback : '';
       const videoUri = typeof entry.videoUri === 'string' ? entry.videoUri : '';
+      const thumbnailUri = typeof entry.thumbnailUri === 'string' ? entry.thumbnailUri : '';
       const createdAt = typeof entry.createdAt === 'string' ? entry.createdAt : new Date().toISOString();
       const reviewFeedback = typeof entry.reviewFeedback === 'string' ? entry.reviewFeedback : undefined;
       const reviewStartAtMs =
@@ -864,6 +883,7 @@ function sanitizeLessonRecords(value: unknown): LessonRecord[] {
           ? (entry.feedbackTimeline as FeedbackMoment[] | string[])
           : undefined,
         videoUri,
+        thumbnailUri,
         createdAt,
         reviewFeedback,
         reviewStartAtMs,
@@ -1075,6 +1095,7 @@ function normalizeLessonRecordEvaluation(value: unknown): LessonRecordEvaluation
     : criteria.reduce((count, criterion) => count + (criterion.isStable ? 1 : 0), 0);
   const totalCount = isShootEvaluation ? shootCriteriaTotal : criteria.length;
   const normalizedLevel = isShootEvaluation ? buildShootLessonRecordLevel(stableCount) : level;
+  const normalizedStrengths = ensureStrengthHighlightsCoverCriteria(criteria, strengths);
 
   return {
     level: normalizedLevel,
@@ -1087,13 +1108,16 @@ function normalizeLessonRecordEvaluation(value: unknown): LessonRecordEvaluation
           )
         : value.summary,
     criteria,
-    strengths,
+    strengths: normalizedStrengths,
     improvements,
   };
 }
 
 function normalizeLessonRecord(
-  record: LessonRecord | (Omit<LessonRecord, 'feedbackTimeline'> & { feedbackTimeline?: FeedbackMoment[] | string[] })
+  record: (
+    Omit<LessonRecord, 'feedbackTimeline' | 'thumbnailUri'> &
+    { feedbackTimeline?: FeedbackMoment[] | string[]; thumbnailUri?: string }
+  )
 ): LessonRecord {
   const normalizedFeedbackTimeline = normalizeFeedbackTimeline(record.feedbackTimeline, record.feedback);
   const normalizedShotOutcome =
@@ -1107,6 +1131,7 @@ function normalizeLessonRecord(
   const nextRecord = {
     ...record,
     shotOutcome: normalizedShotOutcome,
+    thumbnailUri: typeof record.thumbnailUri === 'string' ? record.thumbnailUri : '',
     feedbackTimeline: normalizedFeedbackTimeline,
     evaluation: normalizeLessonRecordEvaluation(record.evaluation),
   } as LessonRecord;
@@ -1224,6 +1249,21 @@ function normalizeLessonRecordVideoMap(value: unknown) {
   }, {});
 }
 
+function normalizeLessonRecordThumbnailMap(value: unknown) {
+  if (!isRecordObject(value)) {
+    return {} as Record<string, string>;
+  }
+
+  return Object.entries(value).reduce<Record<string, string>>((accumulator, [recordId, thumbnailUri]) => {
+    if (typeof thumbnailUri !== 'string' || !thumbnailUri) {
+      return accumulator;
+    }
+
+    accumulator[recordId] = thumbnailUri;
+    return accumulator;
+  }, {});
+}
+
 function buildLessonRecordVideoMap(records: LessonRecord[]) {
   return records.reduce<Record<string, string>>((accumulator, record) => {
     if (!record.videoUri) {
@@ -1235,13 +1275,25 @@ function buildLessonRecordVideoMap(records: LessonRecord[]) {
   }, {});
 }
 
+function buildLessonRecordThumbnailMap(records: LessonRecord[]) {
+  return records.reduce<Record<string, string>>((accumulator, record) => {
+    if (!record.thumbnailUri) {
+      return accumulator;
+    }
+
+    accumulator[record.id] = record.thumbnailUri;
+    return accumulator;
+  }, {});
+}
+
 function buildStoredLessonRecordEntries(
   scopedKeys: ReturnType<typeof getAccountStorageKeys>,
   records: LessonRecord[]
 ): Array<[string, string]> {
   return [
-    [scopedKeys.lessonRecords, JSON.stringify(stripLessonRecordVideos(records))],
+    [scopedKeys.lessonRecords, JSON.stringify(stripLessonRecordMedia(records))],
     [scopedKeys.lessonRecordVideos, JSON.stringify(buildLessonRecordVideoMap(records))],
+    [scopedKeys.lessonRecordThumbnails, JSON.stringify(buildLessonRecordThumbnailMap(records))],
   ];
 }
 
@@ -1313,31 +1365,136 @@ async function persistLessonRecordVideoToFile(userId: string, recordId: string, 
   }
 }
 
-async function localizeLessonRecordVideos(userId: string, records: LessonRecord[]) {
-  const localizedResults = await Promise.all(
-    records.map(async (record) => {
-      if (!record.videoUri) {
-        return {
-          record,
-          changed: false,
-        };
+async function persistLessonRecordThumbnailToFile(
+  userId: string,
+  recordId: string,
+  videoUri: string,
+  thumbnailUri = ''
+) {
+  const normalizedVideoUri = videoUri.trim();
+  const normalizedThumbnailUri = thumbnailUri.trim();
+
+  if (!normalizedVideoUri) {
+    return '';
+  }
+
+  if (Platform.OS === 'web') {
+    if (normalizedThumbnailUri) {
+      return normalizedThumbnailUri;
+    }
+
+    return (await generateLessonRecordThumbnail(normalizedVideoUri)) ?? '';
+  }
+
+  const directory = buildLessonRecordThumbnailDirectory(userId);
+
+  if (!directory) {
+    return normalizedThumbnailUri;
+  }
+
+  const targetUri = buildManagedLessonRecordThumbnailUri(directory, recordId);
+
+  try {
+    await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+
+    const targetInfo = await FileSystem.getInfoAsync(targetUri);
+
+    if (targetInfo.exists) {
+      return targetUri;
+    }
+
+    if (normalizedThumbnailUri.startsWith('file://')) {
+      const existingThumbnailInfo = await FileSystem.getInfoAsync(normalizedThumbnailUri);
+
+      if (existingThumbnailInfo.exists) {
+        await FileSystem.copyAsync({
+          from: normalizedThumbnailUri,
+          to: targetUri,
+        });
+
+        if (FileSystem.cacheDirectory && normalizedThumbnailUri.startsWith(FileSystem.cacheDirectory)) {
+          await FileSystem.deleteAsync(normalizedThumbnailUri, { idempotent: true }).catch(() => {
+            // Ignore cleanup failures after promoting the cached thumbnail to a persisted file.
+          });
+        }
       }
 
-      const nextVideoUri = await persistLessonRecordVideoToFile(userId, record.id, record.videoUri);
+      const nextTargetInfo = await FileSystem.getInfoAsync(targetUri);
 
-      if (nextVideoUri === record.videoUri) {
-        return {
-          record,
-          changed: false,
-        };
+      if (nextTargetInfo.exists) {
+        return targetUri;
+      }
+    }
+
+    const generatedThumbnailUri = await generateLessonRecordThumbnail(normalizedVideoUri);
+
+    if (!generatedThumbnailUri) {
+      return normalizedThumbnailUri;
+    }
+
+    if (!generatedThumbnailUri.startsWith('file://')) {
+      return generatedThumbnailUri;
+    }
+
+    const generatedInfo = await FileSystem.getInfoAsync(generatedThumbnailUri);
+
+    if (!generatedInfo.exists) {
+      return normalizedThumbnailUri;
+    }
+
+    await FileSystem.copyAsync({
+      from: generatedThumbnailUri,
+      to: targetUri,
+    });
+
+    if (FileSystem.cacheDirectory && generatedThumbnailUri.startsWith(FileSystem.cacheDirectory)) {
+      await FileSystem.deleteAsync(generatedThumbnailUri, { idempotent: true }).catch(() => {
+        // Ignore cleanup failures after promoting the cached thumbnail to a persisted file.
+      });
+    }
+
+    return targetUri;
+  } catch {
+    return normalizedThumbnailUri;
+  }
+}
+
+async function localizeLessonRecordMedia(userId: string, records: LessonRecord[]) {
+  const localizedResults = await Promise.all(
+    records.map(async (record) => {
+      let nextRecord = record;
+      let changed = false;
+
+      if (nextRecord.videoUri) {
+        const nextVideoUri = await persistLessonRecordVideoToFile(userId, nextRecord.id, nextRecord.videoUri);
+
+        if (nextVideoUri !== nextRecord.videoUri) {
+          nextRecord = normalizeLessonRecord({
+            ...nextRecord,
+            videoUri: nextVideoUri,
+          });
+          changed = true;
+        }
+      }
+
+      const nextThumbnailUri = await persistLessonRecordThumbnailToFile(
+        userId,
+        nextRecord.id,
+        nextRecord.videoUri,
+        nextRecord.thumbnailUri
+      );
+
+      if (nextThumbnailUri !== nextRecord.thumbnailUri) {
+        nextRecord = normalizeLessonRecord({
+          ...nextRecord,
+          thumbnailUri: nextThumbnailUri,
+        });
+        changed = true;
       }
 
       return {
-        record: normalizeLessonRecord({
-          ...record,
-          videoUri: nextVideoUri,
-        }),
-        changed: true,
+        record: nextRecord,
+        changed,
       };
     })
   );
@@ -1348,23 +1505,29 @@ async function localizeLessonRecordVideos(userId: string, records: LessonRecord[
   };
 }
 
-function stripLessonRecordVideos(records: LessonRecord[]) {
+function stripLessonRecordMedia(records: LessonRecord[]) {
   return records.map((record) =>
-    record.videoUri
+    record.videoUri || record.thumbnailUri
       ? {
           ...record,
           videoUri: '',
+          thumbnailUri: '',
         }
       : record
   );
 }
 
-function hydrateLessonRecordVideos(records: LessonRecord[], videoMap: Record<string, string>) {
+function hydrateLessonRecordMedia(
+  records: LessonRecord[],
+  videoMap: Record<string, string>,
+  thumbnailMap: Record<string, string>
+) {
   return records.map((record) =>
-    videoMap[record.id]
+    videoMap[record.id] || thumbnailMap[record.id]
       ? normalizeLessonRecord({
           ...record,
-          videoUri: videoMap[record.id],
+          videoUri: videoMap[record.id] ?? record.videoUri,
+          thumbnailUri: thumbnailMap[record.id] ?? record.thumbnailUri,
         })
       : record
   );
@@ -1449,7 +1612,7 @@ function buildRemoteSnapshot(payload: RemoteAccountSnapshot): RemoteAccountSnaps
 
   return {
     ...normalizedSnapshot,
-    lessonRecords: stripLessonRecordVideos(normalizedSnapshot.lessonRecords),
+    lessonRecords: stripLessonRecordMedia(normalizedSnapshot.lessonRecords),
   };
 }
 
@@ -1462,11 +1625,18 @@ function buildLessonRecordSnapshotFromStoredEntries(
   const parsedLessonRecordVideos = normalizeLessonRecordVideoMap(
     parseStoredJson<unknown>(stored[scopedKeys.lessonRecordVideos], {})
   );
-  const lessonRecordsWithVideos = hydrateLessonRecordVideos(parsedLessonRecords, parsedLessonRecordVideos);
+  const parsedLessonRecordThumbnails = normalizeLessonRecordThumbnailMap(
+    parseStoredJson<unknown>(stored[scopedKeys.lessonRecordThumbnails], {})
+  );
+  const lessonRecordsWithVideos = hydrateLessonRecordMedia(
+    parsedLessonRecords,
+    parsedLessonRecordVideos,
+    parsedLessonRecordThumbnails
+  );
   return hydrateLegacyShotOutcomes(lessonRecordsWithVideos, parsedShotSuccess);
 }
 
-function mergeLessonRecordVideos(records: LessonRecord[], fallbackRecords: LessonRecord[]) {
+function mergeLessonRecordMedia(records: LessonRecord[], fallbackRecords: LessonRecord[]) {
   const fallbackVideoMap = fallbackRecords.reduce<Record<string, string>>((accumulator, record) => {
     if (record.videoUri) {
       accumulator[record.id] = record.videoUri;
@@ -1474,19 +1644,27 @@ function mergeLessonRecordVideos(records: LessonRecord[], fallbackRecords: Lesso
 
     return accumulator;
   }, {});
+  const fallbackThumbnailMap = fallbackRecords.reduce<Record<string, string>>((accumulator, record) => {
+    if (record.thumbnailUri) {
+      accumulator[record.id] = record.thumbnailUri;
+    }
+
+    return accumulator;
+  }, {});
 
   return records.map((record) =>
-    !record.videoUri && fallbackVideoMap[record.id]
+    ((!record.videoUri && fallbackVideoMap[record.id]) || (!record.thumbnailUri && fallbackThumbnailMap[record.id]))
       ? normalizeLessonRecord({
           ...record,
-          videoUri: fallbackVideoMap[record.id],
+          videoUri: fallbackVideoMap[record.id] ?? record.videoUri,
+          thumbnailUri: fallbackThumbnailMap[record.id] ?? record.thumbnailUri,
         })
       : record
   );
 }
 
 function mergeLessonRecordsWithFallback(records: LessonRecord[], fallbackRecords: LessonRecord[]) {
-  const mergedRecords = mergeLessonRecordVideos(records, fallbackRecords);
+  const mergedRecords = mergeLessonRecordMedia(records, fallbackRecords);
   const mergedRecordIds = new Set(mergedRecords.map((record) => record.id));
   const fallbackOnlyRecords = fallbackRecords
     .filter((record) => !mergedRecordIds.has(record.id))
@@ -1576,11 +1754,15 @@ async function readStoredAccountSnapshot(userId: string): Promise<RemoteAccountS
         [scopedKeys.position, null],
       ] as [string, string | null][]
     ),
-    getLessonRecordEntriesWithMigration([scopedKeys.lessonRecords, scopedKeys.lessonRecordVideos]),
+    getLessonRecordEntriesWithMigration([
+      scopedKeys.lessonRecords,
+      scopedKeys.lessonRecordVideos,
+      scopedKeys.lessonRecordThumbnails,
+    ]),
   ]);
   const stored = Object.fromEntries([...entries, ...lessonRecordEntries]);
   const parsedSnapshot = parseStoredAccountSnapshotFromEntries(scopedKeys, stored);
-  const localizedLessonRecords = await localizeLessonRecordVideos(userId, parsedSnapshot.lessonRecords);
+  const localizedLessonRecords = await localizeLessonRecordMedia(userId, parsedSnapshot.lessonRecords);
 
   if (!localizedLessonRecords.didChange) {
     return parsedSnapshot;
@@ -1608,6 +1790,7 @@ async function writeStoredAccountSnapshot(
   const existingLessonRecordEntries = await getLessonRecordEntriesWithMigration([
     scopedKeys.lessonRecords,
     scopedKeys.lessonRecordVideos,
+    scopedKeys.lessonRecordThumbnails,
   ]);
   const existingStoredLessonRecords = buildLessonRecordSnapshotFromStoredEntries(
     scopedKeys,
@@ -1618,7 +1801,7 @@ async function writeStoredAccountSnapshot(
   const lessonRecordsWithVideos = shouldPreserveExistingLessonRecords
     ? mergeLessonRecordsWithFallback(nextSnapshot.lessonRecords, existingStoredLessonRecords)
     : nextSnapshot.lessonRecords;
-  const localizedLessonRecords = await localizeLessonRecordVideos(userId, lessonRecordsWithVideos);
+  const localizedLessonRecords = await localizeLessonRecordMedia(userId, lessonRecordsWithVideos);
   const storedSnapshot = {
     ...nextSnapshot,
     lessonRecords: localizedLessonRecords.records,
@@ -1748,6 +1931,39 @@ function buildRecordHighlight(
     startAtMs: Math.max(0, Math.round(startAtMs)),
     durationMs: clampHighlightDuration(durationMs),
   };
+}
+
+function shouldCreateStrengthHighlightFromCriterion(criterion: LessonRecordCriterion) {
+  return criterion.isStable && criterion.key !== 'shoot-result';
+}
+
+function ensureStrengthHighlightsCoverCriteria(
+  criteria: LessonRecordCriterion[],
+  strengths: LessonRecordHighlight[]
+) {
+  const nextStrengths = [...strengths];
+  const existingDetails = new Set(
+    nextStrengths.map((highlight) => highlight.detail.trim()).filter(Boolean)
+  );
+
+  for (const criterion of criteria) {
+    if (!shouldCreateStrengthHighlightFromCriterion(criterion)) {
+      continue;
+    }
+
+    const detail = criterion.detail.trim();
+
+    if (!detail || existingDetails.has(detail)) {
+      continue;
+    }
+
+    nextStrengths.push(
+      buildRecordHighlight(`${criterion.label} 안정`, detail, 0, 2200)
+    );
+    existingDetails.add(detail);
+  }
+
+  return nextStrengths;
 }
 
 function findLongestHighlightWindow<T>(
@@ -2093,7 +2309,7 @@ function buildShootRecordEvaluation(
     level,
     summary: buildLessonRecordSummary(level, stableCount, 4),
     criteria,
-    strengths: strengths.slice(0, 2),
+    strengths,
     improvements,
   };
 }
@@ -2126,7 +2342,7 @@ function updateShootRecordEvaluationForOutcome(
     level,
     summary: buildLessonRecordSummary(level, stableCount, criteriaTotal || 4),
     criteria: nextCriteria,
-    strengths: strengths.slice(0, 2),
+    strengths,
     improvements,
   };
 }
@@ -2354,7 +2570,7 @@ function buildFrontDribbleRecordEvaluation(
     level,
     summary: buildLessonRecordSummary(level, stableCount, criteria.length || 5),
     criteria,
-    strengths: strengths.slice(0, 2),
+    strengths,
     improvements,
   };
 }
@@ -2461,7 +2677,7 @@ function buildSideDribbleRecordEvaluation(
     level,
     summary: buildLessonRecordSummary(level, stableCount, criteria.length || 4),
     criteria,
-    strengths: strengths.slice(0, 2),
+    strengths,
     improvements,
   };
 }
@@ -2597,6 +2813,124 @@ function buildDiarySkillInsight(
 function isPositiveFeedback(text: string) {
   const positiveKeywords = ['좋습니다', '좋아요', '안정적', '균형이 좋습니다', '타이밍이 좋습니다', '준비 자세가 좋습니다'];
   return positiveKeywords.some((keyword) => text.includes(keyword));
+}
+
+const REPRESENTATIVE_FEEDBACK_IGNORE_PATTERNS = [
+  '분석하는 중입니다',
+  '분석이 안정되면',
+  '확인하는 중입니다',
+  '정확히 확인되지 않았습니다',
+  '카메라 대기 중',
+  '보이도록',
+];
+
+function stripFeedbackLineNumber(line: string) {
+  return line.replace(/^\d+\.\s*/, '').trim();
+}
+
+function isRecognitionIssueFeedbackLine(line: string) {
+  const normalizedLine = stripFeedbackLineNumber(line);
+  return REPRESENTATIVE_FEEDBACK_IGNORE_PATTERNS.some((pattern) => normalizedLine.includes(pattern));
+}
+
+function buildRepresentativeFeedbackText(text: string) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) {
+    return '';
+  }
+
+  const titleLine = lines[0];
+  const bodyLines = lines
+    .slice(1)
+    .map(stripFeedbackLineNumber)
+    .filter(Boolean);
+  const meaningfulBodyLines = bodyLines.filter((line) => !isRecognitionIssueFeedbackLine(line));
+
+  if (meaningfulBodyLines.length === 0) {
+    return '';
+  }
+
+  return [titleLine, ...meaningfulBodyLines.map((line, index) => `${index + 1}. ${line}`)].join('\n');
+}
+
+function buildRepresentativeFeedbackKey(text: string) {
+  return text
+    .replace(/\d+(?:\.\d+)?/g, '#')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function selectRepresentativeFeedbackFromTimeline(timeline: FeedbackMoment[], fallbackFeedback: string) {
+  const normalizedTimeline = timeline
+    .map((item) => ({
+      atMs: Number.isFinite(item.atMs) ? Math.max(0, item.atMs) : 0,
+      text: item.text.trim(),
+    }))
+    .filter((item) => item.text);
+
+  if (normalizedTimeline.length === 0) {
+    return fallbackFeedback.trim();
+  }
+
+  const buckets = new Map<string, { text: string; count: number; totalDurationMs: number; firstAtMs: number }>();
+  const defaultTailDurationMs =
+    normalizedTimeline.length > 1
+      ? Math.max(500, normalizedTimeline[normalizedTimeline.length - 1].atMs - normalizedTimeline[normalizedTimeline.length - 2].atMs)
+      : 1000;
+  const timelineEndAtMs = normalizedTimeline[normalizedTimeline.length - 1].atMs + defaultTailDurationMs;
+
+  normalizedTimeline.forEach((item, index) => {
+    const representativeText = buildRepresentativeFeedbackText(item.text);
+
+    if (!representativeText) {
+      return;
+    }
+
+    const key = buildRepresentativeFeedbackKey(representativeText);
+
+    if (!key) {
+      return;
+    }
+
+    const nextAtMs = normalizedTimeline[index + 1]?.atMs ?? timelineEndAtMs;
+    const durationMs = Math.max(1, nextAtMs - item.atMs);
+    const bucket = buckets.get(key);
+
+    if (bucket) {
+      bucket.count += 1;
+      bucket.totalDurationMs += durationMs;
+      return;
+    }
+
+    buckets.set(key, {
+      text: representativeText,
+      count: 1,
+      totalDurationMs: durationMs,
+      firstAtMs: item.atMs,
+    });
+  });
+
+  const selected = [...buckets.values()].sort((left, right) => {
+    if (right.totalDurationMs !== left.totalDurationMs) {
+      return right.totalDurationMs - left.totalDurationMs;
+    }
+
+    if (right.count !== left.count) {
+      return right.count - left.count;
+    }
+
+    return left.firstAtMs - right.firstAtMs;
+  })[0];
+
+  if (selected?.text) {
+    return selected.text;
+  }
+
+  return fallbackFeedback.trim();
 }
 
 function scoreFeedbackText(text: string) {
@@ -4611,16 +4945,26 @@ export function useBasketballCoachApp() {
       mode === 'shoot'
         ? buildShootRecordEvaluation(latestShootAnalysisRef.current, [...shootAnalysisFramesRef.current], shotOutcome)
         : buildDribbleRecordEvaluation([...dribbleAnalysisFramesRef.current]);
+    const representativeFeedback = selectRepresentativeFeedbackFromTimeline(
+      [...feedbackTimelineRef.current],
+      latestFeedbackRef.current
+    );
     const recordId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const persistedVideoUri = await persistLessonRecordVideoToFile(currentUserId ?? 'local', recordId, normalizedVideoUri);
+    const persistedThumbnailUri = await persistLessonRecordThumbnailToFile(
+      currentUserId ?? 'local',
+      recordId,
+      persistedVideoUri
+    );
     const nextRecord = normalizeLessonRecord({
       id: recordId,
       dateKey,
       mode,
       shotOutcome,
-      feedback: latestFeedbackRef.current,
+      feedback: representativeFeedback,
       feedbackTimeline: [...feedbackTimelineRef.current],
       videoUri: persistedVideoUri,
+      thumbnailUri: persistedThumbnailUri,
       createdAt: new Date().toLocaleString(),
       reviewFeedback: reviewClip?.feedback,
       reviewStartAtMs: reviewClip?.startAtMs,
@@ -6380,6 +6724,14 @@ export function useBasketballCoachApp() {
     if (record?.videoUri && !record.videoUri.startsWith('data:')) {
       try {
         await FileSystem.deleteAsync(record.videoUri, { idempotent: true });
+      } catch {
+        // Ignore delete failures for already-removed files.
+      }
+    }
+
+    if (record?.thumbnailUri && !record.thumbnailUri.startsWith('data:')) {
+      try {
+        await FileSystem.deleteAsync(record.thumbnailUri, { idempotent: true });
       } catch {
         // Ignore delete failures for already-removed files.
       }

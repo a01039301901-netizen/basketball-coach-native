@@ -1,6 +1,7 @@
 import type {
   BallBrandOption,
   BallRecognitionBand,
+  BallRecognitionPatternOrientation,
   BallRecognitionPatternProfile,
   BallRecognitionProfile,
 } from '../types/app';
@@ -25,18 +26,53 @@ function buildPatternProfileKey(patternProfile: BallRecognitionPatternProfile) {
     patternProfile.columnCoverageRange.min,
     patternProfile.columnCoverageRange.max,
     patternProfile.weight,
+    patternProfile.orientation ?? '',
   ].join('|');
+}
+
+function inferPatternProfileOrientation(
+  patternProfile: Pick<BallRecognitionPatternProfile, 'rowCoverageRange' | 'columnCoverageRange'>
+): BallRecognitionPatternOrientation {
+  const rowMid = (patternProfile.rowCoverageRange.min + patternProfile.rowCoverageRange.max) / 2;
+  const columnMid = (patternProfile.columnCoverageRange.min + patternProfile.columnCoverageRange.max) / 2;
+  const coverageDelta = columnMid - rowMid;
+
+  if (coverageDelta >= 0.12) {
+    return 'vertical';
+  }
+
+  if (coverageDelta <= -0.12) {
+    return 'horizontal';
+  }
+
+  return 'mixed';
+}
+
+function rotatePatternOrientation(
+  orientation: BallRecognitionPatternOrientation | undefined
+): BallRecognitionPatternOrientation | undefined {
+  if (orientation === 'vertical') {
+    return 'horizontal';
+  }
+
+  if (orientation === 'horizontal') {
+    return 'vertical';
+  }
+
+  return orientation;
 }
 
 export function rotateBallPatternProfileQuarterTurn(
   patternProfile: BallRecognitionPatternProfile
 ): BallRecognitionPatternProfile {
+  const baseOrientation = patternProfile.orientation ?? inferPatternProfileOrientation(patternProfile);
   return {
     panelLineRatioRange: clonePatternRange(patternProfile.panelLineRatioRange),
     edgeDensityRange: clonePatternRange(patternProfile.edgeDensityRange),
     rowCoverageRange: clonePatternRange(patternProfile.columnCoverageRange),
     columnCoverageRange: clonePatternRange(patternProfile.rowCoverageRange),
     weight: patternProfile.weight,
+    orientation: rotatePatternOrientation(baseOrientation),
   };
 }
 
@@ -76,6 +112,7 @@ const MOLTEN_REFERENCE_PATTERN_PROFILES: BallRecognitionProfile['patternProfiles
     rowCoverageRange: { min: 0.92, max: 1 },
     columnCoverageRange: { min: 0.546207, max: 0.626207 },
     weight: 0.92,
+    orientation: 'horizontal',
   },
   {
     panelLineRatioRange: { min: 0.104463, max: 0.98 },
@@ -83,6 +120,15 @@ const MOLTEN_REFERENCE_PATTERN_PROFILES: BallRecognitionProfile['patternProfiles
     rowCoverageRange: { min: 0.880455, max: 0.960455 },
     columnCoverageRange: { min: 0.869091, max: 0.949091 },
     weight: 0.92,
+    orientation: 'mixed',
+  },
+  {
+    panelLineRatioRange: { min: 0.125505, max: 0.145505 },
+    edgeDensityRange: { min: 0.15013, max: 0.21013 },
+    rowCoverageRange: { min: 0.539545, max: 0.619545 },
+    columnCoverageRange: { min: 0.92, max: 1 },
+    weight: 0.92,
+    orientation: 'vertical',
   },
 ];
 

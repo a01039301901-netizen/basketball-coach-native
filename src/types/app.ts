@@ -39,6 +39,7 @@ export type CalendarCell =
 export type SkillKey = 'shoot' | 'crossover' | 'layup' | 'stepback' | 'spin' | 'defense';
 export type BallColorOption = 'orange' | 'brown' | 'yellow' | 'white' | 'black' | 'gray' | 'red';
 export type BallBrandOption = 'wilson' | 'spalding' | 'molten';
+export type BallRecognitionPatternOrientation = 'vertical' | 'horizontal' | 'mixed';
 export type PositionOption = 'none' | 'defense' | 'offense';
 export type BallTrainingImageSource = 'camera' | 'library' | 'url';
 export type HomeworkStage = 'base' | 'position_followup' | 'correction';
@@ -85,6 +86,7 @@ export interface BallRecognitionPatternProfile {
   rowCoverageRange: BallRecognitionRange;
   columnCoverageRange: BallRecognitionRange;
   weight: number;
+  orientation?: BallRecognitionPatternOrientation;
 }
 
 export interface BallRecognitionProfile {
@@ -107,6 +109,7 @@ export interface LessonRecord {
   feedback: string;
   feedbackTimeline: FeedbackMoment[];
   videoUri: string;
+  thumbnailUri: string;
   createdAt: string;
   reviewFeedback?: string;
   reviewStartAtMs?: number;

@@ -1,6 +1,18 @@
 import { type AVPlaybackStatus, ResizeMode, Video } from 'expo-av';
 import { memo, type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import {
+  Animated,
+  Easing,
+  FlatList,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
 import { DAY_NAMES } from '../constants/content';
@@ -65,6 +77,8 @@ const SUCCESS_RATE_COMPARE_BAR_MIN_HEIGHT = 12;
 const SUCCESS_RATE_COMPARE_EMPTY_HEIGHT = 8;
 const SUCCESS_RATE_COMPARE_VALUE_OFFSET = 26;
 const SUCCESS_RATE_COMPARE_MIN_ATTEMPTS = 20;
+const RECORD_LIST_GAP = 14;
+const RECORD_LIST_HORIZONTAL_PADDING = 12;
 const DIARY_NEUTRAL_SURFACE = '#2b2e33';
 const DIARY_NEUTRAL_SURFACE_ALT = '#23262a';
 const DIARY_NEUTRAL_SURFACE_SOFT = '#1d2024';
@@ -76,6 +90,7 @@ const DIARY_RECORD_AVERAGE_SURFACE = 'rgba(217,161,110,0.18)';
 const DIARY_RECORD_AVERAGE_BORDER = 'rgba(217,161,110,0.46)';
 const DIARY_RECORD_BAD_SURFACE = 'rgba(191,80,88,0.18)';
 const DIARY_RECORD_BAD_BORDER = 'rgba(191,80,88,0.46)';
+const EMPTY_LESSON_RECORDS: LessonRecord[] = [];
 
 interface SuccessRateComparisonFrame {
   label: string;
@@ -274,6 +289,18 @@ const RecordEvaluationVideoPlayer = memo(function RecordEvaluationVideoPlayer({
   prevProps.source.uri === nextProps.source.uri &&
   prevProps.height === nextProps.height
 ));
+
+const RecordVideoThumbnail = memo(function RecordVideoThumbnail({ thumbnailUri }: { thumbnailUri: string }) {
+  if (thumbnailUri.trim()) {
+    return <Image source={{ uri: thumbnailUri }} resizeMode="cover" style={styles.recordVideoPreviewImage} />;
+  }
+
+  return (
+    <View style={[styles.recordVideoPreview, styles.recordVideoPreviewEmpty]}>
+      <Text style={styles.recordVideoPreviewCaption}>{'썸네일을 준비하고 있습니다.'}</Text>
+    </View>
+  );
+});
 
 function isAllowedDiaryTextCodePoint(codePoint: number) {
   return (
@@ -572,6 +599,27 @@ function getRecordLevelLabel(level: NonNullable<LessonRecord['evaluation']>['lev
   return '\uB098\uC068';
 }
 
+function renderRecordLevelBadge(level?: NonNullable<LessonRecord['evaluation']>['level']) {
+  if (!level) {
+    return null;
+  }
+
+  return (
+    <View
+      style={[
+        styles.recordLevelBadge,
+        level === 'good'
+          ? styles.recordLevelBadgeGood
+          : level === 'average'
+            ? styles.recordLevelBadgeAverage
+            : styles.recordLevelBadgeBad,
+      ]}
+    >
+      <Text style={styles.recordLevelBadgeText}>{getRecordLevelLabel(level)}</Text>
+    </View>
+  );
+}
+
 
 function formatSignedCountDelta(delta: number) {
   return `${delta > 0 ? '+' : ''}${delta}`;
@@ -813,6 +861,12 @@ function getDiaryCriterionDisplayLabel(criterion: LessonRecordCriterion) {
   }
 
   return criterion.label;
+}
+
+function getDiaryCriterionInsightText(criterion: LessonRecordCriterion) {
+  const detail = criterion.detail.trim();
+
+  return detail;
 }
 
 function getShootImprovementTitle(criterionKey: string) {
@@ -1466,6 +1520,7 @@ export function DiaryScreen({
   const recordCardWidth = isWide
     ? Math.min(420, Math.max(360, Math.floor(layoutWidth * 0.34)))
     : Math.max(280, Math.min(layoutWidth - 40, 336));
+  const recordListItemWidth = recordCardWidth + RECORD_LIST_GAP;
   const recordEvaluationVideoHeight = isCompactMobile ? 320 : isWide ? 420 : 360;
   const [playbackFeedback, setPlaybackFeedback] = useState<Record<string, string>>({});
   const [showCalendarModal, setShowCalendarModal] = useState(false);
@@ -1477,7 +1532,6 @@ export function DiaryScreen({
   const [openedEvaluationRecordId, setOpenedEvaluationRecordId] = useState<string | null>(null);
   const [selectedImprovementInsight, setSelectedImprovementInsight] = useState<SelectedImprovementInsight | null>(null);
   const [pendingDeleteRecordId, setPendingDeleteRecordId] = useState<string | null>(null);
-  const inlineVideoRefs = useRef<Record<string, Video | null>>({});
   const evaluationVideoRef = useRef<Video | null>(null);
   const playbackPollersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
   const menuOpenSpacerHeight = showSuccessRateRangeMenu ? 220 : 0;
@@ -1589,29 +1643,35 @@ export function DiaryScreen({
     () => (openedEvaluationRecordId ? selectedDateRecords.find((record) => record.id === openedEvaluationRecordId) ?? null : null),
     [openedEvaluationRecordId, selectedDateRecords]
   );
-  const recordVideoSources = useMemo(() => {
-    const next: Record<string, { uri: string }> = {};
-
-    for (const record of selectedDateRecords) {
-      if (record.videoUri) {
-        next[record.id] = { uri: record.videoUri };
-      }
-    }
-
-    return next;
-  }, [selectedDateRecords]);
   const openedEvaluationVideoSource = useMemo(
     () => (openedEvaluationRecord?.videoUri ? { uri: openedEvaluationRecord.videoUri } : null),
     [openedEvaluationRecord?.videoUri]
   );
+  const recordListData = selectedDateKey ? filteredDateRecords : EMPTY_LESSON_RECORDS;
+  const recordListExtraData = useMemo(
+    () => ({
+      playbackFeedback,
+      bestRecordId: dailyRecordRanking.best?.record.id ?? null,
+      worstRecordId: dailyRecordRanking.worst?.record.id ?? null,
+      openedEvaluationRecordId,
+      recordCardWidth,
+    }),
+    [
+      dailyRecordRanking.best?.record.id,
+      dailyRecordRanking.worst?.record.id,
+      openedEvaluationRecordId,
+      playbackFeedback,
+      recordCardWidth,
+    ]
+  );
 
   const getPlaybackVideoRef = useCallback(
     (record: LessonRecord) => {
-      if (openedEvaluationRecordId === record.id && evaluationVideoRef.current) {
+      if (openedEvaluationRecordId === record.id) {
         return evaluationVideoRef.current;
       }
 
-      return inlineVideoRefs.current[record.id] ?? null;
+      return null;
     },
     [openedEvaluationRecordId]
   );
@@ -1630,7 +1690,7 @@ export function DiaryScreen({
 
       for (const record of selectedDateRecords) {
         if (!next[record.id]) {
-          next[record.id] = getSyncedFeedback(record.feedbackTimeline, record.feedback, 0);
+          next[record.id] = record.feedback;
         }
       }
 
@@ -1735,7 +1795,16 @@ export function DiaryScreen({
     }
 
     if (status.didJustFinish) {
-      syncFeedbackFromPosition(record, 0);
+      setPlaybackFeedback((current) => {
+        if (current[record.id] === record.feedback) {
+          return current;
+        }
+
+        return {
+          ...current,
+          [record.id]: record.feedback,
+        };
+      });
     }
   }, [startPlaybackPolling, stopPlaybackPolling, syncFeedbackFromPosition]);
 
@@ -1854,21 +1923,7 @@ export function DiaryScreen({
           </CollapsibleRecordSection>
         </View>
 
-          {record.mode === 'shoot' ? (
-            <Pressable
-              onPress={() => onToggleShotOutcome(record.id)}
-              style={({ pressed }) => [
-                styles.shotOutcomeToggle,
-                record.shotOutcome === 'success'
-                  ? styles.shotOutcomeToggleSuccess
-                  : styles.shotOutcomeToggleFailure,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text style={styles.shotOutcomeToggleLabel}>{'\uC29B \uACB0\uACFC'}</Text>
-              <Text style={styles.shotOutcomeToggleValue}>{getShotOutcomeLabel(record.shotOutcome)}</Text>
-            </Pressable>
-          ) : null}
+          {renderRecordLevelBadge(evaluation?.level)}
         </View>
         <Text style={styles.recordTitle}>{getRecordTitle(record.mode)}</Text>
         <Text style={styles.recordMeta}>{record.createdAt}</Text>
@@ -1996,24 +2051,36 @@ export function DiaryScreen({
       record.mode === 'shoot'
         ? getShootImprovementHighlights(evaluation)
         : getDribbleImprovementHighlights(record, evaluation);
-    const displayedDribbleCriteria = record.mode === 'dribble' ? getDisplayedDribbleCriteria(record, evaluation) : [];
+    const displayedCriteria = record.mode === 'dribble' ? getDisplayedDribbleCriteria(record, evaluation) : evaluation.criteria;
 
     return (
       <View style={styles.evaluationBox}>
         <Text style={styles.evaluationTitle}>{'\uAE30\uB85D \uD3C9\uAC00'}</Text>
 
-        {record.mode === 'dribble' && displayedDribbleCriteria.length > 0 ? (
-          <View style={styles.criteriaRow}>
-            {displayedDribbleCriteria.map((criterion) => (
-              <View
-                key={`${record.id}-${criterion.key}`}
-                style={[
-                  styles.criterionChip,
-                  criterion.isStable ? styles.criterionChipStable : styles.criterionChipUnstable,
-                ]}
-              >
-                <Text style={styles.criterionChipLabel}>{getDiaryCriterionDisplayLabel(criterion)}</Text>
-                <Text style={styles.criterionChipValue}>{criterion.isStable ? '\uC548\uC815' : '\uBCF4\uC644'}</Text>
+        {displayedCriteria.length > 0 ? (
+          <View style={styles.criteriaList}>
+            {displayedCriteria.map((criterion) => (
+              <View key={`${record.id}-${criterion.key}`} style={styles.criteriaListItem}>
+                <View
+                  style={[
+                    styles.criteriaListBadge,
+                    criterion.isStable ? styles.criteriaListBadgeStable : styles.criteriaListBadgeUnstable,
+                  ]}
+                >
+                  <Text style={styles.criteriaListBadgeText}>{getDiaryCriterionDisplayLabel(criterion)}</Text>
+                </View>
+
+                <View style={styles.criteriaListTextWrap}>
+                  <Text
+                    style={[
+                      styles.criteriaListStatus,
+                      criterion.isStable ? styles.criteriaListStatusStable : styles.criteriaListStatusUnstable,
+                    ]}
+                  >
+                    {criterion.isStable ? '\uC798\uD55C \uC810' : '\uBCF4\uC644'}
+                  </Text>
+                  <Text style={styles.criteriaListDescription}>{getDiaryCriterionInsightText(criterion)}</Text>
+                </View>
               </View>
             ))}
           </View>
@@ -2068,12 +2135,13 @@ export function DiaryScreen({
     );
   }
 
-  function renderRecordCard(record: LessonRecord) {
+  const renderRecordCard = useCallback((record: LessonRecord) => {
     const syncedFeedback = getReadableDiaryFeedback(record, playbackFeedback[record.id] || record.feedback);
     const evaluation = record.evaluation;
     const recordCardLevelStyle = getRecordCardLevelStyle(evaluation?.level);
-    const isBestRecord = dailyRecordRanking.best?.record.id === record.id;
-    const isWorstRecord = dailyRecordRanking.worst?.record.id === record.id;
+    const shouldShowRankingMarkers = dailyRecordRanking.totalCount > 1;
+    const isBestRecord = shouldShowRankingMarkers && dailyRecordRanking.best?.record.id === record.id;
+    const isWorstRecord = shouldShowRankingMarkers && dailyRecordRanking.worst?.record.id === record.id;
 
     return (
       <View
@@ -2102,21 +2170,7 @@ export function DiaryScreen({
             </View>
           </Pressable>
 
-          {record.mode === 'shoot' ? (
-            <Pressable
-              onPress={() => onToggleShotOutcome(record.id)}
-              style={({ pressed }) => [
-                styles.shotOutcomeToggle,
-                record.shotOutcome === 'success'
-                  ? styles.shotOutcomeToggleSuccess
-                  : styles.shotOutcomeToggleFailure,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text style={styles.shotOutcomeToggleLabel}>{'\uC29B \uACB0\uACFC'}</Text>
-              <Text style={styles.shotOutcomeToggleValue}>{getShotOutcomeLabel(record.shotOutcome)}</Text>
-            </Pressable>
-          ) : null}
+          {renderRecordLevelBadge(evaluation?.level)}
         </View>
 
         <Pressable
@@ -2125,21 +2179,13 @@ export function DiaryScreen({
         >
           <Text style={styles.recordMeta}>{record.createdAt}</Text>
 
-          {!openedEvaluationRecordId && record.videoUri ? (
-            <Video
-              ref={(instance) => {
-                inlineVideoRefs.current[record.id] = instance;
-              }}
-              source={recordVideoSources[record.id]}
-              useNativeControls
-              shouldPlay={false}
-              isLooping={false}
-              progressUpdateIntervalMillis={200}
-              resizeMode={ResizeMode.COVER}
-              style={styles.recordVideo}
-              onPlaybackStatusUpdate={(status) => handlePlaybackStatus(record, status)}
-            />
-          ) : null}
+          {record.videoUri ? (
+            <RecordVideoThumbnail thumbnailUri={record.thumbnailUri} />
+          ) : (
+            <View style={[styles.recordVideoPreview, styles.recordVideoPreviewEmpty]}>
+              <Text style={styles.recordVideoPreviewCaption}>{'저장된 영상이 없습니다.'}</Text>
+            </View>
+          )}
 
           <View style={styles.liveFeedbackBox}>
             <Text style={styles.liveFeedbackLabel}>{'\uC2E4\uC2DC\uAC04 \uD53C\uB4DC\uBC31'}</Text>
@@ -2150,7 +2196,67 @@ export function DiaryScreen({
         <SmallButton title={'\uAE30\uB85D \uC0AD\uC81C'} onPress={() => openDeleteConfirm(record.id)} variant="red" />
       </View>
     );
-  }
+  }, [
+    dailyRecordRanking.best?.record.id,
+    dailyRecordRanking.worst?.record.id,
+    openDeleteConfirm,
+    openRecordEvaluation,
+    playbackFeedback,
+    recordCardWidth,
+  ]);
+
+  const renderRecordEmptyState = useCallback(() => {
+    if (!selectedDateKey) {
+      return null;
+    }
+
+    return (
+      <View style={[styles.recordCard, styles.recordCardHorizontal, { width: recordCardWidth }]}>
+        <Text style={styles.recordText}>
+          {recordFilter === 'all'
+            ? '\uC774 \uB0A0\uC9DC\uC5D0 \uC800\uC7A5\uB41C \uB808\uC2A8 \uC601\uC0C1\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'
+            : `\uC774 \uB0A0\uC9DC\uC5D0 \uC800\uC7A5\uB41C ${getRecordFilterLabel(recordFilter)} \uAE30\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.`}
+        </Text>
+      </View>
+    );
+  }, [recordCardWidth, recordFilter, selectedDateKey]);
+
+  const renderRecordCardItem = useCallback(
+    ({ item }: { item: LessonRecord }) => renderRecordCard(item),
+    [renderRecordCard]
+  );
+
+  const getRecordItemLayout = useCallback(
+    (_: ArrayLike<LessonRecord> | null | undefined, index: number) => ({
+      length: recordListItemWidth,
+      offset: RECORD_LIST_HORIZONTAL_PADDING + recordListItemWidth * index,
+      index,
+    }),
+    [recordListItemWidth]
+  );
+
+  const renderRecordList = useCallback(
+    () => (
+      <FlatList
+        horizontal
+        nestedScrollEnabled
+        data={recordListData}
+        extraData={recordListExtraData}
+        renderItem={renderRecordCardItem}
+        keyExtractor={(item) => item.id}
+        getItemLayout={getRecordItemLayout}
+        style={styles.recordsScroll}
+        contentContainerStyle={styles.recordsScrollContent}
+        showsHorizontalScrollIndicator
+        ListEmptyComponent={renderRecordEmptyState}
+        initialNumToRender={2}
+        maxToRenderPerBatch={2}
+        windowSize={3}
+        updateCellsBatchingPeriod={16}
+      />
+    ),
+    [getRecordItemLayout, recordListData, recordListExtraData, renderRecordCardItem, renderRecordEmptyState]
+  );
 
   return (
     <Card style={styles.diaryCard}>
@@ -2578,48 +2684,10 @@ export function DiaryScreen({
 
             {isWide ? (
               <View style={styles.recordsPanel}>
-                <ScrollView
-                  horizontal
-                  nestedScrollEnabled
-                  style={styles.recordsScroll}
-                  contentContainerStyle={styles.recordsScrollContent}
-                  showsHorizontalScrollIndicator
-                >
-                  {selectedDateKey && filteredDateRecords.length === 0 ? (
-                    <View style={styles.recordCard}>
-                      <Text style={styles.recordText}>
-                        {recordFilter === 'all'
-                          ? '\uC774 \uB0A0\uC9DC\uC5D0 \uC800\uC7A5\uB41C \uB808\uC2A8 \uC601\uC0C1\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'
-                          : `\uC774 \uB0A0\uC9DC\uC5D0 \uC800\uC7A5\uB41C ${getRecordFilterLabel(recordFilter)} \uAE30\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.`}
-                      </Text>
-                    </View>
-                  ) : null}
-
-                  {filteredDateRecords.map(renderRecordCard)}
-                </ScrollView>
+                {renderRecordList()}
               </View>
             ) : (
-              <>
-                {selectedDateKey && filteredDateRecords.length === 0 ? (
-                  <View style={styles.recordCard}>
-                    <Text style={styles.recordText}>
-                      {recordFilter === 'all'
-                        ? '\uC774 \uB0A0\uC9DC\uC5D0 \uC800\uC7A5\uB41C \uB808\uC2A8 \uC601\uC0C1\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'
-                        : `\uC774 \uB0A0\uC9DC\uC5D0 \uC800\uC7A5\uB41C ${getRecordFilterLabel(recordFilter)} \uAE30\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.`}
-                    </Text>
-                  </View>
-                ) : null}
-
-                <ScrollView
-                  horizontal
-                  nestedScrollEnabled
-                  style={styles.recordsScroll}
-                  contentContainerStyle={styles.recordsScrollContent}
-                  showsHorizontalScrollIndicator
-                >
-                  {filteredDateRecords.map(renderRecordCard)}
-                </ScrollView>
-              </>
+              renderRecordList()
             )}
           </View>
         </View>
@@ -2635,7 +2703,7 @@ export function DiaryScreen({
         statusBarTranslucent
         onRequestClose={closeRecordEvaluation}
       >
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, styles.recordEvaluationModalOverlay]}>
           <Pressable
             style={styles.modalBackdropPressable}
             onPress={closeRecordEvaluation}
@@ -2654,30 +2722,18 @@ export function DiaryScreen({
             </View>
 
             {openedEvaluationRecord ? (
-              <View style={styles.recordEvaluationLayout}>
+              <ScrollView
+                style={[styles.recordEvaluationScroll, styles.recordEvaluationLayout]}
+                contentContainerStyle={styles.recordEvaluationScrollContent}
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.recordEvaluationMediaSection}>
                   <View style={styles.recordHeader}>
                     <View style={styles.recordTitleRow}>
                       <Text style={styles.recordTitle}>{getRecordTitle(openedEvaluationRecord.mode)}</Text>
                     </View>
 
-                    {openedEvaluationRecord.mode === 'shoot' ? (
-                      <Pressable
-                        onPress={() => onToggleShotOutcome(openedEvaluationRecord.id)}
-                        style={({ pressed }) => [
-                          styles.shotOutcomeToggle,
-                          openedEvaluationRecord.shotOutcome === 'success'
-                            ? styles.shotOutcomeToggleSuccess
-                            : styles.shotOutcomeToggleFailure,
-                          pressed && styles.pressed,
-                        ]}
-                      >
-                        <Text style={styles.shotOutcomeToggleLabel}>{'\uC29B \uACB0\uACFC'}</Text>
-                        <Text style={styles.shotOutcomeToggleValue}>
-                          {getShotOutcomeLabel(openedEvaluationRecord.shotOutcome)}
-                        </Text>
-                      </Pressable>
-                    ) : null}
+                    {renderRecordLevelBadge(openedEvaluationRecord.evaluation?.level)}
                   </View>
 
                   <Text style={styles.recordMeta}>{openedEvaluationRecord.createdAt}</Text>
@@ -2691,44 +2747,37 @@ export function DiaryScreen({
                       onPlaybackStatusUpdate={handleOpenedEvaluationPlaybackStatus}
                     />
                   ) : null}
-
                 </View>
 
-                <ScrollView
-                  style={styles.recordEvaluationScroll}
-                  contentContainerStyle={styles.recordEvaluationScrollContent}
-                  showsVerticalScrollIndicator={false}
-                >
-                  <View style={styles.recordEvaluationDetailSection}>
-                    {selectedImprovementInsight?.recordId === openedEvaluationRecord.id ? (
-                      <View style={styles.selectedImprovementBox}>
-                        <Text style={[styles.selectedImprovementLabel, styles.highlightButtonLabelBad]}>
-                          {selectedImprovementInsight.label}
-                        </Text>
-                        <Text style={styles.selectedImprovementDetail}>{selectedImprovementInsight.detail}</Text>
-                      </View>
-                    ) : null}
-
-                    {renderRecordEvaluationContent(openedEvaluationRecord)}
-
-                    <View style={styles.liveFeedbackBox}>
-                      <Text style={styles.liveFeedbackLabel}>{'\uC2E4\uC2DC\uAC04 \uD53C\uB4DC\uBC31'}</Text>
-                      <Text style={styles.liveFeedbackText}>
-                        {getReadableDiaryFeedback(
-                          openedEvaluationRecord,
-                          playbackFeedback[openedEvaluationRecord.id] || openedEvaluationRecord.feedback
-                        )}
+                <View style={styles.recordEvaluationDetailSection}>
+                  {selectedImprovementInsight?.recordId === openedEvaluationRecord.id ? (
+                    <View style={styles.selectedImprovementBox}>
+                      <Text style={[styles.selectedImprovementLabel, styles.highlightButtonLabelBad]}>
+                        {selectedImprovementInsight.label}
                       </Text>
+                      <Text style={styles.selectedImprovementDetail}>{selectedImprovementInsight.detail}</Text>
                     </View>
+                  ) : null}
 
-                    <SmallButton
-                      title={'\uAE30\uB85D \uC0AD\uC81C'}
-                      onPress={() => openDeleteConfirm(openedEvaluationRecord.id)}
-                      variant="red"
-                    />
+                  {renderRecordEvaluationContent(openedEvaluationRecord)}
+
+                  <View style={styles.liveFeedbackBox}>
+                    <Text style={styles.liveFeedbackLabel}>{'\uC2E4\uC2DC\uAC04 \uD53C\uB4DC\uBC31'}</Text>
+                    <Text style={styles.liveFeedbackText}>
+                      {getReadableDiaryFeedback(
+                        openedEvaluationRecord,
+                        playbackFeedback[openedEvaluationRecord.id] || openedEvaluationRecord.feedback
+                      )}
+                    </Text>
                   </View>
-                </ScrollView>
-              </View>
+
+                  <SmallButton
+                    title={'\uAE30\uB85D \uC0AD\uC81C'}
+                    onPress={() => openDeleteConfirm(openedEvaluationRecord.id)}
+                    variant="red"
+                  />
+                </View>
+              </ScrollView>
             ) : null}
           </View>
         </View>
@@ -3818,6 +3867,10 @@ const styles = StyleSheet.create({
   modalBackdropPressable: {
     ...StyleSheet.absoluteFillObject,
   },
+  recordEvaluationModalOverlay: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
   modalCard: {
     maxHeight: '88%',
     borderRadius: 18,
@@ -3834,9 +3887,16 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   recordEvaluationModalCard: {
-    maxWidth: 760,
+    maxWidth: '100%',
+    maxHeight: '100%',
     width: '100%',
-    alignSelf: 'center',
+    height: '100%',
+    alignSelf: 'stretch',
+    borderRadius: 0,
+    borderWidth: 0,
+    paddingTop: 16,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
   },
   deleteConfirmModalCard: {
     width: '100%',
@@ -3935,6 +3995,7 @@ const styles = StyleSheet.create({
   },
   recordEvaluationScrollContent: {
     paddingBottom: 8,
+    gap: 16,
   },
   recordEvaluationDetailSection: {
     gap: 14,
@@ -4364,6 +4425,52 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
   },
+  criteriaList: {
+    gap: 10,
+  },
+  criteriaListItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  criteriaListBadge: {
+    minWidth: 96,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 0,
+  },
+  criteriaListBadgeStable: {
+    backgroundColor: 'rgba(50,205,50,0.12)',
+  },
+  criteriaListBadgeUnstable: {
+    backgroundColor: 'rgba(191,80,88,0.12)',
+  },
+  criteriaListBadgeText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  criteriaListTextWrap: {
+    flex: 1,
+    gap: 3,
+    paddingTop: 1,
+  },
+  criteriaListStatus: {
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  criteriaListStatusStable: {
+    color: '#57c26a',
+  },
+  criteriaListStatusUnstable: {
+    color: '#d46d75',
+  },
+  criteriaListDescription: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+  },
   criteriaRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -4456,6 +4563,31 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     lineHeight: 18,
+  },
+  recordVideoPreview: {
+    width: '100%',
+    height: 260,
+    borderRadius: 0,
+    backgroundColor: '#111111',
+    marginBottom: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  recordVideoPreviewEmpty: {
+    backgroundColor: '#161616',
+  },
+  recordVideoPreviewImage: {
+    width: '100%',
+    height: 260,
+    marginBottom: 12,
+    backgroundColor: '#111111',
+  },
+  recordVideoPreviewCaption: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
   },
   recordVideo: {
     width: '100%',
