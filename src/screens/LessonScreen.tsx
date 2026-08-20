@@ -435,7 +435,7 @@ export function LessonScreen({
   const isLandscapeMobileLayout = !isDesktopMobileMode && !isWideLayout && width > height;
   const shouldLeftDockCoaching = isLandscapeMobileLayout;
   const isSideDockedCoaching = isWideLayout;
-  const isLessonSessionBusy = isLessonActive || isCameraActive;
+  const isLessonSessionBusy = isLessonActive || cameraStopMode !== null;
   const allowPanelDragHide = !isSideDockedCoaching;
   const coachingPanelTopInset = 88;
   const coachingPanelBottomInset = 12;
@@ -494,7 +494,7 @@ export function LessonScreen({
   );
 
   useEffect(() => {
-    if (isLessonActive || isCameraActive) {
+    if (isLessonActive || cameraStopMode !== null) {
       setShowLessonModePicker(false);
     }
 
@@ -507,7 +507,7 @@ export function LessonScreen({
       setShowShootGuide(false);
       setShootGuideStep(0);
     }
-  }, [isCameraActive, isLessonActive, lessonMode]);
+  }, [cameraStopMode, isLessonActive, lessonMode]);
 
   useEffect(() => {
     const listenerId = coachingPanelTranslateY.addListener(({ value }) => {
@@ -730,7 +730,8 @@ export function LessonScreen({
     outputRange: [1, 1, 0.22, 0],
     extrapolate: 'clamp',
   });
-  const isRoundLessonControlActive = isLessonActive || isCameraActive;
+  const isRoundLessonControlActive = isLessonActive || cameraStopMode !== null;
+  const shouldShowRealtimeCoaching = isLessonActive;
   const floatingCoachingFrame = isLandscapeMobileLayout
     ? {
         left: 12,
@@ -780,13 +781,34 @@ export function LessonScreen({
     setDribbleGuideStep(0);
   }
 
-  function confirmDribbleGuideStep() {
-    if (dribbleGuideStep === 0 && parsedDribbleCount <= 0) {
+  function openDribbleLessonInstructions() {
+    setDribbleGuideStep(1);
+  }
+
+  function goBackToDribbleLessonSetup() {
+    setDribbleGuideStep(0);
+  }
+
+  function goToPreviousDribbleInstructionStep() {
+    if (dribbleGuideStep <= 1) {
+      goBackToDribbleLessonSetup();
       return;
     }
 
+    setDribbleGuideStep((current) => current - 1);
+  }
+
+  function confirmDribbleInstructionStep() {
     if (dribbleGuideStep < 3) {
       setDribbleGuideStep((current) => current + 1);
+      return;
+    }
+
+    beginDribbleLessonFromGuide();
+  }
+
+  function beginDribbleLessonFromGuide() {
+    if (parsedDribbleCount <= 0) {
       return;
     }
 
@@ -801,19 +823,18 @@ export function LessonScreen({
     onBeginLesson(parsedDribbleCount, selectedDribbleView);
   }
 
+  const isDribbleLessonSetupStep = dribbleGuideStep === 0;
   const dribbleViewLabel = selectedDribbleView === 'front' ? '앞모습 드리블' : '옆모습 드리블';
+  const dribbleGuideTitle = isDribbleLessonSetupStep ? '드리블 레슨' : '드리블 레슨 안내';
+  const dribbleInstructionSecondaryLabel = '이전';
+  const dribbleInstructionPrimaryLabel = dribbleGuideStep === 3 ? '시작' : '다음';
 
   function closeShootGuide() {
     setShowShootGuide(false);
     setShootGuideStep(0);
   }
 
-  function confirmShootGuideStep() {
-    if (shootGuideStep < 2) {
-      setShootGuideStep((current) => current + 1);
-      return;
-    }
-
+  function beginShootLessonFromGuide() {
     if (isLessonSessionBusy) {
       setShowShootGuide(false);
       setShootGuideStep(0);
@@ -825,8 +846,25 @@ export function LessonScreen({
     onBeginLesson();
   }
 
-  const dribbleConfirmLabel = dribbleGuideStep === 3 ? '레슨 시작' : '확인';
-  const shootConfirmLabel = shootGuideStep === 2 ? '레슨 시작' : '확인';
+  function confirmShootGuideStep() {
+    if (shootGuideStep < 2) {
+      setShootGuideStep((current) => current + 1);
+      return;
+    }
+
+    beginShootLessonFromGuide();
+  }
+
+  function goToPreviousShootGuideStep() {
+    if (shootGuideStep <= 0) {
+      return;
+    }
+
+    setShootGuideStep((current) => current - 1);
+  }
+
+  const isShootGuideFirstStep = shootGuideStep === 0;
+  const shootConfirmLabel = shootGuideStep === 2 ? '시작' : '다음';
 
   return (
     <View style={styles.screenRoot}>
@@ -841,7 +879,7 @@ export function LessonScreen({
         </Pressable>
       </View>
 
-      {isCameraActive && isSideDockedCoaching ? (
+      {shouldShowRealtimeCoaching && isSideDockedCoaching ? (
         <View
           pointerEvents="box-none"
           style={[
@@ -880,7 +918,7 @@ export function LessonScreen({
         </View>
       ) : null}
 
-      {isCameraActive && !isSideDockedCoaching ? (
+      {shouldShowRealtimeCoaching && !isSideDockedCoaching ? (
         <View pointerEvents="box-none" style={styles.coachingOverlay}>
           <Animated.View
             pointerEvents={allowPanelDragHide && isCoachingPanelHidden ? 'none' : 'auto'}
@@ -1023,21 +1061,12 @@ export function LessonScreen({
         <View style={styles.modalBackdrop}>
           <Pressable onPress={closeDribbleGuide} style={styles.modalBackdropDismissArea} />
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>드리블 레슨 안내</Text>
-            <Text style={styles.modalStep}>STEP {dribbleGuideStep + 1} / 4</Text>
+            <Text style={styles.modalTitle}>{dribbleGuideTitle}</Text>
+            {!isDribbleLessonSetupStep ? <Text style={styles.modalStep}>STEP {dribbleGuideStep} / 3</Text> : null}
 
             {dribbleGuideStep === 0 ? (
               <>
-                <Text style={styles.modalBody}>드리블을 몇 번 하고 레슨을 끝낼 것인지 정해주세요.</Text>
-                <TextInput
-                  value={dribbleCountInput}
-                  onChangeText={(value) => setDribbleCountInput(value.replace(/[^0-9]/g, ''))}
-                  keyboardType="number-pad"
-                  placeholder="예: 10"
-                  placeholderTextColor="rgba(255,255,255,0.45)"
-                  style={styles.countInput}
-                  maxLength={3}
-                />
+                <Text style={styles.modalBody}>어떤 모습으로 드리블할지 정해주세요.</Text>
                 <View style={styles.viewSelectRow}>
                   <Pressable
                     onPress={() => onSelectDribbleView('front')}
@@ -1048,7 +1077,6 @@ export function LessonScreen({
                     ]}
                   >
                     <Text style={styles.viewSelectTitle}>앞모습 드리블</Text>
-                    <Text style={styles.viewSelectCaption}>정면 자세와 양손 균형을 봅니다.</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => onSelectDribbleView('side')}
@@ -1059,10 +1087,21 @@ export function LessonScreen({
                     ]}
                   >
                     <Text style={styles.viewSelectTitle}>옆모습 드리블</Text>
-                    <Text style={styles.viewSelectCaption}>상체 기울기와 시선을 봅니다.</Text>
                   </Pressable>
                 </View>
-                <Text style={styles.modalHint}>입력한 횟수만큼 {dribbleViewLabel}을 하면 자동으로 녹화가 끝나고 리뷰를 시작합니다.</Text>
+                <Text style={styles.modalBody}>드리블을 몇 번 하고 레슨을 끝낼지 정해주세요.</Text>
+                <TextInput
+                  value={dribbleCountInput}
+                  onChangeText={(value) => setDribbleCountInput(value.replace(/[^0-9]/g, ''))}
+                  keyboardType="number-pad"
+                  placeholder="횟수 입력"
+                  placeholderTextColor="rgba(255,255,255,0.45)"
+                  style={styles.countInput}
+                  maxLength={3}
+                />
+                <Pressable onPress={openDribbleLessonInstructions} style={({ pressed }) => [styles.modalInlineLink, pressed && styles.pressed]}>
+                  <Text style={styles.modalInlineLinkText}>레슨 방법 안내 보기</Text>
+                </Pressable>
               </>
             ) : null}
 
@@ -1091,22 +1130,30 @@ export function LessonScreen({
               </>
             ) : null}
 
-            <View style={styles.modalActions}>
-              <Pressable onPress={closeDribbleGuide} style={({ pressed }) => [styles.modalGhostButton, pressed && styles.pressed]}>
-                <Text style={styles.modalGhostButtonText}>닫기</Text>
-              </Pressable>
-              <Pressable
-                onPress={confirmDribbleGuideStep}
-                disabled={dribbleGuideStep === 0 && parsedDribbleCount <= 0}
-                style={({ pressed }) => [
-                  styles.modalPrimaryButton,
-                  dribbleGuideStep === 0 && parsedDribbleCount <= 0 && styles.modalPrimaryButtonDisabled,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text style={styles.modalPrimaryButtonText}>{dribbleConfirmLabel}</Text>
-              </Pressable>
-            </View>
+            {isDribbleLessonSetupStep ? (
+              <View style={styles.modalActions}>
+                <Pressable
+                  onPress={beginDribbleLessonFromGuide}
+                  disabled={parsedDribbleCount <= 0}
+                  style={({ pressed }) => [
+                    styles.modalPrimaryButton,
+                    parsedDribbleCount <= 0 && styles.modalPrimaryButtonDisabled,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={styles.modalPrimaryButtonText}>바로 시작</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.modalActions}>
+                <Pressable onPress={goToPreviousDribbleInstructionStep} style={({ pressed }) => [styles.modalGhostButton, pressed && styles.pressed]}>
+                  <Text style={styles.modalGhostButtonText}>{dribbleInstructionSecondaryLabel}</Text>
+                </Pressable>
+                <Pressable onPress={confirmDribbleInstructionStep} style={({ pressed }) => [styles.modalPrimaryButton, pressed && styles.pressed]}>
+                  <Text style={styles.modalPrimaryButtonText}>{dribbleInstructionPrimaryLabel}</Text>
+                </Pressable>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -1142,9 +1189,15 @@ export function LessonScreen({
             ) : null}
 
             <View style={styles.modalActions}>
-              <Pressable onPress={closeShootGuide} style={({ pressed }) => [styles.modalGhostButton, pressed && styles.pressed]}>
-                <Text style={styles.modalGhostButtonText}>닫기</Text>
-              </Pressable>
+              {isShootGuideFirstStep ? (
+                <Pressable onPress={beginShootLessonFromGuide} style={({ pressed }) => [styles.modalGhostButton, pressed && styles.pressed]}>
+                  <Text style={styles.modalGhostButtonText}>바로 시작</Text>
+                </Pressable>
+              ) : (
+                <Pressable onPress={goToPreviousShootGuideStep} style={({ pressed }) => [styles.modalGhostButton, pressed && styles.pressed]}>
+                  <Text style={styles.modalGhostButtonText}>이전</Text>
+                </Pressable>
+              )}
               <Pressable onPress={confirmShootGuideStep} style={({ pressed }) => [styles.modalPrimaryButton, pressed && styles.pressed]}>
                 <Text style={styles.modalPrimaryButtonText}>{shootConfirmLabel}</Text>
               </Pressable>
@@ -1917,13 +1970,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
+  modalInlineLink: {
+    alignSelf: 'flex-start',
+    marginTop: -2,
+  },
+  modalInlineLinkText: {
+    color: '#ffd8a8',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '800',
+  },
   viewSelectRow: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 10,
     marginBottom: 12,
   },
   viewSelectButton: {
-    flex: 1,
     borderRadius: 0,
     paddingHorizontal: 14,
     paddingVertical: 14,
@@ -1939,12 +2001,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 15,
     fontWeight: '900',
-    marginBottom: 4,
-  },
-  viewSelectCaption: {
-    color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 18,
   },
   modalActions: {
     flexDirection: 'row',

@@ -83,6 +83,12 @@ const styles = StyleSheet.create({
   },
   firework: {
     position: 'absolute',
-    fontSize: 32,
+    fontSize: 36,
+    lineHeight: 42,
+    textAlign: 'center',
+    includeFontPadding: false,
+    textShadowColor: 'rgba(255, 255, 255, 0.35)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
   },
 });

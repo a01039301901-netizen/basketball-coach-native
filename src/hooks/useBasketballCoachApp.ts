@@ -85,7 +85,8 @@ import {
 
 const FEEDBACK_UPDATE_INTERVAL_MS = 1500;
 const DRIBBLE_STANCE_HOLD_MS = 3000;
-const SHOOT_RECOVERY_MS = 3000;
+const SHOOT_SUCCESS_CIRCLE_WINDOW_MS = 5000;
+const SHOOT_SUCCESS_CIRCLE_WINDOW_SECONDS = SHOOT_SUCCESS_CIRCLE_WINDOW_MS / 1000;
 const STORAGE_LOAD_TIMEOUT_MS = 4000;
 const STARTUP_RECOVERY_TIMEOUT_MS = 8000;
 const DEV_TEST_SHOOT_RECORD_ID = '__dev-test-shoot-bad-no-video-v1';
@@ -181,7 +182,7 @@ const DEFAULT_SHOOT_FEEDBACK =
   '???쇰뱶諛?n1. ??媛곷룄, ????대컢, ?섏껜 媛곷룄瑜?遺꾩꽍?섎뒗 以묒엯?덈떎.\n2. ?닿묠遺??諛쒕걹源뚯? 紐??꾩껜媛 ?붾㈃ ?덉뿉 蹂댁씠?꾨줉 留욎떠 二쇱꽭??\n3. 遺꾩꽍???덉젙?섎㈃ 湲곗???留욌뒗 ?쇰뱶諛깆씠 諛붾줈 ?섑??⑸땲??';
 
 function createFireworks(): FireworkItem[] {
-  const emojis = ['*', '+', 'o', '!', '~'];
+  const emojis = ['✨', '🎉', '🔥'];
 
   return Array.from({ length: 10 }, (_, index) => ({
     id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
@@ -1911,6 +1912,39 @@ function getLessonRecordLevelLabel(level: LessonRecordLevel) {
   return '나쁨';
 }
 
+function normalizeCalendarLessonRecordLevelCounts(counts: Record<LessonRecordLevel, number>) {
+  const normalizedCounts: Record<LessonRecordLevel, number> = {
+    good: Math.max(0, counts.good),
+    average: Math.max(0, counts.average),
+    bad: Math.max(0, counts.bad),
+  };
+  const offsetCount = Math.min(normalizedCounts.good, normalizedCounts.bad);
+
+  if (offsetCount > 0) {
+    normalizedCounts.good -= offsetCount;
+    normalizedCounts.bad -= offsetCount;
+    normalizedCounts.average += offsetCount;
+  }
+
+  return normalizedCounts;
+}
+
+function getDominantCalendarLessonRecordLevel(counts: Record<LessonRecordLevel, number>) {
+  const normalizedCounts = normalizeCalendarLessonRecordLevelCounts(counts);
+  const rankedLevels = (Object.entries(normalizedCounts) as [LessonRecordLevel, number][])
+    .sort((left, right) => right[1] - left[1]);
+
+  if (!rankedLevels[0] || rankedLevels[0][1] <= 0) {
+    return null;
+  }
+
+  if (rankedLevels[0][1] === rankedLevels[1]?.[1]) {
+    return null;
+  }
+
+  return rankedLevels[0][0];
+}
+
 function buildLessonRecordSummary(level: LessonRecordLevel, stableCount: number, totalCount: number) {
   return `${totalCount}가지 기준 중 ${stableCount}가지가 안정적이라 ${getLessonRecordLevelLabel(level)} 기록입니다.`;
 }
@@ -2371,14 +2405,12 @@ function buildDribbleRhythmDetail(analysis: DribbleAnalysis | null, isStable: bo
   const comparisonCount = analysis.dribbleRhythmComparisonCount;
   const goodCount = analysis.dribbleRhythmGoodCount;
   const badCount = analysis.dribbleRhythmBadCount;
-  const badRatioText =
-    typeof analysis.dribbleRhythmBadRatio === 'number' ? formatStableRatioText(analysis.dribbleRhythmBadRatio) : '--';
 
   if (isStable) {
     return `드리블 간격 비교 ${comparisonCount}회 중 ${goodCount}회가 0.2초 이하 차이로 유지되었습니다.`;
   }
 
-  return `드리블 간격 비교 ${comparisonCount}회 중 ${badCount}회(${badRatioText})에서 0.2초 이상 차이가 났습니다. 리듬 보완이 필요합니다.`;
+  return `드리블 간격 비교 ${comparisonCount}회 중 ${badCount}회에서 0.2초 이상 차이가 났습니다. 리듬 보완이 필요합니다.`;
 }
 
 function buildFrontDribbleStanceDetail(analysis: DribbleAnalysis | null, isStable: boolean) {
@@ -2754,14 +2786,13 @@ function buildDiarySkillInsight(
     }
   }
 
-  const rankedEvaluationLevels = (Object.entries(evaluationCounts) as [LessonRecordLevel, number][])
-    .sort((left, right) => right[1] - left[1]);
+  const dominantEvaluationLevel = getDominantCalendarLessonRecordLevel(evaluationCounts);
   const evaluationDominantLevel: DiarySkillInsight['evaluationDominantLevel'] =
-    !rankedEvaluationLevels[0] || rankedEvaluationLevels[0][1] <= 0
+    Object.values(evaluationCounts).every((count) => count <= 0)
       ? 'none'
-      : rankedEvaluationLevels[0][1] === rankedEvaluationLevels[1]?.[1]
+      : !dominantEvaluationLevel
         ? 'mixed'
-        : rankedEvaluationLevels[0][0];
+        : dominantEvaluationLevel;
   const shotAttemptsByDate = new Map(shotGraphData.map((item) => [item.dateKey, item.attempts]));
   const getDribbleCountForDate = (dateKey: string) => Math.max(0, dailyDribbleRecords[dateKey] || 0);
   const getShotAttemptsForDate = (dateKey: string) => Math.max(0, shotAttemptsByDate.get(dateKey) || 0);
@@ -3222,7 +3253,6 @@ export function useBasketballCoachApp() {
   const [ballRecognitionCalibrationJob, setBallRecognitionCalibrationJob] = useState<BallRecognitionCalibrationJob | null>(null);
   const [isBallRecognitionTraining, setIsBallRecognitionTraining] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<PositionOption>(DEFAULT_POSITION);
-  const [isHomeworkRevealed, setIsHomeworkRevealed] = useState(false);
   const [debugText, setDebugText] = useState(DEFAULT_DEBUG_TEXT);
   const [feedbackText, setFeedbackText] = useState(DEFAULT_DRIBBLE_FEEDBACK);
   const [lessonReview, setLessonReview] = useState<LessonReviewClip | null>(null);
@@ -3409,19 +3439,13 @@ export function useBasketballCoachApp() {
     const dominantLevelsByDate: Record<string, LessonRecordLevel> = {};
 
     for (const [dateKey, counts] of Object.entries(levelCountsByDate)) {
-      const rankedLevels = (Object.entries(counts) as [LessonRecordLevel, number][]).sort(
-        (left, right) => right[1] - left[1]
-      );
+      const dominantLevel = getDominantCalendarLessonRecordLevel(counts);
 
-      if (!rankedLevels[0] || rankedLevels[0][1] <= 0) {
+      if (!dominantLevel) {
         continue;
       }
 
-      if (rankedLevels[0][1] === rankedLevels[1]?.[1]) {
-        continue;
-      }
-
-      dominantLevelsByDate[dateKey] = rankedLevels[0][0];
+      dominantLevelsByDate[dateKey] = dominantLevel;
     }
 
     return dominantLevelsByDate;
@@ -3501,11 +3525,10 @@ export function useBasketballCoachApp() {
     setSelectedBallColors(DEFAULT_BALL_COLORS);
     setBallRecognitionProfile(null);
     setBallRecognitionPreviews([]);
-    setBallRecognitionCalibrationJob(null);
-    setIsBallRecognitionTraining(false);
-    setSelectedPosition(DEFAULT_POSITION);
-    setIsHomeworkRevealed(false);
-    setDebugText(DEFAULT_DEBUG_TEXT);
+      setBallRecognitionCalibrationJob(null);
+      setIsBallRecognitionTraining(false);
+      setSelectedPosition(DEFAULT_POSITION);
+      setDebugText(DEFAULT_DEBUG_TEXT);
     setFeedbackText(DEFAULT_DRIBBLE_FEEDBACK);
     setLessonReview(null);
     setSelectedDribbleView('front');
@@ -4992,7 +5015,7 @@ export function useBasketballCoachApp() {
   }, [currentUserId, persistLessonRecords]);
 
   const finalizeLessonSession = useCallback(
-    async (shouldSaveRecord: boolean, videoUri: string) => {
+    async (shouldSaveRecord: boolean, videoUri: string, keepCameraPreview = false) => {
       if (feedbackIntervalRef.current) {
         clearInterval(feedbackIntervalRef.current);
         feedbackIntervalRef.current = null;
@@ -5034,15 +5057,23 @@ export function useBasketballCoachApp() {
       setCurrentDribbleCount(0);
       setCountdownValue(null);
       setDribbleResetToken(0);
+      setShootResetToken(0);
       setRecordingStartToken(0);
       setRecordingStopToken(0);
       setCameraStopMode(null);
       setIsCameraPreviewHidden(false);
       setIsLessonActive(false);
-      setIsCameraActive(false);
-      setIsCameraReady(false);
       setCameraError('');
       setIsShootSuccessButtonVisible(false);
+      if (keepCameraPreview) {
+        setIsCameraActive(true);
+        setIsCameraReady(true);
+        setDebugText('레슨을 종료했습니다. 카메라는 계속 켜져 있습니다.');
+        return;
+      }
+
+      setIsCameraActive(false);
+      setIsCameraReady(false);
       setDebugText('移대찓?쇱? MediaPipe瑜?以鍮꾪븯怨??덉뒿?덈떎.');
     },
     [
@@ -5478,6 +5509,9 @@ export function useBasketballCoachApp() {
     }
 
     setScreen(nextScreen);
+    if (nextScreen === 'lesson') {
+      void startLessonCameraPreview();
+    }
     if (nextScreen === 'diary' && !selectedDateKey) {
       const today = new Date();
       setSelectedDateKey(formatDateKey(today));
@@ -5734,10 +5768,6 @@ export function useBasketballCoachApp() {
     setSelectedBallColors(BALL_BRAND_PRESETS[selectedBallBrand] ?? DEFAULT_BALL_COLORS);
   }
 
-  function revealHomework() {
-    setIsHomeworkRevealed(true);
-  }
-
   function changeLessonMode(mode: LessonMode) {
     setLessonMode(mode);
     setIsShootSuccessButtonVisible(false);
@@ -5901,10 +5931,57 @@ export function useBasketballCoachApp() {
     return true;
   }
 
+  async function startLessonCameraPreview() {
+    if (
+      isCameraActive
+      || pendingStopSaveRef.current
+      || pendingReviewStopRef.current
+      || pendingShootReviewRef.current
+      || pendingShootRecordingStopRef.current
+    ) {
+      return false;
+    }
+
+    const granted = await ensurePermissions();
+    if (!granted) {
+      return false;
+    }
+
+    clearRecordingWait();
+    clearShootAutoEnd();
+    setCameraSessionKey((current) => current + 1);
+    setCameraError('');
+    lessonStartedAtRef.current = null;
+    dribbleLessonPhaseRef.current = 'stance_setup';
+    shootLessonStartedRef.current = false;
+    resetShootAnalysisTracking();
+    dribbleTargetCountRef.current = null;
+    dribbleAutoEndingRef.current = false;
+    lessonCompletionCuePlayedRef.current = false;
+    stanceCountdownStartedAtRef.current = null;
+    feedbackTimelineRef.current = [];
+    resetFrontDribbleTrackingSummary();
+    completedDribbleCountRef.current = 0;
+    setCurrentDribbleCount(0);
+    setCountdownValue(null);
+    setDribbleResetToken(0);
+    setShootResetToken(0);
+    setRecordingStartToken(0);
+    setRecordingStopToken(0);
+    setCameraStopMode(null);
+    setLessonReview(null);
+    setIsCameraPreviewHidden(false);
+    setIsShootSuccessButtonVisible(false);
+    setIsLessonActive(false);
+    setIsCameraActive(true);
+    setIsCameraReady(false);
+    setDebugText('MediaPipe 분석 화면과 카메라를 준비하고 있습니다.');
+    return true;
+  }
+
   async function beginLesson(dribbleTargetCount?: number, dribbleView?: DribbleLessonView) {
     if (
       isLessonActive
-      || isCameraActive
       || pendingStopSaveRef.current
       || pendingReviewStopRef.current
       || pendingShootReviewRef.current
@@ -5919,9 +5996,17 @@ export function useBasketballCoachApp() {
       return;
     }
 
+    const shouldReuseCameraPreview =
+      isCameraActive
+      && !isCameraPreviewHidden
+      && cameraStopMode === null
+      && !cameraError;
+
     clearRecordingWait();
     clearShootAutoEnd();
-    setCameraSessionKey((current) => current + 1);
+    if (!shouldReuseCameraPreview) {
+      setCameraSessionKey((current) => current + 1);
+    }
     setCameraError('');
     lessonStartedAtRef.current = null;
     dribbleLessonPhaseRef.current = 'stance_setup';
@@ -5963,6 +6048,19 @@ export function useBasketballCoachApp() {
 
   async function endLesson(forceClose = false) {
     if (!isLessonActive && !isCameraActive) {
+      return;
+    }
+
+    if (
+      !forceClose
+      && (
+        pendingStopSaveRef.current
+        || pendingReviewStopRef.current
+        || pendingShootReviewRef.current
+        || pendingShootRecordingStopRef.current
+      )
+    ) {
+      setDebugText('레슨 종료를 마무리하고 있습니다. 잠시만 기다려 주세요.');
       return;
     }
 
@@ -6019,7 +6117,7 @@ export function useBasketballCoachApp() {
     setDebugText('?덉뒯 ?곸긽????ν븯??以묒엯?덈떎.');
     setIsLessonActive(false);
     setIsCameraReady(false);
-    setCameraStopMode('disconnect');
+    setCameraStopMode(forceClose ? 'disconnect' : 'review');
     setRecordingStopToken(Date.now());
 
     recordingFallbackTimeoutRef.current = setTimeout(() => {
@@ -6027,7 +6125,7 @@ export function useBasketballCoachApp() {
         return;
       }
 
-      void finalizeLessonSession(true, '');
+      void finalizeLessonSession(true, '', !forceClose);
     }, 5000);
   }
 
@@ -6438,10 +6536,12 @@ export function useBasketballCoachApp() {
         if (analysis.releaseDetected) {
           shootLessonStartedRef.current = false;
           dribbleLessonPhaseRef.current = 'cooldown';
-          shootCooldownUntilRef.current = Date.now() + SHOOT_RECOVERY_MS;
-          setIsShootSuccessButtonVisible(true);
-          setImmediateLessonFeedback(`${nextFeedback}\n\n??諛쒖궗瑜??뺤씤?덉뒿?덈떎. 3珥????뱁솕瑜?留덉튂怨???湲곗???遺꾩꽍?⑸땲??`);
-          setDebugText('??諛쒖궗瑜??뺤씤?덉뒿?덈떎. 3珥????뱁솕瑜?醫낅즺?⑸땲??');
+          shootCooldownUntilRef.current = Date.now() + SHOOT_SUCCESS_CIRCLE_WINDOW_MS;
+          setIsShootSuccessButtonVisible(!shootSuccessRecordedForCurrentAttemptRef.current);
+          setImmediateLessonFeedback(
+            `${nextFeedback}\n\n슛 발사를 확인했습니다. ${SHOOT_SUCCESS_CIRCLE_WINDOW_SECONDS}초 동안 성공 동작을 확인한 뒤 기록과 분석을 이어갑니다.`
+          );
+          setDebugText(`슛 발사를 확인했습니다. ${SHOOT_SUCCESS_CIRCLE_WINDOW_SECONDS}초 동안 성공 제스처를 확인합니다.`);
           return;
         }
 
@@ -6507,6 +6607,7 @@ export function useBasketballCoachApp() {
           | { type: 'points'; summary: string }
           | { type: 'dribble_analysis'; analysis: DribbleAnalysis }
           | { type: 'shoot_analysis'; analysis: ShootAnalysis }
+          | { type: 'shoot_success_circle_detected' }
           | { type: 'recording_ready'; videoUri: string }
           | { type: 'recording_error'; message: string }
           | { type: 'error'; message: string };
@@ -6576,6 +6677,23 @@ export function useBasketballCoachApp() {
           return;
         }
 
+        if (payload.type === 'shoot_success_circle_detected') {
+          if (!isLessonActive || lessonModeRef.current !== 'shoot') {
+            return;
+          }
+
+          if (shootSuccessRecordedForCurrentAttemptRef.current || !hasCompletedShootAttempt()) {
+            return;
+          }
+
+          recordSuccessfulShot({
+            preserveFeedback: true,
+            debugMessage: '슛 성공 제스처를 확인했습니다.',
+            celebrate: true,
+          });
+          return;
+        }
+
         if (payload.type === 'recording_ready') {
           if (pendingReviewStopRef.current) {
             void completeDribbleReview(payload.videoUri);
@@ -6587,7 +6705,11 @@ export function useBasketballCoachApp() {
             return;
           }
 
-          void finalizeLessonSession(pendingStopSaveRef.current, payload.videoUri);
+          void finalizeLessonSession(
+            pendingStopSaveRef.current,
+            payload.videoUri,
+            pendingStopSaveRef.current && cameraStopMode === 'review'
+          );
           return;
         }
 
@@ -6624,7 +6746,11 @@ export function useBasketballCoachApp() {
           }
 
           if (pendingStopSaveRef.current) {
-            void finalizeLessonSession(true, '');
+            void finalizeLessonSession(
+              true,
+              '',
+              cameraStopMode === 'review'
+            );
           }
           return;
         }
@@ -6643,7 +6769,9 @@ export function useBasketballCoachApp() {
       clearRecordingWait,
       completeDribbleReview,
       completeShootReview,
+      cameraStopMode,
       finalizeLessonSession,
+      hasCompletedShootAttempt,
       isCameraActive,
       isLessonActive,
       playStartCue,
@@ -6775,7 +6903,6 @@ export function useBasketballCoachApp() {
     isBallRecognitionTraining,
     selectedPosition,
     selectedDribbleView,
-    isHomeworkRevealed,
     debugText,
     feedbackText,
     lessonReview,
@@ -6823,7 +6950,6 @@ export function useBasketballCoachApp() {
     resetBallRecognitionTraining,
     selectPosition,
     setSelectedDribbleView,
-    revealHomework,
     openSkillVideo,
     applyHomeworkTestState,
     openDiaryDate,

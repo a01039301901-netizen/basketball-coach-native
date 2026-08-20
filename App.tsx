@@ -436,8 +436,6 @@ export default function App() {
           {app.isReady && app.currentUser && app.screen === 'home' && (
             <HomeScreen
               homeworkToShow={app.homeworkToShow}
-              isHomeworkVisible={app.isHomeworkRevealed}
-              onRevealHomework={app.revealHomework}
               onOpenLesson={() => void app.navigateTo('lesson')}
               onOpenDiary={() => void app.navigateTo('diary')}
               onOpenRules={() => void app.navigateTo('rules')}

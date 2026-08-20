@@ -189,6 +189,12 @@ export function buildPoseWebHtml(
       const SHOOT_KNEE_EXTENSION_FROM_LOWEST_DELTA = 10;
       const SHOOT_TIMING_SYNC_WINDOW_MS = 180;
       const SHOOT_RELEASE_DURATION_BALANCED_MS = 600;
+      const SHOOT_SUCCESS_CIRCLE_WINDOW_MS = 5000;
+      const SHOOT_SUCCESS_CIRCLE_WRIST_HEAD_Y_GAP = 0.02;
+      const SHOOT_SUCCESS_CIRCLE_HEAD_X_MARGIN = 0.01;
+      const SHOOT_SUCCESS_CIRCLE_MIN_SHOULDER_WIDTH = 0.08;
+      const SHOOT_SUCCESS_CIRCLE_MAX_WRIST_DISTANCE_RATIO = 0.85;
+      const SHOOT_SUCCESS_CIRCLE_STABLE_FRAMES = 2;
 
       const INDEX = {
         nose: 0,
@@ -290,6 +296,10 @@ export function buildPoseWebHtml(
       let shootPreviousBallHandDistance = null;
       let shootBallNearHandAtMs = null;
       let shootArmExtensionAtMs = null;
+      let shootReleaseDetectedAtMs = null;
+      let shootSuccessCircleDetected = false;
+      let shootSuccessCircleStableFrameCount = 0;
+      let shootSuccessCircleEventPending = false;
       let trackedBall = null;
       let trackedBallMissingFrames = 0;
       let previousBallMotionLuminanceMap = null;
@@ -353,6 +363,10 @@ export function buildPoseWebHtml(
         shootPreviousBallHandDistance = null;
         shootBallNearHandAtMs = null;
         shootArmExtensionAtMs = null;
+        shootReleaseDetectedAtMs = null;
+        shootSuccessCircleDetected = false;
+        shootSuccessCircleStableFrameCount = 0;
+        shootSuccessCircleEventPending = false;
       }
 
       function resetBallTracking() {
@@ -2920,6 +2934,7 @@ export function buildPoseWebHtml(
 
         if (releaseDetectedNow) {
           shootReleaseDetected = true;
+          shootReleaseDetectedAtMs = now;
 
           if (shootKneeExtensionAtMs !== null && shootArmExtensionAtMs !== null) {
             const timingDeltaMs = shootArmExtensionAtMs - shootKneeExtensionAtMs;
@@ -2950,6 +2965,64 @@ export function buildPoseWebHtml(
             shootReleaseDurationMs = null;
             shootReleaseDurationState = "unknown";
           }
+        }
+
+        const canCheckShootSuccessCircle =
+          shootReleaseDetectedAtMs !== null &&
+          !shootSuccessCircleDetected &&
+          now - shootReleaseDetectedAtMs <= SHOOT_SUCCESS_CIRCLE_WINDOW_MS;
+
+        if (canCheckShootSuccessCircle) {
+          const canMeasureShootSuccessCircle =
+            visible(head) &&
+            visible(leftShoulder) &&
+            visible(rightShoulder) &&
+            visible(leftElbow) &&
+            visible(rightElbow) &&
+            visible(leftWrist) &&
+            visible(rightWrist);
+          let hasShootSuccessCircleGesture = false;
+
+          if (canMeasureShootSuccessCircle) {
+            const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
+
+            if (shoulderWidth >= SHOOT_SUCCESS_CIRCLE_MIN_SHOULDER_WIDTH) {
+              const wristsAboveHead =
+                leftWrist.y < head.y - SHOOT_SUCCESS_CIRCLE_WRIST_HEAD_Y_GAP &&
+                rightWrist.y < head.y - SHOOT_SUCCESS_CIRCLE_WRIST_HEAD_Y_GAP;
+              const headBetweenWrists =
+                Math.min(leftWrist.x, rightWrist.x) < head.x - SHOOT_SUCCESS_CIRCLE_HEAD_X_MARGIN &&
+                Math.max(leftWrist.x, rightWrist.x) > head.x + SHOOT_SUCCESS_CIRCLE_HEAD_X_MARGIN;
+              const elbowsAboveShoulders =
+                leftElbow.y < leftShoulder.y &&
+                rightElbow.y < rightShoulder.y;
+              const wristsAboveElbows =
+                leftWrist.y < leftElbow.y &&
+                rightWrist.y < rightElbow.y;
+              const wristsCloseEnough =
+                distanceBetween(leftWrist, rightWrist) <= shoulderWidth * SHOOT_SUCCESS_CIRCLE_MAX_WRIST_DISTANCE_RATIO;
+
+              hasShootSuccessCircleGesture =
+                wristsAboveHead &&
+                headBetweenWrists &&
+                elbowsAboveShoulders &&
+                wristsAboveElbows &&
+                wristsCloseEnough;
+            }
+          }
+
+          if (hasShootSuccessCircleGesture) {
+            shootSuccessCircleStableFrameCount += 1;
+
+            if (shootSuccessCircleStableFrameCount >= SHOOT_SUCCESS_CIRCLE_STABLE_FRAMES) {
+              shootSuccessCircleDetected = true;
+              shootSuccessCircleEventPending = true;
+            }
+          } else {
+            shootSuccessCircleStableFrameCount = 0;
+          }
+        } else if (!shootSuccessCircleDetected) {
+          shootSuccessCircleStableFrameCount = 0;
         }
 
         const releaseTiming = shootReleaseDetected ? shootReleaseTiming : "unknown";
@@ -3217,6 +3290,11 @@ export function buildPoseWebHtml(
         if (shootAnalysis.summary !== lastShootSummary || now - lastSentAt > 1200) {
           lastShootSummary = shootAnalysis.summary;
           post({ type: "shoot_analysis", analysis: shootAnalysis });
+        }
+
+        if (shootSuccessCircleEventPending) {
+          shootSuccessCircleEventPending = false;
+          post({ type: "shoot_success_circle_detected" });
         }
       }
 

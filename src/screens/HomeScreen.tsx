@@ -13,8 +13,6 @@ const rulesGuideIcon = require('../../assets/rules-guide-icon.png');
 
 interface HomeScreenProps {
   homeworkToShow: HomeworkProgressItem[];
-  isHomeworkVisible: boolean;
-  onRevealHomework: () => void;
   onOpenLesson: () => void;
   onOpenDiary: () => void;
   onOpenRules: () => void;
@@ -155,8 +153,6 @@ function HomeMenuButton({
 
 export function HomeScreen({
   homeworkToShow,
-  isHomeworkVisible,
-  onRevealHomework,
   onOpenLesson,
   onOpenDiary,
   onOpenRules,
@@ -243,60 +239,53 @@ export function HomeScreen({
             <Text style={styles.homeworkTitle}>오늘의 연습 숙제</Text>
           </View>
         </View>
+        <View style={styles.homeworkList}>
+          {homeworkToShow.map((item) => {
+            const hasDetail = Boolean(item.detailText);
+            const isDetailOpened = Boolean(openedHomeworkDetailIds[item.id]);
 
-        {isHomeworkVisible ? (
-          <View style={styles.homeworkList}>
-            {homeworkToShow.map((item) => {
-              const hasDetail = Boolean(item.detailText);
-              const isDetailOpened = Boolean(openedHomeworkDetailIds[item.id]);
+            return (
+              <View key={item.id} style={styles.homeworkItem}>
+                {item.reasonText ? (
+                  <Text style={styles.homeworkReasonText}>{item.reasonText}</Text>
+                ) : null}
 
-              return (
-                <View key={item.id} style={styles.homeworkItem}>
-                  {item.reasonText ? (
-                    <Text style={styles.homeworkReasonText}>{item.reasonText}</Text>
-                  ) : null}
-
-                  <View style={styles.homeworkHeader}>
-                    <View style={[styles.homeworkBullet, item.isCompleted && styles.homeworkBulletCompleted]} />
-                    <Text style={styles.homeworkText}>{item.title}</Text>
-                  </View>
-
-                  {hasDetail ? (
-                    <Pressable
-                      onPress={() =>
-                        setOpenedHomeworkDetailIds((current) => ({
-                          ...current,
-                          [item.id]: !current[item.id],
-                        }))
-                      }
-                      style={({ pressed }) => [styles.homeworkDetailToggleButton, pressed && styles.pressed]}
-                    >
-                      <Text style={styles.homeworkDetailToggleText}>
-                        {isDetailOpened ? '접기' : item.detailToggleText || '자세히 보기'}
-                      </Text>
-                    </Pressable>
-                  ) : null}
-
-                  {hasDetail && isDetailOpened ? (
-                    <Text style={styles.homeworkDetailText}>{item.detailText}</Text>
-                  ) : null}
-
-                  <View style={styles.homeworkMetaRow}>
-                    <Text style={styles.homeworkStatus}>{item.completionText}</Text>
-                    <Text style={styles.homeworkProgress}>{item.progressText}</Text>
-                  </View>
-                  <View style={styles.progressTrack}>
-                    <View style={[styles.progressFill, { width: `${item.progressPercent}%` }]} />
-                  </View>
+                <View style={styles.homeworkHeader}>
+                  <View style={[styles.homeworkBullet, item.isCompleted && styles.homeworkBulletCompleted]} />
+                  <Text style={styles.homeworkText}>{item.title}</Text>
                 </View>
-              );
-            })}
-          </View>
-        ) : (
-          <Pressable onPress={onRevealHomework} style={({ pressed }) => [styles.homeworkHiddenCard, pressed && styles.pressed]}>
-            <Text style={styles.homeworkHiddenCardText}>오늘의 숙제 확인하기</Text>
-          </Pressable>
-        )}
+
+                {hasDetail ? (
+                  <Pressable
+                    onPress={() =>
+                      setOpenedHomeworkDetailIds((current) => ({
+                        ...current,
+                        [item.id]: !current[item.id],
+                      }))
+                    }
+                    style={({ pressed }) => [styles.homeworkDetailToggleButton, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.homeworkDetailToggleText}>
+                      {isDetailOpened ? '접기' : item.detailToggleText || '자세히 보기'}
+                    </Text>
+                  </Pressable>
+                ) : null}
+
+                {hasDetail && isDetailOpened ? (
+                  <Text style={styles.homeworkDetailText}>{item.detailText}</Text>
+                ) : null}
+
+                <View style={styles.homeworkMetaRow}>
+                  <Text style={styles.homeworkStatus}>{item.completionText}</Text>
+                  <Text style={styles.homeworkProgress}>{item.progressText}</Text>
+                </View>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${item.progressPercent}%` }]} />
+                </View>
+              </View>
+            );
+          })}
+        </View>
       </View>
 
       <View style={[styles.secondaryCards, isWide && styles.secondaryCardsWide]}>
@@ -677,24 +666,6 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 999,
     backgroundColor: colors.secondary,
-  },
-  homeworkHiddenCard: {
-    marginTop: 18,
-    borderRadius: 18,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 0,
-    borderColor: 'transparent',
-    paddingHorizontal: 18,
-    paddingVertical: 28,
-    minHeight: 112,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  homeworkHiddenCardText: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
   },
   secondaryCards: {
     gap: 12,
