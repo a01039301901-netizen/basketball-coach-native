@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
 import { colors } from '../theme/colors';
@@ -20,6 +20,7 @@ interface ProfileScreenProps {
     nextPassword: string;
     nextPasswordConfirm: string;
   }) => Promise<ProfileActionResult>;
+  onDeleteAccount: (password: string) => Promise<ProfileActionResult>;
   onLogout: () => void;
 }
 
@@ -43,18 +44,29 @@ function ResetIcon() {
   return <Text style={styles.resetIconGlyph}>↺</Text>;
 }
 
-export function ProfileScreen({ currentUser, onUpdateProfile, onChangePassword, onLogout }: ProfileScreenProps) {
+export function ProfileScreen({
+  currentUser,
+  onUpdateProfile,
+  onChangePassword,
+  onDeleteAccount,
+  onLogout,
+}: ProfileScreenProps) {
   const [nickname, setNickname] = useState(currentUser.nickname);
   const [currentPassword, setCurrentPassword] = useState('');
   const [nextPassword, setNextPassword] = useState('');
   const [nextPasswordConfirm, setNextPasswordConfirm] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
   const [isCurrentPasswordVisible, setIsCurrentPasswordVisible] = useState(false);
   const [isNextPasswordVisible, setIsNextPasswordVisible] = useState(false);
   const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
+  const [isDeletePasswordVisible, setIsDeletePasswordVisible] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [profileStatus, setProfileStatus] = useState<StatusMessage | null>(null);
   const [passwordStatus, setPasswordStatus] = useState<StatusMessage | null>(null);
+  const [deleteStatus, setDeleteStatus] = useState<StatusMessage | null>(null);
 
   useEffect(() => {
     setNickname(currentUser.nickname);
@@ -107,6 +119,51 @@ export function ProfileScreen({ currentUser, onUpdateProfile, onChangePassword, 
   function handleResetProfileForm() {
     setNickname(currentUser.nickname);
     setProfileStatus(null);
+  }
+
+  function handleOpenDeleteModal() {
+    setDeletePassword('');
+    setDeleteStatus(null);
+    setIsDeletePasswordVisible(false);
+    setIsDeleteModalVisible(true);
+  }
+
+  function handleCloseDeleteModal() {
+    if (isDeletingAccount) {
+      return;
+    }
+
+    setIsDeleteModalVisible(false);
+    setDeletePassword('');
+    setDeleteStatus(null);
+    setIsDeletePasswordVisible(false);
+  }
+
+  async function handleDeleteAccount() {
+    if (isDeletingAccount) {
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    const result = await onDeleteAccount(deletePassword);
+
+    if (!result.success) {
+      setDeleteStatus({
+        tone: 'error',
+        text: result.message,
+      });
+      setIsDeletingAccount(false);
+      return;
+    }
+
+    setDeleteStatus({
+      tone: 'success',
+      text: result.message,
+    });
+    setIsDeleteModalVisible(false);
+    setDeletePassword('');
+    setIsDeletePasswordVisible(false);
+    setIsDeletingAccount(false);
   }
 
   return (
@@ -246,8 +303,73 @@ export function ProfileScreen({ currentUser, onUpdateProfile, onChangePassword, 
       </View>
 
       <View style={styles.logoutButtonWrap}>
-        <SmallButton title="로그아웃" onPress={onLogout} variant="red" />
+        <View style={styles.logoutActionRow}>
+          <SmallButton title="로그아웃" onPress={onLogout} variant="dark" />
+          <SmallButton title="계정 삭제" onPress={handleOpenDeleteModal} variant="red" />
+        </View>
       </View>
+
+      <Modal visible={isDeleteModalVisible} transparent animationType="fade" onRequestClose={handleCloseDeleteModal}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={handleCloseDeleteModal} />
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>계정 삭제</Text>
+              <Pressable
+                accessibilityLabel="계정 삭제 경고창 닫기"
+                onPress={handleCloseDeleteModal}
+                disabled={isDeletingAccount}
+                style={({ pressed }) => [styles.modalCloseButton, isDeletingAccount && styles.controlDisabled, pressed && styles.pressed]}
+              >
+                <Text style={styles.modalCloseButtonText}>닫기</Text>
+              </Pressable>
+            </View>
+
+            <Text style={styles.modalWarningText}>
+              비밀번호 입력 후 계정 삭제 버튼을 누르시면 계정이 삭제됩니다. 삭제된 계정은 다시 로그인 할 수 없습니다.
+            </Text>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>비밀번호</Text>
+              <View style={styles.passwordRow}>
+                <TextInput
+                  value={deletePassword}
+                  onChangeText={setDeletePassword}
+                  placeholder="비밀번호를 입력해 주세요"
+                  placeholderTextColor="rgba(255,255,255,0.45)"
+                  style={[styles.input, styles.passwordInput]}
+                  secureTextEntry={!isDeletePasswordVisible}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Pressable
+                  accessibilityLabel={isDeletePasswordVisible ? '계정 삭제 비밀번호 숨기기' : '계정 삭제 비밀번호 보기'}
+                  onPress={() => setIsDeletePasswordVisible((current) => !current)}
+                  style={({ pressed }) => [styles.passwordToggle, pressed && styles.pressed]}
+                >
+                  <EyeIcon visible={isDeletePasswordVisible} />
+                </Pressable>
+              </View>
+            </View>
+
+            <View style={styles.modalActionRow}>
+              <SmallButton title="취소" onPress={handleCloseDeleteModal} variant="dark" disabled={isDeletingAccount} />
+              <SmallButton
+                title={isDeletingAccount ? '삭제 중...' : '계정 삭제'}
+                onPress={() => void handleDeleteAccount()}
+                variant="red"
+                disabled={isDeletingAccount}
+              />
+            </View>
+
+            {deleteStatus ? (
+              <Text style={[styles.statusText, deleteStatus.tone === 'success' ? styles.statusSuccess : styles.statusError]}>
+                {deleteStatus.text}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -383,6 +505,62 @@ const styles = StyleSheet.create({
   logoutButtonWrap: {
     paddingHorizontal: 18,
     alignItems: 'flex-start',
+  },
+  modalOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(8, 10, 16, 0.62)',
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 24,
+    backgroundColor: colors.surface,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 20,
+    gap: 14,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  modalTitle: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '800',
+  },
+  modalCloseButton: {
+    alignSelf: 'flex-start',
+  },
+  modalCloseButtonText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
+  modalWarningText: {
+    color: colors.textSoft,
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: '700',
+  },
+  modalActionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
   statusText: {
     marginTop: 14,

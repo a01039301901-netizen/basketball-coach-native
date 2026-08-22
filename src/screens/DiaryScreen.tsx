@@ -12,11 +12,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  type ViewToken,
   View,
   useWindowDimensions,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Text as SvgText } from 'react-native-svg';
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
 import { DAY_NAMES } from '../constants/content';
@@ -25,6 +24,7 @@ import type {
   CalendarCell,
   DiarySkillInsight,
   FeedbackMoment,
+  HomeworkDiaryLinkContext,
   LessonRecord,
   LessonRecordCriterion,
   LessonRecordHighlight,
@@ -38,17 +38,19 @@ interface DiaryScreenProps {
   calendarCells: CalendarCell[];
   selectedDateKey: string;
   selectedDateRecords: LessonRecord[];
+  homeworkLinkedDiaryContext: HomeworkDiaryLinkContext | null;
   selectedDateDribbleCount: number;
   diarySkillInsight: DiarySkillInsight;
   shotGraphData: ShotGraphDatum[];
   onChangeMonth: (delta: number) => void;
   onOpenDate: (dateKey: string) => void;
+  onClearHomeworkLinkedDiaryContext: () => void;
   onGoBack: () => void;
   onToggleShotOutcome: (recordId: string) => void;
   onDeleteRecord: (recordId: string) => void;
 }
 
-type RecordFilter = 'all' | 'dribble' | 'shoot' | 'shootSuccess';
+type RecordSort = 'latest' | 'best' | 'worst';
 type SuccessRateRange = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 interface RankedDiaryRecordInsight {
@@ -62,12 +64,41 @@ interface RankedDiaryRecordInsight {
   createdAtTime: number;
 }
 
+interface DailySummaryCorrectionAggregate {
+  key: string;
+  label: string;
+  count: number;
+  averageStableRatio: number;
+  firstSeenIndex: number;
+  coachText: string;
+}
+
+interface DailySummaryAutoFeedback {
+  statusText: string;
+  topFeedbackText: string;
+  nextPracticeText: string;
+  toggleSubtext: string;
+}
+
 interface RecordEvaluationVideoPlayerProps {
   recordId: string;
   source: { uri: string };
   height: number;
   videoRef: MutableRefObject<Video | null>;
   onPlaybackStatusUpdate: (status: AVPlaybackStatus) => void;
+}
+
+interface RecordListSection {
+  key: string;
+  title: string;
+  records: LessonRecord[];
+  emptyText: string;
+}
+
+interface DailyRecordRankingGroup {
+  totalCount: number;
+  best: RankedDiaryRecordInsight | null;
+  worst: RankedDiaryRecordInsight | null;
 }
 
 const SUCCESS_RATE_COMPARE_TRACK_HEIGHT = 126;
@@ -112,7 +143,24 @@ interface EvaluationProgressRingProps {
 
 interface EvaluationProgressRingSegment {
   key: string;
+  label: string;
   ratio: number;
+}
+
+interface DiaryEvaluationCriterionMeta {
+  criterion: LessonRecordCriterion;
+  label: string;
+  detail: string;
+  ratio: number;
+  index: number;
+}
+
+interface DiaryEvaluationQuickSummary {
+  stableCount: number;
+  totalCount: number;
+  totalPercent: number;
+  strongestCriterion: DiaryEvaluationCriterionMeta | null;
+  weakestCriterion: DiaryEvaluationCriterionMeta | null;
 }
 
 function getRecordTitle(mode: LessonRecord['mode']) {
@@ -127,20 +175,16 @@ function getShotOutcomeLabel(shotOutcome: LessonRecord['shotOutcome']) {
   return shotOutcome === 'success' ? '\uC131\uACF5' : '\uC2E4\uD328';
 }
 
-function getRecordFilterLabel(filter: RecordFilter) {
-  if (filter === 'dribble') {
-    return '\uB4DC\uB9AC\uBE14';
+function getRecordSortLabel(sort: RecordSort) {
+  if (sort === 'best') {
+    return '\uB192\uC740 \uD3C9\uAC00\uC21C';
   }
 
-  if (filter === 'shoot') {
-    return '\uC29B';
+  if (sort === 'worst') {
+    return '\uB0AE\uC740 \uD3C9\uAC00\uC21C';
   }
 
-  if (filter === 'shootSuccess') {
-    return '\uC29B \uC131\uACF5';
-  }
-
-  return '\uC804\uCCB4';
+  return '\uCD5C\uC2E0\uC21C';
 }
 
 function getSuccessRateRangeLabel(range: SuccessRateRange) {
@@ -691,6 +735,7 @@ const EvaluationProgressRing = memo(function EvaluationProgressRing({
     () =>
       criteria.map((criterion) => ({
         key: criterion.key,
+        label: getDiaryCriterionDisplayLabel(criterion),
         ratio: getDiaryCriterionStableRatio(criterion),
       })),
     [criteria]
@@ -700,23 +745,30 @@ const EvaluationProgressRing = memo(function EvaluationProgressRing({
     return null;
   }
 
-  const center = size / 2;
+  const labelInset = 68;
+  const canvasSize = size + labelInset * 2;
+  const center = canvasSize / 2;
   const radius = (size - strokeWidth) / 2;
   const segmentSpan = 360 / segments.length;
   const availableSweep = Math.max(2, segmentSpan - segmentGapDegrees);
-  const totalRatio = segments.reduce((sum, segment) => sum + segment.ratio, 0) / segments.length;
-  const totalPercent = Math.round(totalRatio * 100);
+  const totalPercent = getDiaryEvaluationTotalPercent(criteria);
   const centerTextColor = getRecordLevelTone(level);
+  const labelRadius = radius + strokeWidth / 2 + 10;
 
   return (
-    <View style={[styles.evaluationRingWrap, { width: size, height: size }]}>
-      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+    <View style={[styles.evaluationRingWrap, { width: canvasSize, height: canvasSize }]}>
+      <Svg width={canvasSize} height={canvasSize} viewBox={`0 0 ${canvasSize} ${canvasSize}`}>
         {segments.map((segment, index) => {
           const segmentStart = index * segmentSpan + segmentGapDegrees / 2;
           const segmentEnd = segmentStart + availableSweep;
+          const segmentMidAngle = segmentStart + availableSweep / 2;
           const basePath = buildRingArcPath(center, center, radius, segmentStart, segmentEnd);
           const fillEnd = segmentStart + availableSweep * segment.ratio;
           const fillPath = buildRingArcPath(center, center, radius, segmentStart, fillEnd);
+          const labelPosition = polarToCartesian(center, center, labelRadius, segmentMidAngle);
+          const labelAnchor =
+            Math.abs(labelPosition.x - center) < 10 ? 'middle' : labelPosition.x < center ? 'end' : 'start';
+          const labelOffset = labelAnchor === 'start' ? 4 : labelAnchor === 'end' ? -4 : 0;
 
           return fillPath
             ? [
@@ -736,6 +788,18 @@ const EvaluationProgressRing = memo(function EvaluationProgressRing({
                   strokeLinecap="butt"
                   fill="none"
                 />,
+                <SvgText
+                  key={`${segment.key}-label`}
+                  x={labelPosition.x + labelOffset}
+                  y={labelPosition.y}
+                  textAnchor={labelAnchor}
+                  alignmentBaseline="middle"
+                  fontSize={12}
+                  fontWeight="800"
+                  fill="rgba(255,255,255,0.78)"
+                >
+                  {segment.label}
+                </SvgText>,
               ]
             : [
               <Path
@@ -746,6 +810,18 @@ const EvaluationProgressRing = memo(function EvaluationProgressRing({
                 strokeLinecap="butt"
                 fill="none"
               />,
+              <SvgText
+                key={`${segment.key}-label`}
+                x={labelPosition.x + labelOffset}
+                y={labelPosition.y}
+                textAnchor={labelAnchor}
+                alignmentBaseline="middle"
+                fontSize={12}
+                fontWeight="800"
+                fill="rgba(255,255,255,0.78)"
+              >
+                {segment.label}
+              </SvgText>,
             ];
         })}
       </Svg>
@@ -851,23 +927,23 @@ function getDailySummaryEvaluationText(insight: DiarySkillInsight) {
   }
 
   if (insight.evaluationDominantLevel === 'good') {
-    return `\uB300\uCCB4\uB85C \uC88B\uC2B5\uB2C8\uB2E4 \u00B7 \uC88B\uC74C ${good}, \uBCF4\uD1B5 ${average}, \uB098\uC068 ${bad}`;
+    return '\uB300\uCCB4\uB85C \uC88B\uC2B5\uB2C8\uB2E4';
   }
 
   if (insight.evaluationDominantLevel === 'average') {
-    return `\uB300\uCCB4\uB85C \uB098\uC058\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4 \u00B7 \uC88B\uC74C ${good}, \uBCF4\uD1B5 ${average}, \uB098\uC068 ${bad}`;
+    return '\uB300\uCCB4\uB85C \uB098\uC058\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4';
   }
 
   if (insight.evaluationDominantLevel === 'bad') {
-    return `\uB300\uCCB4\uB85C \uBCF4\uC644\uC774 \uB354 \uD544\uC694\uD569\uB2C8\uB2E4 \u00B7 \uC88B\uC74C ${good}, \uBCF4\uD1B5 ${average}, \uB098\uC068 ${bad}`;
+    return '\uB300\uCCB4\uB85C \uBCF4\uC644\uC774 \uB354 \uD544\uC694\uD569\uB2C8\uB2E4';
   }
 
-  return `\uB300\uCCB4\uB85C \uB098\uC058\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4 \u00B7 \uC88B\uC74C ${good}, \uBCF4\uD1B5 ${average}, \uB098\uC068 ${bad}`;
+  return '\uB300\uCCB4\uB85C \uB098\uC058\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4';
 }
 
 function getDailySummaryEvaluationCountText(insight: DiarySkillInsight) {
   const { good, average, bad } = insight.evaluationCounts;
-  return `\uB098\uC068 : ${bad}\uAC1C   \uBCF4\uD1B5 : ${average}\uAC1C   \uC88B\uC74C : ${good}\uAC1C`;
+  return `\uC88B\uC74C ${good}\uAC1C, \uBCF4\uD1B5 ${average}\uAC1C, \uB098\uC068 ${bad}\uAC1C`;
 }
 
 function getRecordCardLevelStyle(level?: NonNullable<LessonRecord['evaluation']>['level']) {
@@ -895,6 +971,22 @@ function getRecordCardLevelStyle(level?: NonNullable<LessonRecord['evaluation']>
   return null;
 }
 
+function getDailySummaryStatusColorStyle(level: DiarySkillInsight['evaluationDominantLevel']) {
+  if (level === 'good') {
+    return styles.dailySummaryStatusGood;
+  }
+
+  if (level === 'average') {
+    return styles.dailySummaryStatusAverage;
+  }
+
+  if (level === 'bad') {
+    return styles.dailySummaryStatusBad;
+  }
+
+  return null;
+}
+
 function renderEvaluationCountSummary(insight: DiarySkillInsight) {
   const { good, average, bad } = insight.evaluationCounts;
 
@@ -909,27 +1001,30 @@ function renderEvaluationCountSummary(insight: DiarySkillInsight) {
   );
 }
 
-function getDailySummaryToggleHeadline(insight: DiarySkillInsight) {
+function getDailySummaryToggleHeadline(insight: DiarySkillInsight, selectedDateKey: string) {
   const { good, average, bad } = insight.evaluationCounts;
   const totalEvaluatedCount = good + average + bad;
+  const isToday = selectedDateKey === formatDateKey(new Date());
+  const dayLabel = isToday ? '\uC624\uB298\uC758' : '\uC774\uB0A0\uC758';
+  const lessonDayLabel = isToday ? '\uC624\uB298' : '\uC774\uB0A0';
 
   if (totalEvaluatedCount === 0) {
-    return '\uC624\uB298 \uB808\uC2A8 \uC0C1\uD0DC\uB97C \uB354 \uAE30\uB85D\uD574 \uBCF4\uC138\uC694';
+    return `${lessonDayLabel} \uB808\uC2A8 \uC0C1\uD0DC\uB97C \uB354 \uAE30\uB85D\uD574 \uBCF4\uC138\uC694`;
   }
 
   if (insight.evaluationDominantLevel === 'good') {
-    return '\uC624\uB298\uC758 \uC0C1\uD0DC\uB294 \uB300\uCCB4\uB85C \uC88B\uC74C\uC774\uC5D0\uC694';
+    return `${dayLabel} \uC0C1\uD0DC\uB294 \uB300\uCCB4\uB85C \uC88B\uC74C\uC774\uC5D0\uC694`;
   }
 
   if (insight.evaluationDominantLevel === 'average') {
-    return '\uC624\uB298\uC758 \uC0C1\uD0DC\uB294 \uB300\uCCB4\uB85C \uBCF4\uD1B5\uC774\uC5D0\uC694';
+    return `${dayLabel} \uC0C1\uD0DC\uB294 \uB300\uCCB4\uB85C \uBCF4\uD1B5\uC774\uC5D0\uC694`;
   }
 
   if (insight.evaluationDominantLevel === 'bad') {
-    return '\uC624\uB298\uC758 \uC0C1\uD0DC\uB294 \uB300\uCCB4\uB85C \uB098\uC068\uC774\uC5D0\uC694';
+    return `${dayLabel} \uC0C1\uD0DC\uB294 \uB300\uCCB4\uB85C \uB098\uC068\uC774\uC5D0\uC694`;
   }
 
-  return '\uC624\uB298 \uB808\uC2A8 \uC0C1\uD0DC\uB97C \uD655\uC778\uD574 \uBCF4\uC138\uC694';
+  return `${lessonDayLabel} \uB808\uC2A8 \uC0C1\uD0DC\uB97C \uD655\uC778\uD574 \uBCF4\uC138\uC694`;
 }
 
 function getDiaryCriterionDisplayLabel(criterion: LessonRecordCriterion) {
@@ -1010,6 +1105,125 @@ function getDiaryCriterionStableRatio(criterion: LessonRecordCriterion) {
   }
 
   return criterion.isStable ? 1 : 0;
+}
+
+function getDiaryEvaluationTotalPercent(criteria: LessonRecordCriterion[]) {
+  if (criteria.length === 0) {
+    return 0;
+  }
+
+  const totalRatio = criteria.reduce((sum, criterion) => sum + getDiaryCriterionStableRatio(criterion), 0) / criteria.length;
+  return Math.round(totalRatio * 100);
+}
+
+function buildDiaryEvaluationCriterionMetas(criteria: LessonRecordCriterion[]) {
+  return criteria.map<DiaryEvaluationCriterionMeta>((criterion, index) => ({
+    criterion,
+    label: getDiaryCriterionDisplayLabel(criterion),
+    detail: getDiaryCriterionInsightText(criterion),
+    ratio: getDiaryCriterionStableRatio(criterion),
+    index,
+  }));
+}
+
+function compareDiaryCriterionMetasForStrength(
+  left: DiaryEvaluationCriterionMeta,
+  right: DiaryEvaluationCriterionMeta
+) {
+  if (left.ratio !== right.ratio) {
+    return right.ratio - left.ratio;
+  }
+
+  if (left.criterion.isStable !== right.criterion.isStable) {
+    return left.criterion.isStable ? -1 : 1;
+  }
+
+  if (left.detail.length !== right.detail.length) {
+    return right.detail.length - left.detail.length;
+  }
+
+  return left.index - right.index;
+}
+
+function compareDiaryCriterionMetasForWeakness(
+  left: DiaryEvaluationCriterionMeta,
+  right: DiaryEvaluationCriterionMeta
+) {
+  if (left.ratio !== right.ratio) {
+    return left.ratio - right.ratio;
+  }
+
+  if (left.criterion.isStable !== right.criterion.isStable) {
+    return left.criterion.isStable ? 1 : -1;
+  }
+
+  if (left.detail.length !== right.detail.length) {
+    return right.detail.length - left.detail.length;
+  }
+
+  return left.index - right.index;
+}
+
+function getDiaryOrderedEvaluationCriteria(criteria: LessonRecordCriterion[]) {
+  return buildDiaryEvaluationCriterionMetas(criteria)
+    .sort((left, right) => {
+      if (left.criterion.isStable !== right.criterion.isStable) {
+        return left.criterion.isStable ? 1 : -1;
+      }
+
+      if (!left.criterion.isStable && left.ratio !== right.ratio) {
+        return left.ratio - right.ratio;
+      }
+
+      if (left.criterion.isStable && left.ratio !== right.ratio) {
+        return right.ratio - left.ratio;
+      }
+
+      if (left.detail.length !== right.detail.length) {
+        return right.detail.length - left.detail.length;
+      }
+
+      return left.index - right.index;
+    })
+    .map((item) => item.criterion);
+}
+
+function getDiaryEvaluationQuickSummary(criteria: LessonRecordCriterion[]): DiaryEvaluationQuickSummary {
+  const criterionMetas = buildDiaryEvaluationCriterionMetas(criteria);
+  const stableCriteria = criterionMetas.filter((item) => item.criterion.isStable);
+  const unstableCriteria = criterionMetas.filter((item) => !item.criterion.isStable);
+
+  return {
+    stableCount: criterionMetas.filter((item) => item.criterion.isStable).length,
+    totalCount: criterionMetas.length,
+    totalPercent: getDiaryEvaluationTotalPercent(criteria),
+    strongestCriterion: stableCriteria.sort(compareDiaryCriterionMetasForStrength)[0] ?? null,
+    weakestCriterion: unstableCriteria.sort(compareDiaryCriterionMetasForWeakness)[0] ?? null,
+  };
+}
+
+function getDiaryEvaluationSummaryHeadline(summary: DiaryEvaluationQuickSummary) {
+  if (summary.totalCount === 0) {
+    return '확인할 수 있는 기준이 아직 없습니다.';
+  }
+
+  return `현재 ${summary.totalCount}개 기준 중 ${summary.stableCount}개가 안정적입니다.`;
+}
+
+function getDiaryEvaluationStrengthSummaryText(summary: DiaryEvaluationQuickSummary) {
+  if (!summary.strongestCriterion) {
+    return '아직 안정적인 기준이 없습니다.';
+  }
+
+  return `${summary.strongestCriterion.label}이 가장 안정적입니다.`;
+}
+
+function getDiaryEvaluationWeaknessSummaryText(summary: DiaryEvaluationQuickSummary) {
+  if (!summary.weakestCriterion) {
+    return '지금은 큰 보완점이 없습니다.';
+  }
+
+  return `${summary.weakestCriterion.label}을 먼저 고쳐보세요.`;
 }
 
 function getDiaryVisibleDetailText(detail: string) {
@@ -1403,65 +1617,161 @@ function getDiaryCorrectionCategoryLabel(record: LessonRecord) {
   }
 
   if (record.dribbleView === 'front') {
-    return '\uC55E \uB4DC\uB9AC\uBE14';
+    return '\uC55E\uB4DC\uB9AC\uBE14';
   }
 
   if (record.dribbleView === 'side') {
-    return '\uC606 \uB4DC\uB9AC\uBE14';
+    return '\uC606\uB4DC\uB9AC\uBE14';
   }
 
   return '\uB4DC\uB9AC\uBE14';
 }
 
-function getDailySummaryCorrectionText(records: LessonRecord[]) {
-  const correctionCounts = new Map<string, { label: string; count: number }>();
+function getDailySummaryCoachingText(criterionKey: string) {
+  if (criterionKey === 'shoot-leg-angle') {
+    return '\uBB34\uB98E \uAC01\uB3C4\uB97C 120~140\uB3C4\uC5D0 \uAC00\uAE5D\uAC8C \uB9DE\uCD94\uBA70 \uC29B\uC744 \uBC18\uBCF5\uD574 \uBCF4\uC138\uC694.';
+  }
+
+  if (criterionKey === 'shoot-release-timing') {
+    return '\uC810\uD504\uC640 \uC288 \uD0C0\uC774\uBC0D\uC774 \uAC19\uC774 \uC774\uC5B4\uC9C0\uB3C4\uB85D \uB9B4\uB9AC\uC2A4 \uD0C0\uC774\uBC0D\uC744 \uB2E4\uC2DC \uB9DE\uCD94\uC5B4 \uBCF4\uC138\uC694.';
+  }
+
+  if (criterionKey === 'shoot-release-point') {
+    return '\uC29B \uD0C0\uC810\uC744 \uBA38\uB9AC \uC704\uCABD\uC73C\uB85C \uC870\uAE08 \uB354 \uB192\uC5EC\uC11C \uB9B4\uB9AC\uC2A4\uD574 \uBCF4\uC138\uC694.';
+  }
+
+  if (criterionKey === 'shoot-release-duration') {
+    return '\uB9B4\uB9AC\uC2A4 \uC2DC\uAC04\uC744 \uC870\uAE08 \uB354 \uC9E7\uAC8C \uAC00\uC838\uAC00\uBA70 \uBE60\uB974\uAC8C \uC29B\uC744 \uC2DC\uB3C4\uD574 \uBCF4\uC138\uC694.';
+  }
+
+  if (criterionKey === 'dribble-front-stance-angle') {
+    return '\uBB34\uB98E\uC744 \uC801\uB2F9\uD788 \uAD7D\uD78C \uB0AE\uC740 \uC790\uC138\uB85C \uC55E\uB4DC\uB9AC\uBE14\uC744 \uBC18\uBCF5\uD574 \uBCF4\uC138\uC694.';
+  }
+
+  if (criterionKey === 'dribble-front-ball-lane') {
+    return '\uACF5\uC774 \uB2E4\uB9AC \uC0AC\uC774 \uB77C\uC778 \uC548\uC5D0\uC11C \uC6C0\uC9C1\uC774\uB3C4\uB85D \uC55E\uB4DC\uB9AC\uBE14\uC744 \uC774\uC5B4\uAC00 \uBCF4\uC138\uC694.';
+  }
+
+  if (criterionKey === 'dribble-front-foot-spacing') {
+    return '\uBC1C \uAC04\uACA9\uC744 \uB108\uBB34 \uB113\uD788\uC9C0 \uB9D0\uACE0 \uADE0\uD615 \uC7A1\uD78C \uAC04\uACA9\uC73C\uB85C \uC55E\uB4DC\uB9AC\uBE14\uD574 \uBCF4\uC138\uC694.';
+  }
+
+  if (criterionKey === 'dribble-torso-posture') {
+    return '\uC0C1\uCCB4\uAC00 \uB108\uBB34 \uC219\uC5EC\uC9C0\uC9C0 \uC54A\uB3C4\uB85D \uC911\uC2EC\uC744 \uC138\uC6B0\uACE0 \uC606\uB4DC\uB9AC\uBE14\uD574 \uBCF4\uC138\uC694.';
+  }
+
+  if (criterionKey === 'dribble-height-appropriate' || criterionKey === 'dribble-height') {
+    return '\uB4DC\uB9AC\uBE14 \uB192\uC774\uB97C \uD5C8\uB9AC \uC544\uB798\uC5D0\uC11C \uC77C\uC815\uD558\uAC8C \uC720\uC9C0\uD574 \uBCF4\uC138\uC694.';
+  }
+
+  if (criterionKey === 'dribble-eye-focus') {
+    return '\uACE0\uAC1C\uB97C \uB4E4\uACE0 \uC804\uBC29\uC744 \uBCF4\uBA70 \uB4DC\uB9AC\uBE14\uD558\uB294 \uC2DC\uAC04\uC744 \uB298\uB824 \uBCF4\uC138\uC694.';
+  }
+
+  if (criterionKey === 'dribble-rhythm') {
+    return '\uBC15\uC790\uAC00 \uB04A\uAE30\uC9C0 \uC54A\uB3C4\uB85D \uAC19\uC740 \uB9AC\uB4EC\uC73C\uB85C \uB4DC\uB9AC\uBE14\uC744 \uC774\uC5B4\uAC00 \uBCF4\uC138\uC694.';
+  }
+
+  if (criterionKey === 'dribble-front-hand-balance') {
+    return '\uC591\uC190 \uC0AC\uC6A9 \uBE44\uC728\uC774 \uD55C\uCABD\uC73C\uB85C \uC30D\uB9AC\uC9C0 \uC54A\uB3C4\uB85D \uAC19\uC740 \uD69F\uC218\uB85C \uBC18\uBCF5\uD574 \uBCF4\uC138\uC694.';
+  }
+
+  if (criterionKey === 'dribble-position-stability') {
+    return '\uACF5 \uC704\uCE58\uAC00 \uD754\uB4E4\uB9AC\uC9C0 \uC54A\uB3C4\uB85D \uBAB8 \uC606\uC5D0\uC11C \uC77C\uC815\uD558\uAC8C \uB4DC\uB9AC\uBE14\uD574 \uBCF4\uC138\uC694.';
+  }
+
+  if (criterionKey === 'dribble-height-stability') {
+    return '\uB4DC\uB9AC\uBE14 \uB192\uC774\uAC00 \uD754\uB4E4\uB9AC\uC9C0 \uC54A\uB3C4\uB85D \uC77C\uC815\uD55C \uB192\uC774\uB85C \uBC18\uBCF5\uD574 \uBCF4\uC138\uC694.';
+  }
+
+  if (criterionKey === 'dribble-tempo-stability') {
+    return '\uB4DC\uB9AC\uBE14 \uBC15\uC790\uAC00 \uD750\uD2B8\uB7EC\uC9C0\uC9C0 \uC54A\uB3C4\uB85D \uAC19\uC740 \uC18D\uB3C4\uB85C \uC774\uC5B4\uAC00 \uBCF4\uC138\uC694.';
+  }
+
+  return '\uC624\uB298 \uB098\uC628 \uD53C\uB4DC\uBC31\uC744 \uC911\uC2EC\uC73C\uB85C \uAC19\uC740 \uB3D9\uC791\uC744 \uD55C \uBC88 \uB354 \uBC18\uBCF5\uD574 \uBCF4\uC138\uC694.';
+}
+
+function buildDailySummaryAutoFeedback(
+  records: LessonRecord[],
+  insight: DiarySkillInsight
+): DailySummaryAutoFeedback {
+  const correctionCounts = new Map<string, DailySummaryCorrectionAggregate & { ratioTotal: number }>();
   let hasEvaluation = false;
 
-  for (const record of records) {
-    const criteria = record.evaluation
-      ? record.mode === 'dribble'
-        ? getDisplayedDribbleCriteria(record, record.evaluation)
-        : record.evaluation.criteria
-      : [];
+  records.forEach((record, recordIndex) => {
+    const criteria = getRankableRecordCriteria(record);
 
     if (criteria.length > 0) {
       hasEvaluation = true;
     }
 
-    for (const criterion of criteria) {
+    criteria.forEach((criterion) => {
       if (criterion.isStable) {
-        continue;
+        return;
       }
 
       const categoryLabel = getDiaryCorrectionCategoryLabel(record);
-      const criterionLabel = getDiaryCriterionDisplayLabel(criterion);
       const correctionKey = `${categoryLabel}:${criterion.key}`;
+      const ratio = getDiaryCriterionStableRatio(criterion);
       const current = correctionCounts.get(correctionKey);
-      const label = `${categoryLabel} ${criterionLabel}`;
 
       if (current) {
         current.count += 1;
-        continue;
+        current.ratioTotal += ratio;
+        current.averageStableRatio = current.ratioTotal / current.count;
+        return;
       }
 
       correctionCounts.set(correctionKey, {
-        label,
+        key: correctionKey,
+        label: `${categoryLabel} ${getDiaryCriterionDisplayLabel(criterion)}`,
         count: 1,
+        averageStableRatio: ratio,
+        firstSeenIndex: recordIndex,
+        coachText: getDailySummaryCoachingText(criterion.key),
+        ratioTotal: ratio,
       });
-    }
-  }
+    });
+  });
 
-  const topCorrection = [...correctionCounts.values()].sort((left, right) => right.count - left.count)[0] ?? null;
+  const topCorrection =
+    [...correctionCounts.values()].sort((left, right) => {
+      if (left.count !== right.count) {
+        return right.count - left.count;
+      }
+
+      if (left.averageStableRatio !== right.averageStableRatio) {
+        return left.averageStableRatio - right.averageStableRatio;
+      }
+
+      return left.firstSeenIndex - right.firstSeenIndex;
+    })[0] ?? null;
+  const statusText = getDailySummaryEvaluationText(insight);
 
   if (topCorrection) {
-    return `${topCorrection.label} \uD53C\uB4DC\uBC31\uC774 \uAC00\uC7A5 \uB9CE\uC544\uC694. \uC774 \uBD80\uBD84\uC744 \uACE0\uCCD0\uBD10\uC694.`;
+    return {
+      statusText,
+      topFeedbackText: `${topCorrection.label} \uD53C\uB4DC\uBC31\uC774 \uAC00\uC7A5 \uB9CE\uC544\uC694 \u00B7 ${topCorrection.count}\uAC1C \uAE30\uB85D`,
+      nextPracticeText: topCorrection.coachText,
+      toggleSubtext: `${topCorrection.label} \uD53C\uB4DC\uBC31\uC774 \uAC00\uC7A5 \uB9CE\uC544\uC694.`,
+    };
   }
 
   if (hasEvaluation) {
-    return '\uC624\uB298\uC740 \uD06C\uAC8C \uACE0\uCCD0\uBCFC \uD53C\uB4DC\uBC31\uC774 \uB9CE\uC9C0 \uC54A\uC544\uC694.';
+    return {
+      statusText,
+      topFeedbackText: '\uC624\uB298\uC740 \uD06C\uAC8C \uACE0\uCCD0\uC57C \uD560 \uD53C\uB4DC\uBC31\uC774 \uB9CE\uC9C0 \uC54A\uC544\uC694.',
+      nextPracticeText: '\uC624\uB298 \uC548\uC815\uC801\uC774\uC5C8\uB358 \uC790\uC138 \uAC10\uAC01\uC744 \uAC19\uAC8C \uD55C \uBC88 \uB354 \uBC18\uBCF5\uD574 \uBCF4\uC138\uC694.',
+      toggleSubtext: '\uC624\uB298\uC740 \uD06C\uAC8C \uACE0\uCCD0\uC57C \uD560 \uD53C\uB4DC\uBC31\uC774 \uB9CE\uC9C0 \uC54A\uC544\uC694.',
+    };
   }
 
-  return '\uC544\uC9C1 \uD53C\uB4DC\uBC31 \uAE30\uB85D\uC774 \uB354 \uD544\uC694\uD574\uC694.';
+  return {
+    statusText,
+    topFeedbackText: '\uC544\uC9C1 \uD53C\uB4DC\uBC31 \uAE30\uB85D\uC774 \uB354 \uD544\uC694\uD574\uC694.',
+    nextPracticeText: '\uAE30\uB85D\uC774 \uB354 \uC313\uC774\uBA74 \uB2E4\uC74C \uC5F0\uC2B5 \uD3EC\uC778\uD2B8\uB97C \uC790\uC138\uD788 \uBCFC \uC218 \uC788\uC5B4\uC694.',
+    toggleSubtext: '\uC544\uC9C1 \uD53C\uB4DC\uBC31 \uAE30\uB85D\uC774 \uB354 \uD544\uC694\uD574\uC694.',
+  };
 }
 
 function getDailySummaryShotText(insight: DiarySkillInsight) {
@@ -1506,6 +1816,87 @@ function getRankableRecordCriteria(record: LessonRecord) {
   }
 
   return getDisplayedDribbleCriteria(record, record.evaluation);
+}
+
+function doesCriterionHighlightMatch(
+  criterionKey: string,
+  highlightLabel: string,
+  dribbleView?: LessonRecord['dribbleView']
+) {
+  if (criterionKey === 'shoot-leg-angle' || criterionKey === 'dribble-front-stance-angle') {
+    return highlightLabel.includes('\uBB34\uB98E');
+  }
+
+  if (criterionKey === 'shoot-release-timing') {
+    return highlightLabel.includes('\uD0C0\uC774\uBC0D');
+  }
+
+  if (criterionKey === 'shoot-release-point') {
+    return highlightLabel.includes('\uB9B4\uB9AC\uC2A4 \uB192\uC774') || highlightLabel.includes('\uC287 \uD0C0\uC810');
+  }
+
+  if (criterionKey === 'shoot-release-duration') {
+    return highlightLabel.includes('\uB9B4\uB9AC\uC2A4 \uC2DC\uAC04') || highlightLabel.includes('\uB9B4\uB9AC\uC988 \uC18D\uB3C4');
+  }
+
+  if (criterionKey === 'dribble-front-ball-lane') {
+    return highlightLabel.includes('\uACF5 \uB77C\uC778') || highlightLabel.includes('\uACF5 \uC704\uCE58');
+  }
+
+  if (criterionKey === 'dribble-front-hand-balance') {
+    return highlightLabel.includes('\uC591\uC190') || highlightLabel.includes('\uADE0\uD615');
+  }
+
+  if (criterionKey === 'dribble-front-foot-spacing') {
+    return highlightLabel.includes('\uBC1C \uAC04\uACA9');
+  }
+
+  if (criterionKey === 'dribble-torso-posture') {
+    return highlightLabel.includes('\uC0C1\uCCB4');
+  }
+
+  if (criterionKey === 'dribble-height-appropriate' || criterionKey === 'dribble-height') {
+    return highlightLabel.includes('\uB4DC\uB9AC\uBE14 \uB192\uC774');
+  }
+
+  if (criterionKey === 'dribble-eye-focus') {
+    return highlightLabel.includes('\uC2DC\uC120');
+  }
+
+  if (criterionKey === 'dribble-rhythm' || criterionKey === 'dribble-tempo-stability') {
+    return highlightLabel.includes('\uB9AC\uB4EC');
+  }
+
+  if (criterionKey === 'dribble-position-stability') {
+    return dribbleView === 'side'
+      ? highlightLabel.includes('\uACF5 \uC704\uCE58')
+      : highlightLabel.includes('\uACF5 \uB77C\uC778') || highlightLabel.includes('\uACF5 \uC704\uCE58');
+  }
+
+  if (criterionKey === 'dribble-height-stability') {
+    return highlightLabel.includes('\uB192\uC774 \uC548\uC815');
+  }
+
+  return false;
+}
+
+function findMatchingCriterionHighlight(
+  record: LessonRecord,
+  criterion: LessonRecordCriterion
+) {
+  const evaluation = record.evaluation;
+
+  if (!evaluation) {
+    return null;
+  }
+
+  const highlights = criterion.isStable ? evaluation.strengths : evaluation.improvements;
+
+  return (
+    highlights.find((highlight) =>
+      doesCriterionHighlightMatch(criterion.key, highlight.label, record.dribbleView)
+    ) ?? null
+  );
 }
 
 function getRankedRecordCategoryLabel(record: LessonRecord) {
@@ -1647,6 +2038,61 @@ function compareRankedDiaryRecordsForWorst(left: RankedDiaryRecordInsight, right
   return right.createdAtTime - left.createdAtTime;
 }
 
+function getDiaryRecordCreatedAtTime(record: LessonRecord) {
+  const createdAtTime = new Date(record.createdAt).getTime();
+  return Number.isFinite(createdAtTime) ? createdAtTime : 0;
+}
+
+function sortDiaryRecords(records: LessonRecord[], sort: RecordSort) {
+  if (sort === 'latest') {
+    return [...records].sort((left, right) => getDiaryRecordCreatedAtTime(right) - getDiaryRecordCreatedAtTime(left));
+  }
+
+  const rankedById = new Map(
+    records.map((record) => [record.id, buildRankedDiaryRecordInsight(record)] as const)
+  );
+
+  return [...records].sort((left, right) => {
+    const leftRank = rankedById.get(left.id) ?? null;
+    const rightRank = rankedById.get(right.id) ?? null;
+
+    if (leftRank && rightRank) {
+      const rankDelta =
+        sort === 'best'
+          ? compareRankedDiaryRecordsForBest(leftRank, rightRank)
+          : compareRankedDiaryRecordsForWorst(leftRank, rightRank);
+
+      if (rankDelta !== 0) {
+        return rankDelta;
+      }
+    } else if (leftRank && !rightRank) {
+      return -1;
+    } else if (!leftRank && rightRank) {
+      return 1;
+    }
+
+    return getDiaryRecordCreatedAtTime(right) - getDiaryRecordCreatedAtTime(left);
+  });
+}
+
+function buildDailyRecordRankingGroup(records: LessonRecord[]): DailyRecordRankingGroup {
+  const rankedRecords = records
+    .map((record) => buildRankedDiaryRecordInsight(record))
+    .filter((record): record is RankedDiaryRecordInsight => Boolean(record));
+  const sortedForBest = [...rankedRecords].sort(compareRankedDiaryRecordsForBest);
+  const best = sortedForBest[0] ?? null;
+  const sortedForWorst = [...rankedRecords].sort(compareRankedDiaryRecordsForWorst);
+  const worst =
+    sortedForWorst.find((record) => record.record.id !== best?.record.id) ??
+    (rankedRecords.length > 1 ? sortedForWorst[0] ?? null : null);
+
+  return {
+    totalCount: rankedRecords.length,
+    best,
+    worst,
+  };
+}
+
 function getSuccessRateHeadline(
   comparisonData: Array<{ label: string; attempts: number; successRate: number }>
 ) {
@@ -1675,11 +2121,13 @@ export function DiaryScreen({
   calendarCells,
   selectedDateKey,
   selectedDateRecords,
+  homeworkLinkedDiaryContext,
   selectedDateDribbleCount,
   diarySkillInsight,
   shotGraphData,
   onChangeMonth,
   onOpenDate,
+  onClearHomeworkLinkedDiaryContext,
   onGoBack,
   onToggleShotOutcome,
   onDeleteRecord,
@@ -1695,16 +2143,16 @@ export function DiaryScreen({
   const recordEvaluationVideoHeight = isCompactMobile ? 320 : isWide ? 420 : 360;
   const [playbackFeedback, setPlaybackFeedback] = useState<Record<string, string>>({});
   const [showCalendarModal, setShowCalendarModal] = useState(false);
-  const [recordFilter, setRecordFilter] = useState<RecordFilter>('all');
+  const [recordSort, setRecordSort] = useState<RecordSort>('latest');
   const [showRecordFilterMenu, setShowRecordFilterMenu] = useState(false);
   const [showDailySummary, setShowDailySummary] = useState(false);
   const [successRateRange, setSuccessRateRange] = useState<SuccessRateRange>('daily');
   const [showSuccessRateRangeMenu, setShowSuccessRateRangeMenu] = useState(false);
   const [openedEvaluationRecordId, setOpenedEvaluationRecordId] = useState<string | null>(null);
   const [pendingDeleteRecordId, setPendingDeleteRecordId] = useState<string | null>(null);
-  const [currentRecordIndex, setCurrentRecordIndex] = useState(0);
+  const [recordCarouselIndices, setRecordCarouselIndices] = useState<Record<string, number>>({});
   const evaluationVideoRef = useRef<Video | null>(null);
-  const recordListRef = useRef<FlatList<LessonRecord> | null>(null);
+  const recordListRefs = useRef<Record<string, FlatList<LessonRecord> | null>>({});
   const playbackPollersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
   const menuOpenSpacerHeight = showSuccessRateRangeMenu ? 220 : 0;
   const dribbleGraphTotal = Math.max(
@@ -1719,6 +2167,10 @@ export function DiaryScreen({
   const rightDribbleGraphWidth: `${number}%` = dribbleGraphTotal > 0
     ? `${(diarySkillInsight.rightDribbleCount / dribbleGraphTotal) * 100}%`
     : '0%';
+  const homeworkLinkedRecordIdsKey = useMemo(
+    () => (homeworkLinkedDiaryContext ? homeworkLinkedDiaryContext.recordIds.join('|') : ''),
+    [homeworkLinkedDiaryContext]
+  );
   const selectedDate = useMemo(() => (selectedDateKey ? parseDateKeyToDate(selectedDateKey) : new Date()), [selectedDateKey]);
   const successRateComparisonFrames = useMemo(
     () => buildSuccessRateComparisonFrames(selectedDate, successRateRange),
@@ -1730,11 +2182,13 @@ export function DiaryScreen({
   }, [selectedDateKey]);
 
   useEffect(() => {
-    setCurrentRecordIndex(0);
+    setRecordCarouselIndices({});
     requestAnimationFrame(() => {
-      recordListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      Object.values(recordListRefs.current).forEach((recordListRef) => {
+        recordListRef?.scrollToOffset({ offset: 0, animated: false });
+      });
     });
-  }, [recordFilter, selectedDateKey]);
+  }, [homeworkLinkedRecordIdsKey, recordSort, selectedDateKey]);
 
   const successRateComparisonData = useMemo(
     () =>
@@ -1786,38 +2240,56 @@ export function DiaryScreen({
 
     return { status: 'default' as const };
   }, [calendarCells, selectedDateKey]);
-  const filteredDateRecords = useMemo(() => {
-    if (recordFilter === 'all') {
+  const homeworkLinkedRecords = useMemo(() => {
+    if (!homeworkLinkedDiaryContext) {
       return selectedDateRecords;
     }
 
-    if (recordFilter === 'shootSuccess') {
-      return selectedDateRecords.filter((record) => record.mode === 'shoot' && record.shotOutcome === 'success');
+    const allowedRecordIds = new Set(homeworkLinkedDiaryContext.recordIds);
+    return selectedDateRecords.filter((record) => allowedRecordIds.has(record.id));
+  }, [homeworkLinkedDiaryContext, selectedDateRecords]);
+  const baseDateRecords = homeworkLinkedDiaryContext ? homeworkLinkedRecords : selectedDateRecords;
+  const recordSections = useMemo<RecordListSection[]>(() => {
+    if (!selectedDateKey) {
+      return [];
     }
 
-    return selectedDateRecords.filter((record) => record.mode === recordFilter);
-  }, [recordFilter, selectedDateRecords]);
-  const dailySummaryCorrectionText = useMemo(
-    () => getDailySummaryCorrectionText(selectedDateRecords),
-    [selectedDateRecords]
+    const getSectionEmptyText = (label: string) =>
+      homeworkLinkedDiaryContext
+        ? `${homeworkLinkedDiaryContext.feedbackLabel} 피드백과 연결된 ${label}이 없습니다.`
+        : `이 날짜에 저장된 ${label}이 없습니다.`;
+    return [
+      {
+        key: 'shoot',
+        title: '슛 레슨 기록',
+        records: sortDiaryRecords(
+          baseDateRecords.filter((record) => record.mode === 'shoot'),
+          recordSort
+        ),
+        emptyText: getSectionEmptyText('슛 레슨 기록'),
+      },
+      {
+        key: 'dribble',
+        title: '드리블 레슨 기록',
+        records: sortDiaryRecords(
+          baseDateRecords.filter((record) => record.mode === 'dribble'),
+          recordSort
+        ),
+        emptyText: getSectionEmptyText('드리블 레슨 기록'),
+      },
+    ];
+  }, [baseDateRecords, homeworkLinkedDiaryContext, recordSort, selectedDateKey]);
+  const dailySummaryAutoFeedback = useMemo(
+    () => buildDailySummaryAutoFeedback(selectedDateRecords, diarySkillInsight),
+    [diarySkillInsight, selectedDateRecords]
   );
-  const dailyRecordRanking = useMemo(() => {
-    const rankedRecords = filteredDateRecords
-      .map((record) => buildRankedDiaryRecordInsight(record))
-      .filter((record): record is RankedDiaryRecordInsight => Boolean(record));
-    const sortedForBest = [...rankedRecords].sort(compareRankedDiaryRecordsForBest);
-    const best = sortedForBest[0] ?? null;
-    const sortedForWorst = [...rankedRecords].sort(compareRankedDiaryRecordsForWorst);
-    const worst =
-      sortedForWorst.find((record) => record.record.id !== best?.record.id) ??
-      (rankedRecords.length > 1 ? sortedForWorst[0] ?? null : null);
-
-    return {
-      totalCount: rankedRecords.length,
-      best,
-      worst,
-    };
-  }, [filteredDateRecords]);
+  const dailyRecordRankingByMode = useMemo(
+    () => ({
+      shoot: buildDailyRecordRankingGroup(baseDateRecords.filter((record) => record.mode === 'shoot')),
+      dribble: buildDailyRecordRankingGroup(baseDateRecords.filter((record) => record.mode === 'dribble')),
+    }),
+    [baseDateRecords]
+  );
   const openedEvaluationRecord = useMemo(
     () => (openedEvaluationRecordId ? selectedDateRecords.find((record) => record.id === openedEvaluationRecordId) ?? null : null),
     [openedEvaluationRecordId, selectedDateRecords]
@@ -1826,36 +2298,24 @@ export function DiaryScreen({
     () => (openedEvaluationRecord?.videoUri ? { uri: openedEvaluationRecord.videoUri } : null),
     [openedEvaluationRecord?.videoUri]
   );
-  const recordListData = selectedDateKey ? filteredDateRecords : EMPTY_LESSON_RECORDS;
-  const hasMultipleRecordCards = recordListData.length > 1;
-  const canMoveToPreviousRecord = hasMultipleRecordCards && currentRecordIndex > 0;
-  const canMoveToNextRecord = hasMultipleRecordCards && currentRecordIndex < recordListData.length - 1;
   const recordListExtraData = useMemo(
     () => ({
-      playbackFeedback,
-      bestRecordId: dailyRecordRanking.best?.record.id ?? null,
-      worstRecordId: dailyRecordRanking.worst?.record.id ?? null,
+      bestShootRecordId: dailyRecordRankingByMode.shoot.best?.record.id ?? null,
+      worstShootRecordId: dailyRecordRankingByMode.shoot.worst?.record.id ?? null,
+      bestDribbleRecordId: dailyRecordRankingByMode.dribble.best?.record.id ?? null,
+      worstDribbleRecordId: dailyRecordRankingByMode.dribble.worst?.record.id ?? null,
       openedEvaluationRecordId,
       recordCardWidth,
     }),
     [
-      dailyRecordRanking.best?.record.id,
-      dailyRecordRanking.worst?.record.id,
+      dailyRecordRankingByMode.dribble.best?.record.id,
+      dailyRecordRankingByMode.dribble.worst?.record.id,
+      dailyRecordRankingByMode.shoot.best?.record.id,
+      dailyRecordRankingByMode.shoot.worst?.record.id,
       openedEvaluationRecordId,
-      playbackFeedback,
       recordCardWidth,
     ]
   );
-  const recordListViewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
-  const onRecordListViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      const nextIndex = viewableItems.find((item) => typeof item.index === 'number')?.index;
-
-      if (typeof nextIndex === 'number') {
-        setCurrentRecordIndex((current) => (current === nextIndex ? current : nextIndex));
-      }
-    }
-  ).current;
 
   const getPlaybackVideoRef = useCallback(
     (record: LessonRecord) => {
@@ -1903,26 +2363,37 @@ export function DiaryScreen({
   }, [openedEvaluationRecordId, selectedDateRecords]);
 
   useEffect(() => {
-    if (!recordListData.length) {
-      if (currentRecordIndex !== 0) {
-        setCurrentRecordIndex(0);
-      }
+    setRecordCarouselIndices((current) => {
+      const next: Record<string, number> = {};
+      let hasChanged = Object.keys(current).length !== recordSections.length;
 
-      return;
-    }
+      recordSections.forEach((section) => {
+        const currentIndex = current[section.key] ?? 0;
+        const clampedIndex = Math.min(currentIndex, Math.max(0, section.records.length - 1));
+        next[section.key] = clampedIndex;
 
-    const maxIndex = recordListData.length - 1;
+        if (clampedIndex !== currentIndex) {
+          hasChanged = true;
+        }
+      });
 
-    if (currentRecordIndex > maxIndex) {
-      setCurrentRecordIndex(maxIndex);
-      requestAnimationFrame(() => {
-        recordListRef.current?.scrollToOffset({
-          offset: recordListItemWidth * maxIndex,
+      return hasChanged ? next : current;
+    });
+
+    requestAnimationFrame(() => {
+      recordSections.forEach((section) => {
+        const nextIndex = Math.min(
+          recordCarouselIndices[section.key] ?? 0,
+          Math.max(0, section.records.length - 1)
+        );
+
+        recordListRefs.current[section.key]?.scrollToOffset({
+          offset: recordListItemWidth * nextIndex,
           animated: false,
         });
       });
-    }
-  }, [currentRecordIndex, recordListData.length, recordListItemWidth]);
+    });
+  }, [recordCarouselIndices, recordListItemWidth, recordSections]);
 
   useEffect(() => {
     const pollers = playbackPollersRef.current;
@@ -2249,24 +2720,67 @@ export function DiaryScreen({
       record.mode === 'dribble'
         ? getDisplayedDribbleCriteria(record, evaluation)
         : evaluation.criteria.filter((criterion) => criterion.key !== 'shoot-result');
+    const orderedDisplayedCriteria = getDiaryOrderedEvaluationCriteria(displayedCriteria);
+    const evaluationSummary = getDiaryEvaluationQuickSummary(orderedDisplayedCriteria);
 
     return (
       <View style={styles.evaluationBox}>
-        <View style={styles.evaluationRingSummary}>
-          <EvaluationProgressRing criteria={displayedCriteria} level={evaluation.level} />
+        <View
+          style={[
+            styles.evaluationSummaryOverview,
+            isCompactMobile && styles.evaluationSummaryOverviewCompact,
+          ]}
+        >
+          <View style={styles.evaluationRingSummary}>
+            <Text style={styles.evaluationSummaryHeadline}>
+              {getDiaryEvaluationSummaryHeadline(evaluationSummary)}
+            </Text>
+            <Text style={styles.evaluationSummaryPercent}>
+              {`전체 충족도 ${evaluationSummary.totalPercent}%`}
+            </Text>
+            <EvaluationProgressRing
+              criteria={orderedDisplayedCriteria}
+              level={evaluation.level}
+              size={isCompactMobile ? 160 : 172}
+              strokeWidth={15}
+            />
+          </View>
+
+          <View style={styles.evaluationSummaryTextWrap}>
+            <View style={styles.evaluationSummaryKeyPointList}>
+              <View style={styles.evaluationSummaryKeyPointRow}>
+                <Text style={[styles.evaluationSummaryKeyPointLabel, styles.evaluationSummaryKeyPointLabelGood]}>
+                  {'강점'}
+                </Text>
+                <Text style={styles.evaluationSummaryKeyPointValue}>
+                  {getDiaryEvaluationStrengthSummaryText(evaluationSummary)}
+                </Text>
+              </View>
+
+              <View style={styles.evaluationSummaryKeyPointRow}>
+                <Text style={[styles.evaluationSummaryKeyPointLabel, styles.evaluationSummaryKeyPointLabelBad]}>
+                  {'보완'}
+                </Text>
+                <Text style={styles.evaluationSummaryKeyPointValue}>
+                  {getDiaryEvaluationWeaknessSummaryText(evaluationSummary)}
+                </Text>
+              </View>
+            </View>
+          </View>
         </View>
 
-        {displayedCriteria.length > 0 ? (
+        {orderedDisplayedCriteria.length > 0 ? (
           <View style={styles.criteriaList}>
-            {displayedCriteria.map((criterion) => {
+            {orderedDisplayedCriteria.map((criterion) => {
               const criterionDetail = getDiaryCriterionInsightText(criterion);
               const criterionLabel = getDiaryCriterionDisplayLabel(criterion);
+              const criterionHighlight = findMatchingCriterionHighlight(record, criterion);
+              const canJumpToCriterionHighlight = Boolean(record.videoUri && criterionHighlight);
 
               if (record.mode === 'dribble') {
                 const stableRatio = getDiaryCriterionStableRatio(criterion);
-
-                return (
-                  <View key={`${record.id}-${criterion.key}`} style={styles.dribbleCriterionMeter}>
+                const content = (
+                  <>
                     <View
                       style={[
                         styles.dribbleCriterionMeterFill,
@@ -2281,12 +2795,26 @@ export function DiaryScreen({
                         <Text style={styles.dribbleCriterionMeterDescription}>{criterionDetail}</Text>
                       ) : null}
                     </View>
+                  </>
+                );
+
+                return canJumpToCriterionHighlight && criterionHighlight ? (
+                  <Pressable
+                    key={`${record.id}-${criterion.key}`}
+                    onPress={() => void jumpToHighlight(record, criterionHighlight.startAtMs)}
+                    style={({ pressed }) => [styles.dribbleCriterionMeter, pressed && styles.pressed]}
+                  >
+                    {content}
+                  </Pressable>
+                ) : (
+                  <View key={`${record.id}-${criterion.key}`} style={styles.dribbleCriterionMeter}>
+                    {content}
                   </View>
                 );
               }
 
-              return (
-                <View key={`${record.id}-${criterion.key}`} style={styles.criteriaListItem}>
+              const content = (
+                <>
                   <View
                     style={[
                       styles.criteriaListBadge,
@@ -2309,6 +2837,20 @@ export function DiaryScreen({
                       <Text style={styles.criteriaListDescription}>{criterionDetail}</Text>
                     ) : null}
                   </View>
+                </>
+              );
+
+              return canJumpToCriterionHighlight && criterionHighlight ? (
+                <Pressable
+                  key={`${record.id}-${criterion.key}`}
+                  onPress={() => void jumpToHighlight(record, criterionHighlight.startAtMs)}
+                  style={({ pressed }) => [styles.criteriaListItem, pressed && styles.pressed]}
+                >
+                  {content}
+                </Pressable>
+              ) : (
+                <View key={`${record.id}-${criterion.key}`} style={styles.criteriaListItem}>
+                  {content}
                 </View>
               );
             })}
@@ -2319,12 +2861,12 @@ export function DiaryScreen({
   }
 
   const renderRecordCard = useCallback((record: LessonRecord) => {
-    const syncedFeedback = getReadableDiaryFeedback(record, playbackFeedback[record.id] || record.feedback);
     const evaluation = record.evaluation;
     const recordCardLevelStyle = getRecordCardLevelStyle(evaluation?.level);
-    const shouldShowRankingMarkers = dailyRecordRanking.totalCount > 1;
-    const isBestRecord = shouldShowRankingMarkers && dailyRecordRanking.best?.record.id === record.id;
-    const isWorstRecord = shouldShowRankingMarkers && dailyRecordRanking.worst?.record.id === record.id;
+    const modeRanking = record.mode === 'shoot' ? dailyRecordRankingByMode.shoot : dailyRecordRankingByMode.dribble;
+    const shouldShowRankingMarkers = modeRanking.totalCount > 1;
+    const isBestRecord = shouldShowRankingMarkers && modeRanking.best?.record.id === record.id;
+    const isWorstRecord = shouldShowRankingMarkers && modeRanking.worst?.record.id === record.id;
 
     return (
       <View
@@ -2369,40 +2911,34 @@ export function DiaryScreen({
               <Text style={styles.recordVideoPreviewCaption}>{'저장된 영상이 없습니다.'}</Text>
             </View>
           )}
-
-          <View style={styles.liveFeedbackBox}>
-            <Text style={styles.liveFeedbackLabel}>{'\uC2E4\uC2DC\uAC04 \uD53C\uB4DC\uBC31'}</Text>
-            <Text style={styles.liveFeedbackText}>{syncedFeedback}</Text>
-          </View>
         </Pressable>
 
         <SmallButton title={'\uAE30\uB85D \uC0AD\uC81C'} onPress={() => openDeleteConfirm(record.id)} variant="red" />
       </View>
     );
   }, [
-    dailyRecordRanking.best?.record.id,
-    dailyRecordRanking.worst?.record.id,
+    dailyRecordRankingByMode.dribble.best?.record.id,
+    dailyRecordRankingByMode.dribble.totalCount,
+    dailyRecordRankingByMode.dribble.worst?.record.id,
+    dailyRecordRankingByMode.shoot.best?.record.id,
+    dailyRecordRankingByMode.shoot.totalCount,
+    dailyRecordRankingByMode.shoot.worst?.record.id,
     openDeleteConfirm,
     openRecordEvaluation,
-    playbackFeedback,
     recordCardWidth,
   ]);
 
-  const renderRecordEmptyState = useCallback(() => {
+  const renderRecordEmptyState = useCallback((emptyText: string) => {
     if (!selectedDateKey) {
       return null;
     }
 
     return (
       <View style={[styles.recordCard, styles.recordCardHorizontal, { width: recordCardWidth }]}>
-        <Text style={styles.recordText}>
-          {recordFilter === 'all'
-            ? '\uC774 \uB0A0\uC9DC\uC5D0 \uC800\uC7A5\uB41C \uB808\uC2A8 \uC601\uC0C1\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.'
-            : `\uC774 \uB0A0\uC9DC\uC5D0 \uC800\uC7A5\uB41C ${getRecordFilterLabel(recordFilter)} \uAE30\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.`}
-        </Text>
+        <Text style={styles.recordText}>{emptyText}</Text>
       </View>
     );
-  }, [recordCardWidth, recordFilter, selectedDateKey]);
+  }, [recordCardWidth, selectedDateKey]);
 
   const renderRecordCardItem = useCallback(
     ({ item }: { item: LessonRecord }) => renderRecordCard(item),
@@ -2410,41 +2946,51 @@ export function DiaryScreen({
   );
 
   const scrollToRecordIndex = useCallback(
-    (index: number, animated = true) => {
-      if (!recordListData.length) {
+    (sectionKey: string, recordCount: number, index: number, animated = true) => {
+      if (!recordCount) {
         return;
       }
 
-      const clampedIndex = Math.max(0, Math.min(index, recordListData.length - 1));
-      setCurrentRecordIndex(clampedIndex);
-      recordListRef.current?.scrollToIndex({ index: clampedIndex, animated, viewPosition: 0 });
+      const clampedIndex = Math.max(0, Math.min(index, recordCount - 1));
+      setRecordCarouselIndices((current) =>
+        current[sectionKey] === clampedIndex
+          ? current
+          : {
+              ...current,
+              [sectionKey]: clampedIndex,
+            }
+      );
+      recordListRefs.current[sectionKey]?.scrollToIndex({ index: clampedIndex, animated, viewPosition: 0 });
     },
-    [recordListData.length]
+    []
   );
 
   const moveRecordCard = useCallback(
-    (delta: number) => {
-      scrollToRecordIndex(currentRecordIndex + delta);
+    (sectionKey: string, recordCount: number, currentIndex: number, delta: number) => {
+      scrollToRecordIndex(sectionKey, recordCount, currentIndex + delta);
     },
-    [currentRecordIndex, scrollToRecordIndex]
+    [scrollToRecordIndex]
   );
 
   const handleRecordListScrollToIndexFailed = useCallback(
-    ({ index }: { index: number }) => {
-      if (!recordListData.length) {
+    (sectionKey: string, recordCount: number, index: number) => {
+      if (!recordCount) {
         return;
       }
 
-      const safeIndex = Math.max(0, Math.min(index, recordListData.length - 1));
-      setCurrentRecordIndex(safeIndex);
+      const safeIndex = Math.max(0, Math.min(index, recordCount - 1));
+      setRecordCarouselIndices((current) => ({
+        ...current,
+        [sectionKey]: safeIndex,
+      }));
       requestAnimationFrame(() => {
-        recordListRef.current?.scrollToOffset({
+        recordListRefs.current[sectionKey]?.scrollToOffset({
           offset: recordListItemWidth * safeIndex,
           animated: false,
         });
       });
     },
-    [recordListData.length, recordListItemWidth]
+    [recordListItemWidth]
   );
 
   const getRecordItemLayout = useCallback(
@@ -2457,22 +3003,30 @@ export function DiaryScreen({
   );
 
   const renderRecordList = useCallback(
-    () => (
+    (section: RecordListSection) => {
+      const currentIndex = recordCarouselIndices[section.key] ?? 0;
+      const hasMultipleRecordCards = section.records.length > 1;
+      const canMoveToPreviousRecord = hasMultipleRecordCards && currentIndex > 0;
+      const canMoveToNextRecord = hasMultipleRecordCards && currentIndex < section.records.length - 1;
+
+      return (
       <View style={styles.recordCarousel}>
         <FlatList
-          ref={recordListRef}
+          ref={(instance) => {
+            recordListRefs.current[section.key] = instance;
+          }}
           horizontal
           nestedScrollEnabled
-          data={recordListData}
+          data={section.records}
           extraData={recordListExtraData}
           renderItem={renderRecordCardItem}
           keyExtractor={(item) => item.id}
           getItemLayout={getRecordItemLayout}
-          onScrollToIndexFailed={handleRecordListScrollToIndexFailed}
+          onScrollToIndexFailed={({ index }) => handleRecordListScrollToIndexFailed(section.key, section.records.length, index)}
           style={styles.recordsScroll}
           contentContainerStyle={styles.recordsScrollContent}
           showsHorizontalScrollIndicator={false}
-          ListEmptyComponent={renderRecordEmptyState}
+          ListEmptyComponent={renderRecordEmptyState(section.emptyText)}
           initialNumToRender={2}
           maxToRenderPerBatch={2}
           windowSize={3}
@@ -2485,19 +3039,24 @@ export function DiaryScreen({
           onMomentumScrollEnd={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
             const nextIndex = Math.max(
               0,
-              Math.min(recordListData.length - 1, Math.round(event.nativeEvent.contentOffset.x / recordListItemWidth))
+              Math.min(section.records.length - 1, Math.round(event.nativeEvent.contentOffset.x / recordListItemWidth))
             );
 
-            setCurrentRecordIndex(nextIndex);
+            setRecordCarouselIndices((current) =>
+              current[section.key] === nextIndex
+                ? current
+                : {
+                    ...current,
+                    [section.key]: nextIndex,
+                  }
+            );
           }}
-          viewabilityConfig={recordListViewabilityConfig}
-          onViewableItemsChanged={onRecordListViewableItemsChanged}
         />
 
         {hasMultipleRecordCards ? (
           <>
             <Pressable
-              onPress={() => moveRecordCard(-1)}
+              onPress={() => moveRecordCard(section.key, section.records.length, currentIndex, -1)}
               disabled={!canMoveToPreviousRecord}
               hitSlop={8}
               style={({ pressed }) => [
@@ -2510,7 +3069,7 @@ export function DiaryScreen({
               <DateArrowIcon direction="left" />
             </Pressable>
             <Pressable
-              onPress={() => moveRecordCard(1)}
+              onPress={() => moveRecordCard(section.key, section.records.length, currentIndex, 1)}
               disabled={!canMoveToNextRecord}
               hitSlop={8}
               style={({ pressed }) => [
@@ -2525,22 +3084,34 @@ export function DiaryScreen({
           </>
         ) : null}
       </View>
-    ),
+      );
+    },
     [
-      canMoveToNextRecord,
-      canMoveToPreviousRecord,
       getRecordItemLayout,
       handleRecordListScrollToIndexFailed,
-      hasMultipleRecordCards,
       moveRecordCard,
-      onRecordListViewableItemsChanged,
-      recordListData,
+      recordCarouselIndices,
       recordListExtraData,
       recordListItemWidth,
-      recordListViewabilityConfig,
       renderRecordCardItem,
       renderRecordEmptyState,
     ]
+  );
+
+  const renderRecordSection = useCallback(
+    (section: RecordListSection) => (
+      <View key={section.key} style={styles.recordSection}>
+        <Text style={styles.recordSectionTitle}>{section.title}</Text>
+        {isWide ? (
+          <View style={styles.recordsPanel}>
+            {renderRecordList(section)}
+          </View>
+        ) : (
+          renderRecordList(section)
+        )}
+      </View>
+    ),
+    [isWide, renderRecordList]
   );
 
   return (
@@ -2596,10 +3167,16 @@ export function DiaryScreen({
                           style={({ pressed }) => [styles.dailySummaryToggle, pressed && styles.pressed]}
                         >
                           <View style={styles.dailySummaryToggleTextWrap}>
-                            <Text style={styles.dailySummaryToggleText}>
-                              {getDailySummaryToggleHeadline(diarySkillInsight)}
+                            <Text
+                              style={[
+                                styles.dailySummaryToggleText,
+                                getDailySummaryStatusColorStyle(diarySkillInsight.evaluationDominantLevel),
+                              ]}
+                            >
+                              {getDailySummaryToggleHeadline(diarySkillInsight, selectedDateKey)}
                             </Text>
-                            <Text style={styles.dailySummaryToggleSubtext}>{dailySummaryCorrectionText}</Text>
+                            <Text style={styles.dailySummaryToggleSubtext}>{dailySummaryAutoFeedback.toggleSubtext}</Text>
+                            <Text style={styles.dailySummaryToggleCoachText}>{dailySummaryAutoFeedback.nextPracticeText}</Text>
                             {!showDailySummary ? (
                               <Text style={styles.dailySummaryToggleHint}>{'\uB354 \uBCF4\uAE30'}</Text>
                             ) : null}
@@ -2626,6 +3203,22 @@ export function DiaryScreen({
                               <Text style={styles.summaryBoardValue}>
                                 {getDailySummaryDribbleText(diarySkillInsight, selectedDateDribbleCount)}
                               </Text>
+                            </View>
+                            <View style={styles.summaryBoardRow}>
+                              <Text style={styles.summaryBoardLabel}>{'\uC624\uB298 \uC0C1\uD0DC'}</Text>
+                              <View style={styles.summaryBoardValueStack}>
+                                <Text
+                                  style={[
+                                    styles.summaryBoardValue,
+                                    getDailySummaryStatusColorStyle(diarySkillInsight.evaluationDominantLevel),
+                                  ]}
+                                >
+                                  {dailySummaryAutoFeedback.statusText}
+                                </Text>
+                                <Text style={styles.summaryBoardSubvalue}>
+                                  {getDailySummaryEvaluationCountText(diarySkillInsight)}
+                                </Text>
+                              </View>
                             </View>
                             </View>
 
@@ -2919,6 +3512,23 @@ export function DiaryScreen({
           </View>
 
           <View style={[styles.recordsColumn, isWide && styles.recordsColumnWide]}>
+            {homeworkLinkedDiaryContext ? (
+              <View style={styles.homeworkLinkedBanner}>
+                <View style={styles.homeworkLinkedBannerTextWrap}>
+                  <Text style={styles.homeworkLinkedBannerTitle}>{'숙제로 연결된 기록 보기'}</Text>
+                  <Text style={styles.homeworkLinkedBannerText}>
+                    {`${homeworkLinkedDiaryContext.feedbackLabel} 피드백이 나온 기록 ${homeworkLinkedDiaryContext.recordIds.length}개만 보고 있어요.`}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={onClearHomeworkLinkedDiaryContext}
+                  style={({ pressed }) => [styles.homeworkLinkedBannerButton, pressed && styles.pressed]}
+                >
+                  <Text style={styles.homeworkLinkedBannerButtonText}>{'전체 기록 보기'}</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
             <View style={styles.recordFilterHeaderRow}>
               <View style={styles.recordFilterWrap}>
                 <Pressable
@@ -2931,32 +3541,32 @@ export function DiaryScreen({
                     pressed && styles.pressed,
                   ]}
                 >
-                  <Text style={styles.recordFilterDropdownText}>{'\uAE30\uB85D \uBCF4\uAE30: '}{getRecordFilterLabel(recordFilter)}</Text>
+                  <Text style={styles.recordFilterDropdownText}>{'\uAE30\uB85D \uBCF4\uAE30: '}{getRecordSortLabel(recordSort)}</Text>
                   <Text style={styles.recordFilterDropdownIcon}>{showRecordFilterMenu ? '\u25B2' : '\u25BC'}</Text>
                 </Pressable>
 
                 {showRecordFilterMenu ? (
                   <View style={styles.recordFilterMenu}>
-                    {(['all', 'dribble', 'shoot', 'shootSuccess'] as RecordFilter[]).map((filterOption) => (
+                    {(['latest', 'best', 'worst'] as RecordSort[]).map((sortOption) => (
                       <Pressable
-                        key={filterOption}
+                        key={sortOption}
                         onPress={() => {
-                          setRecordFilter(filterOption);
+                          setRecordSort(sortOption);
                           setShowRecordFilterMenu(false);
                         }}
                         style={({ pressed }) => [
                           styles.recordFilterMenuItem,
-                          recordFilter === filterOption && styles.recordFilterMenuItemActive,
+                          recordSort === sortOption && styles.recordFilterMenuItemActive,
                           pressed && styles.pressed,
                         ]}
                       >
                         <Text
                           style={[
                             styles.recordFilterMenuText,
-                            recordFilter === filterOption && styles.recordFilterMenuTextActive,
+                            recordSort === sortOption && styles.recordFilterMenuTextActive,
                           ]}
                         >
-                          {getRecordFilterLabel(filterOption)}
+                          {getRecordSortLabel(sortOption)}
                         </Text>
                       </Pressable>
                     ))}
@@ -2967,13 +3577,10 @@ export function DiaryScreen({
               {selectedDateKey ? renderEvaluationCountSummary(diarySkillInsight) : null}
             </View>
 
-            {isWide ? (
-              <View style={styles.recordsPanel}>
-                {renderRecordList()}
-              </View>
-            ) : (
-              renderRecordList()
-            )}
+            <View style={styles.recordSectionsStack}>
+              {recordSections.map((section) => renderRecordSection(section))}
+            </View>
+
           </View>
         </View>
       </View>
@@ -3036,16 +3643,6 @@ export function DiaryScreen({
 
                 <View style={styles.recordEvaluationDetailSection}>
                   {renderRecordEvaluationContent(openedEvaluationRecord)}
-
-                  <View style={styles.liveFeedbackBox}>
-                    <Text style={styles.liveFeedbackLabel}>{'\uC2E4\uC2DC\uAC04 \uD53C\uB4DC\uBC31'}</Text>
-                    <Text style={styles.liveFeedbackText}>
-                      {getReadableDiaryFeedback(
-                        openedEvaluationRecord,
-                        playbackFeedback[openedEvaluationRecord.id] || openedEvaluationRecord.feedback
-                      )}
-                    </Text>
-                  </View>
 
                   <SmallButton
                     title={'\uAE30\uB85D \uC0AD\uC81C'}
@@ -3471,7 +4068,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   skillInsightStatCard: {
-    borderRadius: 18,
+    borderRadius: 0,
     padding: 16,
     backgroundColor: DIARY_NEUTRAL_SURFACE,
     borderWidth: 0,
@@ -3483,7 +4080,7 @@ const styles = StyleSheet.create({
   },
   dailySummarySection: {
     gap: 12,
-    borderRadius: 18,
+    borderRadius: 0,
     padding: 16,
     backgroundColor: DIARY_NEUTRAL_SURFACE,
   },
@@ -3506,10 +4103,25 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     fontWeight: '800',
   },
+  dailySummaryStatusGood: {
+    color: '#57c26a',
+  },
+  dailySummaryStatusAverage: {
+    color: '#f2c94c',
+  },
+  dailySummaryStatusBad: {
+    color: '#d46d75',
+  },
   dailySummaryToggleSubtext: {
     color: colors.textSoft,
     fontSize: 13,
     lineHeight: 20,
+    fontWeight: '700',
+  },
+  dailySummaryToggleCoachText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 19,
     fontWeight: '700',
   },
   dailySummaryToggleHint: {
@@ -3550,6 +4162,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     fontWeight: '800',
+  },
+  summaryBoardValueStack: {
+    flex: 1,
+    gap: 2,
+  },
+  summaryBoardSubvalue: {
+    color: colors.textSoft,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '700',
   },
   summaryBoardValueSuccessRate: {
     color: '#32cd32',
@@ -3601,7 +4223,7 @@ const styles = StyleSheet.create({
     top: 46,
     left: 0,
     right: 0,
-    borderRadius: 14,
+    borderRadius: 0,
     padding: 6,
     backgroundColor: DIARY_NEUTRAL_SURFACE,
     borderWidth: 0,
@@ -3895,11 +4517,60 @@ const styles = StyleSheet.create({
     width: '100%',
     minHeight: 760,
   },
+  homeworkLinkedBanner: {
+    borderRadius: 0,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    backgroundColor: 'rgba(242, 201, 76, 0.12)',
+    borderWidth: 0,
+    borderColor: 'transparent',
+    gap: 12,
+  },
+  homeworkLinkedBannerTextWrap: {
+    gap: 4,
+  },
+  homeworkLinkedBannerTitle: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '800',
+  },
+  homeworkLinkedBannerText: {
+    color: colors.textSoft,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
+  homeworkLinkedBannerButton: {
+    alignSelf: 'flex-start',
+    borderRadius: 0,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: colors.surfaceStrong,
+  },
+  homeworkLinkedBannerButtonText: {
+    color: colors.text,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '800',
+  },
   recordFilterHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     flexWrap: 'wrap',
+  },
+  recordSectionsStack: {
+    gap: 18,
+  },
+  recordSection: {
+    gap: 10,
+  },
+  recordSectionTitle: {
+    color: colors.text,
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '800',
   },
   recordFilterWrap: {
     position: 'relative',
@@ -3977,7 +4648,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     marginTop: 8,
-    borderRadius: 14,
+    borderRadius: 0,
     padding: 6,
     backgroundColor: DIARY_NEUTRAL_SURFACE,
     borderWidth: 0,
@@ -4003,7 +4674,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   recordsPanel: {
-    borderRadius: 16,
+    borderRadius: 0,
     overflow: 'hidden',
     backgroundColor: DIARY_NEUTRAL_SURFACE,
     borderWidth: 0,
@@ -4176,7 +4847,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     maxHeight: '88%',
-    borderRadius: 18,
+    borderRadius: 0,
     padding: 20,
     backgroundColor: DIARY_NEUTRAL_SURFACE_SOFT,
     borderWidth: 1,
@@ -4272,15 +4943,15 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 0,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: DIARY_NEUTRAL_SURFACE_SOFT,
+    backgroundColor: '#ffffff',
     borderWidth: 0,
     borderColor: 'transparent',
   },
   recordEvaluationBackButtonText: {
-    color: colors.text,
+    color: DIARY_NEUTRAL_SURFACE_SOFT,
     fontSize: 22,
     fontWeight: '900',
     lineHeight: 22,
@@ -4410,7 +5081,7 @@ const styles = StyleSheet.create({
   allGraphArea: {
     height: 320,
     position: 'relative',
-    borderRadius: 16,
+    borderRadius: 0,
     backgroundColor: DIARY_NEUTRAL_SURFACE_ALT,
     borderWidth: 1,
     borderColor: DIARY_NEUTRAL_BORDER,
@@ -4736,11 +5407,70 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
   },
+  evaluationSummaryOverview: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 18,
+  },
+  evaluationSummaryOverviewCompact: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 12,
+  },
   evaluationRingSummary: {
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     paddingTop: 2,
     paddingBottom: 6,
+    flexShrink: 0,
+    gap: 6,
+  },
+  evaluationSummaryTextWrap: {
+    alignSelf: 'stretch',
+    flex: 1,
+    minWidth: 0,
+    gap: 10,
+  },
+  evaluationSummaryHeadline: {
+    color: colors.text,
+    fontSize: 21,
+    fontWeight: '900',
+    lineHeight: 29,
+    textAlign: 'center',
+  },
+  evaluationSummaryPercent: {
+    color: colors.textMuted,
+    fontSize: 15,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  evaluationSummaryKeyPointList: {
+    gap: 8,
+  },
+  evaluationSummaryKeyPointRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  evaluationSummaryKeyPointLabel: {
+    fontSize: 12,
+    fontWeight: '900',
+    minWidth: 34,
+  },
+  evaluationSummaryKeyPointLabelGood: {
+    color: '#57c26a',
+  },
+  evaluationSummaryKeyPointLabelBad: {
+    color: '#d46d75',
+  },
+  evaluationSummaryKeyPointValue: {
+    color: colors.text,
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '700',
+    flex: 1,
+    minWidth: 0,
   },
   evaluationRingWrap: {
     position: 'relative',

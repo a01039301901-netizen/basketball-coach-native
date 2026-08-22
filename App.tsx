@@ -428,6 +428,8 @@ export default function App() {
               mode={app.authMode}
               onChangeMode={app.changeAuthMode}
               onLogin={app.login}
+              onReconnectRecentAccount={app.reconnectRecentAccount}
+              recentAccountNickname={app.recentLoginAccount?.nickname}
               onSignup={app.signup}
               onImportAccount={app.importAccountTransfer}
             />
@@ -436,8 +438,10 @@ export default function App() {
           {app.isReady && app.currentUser && app.screen === 'home' && (
             <HomeScreen
               homeworkToShow={app.homeworkToShow}
+              lessonRecords={app.lessonRecords}
               onOpenLesson={() => void app.navigateTo('lesson')}
               onOpenDiary={() => void app.navigateTo('diary')}
+              onOpenHomeworkLinkedDiary={(context) => void app.openHomeworkLinkedDiary(context)}
               onOpenRules={() => void app.navigateTo('rules')}
             />
           )}
@@ -456,11 +460,13 @@ export default function App() {
               calendarCells={app.calendarCells}
               selectedDateKey={app.selectedDateKey}
               selectedDateRecords={app.selectedDateRecords}
+              homeworkLinkedDiaryContext={app.homeworkLinkedDiaryContext}
               selectedDateDribbleCount={app.selectedDateDribbleCount}
               diarySkillInsight={app.diarySkillInsight}
               shotGraphData={app.shotGraphData}
               onChangeMonth={app.changeMonth}
               onOpenDate={app.openDiaryDate}
+              onClearHomeworkLinkedDiaryContext={app.clearHomeworkLinkedDiaryContext}
               onGoBack={() => void app.navigateTo('home')}
               onToggleShotOutcome={app.toggleLessonRecordShotOutcome}
               onDeleteRecord={(recordId) => void app.deleteLessonRecord(recordId)}
@@ -582,6 +588,7 @@ export default function App() {
                       currentUser={app.currentUser!}
                       onUpdateProfile={app.updateProfile}
                       onChangePassword={app.changePassword}
+                      onDeleteAccount={app.deleteAccount}
                       onLogout={() => {
                         setActiveDrawer(null);
                         void app.logout();

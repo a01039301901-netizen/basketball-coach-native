@@ -115,7 +115,7 @@ function respondJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, POST, PATCH, PUT, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
     'Content-Type': 'application/json; charset=utf-8',
   });
   response.end(JSON.stringify(payload));
@@ -544,6 +544,60 @@ async function handleUpdatePassword(request, response) {
   });
 }
 
+async function handleDeleteAccount(request, response) {
+  const body = await parseJsonBody(request);
+  const db = await readDb();
+  const { account } = requireAuthenticatedAccount(db, request);
+
+  if (!account) {
+    respondInvalidSession(response);
+    return;
+  }
+
+  if (!isRecordObject(body)) {
+    respondJson(response, 400, {
+      success: false,
+      code: 'invalid_request',
+      message: '계정 삭제 정보를 다시 확인해 주세요.',
+    });
+    return;
+  }
+
+  const password = String(body.password || '').trim();
+
+  if (!password) {
+    respondJson(response, 400, {
+      success: false,
+      code: 'missing_password',
+      message: '계정 삭제를 위해 비밀번호를 입력해 주세요.',
+    });
+    return;
+  }
+
+  if (!verifyPassword(password, account.passwordHash)) {
+    respondJson(response, 401, {
+      success: false,
+      code: 'password_mismatch',
+      message: '비밀번호가 올바르지 않습니다.',
+    });
+    return;
+  }
+
+  db.accounts = db.accounts.filter((entry) => entry.id !== account.id);
+
+  for (const [token, session] of Object.entries(db.sessions)) {
+    if (isRecordObject(session) && session.userId === account.id) {
+      delete db.sessions[token];
+    }
+  }
+
+  await writeDb(db);
+  respondJson(response, 200, {
+    success: true,
+    message: '계정을 삭제했습니다.',
+  });
+}
+
 const server = http.createServer(async (request, response) => {
   try {
     if (!request.url || !request.method) {
@@ -559,7 +613,7 @@ const server = http.createServer(async (request, response) => {
       response.writeHead(204, {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Allow-Methods': 'GET, POST, PATCH, PUT, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
       });
       response.end();
       return;
@@ -602,6 +656,11 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === 'POST' && requestUrl.pathname === '/me/password') {
       await handleUpdatePassword(request, response);
+      return;
+    }
+
+    if (request.method === 'DELETE' && requestUrl.pathname === '/me') {
+      await handleDeleteAccount(request, response);
       return;
     }
 

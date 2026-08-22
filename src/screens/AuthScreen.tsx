@@ -27,6 +27,8 @@ interface AuthScreenProps {
   onChangeMode: (mode: AuthMode) => void;
   onLogin: (values: AuthSubmitValues) => Promise<AuthActionResult>;
   onSignup: (values: AuthSubmitValues) => Promise<AuthActionResult>;
+  onReconnectRecentAccount?: () => Promise<AuthActionResult>;
+  recentAccountNickname?: string;
   onImportAccount?: (code: string) => Promise<TransferImportResult>;
 }
 
@@ -41,7 +43,14 @@ function EyeIcon({ visible }: { visible: boolean }) {
   );
 }
 
-export function AuthScreen({ mode, onChangeMode, onLogin, onSignup }: AuthScreenProps) {
+export function AuthScreen({
+  mode,
+  onChangeMode,
+  onLogin,
+  onSignup,
+  onReconnectRecentAccount,
+  recentAccountNickname,
+}: AuthScreenProps) {
   const { height, width } = useWindowDimensions();
   const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
@@ -76,6 +85,18 @@ export function AuthScreen({ mode, onChangeMode, onLogin, onSignup }: AuthScreen
     };
 
     const result = mode === 'login' ? await onLogin(submitValues) : await onSignup(submitValues);
+    setStatusMessage(result.success ? '' : result.message);
+    setIsSubmitting(false);
+  }
+
+  async function handleReconnectRecentAccount() {
+    if (isSubmitting || !onReconnectRecentAccount) {
+      return;
+    }
+
+    setStatusMessage('');
+    setIsSubmitting(true);
+    const result = await onReconnectRecentAccount();
     setStatusMessage(result.success ? '' : result.message);
     setIsSubmitting(false);
   }
@@ -142,6 +163,17 @@ export function AuthScreen({ mode, onChangeMode, onLogin, onSignup }: AuthScreen
               {keepSignedIn ? <Text style={styles.checkboxMark}>✓</Text> : null}
             </View>
           </Pressable>
+
+          {isLogin && onReconnectRecentAccount && recentAccountNickname ? (
+            <View style={styles.recentAccountAction}>
+              <SmallButton
+                title={`${recentAccountNickname} 계정으로 계속하기`}
+                onPress={() => void handleReconnectRecentAccount()}
+                variant="dark"
+                disabled={isSubmitting}
+              />
+            </View>
+          ) : null}
 
           {statusMessage ? <Text style={styles.errorText}>{statusMessage}</Text> : null}
 
@@ -306,6 +338,9 @@ const styles = StyleSheet.create({
     color: '#1d140e',
     fontSize: 14,
     fontWeight: '800',
+  },
+  recentAccountAction: {
+    marginTop: 14,
   },
   errorText: {
     marginTop: 12,

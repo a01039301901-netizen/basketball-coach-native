@@ -6,6 +6,7 @@ import { useCameraPermissions } from 'expo-camera';
 import AppStorage from '../utils/appStorage';
 import {
   createEmptyRemoteSnapshot,
+  deleteRemoteAccount,
   fetchRemoteSession,
   loginRemoteAccount,
   signupRemoteAccount,
@@ -37,6 +38,7 @@ import type {
   DribbleLessonView,
   FeedbackMoment,
   FireworkItem,
+  HomeworkDiaryLinkContext,
   HomeworkFeedbackCategory,
   HomeworkProgressItem,
   HomeworkStateRecord,
@@ -79,6 +81,7 @@ import {
   DAILY_SHOOT_TARGET,
   getDailyHomeworkState,
   getHomeworkCompletionMessage,
+  getMostFrequentHomeworkFeedbackSummary,
   getRepresentativeHomeworkFeedbackCategory,
   isDailyBaseHomeworkCompleted,
 } from '../utils/homework';
@@ -91,7 +94,7 @@ const STORAGE_LOAD_TIMEOUT_MS = 4000;
 const STARTUP_RECOVERY_TIMEOUT_MS = 8000;
 const DEV_TEST_SHOOT_RECORD_ID = '__dev-test-shoot-bad-no-video-v1';
 const DEV_TEST_SHOOT_RECORD_SEED_KEY = 'basketballDevSeedShootBadNoVideoV3';
-const DEFAULT_DEBUG_TEXT = '移대찓?쇱? MediaPipe瑜?以鍮꾪븯怨??덉뒿?덈떎.';
+const DEFAULT_DEBUG_TEXT = '카메라와 MediaPipe를 준비하고 있습니다.';
 const LESSON_RECORD_VIDEO_DIRECTORY_NAME = 'lesson-record-videos';
 const LESSON_RECORD_THUMBNAIL_DIRECTORY_NAME = 'lesson-record-thumbnails';
 const DEFAULT_LESSON_RECORD_VIDEO_EXTENSION = 'webm';
@@ -176,10 +179,10 @@ interface BallRecognitionCalibrationJob {
 }
 
 const DEFAULT_DRIBBLE_FEEDBACK =
-  '?쒕━釉??쇰뱶諛?n1. ?쒖꽑, 怨??믪씠, ?곸껜 ?먯꽭瑜?遺꾩꽍?섎뒗 以묒엯?덈떎.\n2. 紐??꾩껜? 怨듭씠 ?붾㈃ ?덉뿉 蹂댁씠?꾨줉 留욎떠 二쇱꽭??\n3. 遺꾩꽍???덉젙?섎㈃ 湲곗???留욌뒗 ?쇰뱶諛깆씠 諛붾줈 ?섑??⑸땲??';
+  '드리블 피드백\n1. 시선, 공 높이, 상체 자세를 분석하는 중입니다.\n2. 몸 전체와 공이 화면 안에 보이도록 맞춰 주세요.\n3. 분석이 안정되면 기준에 맞는 피드백이 바로 나타납니다.';
 
 const DEFAULT_SHOOT_FEEDBACK =
-  '???쇰뱶諛?n1. ??媛곷룄, ????대컢, ?섏껜 媛곷룄瑜?遺꾩꽍?섎뒗 以묒엯?덈떎.\n2. ?닿묠遺??諛쒕걹源뚯? 紐??꾩껜媛 ?붾㈃ ?덉뿉 蹂댁씠?꾨줉 留욎떠 二쇱꽭??\n3. 遺꾩꽍???덉젙?섎㈃ 湲곗???留욌뒗 ?쇰뱶諛깆씠 諛붾줈 ?섑??⑸땲??';
+  '슛 피드백\n1. 팔 각도, 릴리스 타이밍, 무릎 각도를 분석하는 중입니다.\n2. 어깨부터 발끝까지 몸 전체와 공이 화면 안에 보이도록 맞춰 주세요.\n3. 분석이 안정되면 기준에 맞는 피드백이 바로 나타납니다.';
 
 function createFireworks(): FireworkItem[] {
   const emojis = ['✨', '🎉', '🔥'];
@@ -219,16 +222,20 @@ function sanitizeAccountNickname(nickname: string) {
   return nickname.trim().replace(/\s+/g, ' ');
 }
 
-function buildCachedAccount(account: UserAccount): UserAccount {
+function buildCachedAccount(account: UserAccount, password?: string): UserAccount {
   return {
     id: account.id,
     nickname: sanitizeAccountNickname(account.nickname),
+    password: typeof account.password === 'string' ? account.password : password,
     createdAt: account.createdAt,
   };
 }
 
 function mergeCachedAccounts(accountList: UserAccount[], nextAccount: UserAccount) {
-  const cachedAccount = buildCachedAccount(nextAccount);
+  const existingAccount =
+    accountList.find((account) => account.id === nextAccount.id) ??
+    accountList.find((account) => normalizeNickname(account.nickname) === normalizeNickname(nextAccount.nickname));
+  const cachedAccount = buildCachedAccount(nextAccount, existingAccount?.password);
   const normalizedNickname = normalizeNickname(cachedAccount.nickname);
 
   return [
@@ -241,6 +248,22 @@ function mergeCachedAccounts(accountList: UserAccount[], nextAccount: UserAccoun
     }),
     cachedAccount,
   ];
+}
+
+function getMostRecentCachedAccount(accountList: UserAccount[], recentAccountId?: string | null) {
+  if (recentAccountId) {
+    const exactMatch = accountList.find((account) => account.id === recentAccountId);
+
+    if (exactMatch) {
+      return exactMatch;
+    }
+  }
+
+  if (accountList.length === 0) {
+    return null;
+  }
+
+  return accountList[accountList.length - 1] ?? null;
 }
 
 function getAccountStorageKeys(userId: string) {
@@ -787,6 +810,15 @@ function sanitizeDailyHomeworkState(value: unknown): DailyHomeworkState {
           shootAttemptCount: Math.max(0, value.stage2Unlock.shootAttemptCount),
           shotSuccessCount: Math.max(0, value.stage2Unlock.shotSuccessCount),
           lessonCount: Math.max(0, value.stage2Unlock.lessonCount),
+          feedbackCategory: isHomeworkFeedbackCategory(value.stage2Unlock.feedbackCategory)
+            ? value.stage2Unlock.feedbackCategory
+            : value.stage2Unlock.feedbackCategory === null
+              ? null
+              : undefined,
+          feedbackCount:
+            typeof value.stage2Unlock.feedbackCount === 'number' && Number.isFinite(value.stage2Unlock.feedbackCount)
+              ? Math.max(0, Math.trunc(value.stage2Unlock.feedbackCount))
+              : undefined,
         }
       : null;
   const handTotals = isRecordObject(value.handDribbleTotals)
@@ -810,6 +842,18 @@ function sanitizeDailyHomeworkState(value: unknown): DailyHomeworkState {
           direction: value.correctionTask.direction === 'left' ? 'left' : 'right',
           baselineCount: Math.max(0, value.correctionTask.baselineCount),
           createdAt: value.correctionTask.createdAt,
+          triggerLeftCount:
+            typeof value.correctionTask.triggerLeftCount === 'number' && Number.isFinite(value.correctionTask.triggerLeftCount)
+              ? Math.max(0, Math.trunc(value.correctionTask.triggerLeftCount))
+              : undefined,
+          triggerRightCount:
+            typeof value.correctionTask.triggerRightCount === 'number' && Number.isFinite(value.correctionTask.triggerRightCount)
+              ? Math.max(0, Math.trunc(value.correctionTask.triggerRightCount))
+              : undefined,
+          triggerGap:
+            typeof value.correctionTask.triggerGap === 'number' && Number.isFinite(value.correctionTask.triggerGap)
+              ? Math.max(0, Math.trunc(value.correctionTask.triggerGap))
+              : undefined,
         } satisfies CorrectionHomeworkState
       : null;
 
@@ -2056,6 +2100,10 @@ function findLongestHighlightWindow<T>(
 }
 
 function buildShootLegAngleDetail(analysis: ShootAnalysis | null, isStable: boolean) {
+  const measuredAngle = getShootMeasuredLegAngle(analysis);
+  const angleText = formatAngleDegrees(measuredAngle);
+  const legAngleState = getShootLegAngleStateFromMeasuredAngle(analysis);
+
   if (!analysis) {
     return isStable
       ? '무릎 각도가 안정적으로 유지되었습니다.'
@@ -2063,15 +2111,21 @@ function buildShootLegAngleDetail(analysis: ShootAnalysis | null, isStable: bool
   }
 
   if (isStable) {
-    return '무릎 각도가 안정적으로 유지되었습니다.';
+    return angleText
+      ? `무릎 각도가 ${angleText}로 120~140도 기준 안에서 안정적으로 유지되었습니다.`
+      : '무릎 각도가 120~140도 기준 안에서 안정적으로 유지되었습니다.';
   }
 
-  if (analysis.legAngleState === 'low') {
-    return '무릎 사용이 부족합니다. 준비 자세를 조금 더 낮춰 점프 힘을 만들어 주세요.';
+  if (legAngleState === 'low') {
+    return angleText
+      ? `무릎 각도가 ${angleText}로 120~140도보다 작습니다. 무릎을 조금 더 펴서 점프해 주세요.`
+      : '무릎 각도가 120~140도보다 작습니다. 무릎을 조금 더 펴서 점프해 주세요.';
   }
 
-  if (analysis.legAngleState === 'high') {
-    return '무릎이 너무 많이 접혀 있습니다. 상체와 하체 균형을 다시 맞춰 주세요.';
+  if (legAngleState === 'high') {
+    return angleText
+      ? `무릎 각도가 ${angleText}로 120~140도보다 큽니다. 자세를 조금 더 낮춰 점프해 주세요.`
+      : '무릎 각도가 120~140도보다 큽니다. 자세를 조금 더 낮춰 점프해 주세요.';
   }
 
   return '무릎 각도를 조금 더 일정하게 유지해 보세요.';
@@ -2103,12 +2157,34 @@ function formatAngleDegrees(angle: number | null) {
   return angle !== null ? `${angle.toFixed(1)}도` : null;
 }
 
+function getShootMeasuredLegAngle(analysis: ShootAnalysis | null) {
+  return analysis?.lowestLegAngle ?? analysis?.legAngle ?? null;
+}
+
+function getShootLegAngleStateFromMeasuredAngle(analysis: ShootAnalysis | null): ShootAnalysis['legAngleState'] {
+  const measuredAngle = getShootMeasuredLegAngle(analysis);
+
+  if (measuredAngle === null) {
+    return 'unknown';
+  }
+
+  if (measuredAngle < 120) {
+    return 'low';
+  }
+
+  if (measuredAngle > 140) {
+    return 'high';
+  }
+
+  return 'balanced';
+}
+
 function formatReleaseDurationSeconds(durationMs: number | null) {
   return durationMs !== null ? `${(durationMs / 1000).toFixed(2)}초` : '--';
 }
 
 function buildShootLegAngleImprovementReason(analysis: ShootAnalysis | null) {
-  const measuredAngle = analysis?.lowestLegAngle ?? analysis?.legAngle ?? null;
+  const measuredAngle = getShootMeasuredLegAngle(analysis);
   const angleText = formatAngleDegrees(measuredAngle);
 
   if (angleText === null) {
@@ -2116,11 +2192,11 @@ function buildShootLegAngleImprovementReason(analysis: ShootAnalysis | null) {
   }
 
   if (measuredAngle !== null && measuredAngle < 120) {
-    return `슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 ${angleText} 정도로 120~140도로 굽혀야 합니다. 더 벌려서 쏴주세요.`;
+    return `슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 ${angleText} 정도로 120~140도보다 작습니다. 무릎을 조금 더 펴서 쏴주세요.`;
   }
 
   if (measuredAngle !== null && measuredAngle > 140) {
-    return `슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 ${angleText} 정도로 120~140도로 굽혀야 합니다. 더 굽혀서 쏴주세요.`;
+    return `슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 ${angleText} 정도로 120~140도보다 큽니다. 자세를 조금 더 낮춰 쏴주세요.`;
   }
 
   return `슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 ${angleText} 정도입니다. 120~140도로 일정하게 유지해 주세요.`;
@@ -2197,7 +2273,7 @@ function buildShootRecordEvaluation(
   frames: TimedShootAnalysis[],
   shotOutcome: LessonRecord['shotOutcome']
 ): LessonRecordEvaluation {
-  const legAngleStable = analysis?.legAngleState === 'balanced';
+  const legAngleStable = getShootLegAngleStateFromMeasuredAngle(analysis) === 'balanced';
   const releaseTimingStable = analysis?.releaseTiming === 'balanced';
   const releasePointStable = analysis?.releasePointState === 'high';
   const releaseDurationStable = analysis?.releaseDurationState === 'balanced';
@@ -2726,6 +2802,75 @@ function buildDribbleRecordEvaluation(frames: TimedDribbleAnalysis[]): LessonRec
   return buildSideDribbleRecordEvaluation(frames, latestAnalysis);
 }
 
+function buildRecordedDribbleHandTotalsByDate(lessonRecords: LessonRecord[]) {
+  const totalsByDate = new Map<string, { left: number; right: number }>();
+
+  for (const record of lessonRecords) {
+    if (record.mode !== 'dribble') {
+      continue;
+    }
+
+    const current = totalsByDate.get(record.dateKey) ?? { left: 0, right: 0 };
+    current.left += Math.max(0, record.leftHandDribbleCount ?? 0);
+    current.right += Math.max(0, record.rightHandDribbleCount ?? 0);
+    totalsByDate.set(record.dateKey, current);
+  }
+
+  return totalsByDate;
+}
+
+function getDiaryDribbleHandTotalsForDate(
+  dateKey: string,
+  homeworkState: HomeworkStateRecord,
+  recordedHandTotalsByDate: Map<string, { left: number; right: number }>,
+  todayDateKey: string
+) {
+  const recordedTotals = recordedHandTotalsByDate.get(dateKey) ?? { left: 0, right: 0 };
+  const homeworkForDate = homeworkState[dateKey] ?? null;
+  const shouldUseHomeworkHandTotals =
+    homeworkForDate !== null
+      && (dateKey === todayDateKey
+        || homeworkForDate.handDribbleTotals.left > 0
+        || homeworkForDate.handDribbleTotals.right > 0);
+  const left = shouldUseHomeworkHandTotals
+    ? Math.max(0, homeworkForDate.handDribbleTotals.left)
+    : recordedTotals.left;
+  const right = shouldUseHomeworkHandTotals
+    ? Math.max(0, homeworkForDate.handDribbleTotals.right)
+    : recordedTotals.right;
+
+  return {
+    left,
+    right,
+    total: left + right,
+  };
+}
+
+function getDiaryDribbleCountForDate(
+  dateKey: string,
+  dailyDribbleRecords: Record<string, number>,
+  homeworkState: HomeworkStateRecord,
+  recordedHandTotalsByDate: Map<string, { left: number; right: number }>,
+  todayDateKey: string
+) {
+  if (!dateKey) {
+    return 0;
+  }
+
+  const handTotals = getDiaryDribbleHandTotalsForDate(
+    dateKey,
+    homeworkState,
+    recordedHandTotalsByDate,
+    todayDateKey
+  );
+
+  if (handTotals.total > 0) {
+    return handTotals.total;
+  }
+
+  return Math.max(0, dailyDribbleRecords[dateKey] || 0);
+}
+
 function buildDiarySkillInsight(
   selectedDateKey: string,
   shotGraphData: ShotGraphDatum[],
@@ -2737,31 +2882,24 @@ function buildDiarySkillInsight(
   const selectedShotAttempts = selectedShotGraph?.attempts ?? 0;
   const selectedShotSuccesses = selectedShotGraph?.successes ?? 0;
   const selectedShotSuccessRate = selectedShotGraph?.successRate ?? 0;
-  const selectedDateDribbleCount = selectedDateKey ? Math.max(0, dailyDribbleRecords[selectedDateKey] || 0) : 0;
   const todayDateKey = formatDateKey(new Date());
-  const selectedHomeworkState = selectedDateKey ? homeworkState[selectedDateKey] ?? null : null;
-  const selectedDateDribbleRecords = lessonRecords.filter(
-    (record) => record.dateKey === selectedDateKey && record.mode === 'dribble'
+  const recordedHandTotalsByDate = buildRecordedDribbleHandTotalsByDate(lessonRecords);
+  const selectedDribbleHandTotals = getDiaryDribbleHandTotalsForDate(
+    selectedDateKey,
+    homeworkState,
+    recordedHandTotalsByDate,
+    todayDateKey
   );
-  const recordedLeftDribbleCount = selectedDateDribbleRecords.reduce(
-    (sum, record) => sum + Math.max(0, record.leftHandDribbleCount ?? 0),
-    0
+  const selectedDateRecordCount = selectedDateKey ? lessonRecords.filter((record) => record.dateKey === selectedDateKey).length : 0;
+  const selectedDateDribbleCount = getDiaryDribbleCountForDate(
+    selectedDateKey,
+    dailyDribbleRecords,
+    homeworkState,
+    recordedHandTotalsByDate,
+    todayDateKey
   );
-  const recordedRightDribbleCount = selectedDateDribbleRecords.reduce(
-    (sum, record) => sum + Math.max(0, record.rightHandDribbleCount ?? 0),
-    0
-  );
-  const shouldUseHomeworkHandTotals =
-    selectedHomeworkState !== null &&
-    (selectedDateKey === todayDateKey
-      || selectedHomeworkState.handDribbleTotals.left > 0
-      || selectedHomeworkState.handDribbleTotals.right > 0);
-  const leftDribbleCount = shouldUseHomeworkHandTotals
-    ? Math.max(0, selectedHomeworkState.handDribbleTotals.left)
-    : recordedLeftDribbleCount;
-  const rightDribbleCount = shouldUseHomeworkHandTotals
-    ? Math.max(0, selectedHomeworkState.handDribbleTotals.right)
-    : recordedRightDribbleCount;
+  const leftDribbleCount = selectedDribbleHandTotals.left;
+  const rightDribbleCount = selectedDribbleHandTotals.right;
   const dribbleBalanceGap = Math.abs(leftDribbleCount - rightDribbleCount);
   const dribbleTotal = leftDribbleCount + rightDribbleCount;
   const dribbleBalance =
@@ -2794,7 +2932,8 @@ function buildDiarySkillInsight(
         ? 'mixed'
         : dominantEvaluationLevel;
   const shotAttemptsByDate = new Map(shotGraphData.map((item) => [item.dateKey, item.attempts]));
-  const getDribbleCountForDate = (dateKey: string) => Math.max(0, dailyDribbleRecords[dateKey] || 0);
+  const getDribbleCountForDate = (dateKey: string) =>
+    getDiaryDribbleCountForDate(dateKey, dailyDribbleRecords, homeworkState, recordedHandTotalsByDate, todayDateKey);
   const getShotAttemptsForDate = (dateKey: string) => Math.max(0, shotAttemptsByDate.get(dateKey) || 0);
   const getPracticeTotalForDate = (dateKey: string) =>
     getDribbleCountForDate(dateKey) + getShotAttemptsForDate(dateKey);
@@ -2806,7 +2945,12 @@ function buildDiarySkillInsight(
   const yesterdayDribbleCount = yesterdayKey ? getDribbleCountForDate(yesterdayKey) : 0;
   const yesterdayShotAttempts = yesterdayKey ? getShotAttemptsForDate(yesterdayKey) : 0;
   const previousPracticeDateKeys = Array.from(
-    new Set([...Object.keys(dailyDribbleRecords), ...shotGraphData.map((item) => item.dateKey)])
+    new Set([
+      ...Object.keys(dailyDribbleRecords),
+      ...Object.keys(homeworkState),
+      ...shotGraphData.map((item) => item.dateKey),
+      ...lessonRecords.map((record) => record.dateKey),
+    ])
   )
     .filter((dateKey) => dateKey !== selectedDateKey && parseDateKeyToTime(dateKey) < selectedDateTime && getPracticeTotalForDate(dateKey) > 0)
     .sort((left, right) => parseDateKeyToTime(right) - parseDateKeyToTime(left));
@@ -2816,8 +2960,7 @@ function buildDiarySkillInsight(
   const previousShotRecord = shotGraphData
     .filter((item) => item.dateKey !== selectedDateKey && parseDateKeyToTime(item.dateKey) < selectedDateTime && item.attempts > 0)
     .sort((left, right) => parseDateKeyToTime(right.dateKey) - parseDateKeyToTime(left.dateKey))[0] ?? null;
-  const canShowDailySummary =
-    selectedDateDribbleCount >= DAILY_DRIBBLE_TARGET && selectedShotAttempts >= DAILY_SHOOT_TARGET;
+  const canShowDailySummary = selectedDateRecordCount > 0;
 
   return {
     selectedShotAttempts,
@@ -3054,15 +3197,17 @@ function buildShootReviewFeedback(analysis: ShootAnalysis | null) {
     return '슛 촬영 분석 결과\n1. 자세를 충분히 확인하지 못했습니다. 전신과 공이 함께 보이도록 다시 촬영해 주세요.\n2. 다리 각도와 타이밍을 다시 확인할 수 있도록 조금 더 선명하게 촬영해 주세요.';
   }
 
-  const legAngleText = analysis.lowestLegAngle !== null ? `${analysis.lowestLegAngle.toFixed(1)}도` : '--';
+  const measuredLegAngle = getShootMeasuredLegAngle(analysis);
+  const legAngleText = measuredLegAngle !== null ? `${measuredLegAngle.toFixed(1)}도` : '--';
+  const legAngleState = getShootLegAngleStateFromMeasuredAngle(analysis);
   const releaseDurationText = formatReleaseDurationSeconds(analysis.releaseDurationMs);
   const legLine =
-    analysis.legAngleState === 'low'
-      ? `1. 준비 자세의 다리 각도가 ${legAngleText}로 낮습니다. 무릎을 조금 더 사용해 점프해 주세요.`
-      : analysis.legAngleState === 'high'
-        ? `1. 준비 자세의 다리 각도가 ${legAngleText}로 높습니다. 자세를 조금 더 편안하게 낮춰 주세요.`
-        : analysis.legAngleState === 'balanced'
-          ? `1. 준비 자세의 다리 각도가 ${legAngleText}로 안정적입니다.`
+    legAngleState === 'low'
+      ? `1. 준비 자세의 무릎 각도가 ${legAngleText}로 120~140도보다 작습니다. 무릎을 조금 더 펴서 점프해 주세요.`
+      : legAngleState === 'high'
+        ? `1. 준비 자세의 무릎 각도가 ${legAngleText}로 120~140도보다 큽니다. 자세를 조금 더 낮춰 주세요.`
+        : legAngleState === 'balanced'
+          ? `1. 준비 자세의 무릎 각도가 ${legAngleText}로 안정적입니다.`
           : '1. 다리 각도를 충분히 확인하지 못했습니다. 전신이 보이도록 다시 촬영해 주세요.';
 
   const timingLine =
@@ -3089,6 +3234,17 @@ function buildShootReviewFeedback(analysis: ShootAnalysis | null) {
         : '4. 릴리스 시간을 충분히 확인하지 못했습니다. 동작이 끊기지 않게 다시 촬영해 주세요.';
 
   return `슛 촬영 분석 결과\n${legLine}\n${timingLine}\n${releasePointLine}\n${releaseDurationLine}`;
+}
+
+function selectRepresentativeShootAnalysis(analyses: ShootAnalysis[], fallback: ShootAnalysis | null) {
+  const reversedAnalyses = [...analyses].reverse();
+
+  return (
+    reversedAnalyses.find((item) => item.releaseDetected)
+    ?? reversedAnalyses.find((item) => getShootMeasuredLegAngle(item) !== null)
+    ?? analyses[analyses.length - 1]
+    ?? fallback
+  );
 }
 
 function isDribbleStanceReady(analysis: DribbleAnalysis) {
@@ -3244,6 +3400,7 @@ export function useBasketballCoachApp() {
   const [shotAttemptRecords, setShotAttemptRecords] = useState<Record<string, number>>({});
   const [shotSuccessRecords, setShotSuccessRecords] = useState<Record<string, number>>({});
   const [selectedDateKey, setSelectedDateKey] = useState('');
+  const [homeworkLinkedDiaryContext, setHomeworkLinkedDiaryContext] = useState<HomeworkDiaryLinkContext | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedSkillKey, setSelectedSkillKey] = useState<SkillKey | ''>('');
   const [selectedBallBrand, setSelectedBallBrand] = useState<BallBrandOption>(DEFAULT_BALL_BRAND);
@@ -3321,6 +3478,7 @@ export function useBasketballCoachApp() {
   const seededDevTestUsersRef = useRef<Set<string>>(new Set());
   const remoteTokenRef = useRef<string | null>(null);
   const lastRemoteSnapshotRef = useRef('');
+  const lastLoggedOutAccountIdRef = useRef('');
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
   const currentUserId = currentUser?.id ?? '';
@@ -3458,7 +3616,6 @@ export function useBasketballCoachApp() {
     () => lessonRecords.filter((record) => record.dateKey === selectedDateKey).slice().reverse(),
     [lessonRecords, selectedDateKey]
   );
-  const selectedDateDribbleCount = selectedDateKey ? dailyDribbleRecords[selectedDateKey] || 0 : 0;
   const shotGraphData = useMemo<ShotGraphDatum[]>(() => {
     const allDateKeys = Array.from(
       new Set([...Object.keys(shotAttemptRecords), ...Object.keys(shotSuccessRecords)])
@@ -3481,6 +3638,11 @@ export function useBasketballCoachApp() {
     () => buildDiarySkillInsight(selectedDateKey, shotGraphData, dailyDribbleRecords, homeworkState, lessonRecords),
     [dailyDribbleRecords, homeworkState, lessonRecords, selectedDateKey, shotGraphData]
   );
+  const selectedDateDribbleCount = selectedDateKey
+    ? diarySkillInsight.leftDribbleCount + diarySkillInsight.rightDribbleCount > 0
+      ? diarySkillInsight.leftDribbleCount + diarySkillInsight.rightDribbleCount
+      : dailyDribbleRecords[selectedDateKey] || 0
+    : 0;
 
   const persistScopedAccountValue = useCallback(
     (scopedKey: keyof ReturnType<typeof getAccountStorageKeys>, value: unknown) => {
@@ -3519,6 +3681,7 @@ export function useBasketballCoachApp() {
     setShotAttemptRecords({});
     setShotSuccessRecords({});
     setSelectedDateKey(resetDateKey);
+    setHomeworkLinkedDiaryContext(null);
     setCurrentDate(resetDate);
     setSelectedSkillKey('');
     setSelectedBallBrand(DEFAULT_BALL_BRAND);
@@ -3598,25 +3761,40 @@ export function useBasketballCoachApp() {
     await AppStorage.removeItem(STORAGE_KEYS.session);
   }, []);
 
+  const persistRecentAccountId = useCallback(async (accountId?: string | null) => {
+    const nextAccountId = typeof accountId === 'string' ? accountId.trim() : '';
+    lastLoggedOutAccountIdRef.current = nextAccountId;
+
+    if (nextAccountId) {
+      await AppStorage.setItem(STORAGE_KEYS.recentAccountId, nextAccountId);
+      return;
+    }
+
+    await AppStorage.removeItem(STORAGE_KEYS.recentAccountId);
+  }, []);
+
   const activateRemoteAccount = useCallback(
     async ({
       account,
       keepSignedIn,
       snapshot,
       token,
+      cachedPassword,
       baseAccounts,
     }: {
       account: UserAccount;
       keepSignedIn: boolean;
       snapshot?: RemoteAccountSnapshot;
       token: string;
+      cachedPassword?: string;
       baseAccounts?: UserAccount[];
     }) => {
-      const nextAccount = buildCachedAccount(account);
+      const nextAccount = buildCachedAccount(account, cachedPassword);
       const nextSnapshot = normalizeAccountSnapshot(snapshot ?? createEmptyRemoteSnapshot());
       const nextAccounts = mergeCachedAccounts(baseAccounts ?? accounts, nextAccount);
 
       await AppStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(nextAccounts));
+      await persistRecentAccountId(nextAccount.id);
       const storedSnapshot = await writeStoredAccountSnapshot(nextAccount.id, nextSnapshot);
       lastRemoteSnapshotRef.current = JSON.stringify(buildRemoteSnapshot(storedSnapshot));
       await persistSession(nextAccount.id, keepSignedIn, token);
@@ -3629,7 +3807,36 @@ export function useBasketballCoachApp() {
         nextAccounts,
       };
     },
-    [accounts, persistSession]
+    [accounts, persistRecentAccountId, persistSession]
+  );
+
+  const activateCachedAccount = useCallback(
+    async ({
+      account,
+      keepSignedIn,
+      baseAccounts,
+    }: {
+      account: UserAccount;
+      keepSignedIn: boolean;
+      baseAccounts?: UserAccount[];
+    }) => {
+      remoteTokenRef.current = null;
+      const nextAccount = buildCachedAccount(account);
+      const nextAccounts = mergeCachedAccounts(baseAccounts ?? accounts, nextAccount);
+
+      await AppStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(nextAccounts));
+      await persistRecentAccountId(nextAccount.id);
+      await persistSession(nextAccount.id, keepSignedIn, null);
+      setAccounts(nextAccounts);
+      setCurrentUser(toAuthUser(nextAccount));
+      setAuthMode('login');
+
+      return {
+        nextAccount,
+        nextAccounts,
+      };
+    },
+    [accounts, persistRecentAccountId, persistSession]
   );
 
   const applyAccountSnapshot = useCallback((snapshot: RemoteAccountSnapshot) => {
@@ -3730,22 +3937,26 @@ export function useBasketballCoachApp() {
           setStartupStatusText('로그인 정보를 확인하고 있습니다.');
         }
         const entries = await withTimeout(
-          AppStorage.multiGet([STORAGE_KEYS.accounts, STORAGE_KEYS.session]),
+          AppStorage.multiGet([STORAGE_KEYS.accounts, STORAGE_KEYS.session, STORAGE_KEYS.recentAccountId]),
           STORAGE_LOAD_TIMEOUT_MS,
           [
             [STORAGE_KEYS.accounts, null],
             [STORAGE_KEYS.session, null],
+            [STORAGE_KEYS.recentAccountId, null],
           ] as [string, string | null][]
         );
         const stored = Object.fromEntries(entries);
         const parsedAccounts = sanitizeStoredAccounts(parseStoredJson<unknown[]>(stored[STORAGE_KEYS.accounts], []));
         const parsedSession = sanitizeStoredSession(parseStoredJson<unknown>(stored[STORAGE_KEYS.session], null));
+        const parsedRecentAccountId =
+          typeof stored[STORAGE_KEYS.recentAccountId] === 'string' ? stored[STORAGE_KEYS.recentAccountId]!.trim() : '';
 
         if (!isMounted) {
           return;
         }
 
         remoteTokenRef.current = parsedSession?.remoteToken ?? null;
+        lastLoggedOutAccountIdRef.current = parsedRecentAccountId;
         setAccounts(parsedAccounts);
         setAuthMode('login');
 
@@ -4207,6 +4418,8 @@ export function useBasketballCoachApp() {
       return;
     }
 
+    const stage2FeedbackSummary = getMostFrequentHomeworkFeedbackSummary(lessonRecords, 3);
+
     setHomeworkState((current) => {
       const currentDailyState = getDailyHomeworkState(current, todayKey);
 
@@ -4223,7 +4436,8 @@ export function useBasketballCoachApp() {
             todayDribbleCount,
             todayShootAttemptCount,
             todayShotSuccessCount,
-            todayLessonCount
+            todayLessonCount,
+            stage2FeedbackSummary
           ),
         },
       };
@@ -4235,6 +4449,7 @@ export function useBasketballCoachApp() {
     currentUserId,
     isAccountDataReady,
     todayDribbleCount,
+    lessonRecords,
     todayHomeworkState.stage2Unlock,
     todayKey,
     todayLessonCount,
@@ -4801,7 +5016,11 @@ export function useBasketballCoachApp() {
                 (nextState.correctionDirection === 'left' ? safeLeftHandTotal : safeRightHandTotal) - safeCorrectionProgress
               ),
               createdAt: new Date().toISOString(),
+              triggerLeftCount: safeLeftHandTotal,
+              triggerRightCount: safeRightHandTotal,
+              triggerGap: Math.abs(safeLeftHandTotal - safeRightHandTotal),
             };
+      const stage2FeedbackSummary = getMostFrequentHomeworkFeedbackSummary(lessonRecordsRef.current, 3);
       const stage2Unlock = nextState.isStage2Unlocked
         ? todayHomeworkState.stage2Unlock ??
           buildStage2UnlockSnapshot(
@@ -4809,7 +5028,8 @@ export function useBasketballCoachApp() {
             safeDribbleCount,
             safeShootAttemptCount,
             safeShotSuccessCount,
-            todayLessonCount
+            todayLessonCount,
+            stage2FeedbackSummary
           )
         : null;
 
@@ -4963,10 +5183,14 @@ export function useBasketballCoachApp() {
     const dateKey = formatDateKey(new Date());
     const mode = lessonModeRef.current;
     const latestDribbleAnalysis = latestDribbleAnalysisRef.current;
+    const representativeShootAnalysis =
+      mode === 'shoot'
+        ? selectRepresentativeShootAnalysis(shootAnalysisHistoryRef.current, latestShootAnalysisRef.current)
+        : null;
     const shotOutcome = mode === 'shoot' ? (shootSuccessRecordedForCurrentAttemptRef.current ? 'success' : 'failure') : undefined;
     const evaluation =
       mode === 'shoot'
-        ? buildShootRecordEvaluation(latestShootAnalysisRef.current, [...shootAnalysisFramesRef.current], shotOutcome)
+        ? buildShootRecordEvaluation(representativeShootAnalysis, [...shootAnalysisFramesRef.current], shotOutcome)
         : buildDribbleRecordEvaluation([...dribbleAnalysisFramesRef.current]);
     const representativeFeedback = selectRepresentativeFeedbackFromTimeline(
       [...feedbackTimelineRef.current],
@@ -5233,6 +5457,21 @@ export function useBasketballCoachApp() {
       };
     }
 
+    const normalizedNickname = normalizeNickname(trimmedNickname);
+    const matchingCachedAccount =
+      accounts.find((account) => normalizeNickname(account.nickname) === normalizedNickname) ?? null;
+    const legacyAccount = accounts.find(
+      (account) => normalizeNickname(account.nickname) === normalizedNickname && account.password === trimmedPassword
+    );
+    const recentCachedAccount = getMostRecentCachedAccount(accounts, lastLoggedOutAccountIdRef.current);
+    const recentlyUsedCachedAccount =
+      recentCachedAccount && normalizeNickname(recentCachedAccount.nickname) === normalizedNickname
+        ? recentCachedAccount
+        : null;
+    const reconnectableCachedAccount =
+      recentlyUsedCachedAccount ?? (accounts.length === 1 ? matchingCachedAccount : null) ?? legacyAccount ?? null;
+    const migrationSourceAccount = matchingCachedAccount ?? recentlyUsedCachedAccount;
+
     const remoteResult = await loginRemoteAccount({
       nickname: trimmedNickname,
       password: trimmedPassword,
@@ -5244,6 +5483,7 @@ export function useBasketballCoachApp() {
         keepSignedIn,
         snapshot: remoteResult.snapshot,
         token: remoteResult.token,
+        cachedPassword: trimmedPassword,
       });
 
       return {
@@ -5252,17 +5492,48 @@ export function useBasketballCoachApp() {
       };
     }
 
-    const normalizedNickname = normalizeNickname(trimmedNickname);
-    const legacyAccount = accounts.find(
-      (account) => normalizeNickname(account.nickname) === normalizedNickname && account.password === trimmedPassword
-    );
+    const canReconnectRecentAccount =
+      (remoteResult.code === 'server_unavailable'
+        || remoteResult.code === 'server_url_unavailable'
+        || remoteResult.code === 'invalid_server_response')
+      && Boolean(reconnectableCachedAccount);
 
-    if (remoteResult.code === 'account_not_found' && legacyAccount?.password) {
-      const legacySnapshot = await readStoredAccountSnapshot(legacyAccount.id);
+    if (canReconnectRecentAccount && reconnectableCachedAccount) {
+      await activateCachedAccount({
+        account: reconnectableCachedAccount,
+        keepSignedIn,
+      });
+
+      return {
+        success: true,
+        message: '방금 사용한 계정을 기기 저장 데이터로 다시 연결했습니다.',
+      };
+    }
+
+    const canUseLocalFallback =
+      (remoteResult.code === 'server_unavailable'
+        || remoteResult.code === 'server_url_unavailable'
+        || remoteResult.code === 'invalid_server_response')
+      && Boolean(legacyAccount?.password);
+
+    if (canUseLocalFallback && legacyAccount?.password) {
+      await activateCachedAccount({
+        account: legacyAccount,
+        keepSignedIn,
+      });
+
+      return {
+        success: true,
+        message: '저장된 계정 데이터로 다시 로그인했습니다.',
+      };
+    }
+
+    if (remoteResult.code === 'account_not_found' && migrationSourceAccount) {
+      const legacySnapshot = await readStoredAccountSnapshot(migrationSourceAccount.id);
       const migrateResult = await signupRemoteAccount({
         nickname: trimmedNickname,
         password: trimmedPassword,
-        createdAt: legacyAccount.createdAt,
+        createdAt: migrationSourceAccount.createdAt,
         snapshot: buildRemoteSnapshot(legacySnapshot),
       });
 
@@ -5272,6 +5543,7 @@ export function useBasketballCoachApp() {
           keepSignedIn,
           snapshot: migrateResult.snapshot,
           token: migrateResult.token,
+          cachedPassword: trimmedPassword,
         });
 
         return {
@@ -5283,6 +5555,81 @@ export function useBasketballCoachApp() {
       return {
         success: false,
         message: migrateResult.message,
+      };
+    }
+
+    return {
+      success: false,
+      message: remoteResult.message,
+    };
+  }
+
+  async function reconnectRecentAccount(): Promise<AuthActionResult> {
+    const recentAccount = getMostRecentCachedAccount(accounts, lastLoggedOutAccountIdRef.current);
+
+    if (!recentAccount) {
+      return {
+        success: false,
+        message: '이 기기에서 최근 사용한 계정을 찾지 못했습니다.',
+      };
+    }
+
+    if (!recentAccount.password) {
+      await activateCachedAccount({
+        account: recentAccount,
+        keepSignedIn: true,
+      });
+
+      return {
+        success: true,
+        message: '최근 사용한 계정을 다시 연결했습니다.',
+      };
+    }
+
+    const legacySnapshot = await readStoredAccountSnapshot(recentAccount.id);
+    let remoteResult = await loginRemoteAccount({
+      nickname: recentAccount.nickname,
+      password: recentAccount.password,
+    });
+
+    if (!remoteResult.success && remoteResult.code === 'account_not_found') {
+      remoteResult = await signupRemoteAccount({
+        nickname: recentAccount.nickname,
+        password: recentAccount.password,
+        createdAt: recentAccount.createdAt,
+        snapshot: buildRemoteSnapshot(legacySnapshot),
+      });
+    }
+
+    if (remoteResult.success && remoteResult.account && remoteResult.token) {
+      await activateRemoteAccount({
+        account: remoteResult.account,
+        keepSignedIn: true,
+        snapshot: remoteResult.snapshot,
+        token: remoteResult.token,
+        cachedPassword: recentAccount.password,
+      });
+
+      return {
+        success: true,
+        message: '방금 전까지 사용하던 계정으로 다시 로그인했습니다.',
+      };
+    }
+
+    const canUseLocalFallback =
+      remoteResult.code === 'server_unavailable'
+      || remoteResult.code === 'server_url_unavailable'
+      || remoteResult.code === 'invalid_server_response';
+
+    if (canUseLocalFallback) {
+      await activateCachedAccount({
+        account: recentAccount,
+        keepSignedIn: true,
+      });
+
+      return {
+        success: true,
+        message: '최근 사용한 계정을 기기 저장 데이터로 다시 연결했습니다.',
       };
     }
 
@@ -5321,6 +5668,7 @@ export function useBasketballCoachApp() {
       keepSignedIn,
       snapshot: remoteResult.snapshot,
       token: remoteResult.token,
+      cachedPassword: trimmedPassword,
     });
 
     return {
@@ -5465,6 +5813,20 @@ export function useBasketballCoachApp() {
         nextPassword: trimmedNextPassword,
       });
 
+      if (remoteResult.success) {
+        const nextAccounts = accounts.map((account) =>
+          account.id === currentUserId
+            ? {
+                ...account,
+                password: trimmedNextPassword,
+              }
+            : account
+        );
+
+        await AppStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(nextAccounts));
+        setAccounts(nextAccounts);
+      }
+
       return {
         success: remoteResult.success,
         message: remoteResult.message,
@@ -5492,15 +5854,131 @@ export function useBasketballCoachApp() {
       message: '비밀번호를 수정했습니다.',
     };
   }
+  async function deleteAccount(password: string): Promise<AuthActionResult> {
+    if (!currentUserId) {
+      return {
+        success: false,
+        message: '로그인한 계정을 먼저 확인해 주세요.',
+      };
+    }
+
+    const trimmedPassword = password.trim();
+
+    if (!trimmedPassword) {
+      return {
+        success: false,
+        message: '계정 삭제를 위해 비밀번호를 입력해 주세요.',
+      };
+    }
+
+    const currentAccount = accounts.find((account) => account.id === currentUserId);
+
+    if (!currentAccount) {
+      return {
+        success: false,
+        message: '현재 계정 정보를 찾지 못했습니다.',
+      };
+    }
+
+    if (screen === 'lesson' && (isLessonActive || isCameraActive)) {
+      await endLesson(true);
+    }
+
+    if (remoteTokenRef.current) {
+      const remoteResult = await deleteRemoteAccount(remoteTokenRef.current, {
+        password: trimmedPassword,
+      });
+
+      if (!remoteResult.success) {
+        return {
+          success: false,
+          message: remoteResult.message,
+        };
+      }
+    } else if (typeof currentAccount.password !== 'string' || currentAccount.password !== trimmedPassword) {
+      return {
+        success: false,
+        message: '비밀번호가 올바르지 않습니다.',
+      };
+    }
+
+    const scopedKeys = getAccountStorageKeys(currentUserId);
+    const storageKeysToRemove = [
+      ...Object.values(scopedKeys),
+      buildAccountStorageKey(DEV_TEST_SHOOT_RECORD_SEED_KEY, currentUserId),
+    ];
+    const videoDirectory = buildLessonRecordVideoDirectory(currentUserId);
+    const thumbnailDirectory = buildLessonRecordThumbnailDirectory(currentUserId);
+
+    await Promise.all(
+      lessonRecords.map(async (record) => {
+        if (record.videoUri && !record.videoUri.startsWith('data:')) {
+          await FileSystem.deleteAsync(record.videoUri, { idempotent: true }).catch(() => {
+            // Ignore already-removed lesson record videos during account deletion.
+          });
+        }
+
+        if (record.thumbnailUri && !record.thumbnailUri.startsWith('data:')) {
+          await FileSystem.deleteAsync(record.thumbnailUri, { idempotent: true }).catch(() => {
+            // Ignore already-removed lesson record thumbnails during account deletion.
+          });
+        }
+      })
+    );
+
+    await deleteBallRecognitionPreviewFiles(ballRecognitionPreviews).catch(() => {
+      // Ignore preview cleanup failures and continue removing the account state.
+    });
+
+    if (videoDirectory) {
+      await FileSystem.deleteAsync(videoDirectory, { idempotent: true }).catch(() => {
+        // Ignore managed lesson video directory cleanup failures.
+      });
+    }
+
+    if (thumbnailDirectory) {
+      await FileSystem.deleteAsync(thumbnailDirectory, { idempotent: true }).catch(() => {
+        // Ignore managed thumbnail directory cleanup failures.
+      });
+    }
+
+    await Promise.all(
+      storageKeysToRemove.map((key) =>
+        AppStorage.removeItem(key).catch(() => {
+          // Ignore stale storage key cleanup failures while finalizing account deletion.
+        })
+      )
+    );
+
+    const nextAccounts = accounts.filter((account) => account.id !== currentUserId);
+    await AppStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(nextAccounts));
+    await AppStorage.removeItem(STORAGE_KEYS.session);
+    await persistRecentAccountId(nextAccounts[nextAccounts.length - 1]?.id ?? null);
+
+    remoteTokenRef.current = null;
+    lastRemoteSnapshotRef.current = '';
+    setAccounts(nextAccounts);
+    resetAccountState();
+    setCurrentUser(null);
+    setHomeworkLinkedDiaryContext(null);
+    setAuthMode('login');
+
+    return {
+      success: true,
+      message: '계정을 삭제했습니다.',
+    };
+  }
   async function logout() {
     if (screen === 'lesson' && (isLessonActive || isCameraActive)) {
       await endLesson(true);
     }
 
+    await persistRecentAccountId(currentUserId);
     remoteTokenRef.current = null;
     lastRemoteSnapshotRef.current = '';
     await AppStorage.removeItem(STORAGE_KEYS.session);
     setCurrentUser(null);
+    setHomeworkLinkedDiaryContext(null);
     setAuthMode('login');
   }
   async function navigateTo(nextScreen: AppScreen) {
@@ -5509,6 +5987,11 @@ export function useBasketballCoachApp() {
     }
 
     setScreen(nextScreen);
+    if (nextScreen !== 'diary') {
+      setHomeworkLinkedDiaryContext(null);
+    } else {
+      setHomeworkLinkedDiaryContext(null);
+    }
     if (nextScreen === 'lesson') {
       void startLessonCameraPreview();
     }
@@ -5517,6 +6000,17 @@ export function useBasketballCoachApp() {
       setSelectedDateKey(formatDateKey(today));
       setCurrentDate(today);
     }
+  }
+
+  async function openHomeworkLinkedDiary(context: HomeworkDiaryLinkContext) {
+    if (screen === 'lesson' && (isLessonActive || isCameraActive)) {
+      await endLesson(true);
+    }
+
+    setHomeworkLinkedDiaryContext(context);
+    setSelectedDateKey(context.dateKey);
+    setCurrentDate(parseDateKeyToDate(context.dateKey));
+    setScreen('diary');
   }
 
   function selectSkill(skillKey: SkillKey) {
@@ -6256,11 +6750,10 @@ export function useBasketballCoachApp() {
       clearRecordingWait();
       pendingShootReviewRef.current = false;
 
-      const recordedAnalyses = shootAnalysisHistoryRef.current;
-      const finalAnalysis =
-        [...recordedAnalyses].reverse().find((item) => item.releaseDetected) ??
-        recordedAnalyses[recordedAnalyses.length - 1] ??
-        latestShootAnalysisRef.current;
+      const finalAnalysis = selectRepresentativeShootAnalysis(
+        shootAnalysisHistoryRef.current,
+        latestShootAnalysisRef.current
+      );
 
       const finalFeedback = buildShootReviewFeedback(finalAnalysis ?? null);
       latestFeedbackRef.current = finalFeedback;
@@ -6328,8 +6821,8 @@ export function useBasketballCoachApp() {
     setRecordingStartToken(Date.now());
     setImmediateLessonFeedback(
       isFrontDribble
-        ? '?쒖옉?⑸땲?? 吏湲덈????뱁솕瑜??쒖옉?섍퀬 ?쒕━釉??잛닔瑜??됰땲?? ?ㅼ젙???잛닔源뚯? ?쒕━釉뷀빐 二쇱꽭??'
-        : '?쒖옉?⑸땲?? ?댁젣 ?쒕━釉붿쓣 吏꾪뻾??二쇱꽭?? 怨??믪씠? ?쒖꽑, ?먯꽭瑜?怨꾩냽 遺꾩꽍?⑸땲??'
+        ? '시작합니다. 지금부터 드리블을 시작하고 횟수를 셉니다. 설정한 횟수까지 드리블해 주세요.'
+        : '시작합니다. 이제 드리블을 진행해 주세요. 공 높이와 시선, 자세를 계속 분석합니다.'
     );
     setDebugText('移댁슫???꾨즺, ?쒕━釉??쒖옉');
   }
@@ -6356,7 +6849,7 @@ export function useBasketballCoachApp() {
       setRecordingStartToken(Date.now());
       shootRecordingStartedRef.current = true;
     }
-    setImmediateLessonFeedback('?쒖옉?⑸땲?? ?댁젣 ?쏆쓣 諛쒖궗??二쇱꽭?? 珥ъ쁺???앸굹硫???湲곗? 寃곌낵瑜??뚮젮?쒕┰?덈떎.');
+    setImmediateLessonFeedback('시작합니다. 이제 슛을 발사해 주세요. 촬영이 끝나면 기준에 따라 결과를 알려드립니다.');
     setDebugText('移댁슫???꾨즺, ??珥ъ쁺 ?쒖옉');
   }
 
@@ -6432,7 +6925,7 @@ export function useBasketballCoachApp() {
       if (phase === 'stance_setup') {
         dribbleLessonPhaseRef.current = 'countdown';
         stanceCountdownStartedAtRef.current = Date.now();
-        setImmediateLessonFeedback('醫뗭븘?? 以鍮??먯꽭媛 湲곗???留욎븯?듬땲?? 3珥??숈븞 洹몃?濡??좎???二쇱꽭??');
+        setImmediateLessonFeedback('좋아요. 준비 자세가 기준에 맞습니다. 3초 동안 그대로 유지해 주세요.');
         setDebugText('드리블 준비 자세 확인: 3초 유지 중');
         return;
       }
@@ -6449,19 +6942,19 @@ export function useBasketballCoachApp() {
         const remainingSeconds = Math.max(1, Math.ceil((DRIBBLE_STANCE_HOLD_MS - elapsed) / 1000));
         pendingFeedbackRef.current =
           targetView === 'front'
-            ? `?뺣㈃ ?쒕━釉?以鍮??먯꽭瑜??좎???二쇱꽭??
-1. 諛?臾대쫷-?됰뜦??媛곷룄瑜?140~170?꾨줈 ?좎???二쇱꽭??
-2. ${remainingSeconds}珥??숈븞 ?먯꽭瑜??좎??섎㈃ ?뱁솕? ?쒕━釉?移댁슫?멸? ?쒖옉?⑸땲??
-3. 怨듦낵 ?섏껜媛 ?④퍡 ??蹂댁씠?꾨줉 ??二쇱꽭??`
-            : `?녿え???쒕━釉?以鍮??먯꽭瑜??좎???二쇱꽭??
-1. ?곸껜 湲곗슱湲곕? 40~80?꾨줈 ?좎???二쇱꽭??
-2. ${remainingSeconds}珥??숈븞 ?먯꽭瑜??좎??섎㈃ ?쒕━釉붿쓣 ?쒖옉?⑸땲??
-3. 怨듦낵 ?곸껜媛 ?④퍡 ??蹂댁씠?꾨줉 ??二쇱꽭??`;
+            ? `정면 드리블 준비 자세를 유지해 주세요.
+1. 발-무릎-엉덩이 각도를 140~170도로 맞춰 주세요.
+2. ${remainingSeconds}초 동안 자세를 유지하면 드리블 카운트가 시작됩니다.
+3. 공과 하체가 화면 안에 함께 보이도록 맞춰 주세요.`
+            : `옆모습 드리블 준비 자세를 유지해 주세요.
+1. 상체 기울기를 40~80도로 맞춰 주세요.
+2. ${remainingSeconds}초 동안 자세를 유지하면 드리블을 시작합니다.
+3. 공과 상체가 화면 안에 함께 보이도록 맞춰 주세요.`;
         setDebugText(`以鍮??먯꽭 ?좎? 以? ${remainingSeconds}珥??⑥쓬`);
         return;
       }
 
-      pendingFeedbackRef.current = '?댁젣 ?쒕━釉붿쓣 ?쒖옉??二쇱꽭?? 怨듭씠 諛?媛源뚯씠 ?대젮?붾떎媛 ?ㅼ떆 ?щ씪?ㅻ㈃ ?쒕━釉?遺꾩꽍???댁뼱媛묐땲??';
+      pendingFeedbackRef.current = '이제 드리블을 시작해 주세요. 공이 발 가까이 내려왔다가 다시 올라오면 드리블 분석을 이어갑니다.';
       setDebugText('드리블 시작 대기 중');
       return;
       setDebugText(`??遺꾩꽍 以? ${analysis.summary}`);
@@ -6555,7 +7048,7 @@ export function useBasketballCoachApp() {
           stanceCountdownStartedAtRef.current = null;
           setCountdownValue(null);
           pendingFeedbackRef.current =
-            '??以鍮??먯꽭媛 ?먰듃?ъ죱?듬땲??\n1. ??媛곷룄瑜??ㅼ떆 80~120?꾨줈 留욎떠 二쇱꽭??\n2. 以鍮??먯꽭媛 ?ㅼ떆 ?≫엳硫?3珥?移댁슫?몃? 泥섏쓬遺???쒖옉?⑸땲??\n3. 移댁슫?멸? ?앸굹硫?洹몃븣 ???덉뒯???쒖옉?⑸땲??';
+            '슛 준비 자세가 흐트러졌습니다.\n1. 팔 각도를 다시 80~120도로 맞춰 주세요.\n2. 준비 자세가 다시 잡히면 3초 카운트를 처음부터 시작합니다.\n3. 카운트가 끝나면 그때 레슨을 시작합니다.';
           setDebugText('??以鍮??먯꽭媛 臾대꼫??移댁슫?몃? ?ㅼ떆 ?쒖옉?⑸땲??');
           return;
         }
@@ -6569,7 +7062,7 @@ export function useBasketballCoachApp() {
         }
 
         const remainingSeconds = Math.max(1, Math.ceil((DRIBBLE_STANCE_HOLD_MS - elapsed) / 1000));
-        pendingFeedbackRef.current = `??以鍮??먯꽭瑜??좎???二쇱꽭??\n1. ??媛곷룄瑜?湲곗? 踰붿쐞 ?덉쑝濡?留욎떠 二쇱꽭??\n2. ${remainingSeconds}珥??숈븞 ?먯꽭瑜??좎??섎㈃ ???덉뒯???쒖옉?⑸땲??\n3. ?쏆씠 ?앸궃 ????湲곗? 寃곌낵瑜??뚮젮?쒕┰?덈떎.`;
+        pendingFeedbackRef.current = `슛 준비 자세를 유지해 주세요.\n1. 팔 각도를 기준 범위 안으로 맞춰 주세요.\n2. ${remainingSeconds}초 동안 자세를 유지하면 슛 레슨을 시작합니다.\n3. 슛이 끝나면 기준에 따라 결과를 알려드립니다.`;
         setDebugText(`??以鍮??먯꽭 ?좎? 以? ${remainingSeconds}珥??⑥쓬`);
         return;
       }
@@ -6586,7 +7079,7 @@ export function useBasketballCoachApp() {
       if (phase === 'stance_setup') {
         dribbleLessonPhaseRef.current = 'countdown';
         stanceCountdownStartedAtRef.current = Date.now();
-        setImmediateLessonFeedback('醫뗭븘?? ??以鍮??먯꽭媛 留욎븯?듬땲?? 3珥??숈븞 洹몃?濡??좎???二쇱꽭??');
+        setImmediateLessonFeedback('좋아요. 슛 준비 자세가 맞습니다. 3초 동안 그대로 유지해 주세요.');
         setDebugText('슛 준비 자세 확인: 3초 유지 중');
         return;
       }
@@ -6727,7 +7220,7 @@ export function useBasketballCoachApp() {
             pendingShootReviewRef.current = false;
             pendingShootRecordingStopRef.current = false;
             const finalFeedback = buildShootReviewFeedback(latestShootAnalysisRef.current);
-            latestFeedbackRef.current = `${finalFeedback}\n\n?곸긽 ??μ뿉???ㅽ뙣?덉뒿?덈떎.`;
+            latestFeedbackRef.current = `${finalFeedback}\n\n영상 저장에 실패했습니다.`;
             setFeedbackText(latestFeedbackRef.current);
             resetShootAnalysisTracking();
             setRecordingStartToken(0);
@@ -6741,7 +7234,7 @@ export function useBasketballCoachApp() {
             setIsCameraActive(true);
             setIsCameraReady(true);
             setIsShootSuccessButtonVisible(false);
-            setImmediateLessonFeedback(`${latestFeedbackRef.current}\n\n?ㅼ떆 ??以鍮??먯꽭瑜?留욎떠 二쇱꽭??`);
+            setImmediateLessonFeedback(`${latestFeedbackRef.current}\n\n다시 슛 준비 자세를 맞춰 주세요.`);
             return;
           }
 
@@ -6782,8 +7275,13 @@ export function useBasketballCoachApp() {
   );
 
   function openDiaryDate(dateKey: string) {
+    setHomeworkLinkedDiaryContext(null);
     setSelectedDateKey(dateKey);
     setCurrentDate(parseDateKeyToDate(dateKey));
+  }
+
+  function clearHomeworkLinkedDiaryContext() {
+    setHomeworkLinkedDiaryContext(null);
   }
 
   function changeMonth(delta: number) {
@@ -6889,7 +7387,9 @@ export function useBasketballCoachApp() {
     homeworkTestState,
     currentDate,
     selectedDateKey,
+    lessonRecords,
     selectedDateRecords,
+    homeworkLinkedDiaryContext,
     selectedDateDribbleCount,
     diarySkillInsight,
     shotGraphData,
@@ -6928,9 +7428,11 @@ export function useBasketballCoachApp() {
     createTransferCode,
     importAccountTransfer,
     login,
+    reconnectRecentAccount,
     signup,
     updateProfile,
     changePassword,
+    deleteAccount,
     logout,
     navigateTo,
     changeLessonMode,
@@ -6951,8 +7453,11 @@ export function useBasketballCoachApp() {
     selectPosition,
     setSelectedDribbleView,
     openSkillVideo,
+    recentLoginAccount: getMostRecentCachedAccount(accounts, lastLoggedOutAccountIdRef.current),
     applyHomeworkTestState,
     openDiaryDate,
+    openHomeworkLinkedDiary,
+    clearHomeworkLinkedDiaryContext,
     changeMonth,
     deleteLessonRecord,
   };

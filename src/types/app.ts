@@ -188,6 +188,22 @@ export interface DiarySkillInsight {
   evaluationDominantLevel: LessonRecordLevel | 'mixed' | 'none';
 }
 
+export interface HomeworkLinkedRecordPreview {
+  recordId: string;
+  dateKey: string;
+  mode: LessonMode;
+  thumbnailUri: string;
+  createdAt: string;
+}
+
+export interface HomeworkDiaryLinkContext {
+  dateKey: string;
+  title: string;
+  feedbackLabel: string;
+  recordIds: string[];
+  previewRecords: HomeworkLinkedRecordPreview[];
+}
+
 export interface HomeworkProgressItem {
   id: string;
   title: string;
@@ -203,6 +219,7 @@ export interface HomeworkProgressItem {
   reasonText?: string;
   detailToggleText?: string;
   detailText?: string;
+  linkedDiaryContext?: HomeworkDiaryLinkContext | null;
 }
 
 export interface SkillVideoOpenEvent {
@@ -217,12 +234,17 @@ export interface HomeworkUnlockSnapshot {
   shootAttemptCount: number;
   shotSuccessCount: number;
   lessonCount: number;
+  feedbackCategory?: HomeworkFeedbackCategory | null;
+  feedbackCount?: number;
 }
 
 export interface CorrectionHomeworkState {
   direction: HomeworkCorrectionSide;
   baselineCount: number;
   createdAt: string;
+  triggerLeftCount?: number;
+  triggerRightCount?: number;
+  triggerGap?: number;
 }
 
 export interface DailyHomeworkState {

@@ -85,13 +85,14 @@ export function buildShootFeedbackText(analysis: ShootAnalysis): string {
         ? '발사 직전 가장 최근 공의 위치가 머리보다 아래에 있습니다. 공을 조금 더 높게 끌어올려 슛해 주세요.'
         : '발사 직전 가장 최근 공의 위치를 확인하는 중입니다. 머리와 공이 함께 보이도록 맞춰 주세요.';
 
+  const measuredLegAngle = analysis.lowestLegAngle ?? analysis.legAngle;
   const legLine =
     analysis.legAngleState === 'low'
-      ? `점프 준비 자세의 하체 각도가 ${analysis.lowestLegAngle ? analysis.lowestLegAngle.toFixed(1) : '--'}도로 너무 낮습니다. 무릎을 조금 더 펴서 점프해 주세요.`
+      ? `점프 준비 자세의 무릎 각도가 ${measuredLegAngle !== null ? measuredLegAngle.toFixed(1) : '--'}도로 120~140도보다 작습니다. 무릎을 조금 더 펴서 점프해 주세요.`
       : analysis.legAngleState === 'high'
-        ? `점프 준비 자세의 하체 각도가 ${analysis.lowestLegAngle ? analysis.lowestLegAngle.toFixed(1) : '--'}도로 너무 높습니다. 자세를 더 낮춰 점프해 주세요.`
+        ? `점프 준비 자세의 무릎 각도가 ${measuredLegAngle !== null ? measuredLegAngle.toFixed(1) : '--'}도로 120~140도보다 큽니다. 자세를 더 낮춰 점프해 주세요.`
         : analysis.legAngleState === 'balanced'
-          ? '점프 준비 자세의 하체 각도는 안정적입니다.'
+          ? '점프 준비 자세의 무릎 각도는 안정적입니다.'
           : '엉덩이, 무릎, 발이 잘 보이도록 서서 하체 자세를 확인해 주세요.';
 
   const timingLine =

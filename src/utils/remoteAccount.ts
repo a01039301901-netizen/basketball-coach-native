@@ -48,7 +48,7 @@ export interface RemoteAuthResult extends RemoteActionResult {
 
 interface RemoteRequestOptions {
   body?: unknown;
-  method?: 'GET' | 'POST' | 'PATCH' | 'PUT';
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   token?: string | null;
 }
 
@@ -279,6 +279,19 @@ export function updateRemoteAccountPassword(
 ) {
   return requestRemote<RemoteActionResult>('/me/password', {
     method: 'POST',
+    token,
+    body: values,
+  });
+}
+
+export function deleteRemoteAccount(
+  token: string,
+  values: {
+    password: string;
+  }
+) {
+  return requestRemote<RemoteActionResult>('/me', {
+    method: 'DELETE',
     token,
     body: values,
   });

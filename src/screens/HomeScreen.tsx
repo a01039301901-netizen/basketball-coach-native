@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { colors } from '../theme/colors';
-import type { HomeworkProgressItem } from '../types/app';
+import type { HomeworkDiaryLinkContext, HomeworkProgressItem, LessonMode, LessonRecord } from '../types/app';
 import { getDesktopMobileFrameWidth, shouldUseDesktopMobileLayout } from '../utils/layout';
 
 type HomeMenuArtworkType = 'lesson' | 'diary';
@@ -13,8 +13,10 @@ const rulesGuideIcon = require('../../assets/rules-guide-icon.png');
 
 interface HomeScreenProps {
   homeworkToShow: HomeworkProgressItem[];
+  lessonRecords: LessonRecord[];
   onOpenLesson: () => void;
   onOpenDiary: () => void;
+  onOpenHomeworkLinkedDiary: (context: HomeworkDiaryLinkContext) => void;
   onOpenRules: () => void;
 }
 
@@ -49,6 +51,22 @@ function HomeMenuArtwork({ type }: { type: HomeMenuArtworkType }) {
       <Image source={diaryCalendarArt} resizeMode="contain" style={styles.diaryArtworkImage} />
     </View>
   );
+}
+
+function getHomeworkPreviewModeLabel(mode: LessonMode) {
+  return mode === 'shoot' ? '슛 레슨' : '드리블 레슨';
+}
+
+function getHomeworkEvaluationLevelLabel(level: NonNullable<LessonRecord['evaluation']>['level']) {
+  if (level === 'good') {
+    return '좋음';
+  }
+
+  if (level === 'average') {
+    return '보통';
+  }
+
+  return '나쁨';
 }
 
 function HomeMenuButton({
@@ -153,14 +171,58 @@ function HomeMenuButton({
 
 export function HomeScreen({
   homeworkToShow,
+  lessonRecords,
   onOpenLesson,
   onOpenDiary,
+  onOpenHomeworkLinkedDiary,
   onOpenRules,
 }: HomeScreenProps) {
   const { width } = useWindowDimensions();
   const layoutWidth = shouldUseDesktopMobileLayout(width) ? getDesktopMobileFrameWidth(width) : width;
   const isWide = layoutWidth >= 860;
-  const [openedHomeworkDetailIds, setOpenedHomeworkDetailIds] = useState<Record<string, boolean>>({});
+  const [selectedHomeworkReasonItem, setSelectedHomeworkReasonItem] = useState<HomeworkProgressItem | null>(null);
+  const [selectedHomeworkEvaluationRecord, setSelectedHomeworkEvaluationRecord] = useState<LessonRecord | null>(null);
+  const selectedHomeworkReasonSummary = selectedHomeworkReasonItem?.reasonText?.trim() || '';
+  const hasSelectedHomeworkDetailText = Boolean(selectedHomeworkReasonItem?.detailText?.trim());
+  const selectedHomeworkReasonText =
+    selectedHomeworkReasonItem?.detailText?.trim() ||
+    selectedHomeworkReasonSummary ||
+    '이 숙제가 생성된 이유를 준비하고 있어요.';
+  const lessonRecordMap = useMemo(
+    () => new Map(lessonRecords.map((record) => [record.id, record] as const)),
+    [lessonRecords]
+  );
+  const selectedHomeworkLinkedRecordCards = useMemo(() => {
+    const previewRecords = selectedHomeworkReasonItem?.linkedDiaryContext?.previewRecords ?? [];
+
+    return previewRecords.map((preview) => ({
+      preview,
+      record: lessonRecordMap.get(preview.recordId) ?? null,
+    }));
+  }, [lessonRecordMap, selectedHomeworkReasonItem]);
+  const selectedHomeworkEvaluation = selectedHomeworkEvaluationRecord?.evaluation ?? null;
+
+  function closeHomeworkReasonModal() {
+    setSelectedHomeworkEvaluationRecord(null);
+    setSelectedHomeworkReasonItem(null);
+  }
+
+  function closeHomeworkEvaluationModal() {
+    setSelectedHomeworkEvaluationRecord(null);
+  }
+
+  function openHomeworkEvaluationRecord(record: LessonRecord | null) {
+    if (!record) {
+      return;
+    }
+
+    setSelectedHomeworkEvaluationRecord(record);
+  }
+
+  function openLessonFromHomeworkReason() {
+    closeHomeworkReasonModal();
+    onOpenLesson();
+  }
 
   const menuButtons = [
     {
@@ -241,39 +303,30 @@ export function HomeScreen({
         </View>
         <View style={styles.homeworkList}>
           {homeworkToShow.map((item) => {
-            const hasDetail = Boolean(item.detailText);
-            const isDetailOpened = Boolean(openedHomeworkDetailIds[item.id]);
+            const hasReasonDetail = Boolean(item.detailText || item.reasonText);
+            const isDailyPracticeHomework = item.stage === 'base' && item.source === 'daily';
+            const homeworkDetailLabel = `${item.detailToggleText || '자세히 보기'} >`;
 
             return (
-              <View key={item.id} style={styles.homeworkItem}>
-                {item.reasonText ? (
-                  <Text style={styles.homeworkReasonText}>{item.reasonText}</Text>
+              <Pressable
+                key={item.id}
+                disabled={!hasReasonDetail}
+                onPress={hasReasonDetail ? () => setSelectedHomeworkReasonItem(item) : undefined}
+                style={({ pressed }) => [styles.homeworkItem, hasReasonDetail && pressed && styles.pressed]}
+              >
+                {isDailyPracticeHomework || hasReasonDetail ? (
+                  <View style={styles.homeworkItemTopRow}>
+                    {isDailyPracticeHomework ? (
+                      <Text style={styles.homeworkCategoryText}>{'하루 연습량'}</Text>
+                    ) : null}
+                    {hasReasonDetail ? <Text style={styles.homeworkDetailToggleText}>{homeworkDetailLabel}</Text> : null}
+                  </View>
                 ) : null}
 
                 <View style={styles.homeworkHeader}>
                   <View style={[styles.homeworkBullet, item.isCompleted && styles.homeworkBulletCompleted]} />
                   <Text style={styles.homeworkText}>{item.title}</Text>
                 </View>
-
-                {hasDetail ? (
-                  <Pressable
-                    onPress={() =>
-                      setOpenedHomeworkDetailIds((current) => ({
-                        ...current,
-                        [item.id]: !current[item.id],
-                      }))
-                    }
-                    style={({ pressed }) => [styles.homeworkDetailToggleButton, pressed && styles.pressed]}
-                  >
-                    <Text style={styles.homeworkDetailToggleText}>
-                      {isDetailOpened ? '접기' : item.detailToggleText || '자세히 보기'}
-                    </Text>
-                  </Pressable>
-                ) : null}
-
-                {hasDetail && isDetailOpened ? (
-                  <Text style={styles.homeworkDetailText}>{item.detailText}</Text>
-                ) : null}
 
                 <View style={styles.homeworkMetaRow}>
                   <Text style={styles.homeworkStatus}>{item.completionText}</Text>
@@ -282,7 +335,7 @@ export function HomeScreen({
                 <View style={styles.progressTrack}>
                   <View style={[styles.progressFill, { width: `${item.progressPercent}%` }]} />
                 </View>
-              </View>
+              </Pressable>
             );
           })}
         </View>
@@ -308,6 +361,185 @@ export function HomeScreen({
           </View>
         </Pressable>
       </View>
+
+      <Modal
+        visible={Boolean(selectedHomeworkReasonItem)}
+        transparent
+        animationType="fade"
+        onRequestClose={closeHomeworkReasonModal}
+      >
+        <View style={styles.reasonModalOverlay}>
+          <Pressable style={styles.reasonModalBackdrop} onPress={closeHomeworkReasonModal} />
+          <View style={styles.reasonModalCard}>
+            <View style={styles.reasonModalHeader}>
+              <Text style={styles.reasonModalTitle}>{selectedHomeworkReasonItem?.title}</Text>
+              <Pressable
+                onPress={closeHomeworkReasonModal}
+                style={({ pressed }) => [styles.reasonModalCloseButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.reasonModalCloseButtonText}>닫기</Text>
+              </Pressable>
+            </View>
+            <ScrollView
+              style={styles.reasonModalScroll}
+              contentContainerStyle={styles.reasonModalScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {selectedHomeworkReasonSummary && hasSelectedHomeworkDetailText ? (
+                <Text style={styles.reasonModalSummary}>{selectedHomeworkReasonSummary}</Text>
+              ) : null}
+              {selectedHomeworkLinkedRecordCards.length > 0 ? (
+                <View style={styles.reasonModalLinkedPreviewRow}>
+                  {selectedHomeworkLinkedRecordCards.map(({ preview, record }) => (
+                    <Pressable
+                      key={preview.recordId}
+                      disabled={!record}
+                      onPress={() => openHomeworkEvaluationRecord(record)}
+                      style={({ pressed }) => [
+                        styles.reasonModalLinkedPreviewCard,
+                        !record && styles.reasonModalLinkedPreviewCardDisabled,
+                        record && pressed && styles.pressed,
+                      ]}
+                    >
+                      {preview.thumbnailUri.trim() ? (
+                        <Image source={{ uri: preview.thumbnailUri }} resizeMode="cover" style={styles.reasonModalLinkedPreviewImage} />
+                      ) : (
+                        <View style={[styles.reasonModalLinkedPreviewImage, styles.reasonModalLinkedPreviewImageEmpty]}>
+                          <Text style={styles.reasonModalLinkedPreviewEmptyText}>기록</Text>
+                        </View>
+                      )}
+                      <View style={styles.reasonModalLinkedPreviewMeta}>
+                        <Text style={styles.reasonModalLinkedPreviewMode}>{getHomeworkPreviewModeLabel(preview.mode)}</Text>
+                        <Text style={styles.reasonModalLinkedPreviewTime} numberOfLines={1}>
+                          {preview.createdAt}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+              <Text style={styles.reasonModalBody}>{selectedHomeworkReasonText}</Text>
+              <Pressable
+                onPress={openLessonFromHomeworkReason}
+                style={({ pressed }) => [styles.reasonModalActionButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.reasonModalActionButtonText}>바로 레슨하러 가기</Text>
+              </Pressable>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={Boolean(selectedHomeworkEvaluationRecord)}
+        transparent
+        animationType="fade"
+        onRequestClose={closeHomeworkEvaluationModal}
+      >
+        <View style={styles.homeworkEvaluationOverlay}>
+          <Pressable style={styles.homeworkEvaluationBackdrop} onPress={closeHomeworkEvaluationModal} />
+          <View style={styles.homeworkEvaluationCard}>
+            <View style={styles.homeworkEvaluationHeader}>
+              <Text style={styles.homeworkEvaluationTitle}>기록 평가</Text>
+              <Pressable
+                onPress={closeHomeworkEvaluationModal}
+                style={({ pressed }) => [styles.homeworkEvaluationCloseButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.homeworkEvaluationCloseText}>닫기</Text>
+              </Pressable>
+            </View>
+            <ScrollView
+              style={styles.homeworkEvaluationScroll}
+              contentContainerStyle={styles.homeworkEvaluationScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {selectedHomeworkEvaluationRecord?.thumbnailUri.trim() ? (
+                <Image
+                  source={{ uri: selectedHomeworkEvaluationRecord.thumbnailUri }}
+                  resizeMode="cover"
+                  style={styles.homeworkEvaluationThumbnail}
+                />
+              ) : (
+                <View style={[styles.homeworkEvaluationThumbnail, styles.homeworkEvaluationThumbnailEmpty]}>
+                  <Text style={styles.homeworkEvaluationThumbnailEmptyText}>썸네일 없음</Text>
+                </View>
+              )}
+
+              <View style={styles.homeworkEvaluationMetaRow}>
+                <View style={styles.homeworkEvaluationModeBadge}>
+                  <Text style={styles.homeworkEvaluationModeBadgeText}>
+                    {selectedHomeworkEvaluationRecord ? getHomeworkPreviewModeLabel(selectedHomeworkEvaluationRecord.mode) : ''}
+                  </Text>
+                </View>
+                {selectedHomeworkEvaluation ? (
+                  <View
+                    style={[
+                      styles.homeworkEvaluationLevelBadge,
+                      selectedHomeworkEvaluation.level === 'good'
+                        ? styles.homeworkEvaluationLevelBadgeGood
+                        : selectedHomeworkEvaluation.level === 'average'
+                          ? styles.homeworkEvaluationLevelBadgeAverage
+                          : styles.homeworkEvaluationLevelBadgeBad,
+                    ]}
+                  >
+                    <Text style={styles.homeworkEvaluationLevelText}>
+                      {getHomeworkEvaluationLevelLabel(selectedHomeworkEvaluation.level)}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {selectedHomeworkEvaluationRecord?.createdAt ? (
+                <Text style={styles.homeworkEvaluationCreatedAt}>{selectedHomeworkEvaluationRecord.createdAt}</Text>
+              ) : null}
+
+              {selectedHomeworkEvaluation ? (
+                <>
+                  <Text style={styles.homeworkEvaluationSummary}>{selectedHomeworkEvaluation.summary}</Text>
+                  <View style={styles.homeworkEvaluationCriteriaList}>
+                    {selectedHomeworkEvaluation.criteria.map((criterion) => (
+                      <View key={`${criterion.key}-${criterion.label}`} style={styles.homeworkEvaluationCriterionRow}>
+                        <View
+                          style={[
+                            styles.homeworkEvaluationCriterionStatus,
+                            criterion.isStable
+                              ? styles.homeworkEvaluationCriterionStatusStable
+                              : styles.homeworkEvaluationCriterionStatusUnstable,
+                          ]}
+                        >
+                          <Text style={styles.homeworkEvaluationCriterionStatusText}>
+                            {criterion.isStable ? '좋음' : '보완'}
+                          </Text>
+                        </View>
+                        <View style={styles.homeworkEvaluationCriterionTextWrap}>
+                          <Text style={styles.homeworkEvaluationCriterionLabel}>{criterion.label}</Text>
+                          <Text style={styles.homeworkEvaluationCriterionDetail}>{criterion.detail}</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+
+                  {selectedHomeworkEvaluation.improvements.length > 0 ? (
+                    <View style={styles.homeworkEvaluationHighlightList}>
+                      <Text style={styles.homeworkEvaluationSectionTitle}>보완 포인트</Text>
+                      {selectedHomeworkEvaluation.improvements.map((highlight, index) => (
+                        <View key={`${highlight.label}-${index}`} style={styles.homeworkEvaluationHighlightCard}>
+                          <Text style={styles.homeworkEvaluationHighlightLabel}>{highlight.label}</Text>
+                          <Text style={styles.homeworkEvaluationHighlightDetail}>{highlight.detail}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+                </>
+              ) : (
+                <Text style={styles.homeworkEvaluationEmptyText}>
+                  자세한 기록 평가는 AI로 분석한 기록부터 확인할 수 있습니다.
+                </Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -598,11 +830,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
-  homeworkReasonText: {
-    color: colors.textMuted,
+  homeworkCategoryText: {
+    color: colors.textAccent,
     fontSize: 12,
     lineHeight: 18,
-    fontWeight: '600',
+    fontWeight: '800',
+  },
+  homeworkItemTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   homeworkHeader: {
     flexDirection: 'row',
@@ -625,20 +862,12 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     fontWeight: '700',
   },
-  homeworkDetailToggleButton: {
-    alignSelf: 'flex-start',
-  },
   homeworkDetailToggleText: {
+    marginLeft: 'auto',
     color: colors.textMuted,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: '700',
-  },
-  homeworkDetailText: {
-    color: colors.textSoft,
-    fontSize: 13,
-    lineHeight: 20,
-    fontWeight: '600',
   },
   homeworkMetaRow: {
     flexDirection: 'row',
@@ -666,6 +895,45 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 999,
     backgroundColor: colors.secondary,
+  },
+  homeworkLinkedSection: {
+    gap: 10,
+    marginTop: 4,
+  },
+  homeworkLinkedSectionTitle: {
+    color: colors.textSoft,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
+  homeworkLinkedPreviewRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  homeworkLinkedPreviewCard: {
+    flex: 1,
+    gap: 8,
+  },
+  homeworkLinkedPreviewImage: {
+    width: '100%',
+    aspectRatio: 1.18,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+  },
+  homeworkLinkedPreviewImageEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeworkLinkedPreviewEmptyText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  homeworkLinkedPreviewLabel: {
+    color: colors.textMuted,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '700',
   },
   secondaryCards: {
     gap: 12,
@@ -717,6 +985,318 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     opacity: 0.96,
+  },
+  reasonModalOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+  },
+  reasonModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(8, 10, 16, 0.56)',
+  },
+  reasonModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '86%',
+    borderRadius: 24,
+    backgroundColor: colors.surface,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 20,
+    gap: 12,
+  },
+  reasonModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  reasonModalTitle: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '800',
+  },
+  reasonModalCloseButton: {
+    alignSelf: 'flex-start',
+  },
+  reasonModalCloseButtonText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
+  reasonModalScroll: {
+    flexGrow: 0,
+  },
+  reasonModalScrollContent: {
+    gap: 14,
+  },
+  reasonModalSummary: {
+    color: colors.text,
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: '700',
+  },
+  reasonModalLinkedPreviewRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  reasonModalLinkedPreviewCard: {
+    width: '48%',
+    gap: 8,
+  },
+  reasonModalLinkedPreviewCardDisabled: {
+    opacity: 0.55,
+  },
+  reasonModalLinkedPreviewImage: {
+    width: '100%',
+    aspectRatio: 1.16,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceStrong,
+  },
+  reasonModalLinkedPreviewImageEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reasonModalLinkedPreviewEmptyText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  reasonModalLinkedPreviewMeta: {
+    gap: 2,
+  },
+  reasonModalLinkedPreviewMode: {
+    color: colors.text,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '800',
+  },
+  reasonModalLinkedPreviewTime: {
+    color: colors.textMuted,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '600',
+  },
+  reasonModalBody: {
+    color: colors.textSoft,
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: '600',
+  },
+  reasonModalActionButton: {
+    marginTop: 4,
+    alignSelf: 'stretch',
+    borderRadius: 0,
+    paddingHorizontal: 18,
+    paddingVertical: 13,
+    backgroundColor: colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reasonModalActionButtonText: {
+    color: '#1b130c',
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '900',
+  },
+  homeworkEvaluationOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+  },
+  homeworkEvaluationBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(8, 10, 16, 0.68)',
+  },
+  homeworkEvaluationCard: {
+    width: '100%',
+    maxWidth: 460,
+    maxHeight: '88%',
+    borderRadius: 24,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 18,
+    gap: 14,
+  },
+  homeworkEvaluationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  homeworkEvaluationTitle: {
+    color: colors.text,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '900',
+  },
+  homeworkEvaluationCloseButton: {
+    alignSelf: 'flex-start',
+  },
+  homeworkEvaluationCloseText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
+  homeworkEvaluationScroll: {
+    flexGrow: 0,
+  },
+  homeworkEvaluationScrollContent: {
+    gap: 14,
+    paddingBottom: 4,
+  },
+  homeworkEvaluationThumbnail: {
+    width: '100%',
+    height: 184,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceStrong,
+  },
+  homeworkEvaluationThumbnailEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeworkEvaluationThumbnailEmptyText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  homeworkEvaluationMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  homeworkEvaluationModeBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#f5ddc4',
+  },
+  homeworkEvaluationModeBadgeText: {
+    color: '#51331c',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  homeworkEvaluationLevelBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  homeworkEvaluationLevelBadgeGood: {
+    backgroundColor: 'rgba(87, 194, 106, 0.16)',
+  },
+  homeworkEvaluationLevelBadgeAverage: {
+    backgroundColor: 'rgba(230, 174, 95, 0.16)',
+  },
+  homeworkEvaluationLevelBadgeBad: {
+    backgroundColor: 'rgba(212, 109, 117, 0.16)',
+  },
+  homeworkEvaluationLevelText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  homeworkEvaluationCreatedAt: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+  homeworkEvaluationSummary: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: '700',
+  },
+  homeworkEvaluationCriteriaList: {
+    gap: 10,
+  },
+  homeworkEvaluationCriterionRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  homeworkEvaluationCriterionStatus: {
+    minWidth: 48,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeworkEvaluationCriterionStatusStable: {
+    backgroundColor: 'rgba(87, 194, 106, 0.16)',
+  },
+  homeworkEvaluationCriterionStatusUnstable: {
+    backgroundColor: 'rgba(212, 109, 117, 0.16)',
+  },
+  homeworkEvaluationCriterionStatusText: {
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  homeworkEvaluationCriterionTextWrap: {
+    flex: 1,
+    gap: 4,
+  },
+  homeworkEvaluationCriterionLabel: {
+    color: colors.text,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '800',
+  },
+  homeworkEvaluationCriterionDetail: {
+    color: colors.textSoft,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+  homeworkEvaluationHighlightList: {
+    gap: 10,
+  },
+  homeworkEvaluationSectionTitle: {
+    color: colors.text,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '900',
+  },
+  homeworkEvaluationHighlightCard: {
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: colors.surfaceStrong,
+    gap: 4,
+  },
+  homeworkEvaluationHighlightLabel: {
+    color: colors.text,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '900',
+  },
+  homeworkEvaluationHighlightDetail: {
+    color: colors.textSoft,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+  homeworkEvaluationEmptyText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: '600',
   },
   pressed: {
     opacity: 0.92,
