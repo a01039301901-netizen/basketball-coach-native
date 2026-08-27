@@ -106,6 +106,7 @@ export interface LessonRecord {
   dateKey: string;
   mode: LessonMode;
   shotOutcome?: ShotOutcome;
+  isStarred?: boolean;
   feedback: string;
   feedbackTimeline: FeedbackMoment[];
   videoUri: string;
@@ -202,6 +203,7 @@ export interface HomeworkDiaryLinkContext {
   feedbackLabel: string;
   recordIds: string[];
   previewRecords: HomeworkLinkedRecordPreview[];
+  openedRecordId?: string;
 }
 
 export interface HomeworkProgressItem {

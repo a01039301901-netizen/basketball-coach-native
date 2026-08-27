@@ -5,6 +5,7 @@ import type {
   HomeworkCorrectionSide,
   HomeworkFeedbackCategory,
   HomeworkLinkedRecordPreview,
+  LessonMode,
   HomeworkProgressItem,
   HomeworkStateRecord,
   HomeworkUnlockSnapshot,
@@ -358,6 +359,50 @@ function buildStage2FeedbackLinkedDiaryContext(
   };
 }
 
+function getHomeworkFeedbackTargetLessonMode(category: HomeworkFeedbackCategory | null): LessonMode | null {
+  switch (category) {
+    case 'shoot_arm_angle':
+    case 'shoot_release_timing':
+    case 'leg_angle':
+      return 'shoot';
+    case 'dribble_balance':
+    case 'torso_posture':
+      return 'dribble';
+    default:
+      return null;
+  }
+}
+
+function getStage2RelevantFollowupLessonRecords(
+  lessonRecords: LessonRecord[],
+  stage2Unlock: HomeworkUnlockSnapshot
+) {
+  const followupRecords = lessonRecords.slice(Math.max(0, Math.trunc(stage2Unlock.lessonCount)));
+  const targetMode = getHomeworkFeedbackTargetLessonMode(stage2Unlock.feedbackCategory ?? null);
+
+  if (!targetMode) {
+    return followupRecords;
+  }
+
+  return followupRecords.filter((record) => record.mode === targetMode);
+}
+
+function isStage2FeedbackHomeworkResolved(
+  lessonRecords: LessonRecord[],
+  stage2Unlock: HomeworkUnlockSnapshot
+) {
+  const relevantFollowupRecords = getStage2RelevantFollowupLessonRecords(lessonRecords, stage2Unlock);
+  const feedbackCategory = stage2Unlock.feedbackCategory ?? null;
+
+  if (!feedbackCategory) {
+    return relevantFollowupRecords.length >= POSITION_FEEDBACK_RETRY_TARGET;
+  }
+
+  return relevantFollowupRecords.some(
+    (record) => getRepresentativeHomeworkFeedbackCategory(record) !== feedbackCategory
+  );
+}
+
 function buildBaseHomeworkItems(dribbleCount: number, shootAttemptCount: number) {
   return [
     buildProgressItem('base-dribble', DAILY_DRIBBLE_HOMEWORK_TITLE, 'base', 'daily', dribbleCount, DAILY_DRIBBLE_TARGET, {
@@ -375,7 +420,7 @@ function buildStage2FollowupHomeworkItems(
   input: BuildHomeworkProgressInput,
   stage2Unlock: HomeworkUnlockSnapshot
 ) {
-  const followupLessonCount = Math.max(0, getTodayLessonCount(input.dateKey, input.lessonRecords) - stage2Unlock.lessonCount);
+  const isResolved = isStage2FeedbackHomeworkResolved(input.lessonRecords, stage2Unlock);
   const feedbackCategory = stage2Unlock.feedbackCategory ?? null;
   const feedbackCount = typeof stage2Unlock.feedbackCount === 'number' ? Math.max(0, Math.trunc(stage2Unlock.feedbackCount)) : 0;
   const hasFeedbackEvidence = Boolean(feedbackCategory) && feedbackCount > 0;
@@ -395,7 +440,7 @@ function buildStage2FollowupHomeworkItems(
       '가장 많이 나온 피드백 부분 고치기',
       'position_followup',
       'feedback',
-      followupLessonCount,
+      isResolved ? POSITION_FEEDBACK_RETRY_TARGET : 0,
       POSITION_FEEDBACK_RETRY_TARGET,
       {
         reasonText,

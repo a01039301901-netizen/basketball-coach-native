@@ -38,6 +38,7 @@ interface DiaryScreenProps {
   calendarCells: CalendarCell[];
   selectedDateKey: string;
   selectedDateRecords: LessonRecord[];
+  allLessonRecords: LessonRecord[];
   homeworkLinkedDiaryContext: HomeworkDiaryLinkContext | null;
   selectedDateDribbleCount: number;
   diarySkillInsight: DiarySkillInsight;
@@ -47,6 +48,7 @@ interface DiaryScreenProps {
   onClearHomeworkLinkedDiaryContext: () => void;
   onGoBack: () => void;
   onToggleShotOutcome: (recordId: string) => void;
+  onToggleStarredRecord: (recordId: string) => void;
   onDeleteRecord: (recordId: string) => void;
 }
 
@@ -99,6 +101,16 @@ interface DailyRecordRankingGroup {
   totalCount: number;
   best: RankedDiaryRecordInsight | null;
   worst: RankedDiaryRecordInsight | null;
+}
+
+interface SelectedCriterionComparisonSummary {
+  label: string;
+  currentRatio: number;
+  currentDetail: string;
+  previousRatio: number | null;
+  previousDateKey: string | null;
+  delta: number | null;
+  fallbackText: string | null;
 }
 
 const SUCCESS_RATE_COMPARE_TRACK_HEIGHT = 126;
@@ -1590,11 +1602,11 @@ function getDisplayedDribbleCriteria(
     : [
         {
           key: 'dribble-torso-posture',
-          legacyKeys: ['dribble-torso-posture'],
+          legacyKeys: ['dribble-torso-posture', 'dribble-position-stability'],
         },
         {
           key: 'dribble-height-appropriate',
-          legacyKeys: ['dribble-height-appropriate', 'dribble-height'],
+          legacyKeys: ['dribble-height-appropriate', 'dribble-height', 'dribble-height-stability'],
         },
         {
           key: 'dribble-eye-focus',
@@ -1602,12 +1614,28 @@ function getDisplayedDribbleCriteria(
         },
         {
           key: 'dribble-rhythm',
-          legacyKeys: ['dribble-rhythm'],
+          legacyKeys: ['dribble-rhythm', 'dribble-tempo-stability'],
         },
       ];
 
   return orderedCriteria
-    .map((entry) => evaluation.criteria.find((criterion) => entry.legacyKeys.includes(criterion.key)) ?? null)
+    .map((entry) => {
+      const criterion = evaluation.criteria.find((item) => entry.legacyKeys.includes(item.key)) ?? null;
+
+      if (!criterion) {
+        return null;
+      }
+
+      if (criterion.key === entry.key) {
+        return criterion;
+      }
+
+      return {
+        ...criterion,
+        key: entry.key,
+        label: getDiaryCriterionDisplayLabel({ ...criterion, key: entry.key }),
+      } satisfies LessonRecordCriterion;
+    })
     .filter((criterion): criterion is LessonRecordCriterion => Boolean(criterion));
 }
 
@@ -1818,6 +1846,108 @@ function getRankableRecordCriteria(record: LessonRecord) {
   return getDisplayedDribbleCriteria(record, record.evaluation);
 }
 
+function findComparableCriterion(record: LessonRecord, criterionKey: string) {
+  return getRankableRecordCriteria(record).find((criterion) => criterion.key === criterionKey) ?? null;
+}
+
+function getComparableRecordTypeLabel(record: LessonRecord) {
+  if (record.mode === 'shoot') {
+    return '슛';
+  }
+
+  if (record.dribbleView === 'front') {
+    return '앞모습 드리블';
+  }
+
+  if (record.dribbleView === 'side') {
+    return '옆모습 드리블';
+  }
+
+  return '드리블';
+}
+
+function findPreviousComparableRecord(
+  allLessonRecords: LessonRecord[],
+  currentRecord: LessonRecord,
+  criterionKey: string
+) {
+  const currentRecordTime = getDiaryRecordCreatedAtTime(currentRecord);
+
+  return [...allLessonRecords]
+    .filter((candidate) => {
+      if (candidate.id === currentRecord.id || !candidate.evaluation) {
+        return false;
+      }
+
+      if (candidate.mode !== currentRecord.mode) {
+        return false;
+      }
+
+      if (candidate.mode === 'dribble' && candidate.dribbleView !== currentRecord.dribbleView) {
+        return false;
+      }
+
+      if (getDiaryRecordCreatedAtTime(candidate) >= currentRecordTime) {
+        return false;
+      }
+
+      return Boolean(findComparableCriterion(candidate, criterionKey));
+    })
+    .sort((left, right) => getDiaryRecordCreatedAtTime(right) - getDiaryRecordCreatedAtTime(left))[0] ?? null;
+}
+
+function buildSelectedCriterionComparisonSummary(
+  allLessonRecords: LessonRecord[],
+  currentRecord: LessonRecord | null,
+  selectedCriterion: LessonRecordCriterion | null
+): SelectedCriterionComparisonSummary | null {
+  if (!currentRecord || !selectedCriterion) {
+    return null;
+  }
+
+  const previousRecord = findPreviousComparableRecord(allLessonRecords, currentRecord, selectedCriterion.key);
+  const previousCriterion = previousRecord ? findComparableCriterion(previousRecord, selectedCriterion.key) : null;
+  const currentRatio = Math.round(getDiaryCriterionStableRatio(selectedCriterion) * 100);
+
+  if (!previousRecord || !previousCriterion) {
+    return {
+      label: getDiaryCriterionDisplayLabel(selectedCriterion),
+      currentRatio,
+      currentDetail: getDiaryCriterionInsightText(selectedCriterion),
+      previousRatio: null,
+      previousDateKey: null,
+      delta: null,
+      fallbackText: `비교할 이전 ${getComparableRecordTypeLabel(currentRecord)} 기록이 없습니다.`,
+    };
+  }
+
+  const previousRatio = Math.round(getDiaryCriterionStableRatio(previousCriterion) * 100);
+
+  return {
+    label: getDiaryCriterionDisplayLabel(selectedCriterion),
+    currentRatio,
+    currentDetail: getDiaryCriterionInsightText(selectedCriterion),
+    previousRatio,
+    previousDateKey: previousRecord.dateKey,
+    delta: currentRatio - previousRatio,
+    fallbackText: null,
+  };
+}
+
+function getCriterionJumpStartAtMs(record: LessonRecord, criterion: LessonRecordCriterion) {
+  const highlight = findMatchingCriterionHighlight(record, criterion);
+
+  if (highlight) {
+    return Math.max(0, highlight.startAtMs);
+  }
+
+  if (typeof record.reviewStartAtMs === 'number' && Number.isFinite(record.reviewStartAtMs)) {
+    return Math.max(0, record.reviewStartAtMs);
+  }
+
+  return 0;
+}
+
 function doesCriterionHighlightMatch(
   criterionKey: string,
   highlightLabel: string,
@@ -1915,6 +2045,23 @@ function getRankedRecordCategoryLabel(record: LessonRecord) {
   return '\uB4DC\uB9AC\uBE14';
 }
 
+function parseLessonRecordTimestamp(record: LessonRecord) {
+  const [recordIdTimestampText] = record.id.split('-');
+  const recordIdTimestamp = Number(recordIdTimestampText);
+
+  if (Number.isFinite(recordIdTimestamp) && recordIdTimestamp > 0) {
+    return recordIdTimestamp;
+  }
+
+  const createdAtTime = new Date(record.createdAt).getTime();
+
+  if (Number.isFinite(createdAtTime) && createdAtTime > 0) {
+    return createdAtTime;
+  }
+
+  return 0;
+}
+
 function getRecordLevelWeight(level: NonNullable<LessonRecord['evaluation']>['level']) {
   if (level === 'good') {
     return 3;
@@ -1976,7 +2123,7 @@ function buildRankedDiaryRecordInsight(record: LessonRecord): RankedDiaryRecordI
         : null
     )
     .filter((ratio): ratio is number => ratio !== null);
-  const createdAtTime = new Date(record.createdAt).getTime();
+  const createdAtTime = parseLessonRecordTimestamp(record);
 
   return {
     record,
@@ -2039,13 +2186,31 @@ function compareRankedDiaryRecordsForWorst(left: RankedDiaryRecordInsight, right
 }
 
 function getDiaryRecordCreatedAtTime(record: LessonRecord) {
-  const createdAtTime = new Date(record.createdAt).getTime();
-  return Number.isFinite(createdAtTime) ? createdAtTime : 0;
+  return parseLessonRecordTimestamp(record);
 }
 
 function sortDiaryRecords(records: LessonRecord[], sort: RecordSort) {
+  const compareStarredFirst = (left: LessonRecord, right: LessonRecord) => {
+    const leftIsStarred = left.isStarred === true;
+    const rightIsStarred = right.isStarred === true;
+
+    if (leftIsStarred === rightIsStarred) {
+      return 0;
+    }
+
+    return leftIsStarred ? -1 : 1;
+  };
+
   if (sort === 'latest') {
-    return [...records].sort((left, right) => getDiaryRecordCreatedAtTime(right) - getDiaryRecordCreatedAtTime(left));
+    return [...records].sort((left, right) => {
+      const starredDelta = compareStarredFirst(left, right);
+
+      if (starredDelta !== 0) {
+        return starredDelta;
+      }
+
+      return getDiaryRecordCreatedAtTime(right) - getDiaryRecordCreatedAtTime(left);
+    });
   }
 
   const rankedById = new Map(
@@ -2053,6 +2218,12 @@ function sortDiaryRecords(records: LessonRecord[], sort: RecordSort) {
   );
 
   return [...records].sort((left, right) => {
+    const starredDelta = compareStarredFirst(left, right);
+
+    if (starredDelta !== 0) {
+      return starredDelta;
+    }
+
     const leftRank = rankedById.get(left.id) ?? null;
     const rightRank = rankedById.get(right.id) ?? null;
 
@@ -2121,6 +2292,7 @@ export function DiaryScreen({
   calendarCells,
   selectedDateKey,
   selectedDateRecords,
+  allLessonRecords,
   homeworkLinkedDiaryContext,
   selectedDateDribbleCount,
   diarySkillInsight,
@@ -2130,6 +2302,7 @@ export function DiaryScreen({
   onClearHomeworkLinkedDiaryContext,
   onGoBack,
   onToggleShotOutcome,
+  onToggleStarredRecord,
   onDeleteRecord,
 }: DiaryScreenProps) {
   const { width } = useWindowDimensions();
@@ -2148,12 +2321,17 @@ export function DiaryScreen({
   const [showDailySummary, setShowDailySummary] = useState(false);
   const [successRateRange, setSuccessRateRange] = useState<SuccessRateRange>('daily');
   const [showSuccessRateRangeMenu, setShowSuccessRateRangeMenu] = useState(false);
+  const [pendingHomeworkOpenedRecordId, setPendingHomeworkOpenedRecordId] = useState<string | null>(null);
   const [openedEvaluationRecordId, setOpenedEvaluationRecordId] = useState<string | null>(null);
+  const [selectedCriterionKey, setSelectedCriterionKey] = useState<string | null>(null);
   const [pendingDeleteRecordId, setPendingDeleteRecordId] = useState<string | null>(null);
   const [recordCarouselIndices, setRecordCarouselIndices] = useState<Record<string, number>>({});
   const evaluationVideoRef = useRef<Video | null>(null);
+  const evaluationScrollRef = useRef<ScrollView | null>(null);
   const recordListRefs = useRef<Record<string, FlatList<LessonRecord> | null>>({});
   const playbackPollersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  const selectedCriterionComparisonYRef = useRef(0);
+  const pendingCriterionComparisonScrollRef = useRef(false);
   const menuOpenSpacerHeight = showSuccessRateRangeMenu ? 220 : 0;
   const dribbleGraphTotal = Math.max(
     selectedDateDribbleCount,
@@ -2180,6 +2358,10 @@ export function DiaryScreen({
   useEffect(() => {
     setShowDailySummary(false);
   }, [selectedDateKey]);
+
+  useEffect(() => {
+    setPendingHomeworkOpenedRecordId(homeworkLinkedDiaryContext?.openedRecordId?.trim() || null);
+  }, [homeworkLinkedDiaryContext?.dateKey, homeworkLinkedDiaryContext?.openedRecordId]);
 
   useEffect(() => {
     setRecordCarouselIndices({});
@@ -2294,6 +2476,34 @@ export function DiaryScreen({
     () => (openedEvaluationRecordId ? selectedDateRecords.find((record) => record.id === openedEvaluationRecordId) ?? null : null),
     [openedEvaluationRecordId, selectedDateRecords]
   );
+  const openedEvaluationDisplayedCriteria = useMemo(() => {
+    if (!openedEvaluationRecord?.evaluation) {
+      return [] as LessonRecordCriterion[];
+    }
+
+    return openedEvaluationRecord.mode === 'dribble'
+      ? getDisplayedDribbleCriteria(openedEvaluationRecord, openedEvaluationRecord.evaluation)
+      : openedEvaluationRecord.evaluation.criteria.filter((criterion) => criterion.key !== 'shoot-result');
+  }, [openedEvaluationRecord]);
+  const openedEvaluationOrderedCriteria = useMemo(
+    () => getDiaryOrderedEvaluationCriteria(openedEvaluationDisplayedCriteria),
+    [openedEvaluationDisplayedCriteria]
+  );
+  const openedEvaluationSummary = useMemo(
+    () => getDiaryEvaluationQuickSummary(openedEvaluationOrderedCriteria),
+    [openedEvaluationOrderedCriteria]
+  );
+  const selectedEvaluationCriterion = useMemo(
+    () =>
+      selectedCriterionKey
+        ? openedEvaluationOrderedCriteria.find((criterion) => criterion.key === selectedCriterionKey) ?? null
+        : null,
+    [openedEvaluationOrderedCriteria, selectedCriterionKey]
+  );
+  const selectedCriterionComparison = useMemo(
+    () => buildSelectedCriterionComparisonSummary(allLessonRecords, openedEvaluationRecord, selectedEvaluationCriterion),
+    [allLessonRecords, openedEvaluationRecord, selectedEvaluationCriterion]
+  );
   const openedEvaluationVideoSource = useMemo(
     () => (openedEvaluationRecord?.videoUri ? { uri: openedEvaluationRecord.videoUri } : null),
     [openedEvaluationRecord?.videoUri]
@@ -2328,6 +2538,18 @@ export function DiaryScreen({
     [openedEvaluationRecordId]
   );
 
+  const scrollToSelectedCriterionComparison = useCallback((animated = true) => {
+    if (!evaluationScrollRef.current || selectedCriterionComparisonYRef.current <= 0) {
+      return;
+    }
+
+    evaluationScrollRef.current.scrollTo({
+      y: Math.max(0, selectedCriterionComparisonYRef.current - 12),
+      animated,
+    });
+    pendingCriterionComparisonScrollRef.current = false;
+  }, []);
+
   const moveSelectedDate = useCallback(
     (delta: number) => {
       const nextDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() + delta);
@@ -2361,6 +2583,35 @@ export function DiaryScreen({
       setOpenedEvaluationRecordId(null);
     }
   }, [openedEvaluationRecordId, selectedDateRecords]);
+
+  useEffect(() => {
+    setSelectedCriterionKey(null);
+    selectedCriterionComparisonYRef.current = 0;
+    pendingCriterionComparisonScrollRef.current = false;
+  }, [openedEvaluationRecordId]);
+
+  useEffect(() => {
+    if (!selectedCriterionComparison || !pendingCriterionComparisonScrollRef.current) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      scrollToSelectedCriterionComparison();
+    });
+  }, [scrollToSelectedCriterionComparison, selectedCriterionComparison]);
+
+  useEffect(() => {
+    if (!pendingHomeworkOpenedRecordId) {
+      return;
+    }
+
+    if (!selectedDateRecords.some((record) => record.id === pendingHomeworkOpenedRecordId)) {
+      return;
+    }
+
+    setOpenedEvaluationRecordId(pendingHomeworkOpenedRecordId);
+    setPendingHomeworkOpenedRecordId(null);
+  }, [pendingHomeworkOpenedRecordId, selectedDateRecords]);
 
   useEffect(() => {
     setRecordCarouselIndices((current) => {
@@ -2498,17 +2749,48 @@ export function DiaryScreen({
       }
 
       syncFeedbackFromPosition(record, startAtMs);
-      await video.playFromPositionAsync(Math.max(0, startAtMs));
-      startPlaybackPolling(record);
+      try {
+        await video.playFromPositionAsync(Math.max(0, startAtMs));
+        startPlaybackPolling(record);
+      } catch {
+        // Keep the selected criterion visible even when the player cannot seek immediately.
+      }
     },
     [getPlaybackVideoRef, startPlaybackPolling, syncFeedbackFromPosition]
   );
 
+  const handleCriterionPress = useCallback(
+    (record: LessonRecord, criterion: LessonRecordCriterion) => {
+      setSelectedCriterionKey(criterion.key);
+      pendingCriterionComparisonScrollRef.current = true;
+
+      const jumpStartAtMs = getCriterionJumpStartAtMs(record, criterion);
+
+      if (!record.videoUri.trim()) {
+        requestAnimationFrame(() => {
+          scrollToSelectedCriterionComparison();
+        });
+        return;
+      }
+
+      void jumpToHighlight(record, jumpStartAtMs).finally(() => {
+        requestAnimationFrame(() => {
+          scrollToSelectedCriterionComparison();
+        });
+      });
+    },
+    [jumpToHighlight, scrollToSelectedCriterionComparison]
+  );
+
   const openRecordEvaluation = useCallback((recordId: string) => {
+    setSelectedCriterionKey(null);
+    pendingCriterionComparisonScrollRef.current = false;
     setOpenedEvaluationRecordId(recordId);
   }, []);
 
   const closeRecordEvaluation = useCallback(() => {
+    setSelectedCriterionKey(null);
+    pendingCriterionComparisonScrollRef.current = false;
     setOpenedEvaluationRecordId(null);
   }, []);
 
@@ -2716,12 +2998,12 @@ export function DiaryScreen({
       );
     }
 
-    const displayedCriteria =
-      record.mode === 'dribble'
-        ? getDisplayedDribbleCriteria(record, evaluation)
-        : evaluation.criteria.filter((criterion) => criterion.key !== 'shoot-result');
-    const orderedDisplayedCriteria = getDiaryOrderedEvaluationCriteria(displayedCriteria);
-    const evaluationSummary = getDiaryEvaluationQuickSummary(orderedDisplayedCriteria);
+    const orderedDisplayedCriteria = record.id === openedEvaluationRecord?.id
+      ? openedEvaluationOrderedCriteria
+      : getDiaryOrderedEvaluationCriteria(getRankableRecordCriteria(record));
+    const evaluationSummary = record.id === openedEvaluationRecord?.id
+      ? openedEvaluationSummary
+      : getDiaryEvaluationQuickSummary(orderedDisplayedCriteria);
 
     return (
       <View style={styles.evaluationBox}>
@@ -2772,10 +3054,9 @@ export function DiaryScreen({
         {orderedDisplayedCriteria.length > 0 ? (
           <View style={styles.criteriaList}>
             {orderedDisplayedCriteria.map((criterion) => {
+              const isSelected = criterion.key === selectedCriterionKey;
               const criterionDetail = getDiaryCriterionInsightText(criterion);
               const criterionLabel = getDiaryCriterionDisplayLabel(criterion);
-              const criterionHighlight = findMatchingCriterionHighlight(record, criterion);
-              const canJumpToCriterionHighlight = Boolean(record.videoUri && criterionHighlight);
 
               if (record.mode === 'dribble') {
                 const stableRatio = getDiaryCriterionStableRatio(criterion);
@@ -2798,18 +3079,18 @@ export function DiaryScreen({
                   </>
                 );
 
-                return canJumpToCriterionHighlight && criterionHighlight ? (
+                return (
                   <Pressable
                     key={`${record.id}-${criterion.key}`}
-                    onPress={() => void jumpToHighlight(record, criterionHighlight.startAtMs)}
-                    style={({ pressed }) => [styles.dribbleCriterionMeter, pressed && styles.pressed]}
+                    onPress={() => handleCriterionPress(record, criterion)}
+                    style={({ pressed }) => [
+                      styles.dribbleCriterionMeter,
+                      isSelected && styles.dribbleCriterionMeterSelected,
+                      pressed && styles.pressed,
+                    ]}
                   >
                     {content}
                   </Pressable>
-                ) : (
-                  <View key={`${record.id}-${criterion.key}`} style={styles.dribbleCriterionMeter}>
-                    {content}
-                  </View>
                 );
               }
 
@@ -2819,6 +3100,7 @@ export function DiaryScreen({
                     style={[
                       styles.criteriaListBadge,
                       criterion.isStable ? styles.criteriaListBadgeStable : styles.criteriaListBadgeUnstable,
+                      isSelected && styles.criteriaListBadgeSelected,
                     ]}
                   >
                     <Text style={styles.criteriaListBadgeText}>{criterionLabel}</Text>
@@ -2840,18 +3122,18 @@ export function DiaryScreen({
                 </>
               );
 
-              return canJumpToCriterionHighlight && criterionHighlight ? (
+              return (
                 <Pressable
                   key={`${record.id}-${criterion.key}`}
-                  onPress={() => void jumpToHighlight(record, criterionHighlight.startAtMs)}
-                  style={({ pressed }) => [styles.criteriaListItem, pressed && styles.pressed]}
+                  onPress={() => handleCriterionPress(record, criterion)}
+                  style={({ pressed }) => [
+                    styles.criteriaListItem,
+                    isSelected && styles.criteriaListItemSelected,
+                    pressed && styles.pressed,
+                  ]}
                 >
                   {content}
                 </Pressable>
-              ) : (
-                <View key={`${record.id}-${criterion.key}`} style={styles.criteriaListItem}>
-                  {content}
-                </View>
               );
             })}
           </View>
@@ -2879,6 +3161,17 @@ export function DiaryScreen({
           { width: recordCardWidth },
         ]}
       >
+        {record.mode === 'shoot' && record.isStarred ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => onToggleStarredRecord(record.id)}
+            style={({ pressed }) => [styles.recordStarBadge, pressed && styles.pressed]}
+          >
+            <Text style={styles.recordStarBadgeIcon}>★</Text>
+            <Text style={styles.recordStarBadgeText}>체크된 기록</Text>
+          </Pressable>
+        ) : null}
+
         <View style={styles.recordHeader}>
           <Pressable
             onPress={() => openRecordEvaluation(record.id)}
@@ -2925,6 +3218,7 @@ export function DiaryScreen({
     dailyRecordRankingByMode.shoot.worst?.record.id,
     openDeleteConfirm,
     openRecordEvaluation,
+    onToggleStarredRecord,
     recordCardWidth,
   ]);
 
@@ -3615,6 +3909,7 @@ export function DiaryScreen({
 
             {openedEvaluationRecord ? (
               <ScrollView
+                ref={evaluationScrollRef}
                 style={[styles.recordEvaluationScroll, styles.recordEvaluationLayout]}
                 contentContainerStyle={styles.recordEvaluationScrollContent}
                 showsVerticalScrollIndicator={false}
@@ -3640,6 +3935,105 @@ export function DiaryScreen({
                     />
                   ) : null}
                 </View>
+
+                {selectedCriterionComparison ? (
+                  <View
+                    onLayout={(event) => {
+                      selectedCriterionComparisonYRef.current = event.nativeEvent.layout.y;
+
+                      if (pendingCriterionComparisonScrollRef.current) {
+                        requestAnimationFrame(() => {
+                          scrollToSelectedCriterionComparison();
+                        });
+                      }
+                    }}
+                    style={styles.selectedCriterionComparisonSection}
+                  >
+                    <Text
+                      style={[
+                        styles.selectedCriterionComparisonTitle,
+                        selectedEvaluationCriterion && !selectedEvaluationCriterion.isStable
+                          ? styles.selectedCriterionComparisonTitleUnstable
+                          : null,
+                      ]}
+                    >
+                      {selectedCriterionComparison.label}
+                    </Text>
+
+                    {selectedCriterionComparison.currentDetail ? (
+                      <Text style={styles.selectedCriterionComparisonDetail}>
+                        {selectedCriterionComparison.currentDetail}
+                      </Text>
+                    ) : null}
+
+                    <Text style={styles.selectedCriterionComparisonSummary}>
+                      {selectedCriterionComparison.previousRatio !== null && selectedCriterionComparison.previousDateKey
+                        ? `현재 ${selectedCriterionComparison.currentRatio}% · 직전 기록(${formatDiarySummaryDateLabel(selectedCriterionComparison.previousDateKey)}) ${selectedCriterionComparison.previousRatio}%`
+                        : `현재 ${selectedCriterionComparison.currentRatio}%`}
+                    </Text>
+
+                    <View style={styles.selectedCriterionComparisonBars}>
+                      <View style={styles.selectedCriterionComparisonBarRow}>
+                        <Text style={styles.selectedCriterionComparisonBarLabel}>{'현재'}</Text>
+                        <View style={styles.selectedCriterionComparisonBarTrack}>
+                          <View
+                            style={[
+                              styles.selectedCriterionComparisonBarFill,
+                              styles.selectedCriterionComparisonBarFillCurrent,
+                              { width: `${selectedCriterionComparison.currentRatio}%` },
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.selectedCriterionComparisonBarValue}>
+                          {`${selectedCriterionComparison.currentRatio}%`}
+                        </Text>
+                      </View>
+
+                      <View style={styles.selectedCriterionComparisonBarRow}>
+                        <Text style={styles.selectedCriterionComparisonBarLabel}>
+                          {selectedCriterionComparison.previousDateKey
+                            ? formatDiarySummaryDateLabel(selectedCriterionComparison.previousDateKey)
+                            : '직전'}
+                        </Text>
+                        <View style={styles.selectedCriterionComparisonBarTrack}>
+                          <View
+                            style={[
+                              styles.selectedCriterionComparisonBarFill,
+                              styles.selectedCriterionComparisonBarFillPrevious,
+                              { width: `${selectedCriterionComparison.previousRatio ?? 0}%` },
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.selectedCriterionComparisonBarValue}>
+                          {selectedCriterionComparison.previousRatio !== null
+                            ? `${selectedCriterionComparison.previousRatio}%`
+                            : '--'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text
+                      style={[
+                        styles.selectedCriterionComparisonDelta,
+                        selectedCriterionComparison.fallbackText
+                          ? styles.selectedCriterionComparisonDeltaNeutral
+                          : selectedCriterionComparison.delta && selectedCriterionComparison.delta > 0
+                            ? styles.selectedCriterionComparisonDeltaUp
+                            : selectedCriterionComparison.delta && selectedCriterionComparison.delta < 0
+                              ? styles.selectedCriterionComparisonDeltaDown
+                              : styles.selectedCriterionComparisonDeltaNeutral,
+                      ]}
+                    >
+                      {selectedCriterionComparison.fallbackText
+                        ? selectedCriterionComparison.fallbackText
+                        : selectedCriterionComparison.delta === 0
+                          ? '직전 기록과 같아요'
+                          : selectedCriterionComparison.delta && selectedCriterionComparison.delta > 0
+                            ? `직전 기록보다 ${Math.abs(selectedCriterionComparison.delta)}% 높아졌어요`
+                            : `직전 기록보다 ${Math.abs(selectedCriterionComparison.delta ?? 0)}% 낮아졌어요`}
+                    </Text>
+                  </View>
+                ) : null}
 
                 <View style={styles.recordEvaluationDetailSection}>
                   {renderRecordEvaluationContent(openedEvaluationRecord)}
@@ -4982,6 +5376,79 @@ const styles = StyleSheet.create({
   recordEvaluationDetailSection: {
     gap: 14,
   },
+  selectedCriterionComparisonSection: {
+    gap: 10,
+    paddingVertical: 12,
+  },
+  selectedCriterionComparisonTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  selectedCriterionComparisonTitleUnstable: {
+    color: '#d46d75',
+  },
+  selectedCriterionComparisonDetail: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  selectedCriterionComparisonSummary: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '800',
+  },
+  selectedCriterionComparisonBars: {
+    gap: 8,
+  },
+  selectedCriterionComparisonBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  selectedCriterionComparisonBarLabel: {
+    width: 42,
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  selectedCriterionComparisonBarTrack: {
+    flex: 1,
+    height: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+  },
+  selectedCriterionComparisonBarFill: {
+    height: '100%',
+  },
+  selectedCriterionComparisonBarFillCurrent: {
+    backgroundColor: colors.textAccent,
+  },
+  selectedCriterionComparisonBarFillPrevious: {
+    backgroundColor: 'rgba(255,255,255,0.36)',
+  },
+  selectedCriterionComparisonBarValue: {
+    width: 40,
+    textAlign: 'right',
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  selectedCriterionComparisonDelta: {
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '800',
+  },
+  selectedCriterionComparisonDeltaUp: {
+    color: '#57c26a',
+  },
+  selectedCriterionComparisonDeltaDown: {
+    color: '#d46d75',
+  },
+  selectedCriterionComparisonDeltaNeutral: {
+    color: colors.textMuted,
+  },
   recordEvaluationBody: {
     gap: 14,
   },
@@ -5182,6 +5649,30 @@ const styles = StyleSheet.create({
   recordCardDribble: {
     borderColor: DIARY_NEUTRAL_BORDER,
     backgroundColor: DIARY_NEUTRAL_SURFACE,
+  },
+  recordStarBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,212,81,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,212,81,0.38)',
+  },
+  recordStarBadgeIcon: {
+    color: '#ffd451',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  recordStarBadgeText: {
+    color: '#ffe89a',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   recordHeader: {
     flexDirection: 'row',
@@ -5492,16 +5983,30 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   criteriaListItem: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    borderRadius: 10,
+  },
+  criteriaListItemSelected: {
+    borderColor: 'rgba(255,159,28,0.28)',
   },
   dribbleCriterionMeter: {
+    width: '100%',
     position: 'relative',
     overflow: 'hidden',
     minHeight: 0,
     borderRadius: 16,
     backgroundColor: 'rgba(191,80,88,0.28)',
+  },
+  dribbleCriterionMeterSelected: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.24)',
   },
   dribbleCriterionMeterFill: {
     position: 'absolute',
@@ -5513,6 +6018,7 @@ const styles = StyleSheet.create({
   dribbleCriterionMeterContent: {
     position: 'relative',
     zIndex: 1,
+    minWidth: 0,
     gap: 4,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -5521,14 +6027,18 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 13,
     fontWeight: '900',
+    flexShrink: 1,
   },
   dribbleCriterionMeterDescription: {
     color: colors.text,
     fontSize: 12,
     lineHeight: 17,
+    flexShrink: 1,
   },
   criteriaListBadge: {
     minWidth: 96,
+    flexShrink: 0,
+    alignSelf: 'flex-start',
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 0,
@@ -5539,6 +6049,11 @@ const styles = StyleSheet.create({
   criteriaListBadgeUnstable: {
     backgroundColor: 'rgba(191,80,88,0.12)',
   },
+  criteriaListBadgeSelected: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,159,28,0.32)',
+    backgroundColor: 'rgba(255,159,28,0.12)',
+  },
   criteriaListBadgeText: {
     color: colors.text,
     fontSize: 12,
@@ -5547,6 +6062,8 @@ const styles = StyleSheet.create({
   },
   criteriaListTextWrap: {
     flex: 1,
+    flexGrow: 1,
+    minWidth: 0,
     gap: 3,
     paddingTop: 1,
   },
@@ -5564,6 +6081,8 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     lineHeight: 18,
+    flexShrink: 1,
+    width: '100%',
   },
   criteriaRow: {
     flexDirection: 'row',

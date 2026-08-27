@@ -1,9 +1,48 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState, type PropsWithChildren } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card } from '../components/common/Card';
 import { RULE_GUIDE_MEMORY_LINES, RULE_GUIDE_SECTIONS } from '../constants/rulesGuide';
 import { colors } from '../theme/colors';
 
+interface CollapsibleRuleCardProps extends PropsWithChildren {
+  title: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  style?: object;
+}
+
+function CollapsibleRuleCard({ title, isOpen, onToggle, style, children }: CollapsibleRuleCardProps) {
+  return (
+    <Card style={style}>
+      <Pressable
+        accessibilityLabel={isOpen ? `${title} 접기` : `${title} 펼치기`}
+        onPress={onToggle}
+        style={({ pressed }) => [styles.cardHeaderButton, pressed && styles.pressed]}
+      >
+        <Text style={styles.cardHeaderTitle}>{title}</Text>
+        <View style={styles.cardHeaderAction}>
+          <Text style={styles.cardHeaderActionText}>{isOpen ? '⌃' : '⌄'}</Text>
+        </View>
+      </Pressable>
+      {isOpen ? children : null}
+    </Card>
+  );
+}
+
 export function RulesGuideScreen() {
+  const [openedSections, setOpenedSections] = useState<Record<string, boolean>>(() => ({
+    ...Object.fromEntries(RULE_GUIDE_SECTIONS.map((section) => [section.title, true])),
+    memory: true,
+  }));
+  const sectionEntries = useMemo(() => RULE_GUIDE_SECTIONS, []);
+
+  function toggleSection(sectionKey: string) {
+    setOpenedSections((current) => ({
+      ...current,
+      [sectionKey]: !current[sectionKey],
+    }));
+  }
+
   return (
     <View style={styles.layout}>
       <Card title="농구 규칙 가이드" style={styles.heroCard}>
@@ -12,29 +51,40 @@ export function RulesGuideScreen() {
         </Text>
       </Card>
 
-      {RULE_GUIDE_SECTIONS.map((section) => (
-        <Card key={section.title} title={section.title} style={styles.sectionCard}>
+      {sectionEntries.map((section) => (
+        <CollapsibleRuleCard
+          key={section.title}
+          title={section.title}
+          isOpen={Boolean(openedSections[section.title])}
+          onToggle={() => toggleSection(section.title)}
+          style={styles.sectionCard}
+        >
           <View style={styles.lineList}>
-            {section.lines.map((line) => (
-              <View key={line} style={styles.lineRow}>
+            {section.lines.map((line, index) => (
+              <View key={`${section.title}-${index}`} style={styles.lineRow}>
                 <View style={styles.bullet} />
                 <Text style={styles.lineText}>{line}</Text>
               </View>
             ))}
           </View>
           {section.source ? <Text style={styles.sourceText}>{section.source}</Text> : null}
-        </Card>
+        </CollapsibleRuleCard>
       ))}
 
-      <Card title="초보자가 꼭 기억할 5가지" style={styles.memoryCard}>
+      <CollapsibleRuleCard
+        title="초보자가 꼭 기억할 5가지"
+        isOpen={Boolean(openedSections.memory)}
+        onToggle={() => toggleSection('memory')}
+        style={styles.memoryCard}
+      >
         <View style={styles.memoryList}>
-          {RULE_GUIDE_MEMORY_LINES.map((line) => (
-            <View key={line} style={styles.memoryItem}>
+          {RULE_GUIDE_MEMORY_LINES.map((line, index) => (
+            <View key={`memory-${index}`} style={styles.memoryItem}>
               <Text style={styles.memoryText}>{line}</Text>
             </View>
           ))}
         </View>
-      </Card>
+      </CollapsibleRuleCard>
     </View>
   );
 }
@@ -51,6 +101,35 @@ const styles = StyleSheet.create({
     color: colors.textSoft,
     fontSize: 15,
     lineHeight: 22,
+  },
+  cardHeaderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 10,
+  },
+  cardHeaderTitle: {
+    flex: 1,
+    color: colors.textSoft,
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  cardHeaderAction: {
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardHeaderActionText: {
+    color: colors.textAccent,
+    fontSize: 18,
+    lineHeight: 18,
+    fontWeight: '900',
   },
   sectionCard: {
     gap: 10,
@@ -101,5 +180,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '700',
+  },
+  pressed: {
+    opacity: 0.9,
   },
 });

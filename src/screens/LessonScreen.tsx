@@ -54,12 +54,13 @@ interface LessonScreenProps {
   lessonReview: LessonReviewClip | null;
   currentDribbleCount: number;
   cameraError: string;
-  isShootSuccessButtonVisible: boolean;
+  isShootRecordStarButtonVisible: boolean;
+  isCurrentShootRecordStarred: boolean;
   onSelectMode: (mode: LessonMode) => void;
   onSelectDribbleView: (view: DribbleLessonView) => void;
   onBeginLesson: (dribbleTargetCount?: number, dribbleView?: DribbleLessonView) => void;
   onEndLesson: () => void;
-  onRegisterSuccessfulShot: () => void;
+  onToggleCurrentShootRecordStar: () => void;
   onGoHome: () => void;
   onPoseMessage: (event: WebViewMessageEvent) => void;
 }
@@ -139,6 +140,31 @@ function CameraShutterButton({ active, disabled = false, onPress }: CameraShutte
       ]}
     >
       <View style={[styles.shutterButtonInner, active && styles.shutterButtonInnerActive]} />
+    </Pressable>
+  );
+}
+
+function OverlayStarButton({
+  active,
+  onPress,
+}: {
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={active ? '체크한 슛 기록 해제' : '방금 한 슛 기록 체크'}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.overlayStarButton,
+        active && styles.overlayStarButtonActive,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text style={[styles.overlayStarButtonIcon, active && styles.overlayStarButtonIconActive]}>
+        {active ? '★' : '☆'}
+      </Text>
     </Pressable>
   );
 }
@@ -419,12 +445,13 @@ export function LessonScreen({
   lessonReview,
   currentDribbleCount,
   cameraError,
-  isShootSuccessButtonVisible,
+  isShootRecordStarButtonVisible,
+  isCurrentShootRecordStarred,
   onSelectMode,
   onSelectDribbleView,
   onBeginLesson,
   onEndLesson,
-  onRegisterSuccessfulShot,
+  onToggleCurrentShootRecordStar,
   onGoHome,
   onPoseMessage,
 }: LessonScreenProps) {
@@ -995,9 +1022,9 @@ export function LessonScreen({
               <CameraShutterButton active={isRoundLessonControlActive} onPress={isRoundLessonControlActive ? onEndLesson : openLessonStart} />
             </View>
 
-            {lessonMode === 'shoot' && isShootSuccessButtonVisible ? (
+            {lessonMode === 'shoot' && isShootRecordStarButtonVisible ? (
               <View pointerEvents="box-none" style={styles.landscapeUtilityDock}>
-                <OverlayUtilityButton title="슛 성공" onPress={onRegisterSuccessfulShot} variant="accent" />
+                <OverlayStarButton active={isCurrentShootRecordStarred} onPress={onToggleCurrentShootRecordStar} />
               </View>
             ) : null}
           </>
@@ -1013,8 +1040,8 @@ export function LessonScreen({
               </View>
 
               <View style={styles.captureSideSlot}>
-                {lessonMode === 'shoot' && isShootSuccessButtonVisible ? (
-                  <OverlayUtilityButton title="슛 성공" onPress={onRegisterSuccessfulShot} variant="accent" />
+                {lessonMode === 'shoot' && isShootRecordStarButtonVisible ? (
+                  <OverlayStarButton active={isCurrentShootRecordStarred} onPress={onToggleCurrentShootRecordStar} />
                 ) : (
                   <View style={styles.captureSidePlaceholder} />
                 )}
@@ -1850,6 +1877,34 @@ const styles = StyleSheet.create({
     color: '#fff9f2',
     fontSize: 13,
     fontWeight: '800',
+  },
+  overlayStarButton: {
+    width: 58,
+    height: 58,
+    borderRadius: 999,
+    backgroundColor: 'rgba(10,10,10,0.58)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,214,81,0.64)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+  },
+  overlayStarButtonActive: {
+    backgroundColor: 'rgba(69,52,0,0.82)',
+    borderColor: '#ffd451',
+  },
+  overlayStarButtonIcon: {
+    color: '#ffd451',
+    fontSize: 30,
+    lineHeight: 32,
+    fontWeight: '900',
+  },
+  overlayStarButtonIconActive: {
+    color: '#ffe27a',
   },
   errorBox: {
     marginBottom: 14,

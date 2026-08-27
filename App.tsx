@@ -384,12 +384,13 @@ export default function App() {
                 lessonReview={app.lessonReview}
                 currentDribbleCount={app.currentDribbleCount}
                 cameraError={app.cameraError}
-                isShootSuccessButtonVisible={app.isShootSuccessButtonVisible}
+                isShootRecordStarButtonVisible={app.isShootRecordStarButtonVisible}
+                isCurrentShootRecordStarred={app.isCurrentShootRecordStarred}
                 onSelectMode={app.changeLessonMode}
                 onSelectDribbleView={app.setSelectedDribbleView}
                 onBeginLesson={(dribbleTargetCount, dribbleView) => void app.beginLesson(dribbleTargetCount, dribbleView)}
                 onEndLesson={() => void app.endLesson()}
-                onRegisterSuccessfulShot={app.registerSuccessfulShot}
+                onToggleCurrentShootRecordStar={app.toggleCurrentShootRecordStar}
                 onGoHome={() => void app.navigateTo('home')}
                 onPoseMessage={app.handlePoseMessage}
               />
@@ -441,7 +442,6 @@ export default function App() {
               lessonRecords={app.lessonRecords}
               onOpenLesson={() => void app.navigateTo('lesson')}
               onOpenDiary={() => void app.navigateTo('diary')}
-              onOpenHomeworkLinkedDiary={(context) => void app.openHomeworkLinkedDiary(context)}
               onOpenRules={() => void app.navigateTo('rules')}
             />
           )}
@@ -460,6 +460,7 @@ export default function App() {
               calendarCells={app.calendarCells}
               selectedDateKey={app.selectedDateKey}
               selectedDateRecords={app.selectedDateRecords}
+              allLessonRecords={app.lessonRecords}
               homeworkLinkedDiaryContext={app.homeworkLinkedDiaryContext}
               selectedDateDribbleCount={app.selectedDateDribbleCount}
               diarySkillInsight={app.diarySkillInsight}
@@ -469,6 +470,7 @@ export default function App() {
               onClearHomeworkLinkedDiaryContext={app.clearHomeworkLinkedDiaryContext}
               onGoBack={() => void app.navigateTo('home')}
               onToggleShotOutcome={app.toggleLessonRecordShotOutcome}
+              onToggleStarredRecord={app.toggleLessonRecordStarred}
               onDeleteRecord={(recordId) => void app.deleteLessonRecord(recordId)}
             />
           )}

@@ -895,6 +895,7 @@ function sanitizeLessonRecords(value: unknown): LessonRecord[] {
       const mode = entry.mode === 'shoot' ? 'shoot' : 'dribble';
       const shotOutcome =
         entry.shotOutcome === 'success' ? 'success' : entry.shotOutcome === 'failure' ? 'failure' : undefined;
+      const isStarred = entry.isStarred === true;
       const feedback = typeof entry.feedback === 'string' ? entry.feedback : '';
       const videoUri = typeof entry.videoUri === 'string' ? entry.videoUri : '';
       const thumbnailUri = typeof entry.thumbnailUri === 'string' ? entry.thumbnailUri : '';
@@ -923,6 +924,7 @@ function sanitizeLessonRecords(value: unknown): LessonRecord[] {
         dateKey,
         mode,
         shotOutcome,
+        isStarred,
         feedback,
         feedbackTimeline: Array.isArray(entry.feedbackTimeline)
           ? (entry.feedbackTimeline as FeedbackMoment[] | string[])
@@ -1176,6 +1178,7 @@ function normalizeLessonRecord(
   const nextRecord = {
     ...record,
     shotOutcome: normalizedShotOutcome,
+    isStarred: record.isStarred === true,
     thumbnailUri: typeof record.thumbnailUri === 'string' ? record.thumbnailUri : '',
     feedbackTimeline: normalizedFeedbackTimeline,
     evaluation: normalizeLessonRecordEvaluation(record.evaluation),
@@ -1975,18 +1978,45 @@ function normalizeCalendarLessonRecordLevelCounts(counts: Record<LessonRecordLev
 
 function getDominantCalendarLessonRecordLevel(counts: Record<LessonRecordLevel, number>) {
   const normalizedCounts = normalizeCalendarLessonRecordLevelCounts(counts);
-  const rankedLevels = (Object.entries(normalizedCounts) as [LessonRecordLevel, number][])
-    .sort((left, right) => right[1] - left[1]);
+  const maxCount = Math.max(normalizedCounts.good, normalizedCounts.average, normalizedCounts.bad);
 
-  if (!rankedLevels[0] || rankedLevels[0][1] <= 0) {
+  if (maxCount <= 0) {
     return null;
   }
 
-  if (rankedLevels[0][1] === rankedLevels[1]?.[1]) {
+  const topLevels = (Object.entries(normalizedCounts) as [LessonRecordLevel, number][])
+    .filter(([, count]) => count === maxCount)
+    .map(([level]) => level);
+
+  if (topLevels.length === 1) {
+    return topLevels[0];
+  }
+
+  if (topLevels.includes('bad') && topLevels.includes('average') && !topLevels.includes('good')) {
+    return 'bad';
+  }
+
+  if (topLevels.includes('good') && topLevels.includes('average') && !topLevels.includes('bad')) {
+    return 'good';
+  }
+
+  if (topLevels.includes('good') && topLevels.includes('bad') && !topLevels.includes('average')) {
     return null;
   }
 
-  return rankedLevels[0][0];
+  if (topLevels.length === 3) {
+    return 'average';
+  }
+
+  if (topLevels[0]) {
+    return topLevels[0];
+  }
+
+  if (!topLevels[0]) {
+    return null;
+  }
+
+  return topLevels[0];
 }
 
 function buildLessonRecordSummary(level: LessonRecordLevel, stableCount: number, totalCount: number) {
@@ -3430,7 +3460,8 @@ export function useBasketballCoachApp() {
   const [fireworks, setFireworks] = useState<FireworkItem[]>([]);
   const [showFireworks, setShowFireworks] = useState(false);
   const [startupStatusText, setStartupStatusText] = useState('앱을 준비하고 있습니다.');
-  const [isShootSuccessButtonVisible, setIsShootSuccessButtonVisible] = useState(false);
+  const [isShootRecordStarButtonVisible, setIsShootRecordStarButtonVisible] = useState(false);
+  const [isCurrentShootRecordStarred, setIsCurrentShootRecordStarred] = useState(false);
 
   const feedbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pendingFeedbackRef = useRef<string | null>(null);
@@ -3474,6 +3505,8 @@ export function useBasketballCoachApp() {
   const frontDribbleSummaryShownRef = useRef(false);
   const shotSuccessRecordsRef = useRef<Record<string, number>>({});
   const shootSuccessRecordedForCurrentAttemptRef = useRef(false);
+  const currentShootRecordIdRef = useRef<string | null>(null);
+  const pendingShootRecordStarredRef = useRef(false);
   const startupRecoveryTriggeredRef = useRef(false);
   const seededDevTestUsersRef = useRef<Set<string>>(new Set());
   const remoteTokenRef = useRef<string | null>(null);
@@ -3668,6 +3701,13 @@ export function useBasketballCoachApp() {
     [currentUserId, isAccountDataReady]
   );
 
+  const resetShootRecordStarState = useCallback(() => {
+    currentShootRecordIdRef.current = null;
+    pendingShootRecordStarredRef.current = false;
+    setIsCurrentShootRecordStarred(false);
+    setIsShootRecordStarButtonVisible(false);
+  }, []);
+
   const resetAccountState = useCallback(() => {
     const resetDate = new Date();
     const resetDateKey = formatDateKey(resetDate);
@@ -3711,7 +3751,7 @@ export function useBasketballCoachApp() {
     setFireworks([]);
     setShowFireworks(false);
     setStartupStatusText('앱을 준비하고 있습니다.');
-    setIsShootSuccessButtonVisible(false);
+    resetShootRecordStarState();
 
     latestFeedbackRef.current = DEFAULT_DRIBBLE_FEEDBACK;
     pendingFeedbackRef.current = null;
@@ -3747,7 +3787,7 @@ export function useBasketballCoachApp() {
     frontDribbleWeakPointRef.current = null;
     frontDribbleSummaryShownRef.current = false;
     lastCountdownCueValueRef.current = null;
-  }, []);
+  }, [resetShootRecordStarState]);
 
   const persistSession = useCallback(async (userId: string, keepSignedIn: boolean, remoteToken?: string | null) => {
     remoteTokenRef.current = remoteToken ?? null;
@@ -5161,8 +5201,6 @@ export function useBasketballCoachApp() {
         setDebugText(options.debugMessage);
       }
 
-      setIsShootSuccessButtonVisible(false);
-
       if (options?.celebrate !== false) {
         setFireworks(createFireworks());
         setShowFireworks(true);
@@ -5208,6 +5246,7 @@ export function useBasketballCoachApp() {
       dateKey,
       mode,
       shotOutcome,
+      isStarred: mode === 'shoot' ? pendingShootRecordStarredRef.current : false,
       feedback: representativeFeedback,
       feedbackTimeline: [...feedbackTimelineRef.current],
       videoUri: persistedVideoUri,
@@ -5233,6 +5272,13 @@ export function useBasketballCoachApp() {
     lessonRecordsRef.current = nextLessonRecords;
     setLessonRecords(nextLessonRecords);
     persistLessonRecords(nextLessonRecords);
+
+    if (mode === 'shoot') {
+      currentShootRecordIdRef.current = recordId;
+      pendingShootRecordStarredRef.current = nextRecord.isStarred === true;
+      setIsCurrentShootRecordStarred(nextRecord.isStarred === true);
+      setIsShootRecordStarButtonVisible(true);
+    }
 
     setSelectedDateKey(dateKey);
     return true;
@@ -5288,7 +5334,7 @@ export function useBasketballCoachApp() {
       setIsCameraPreviewHidden(false);
       setIsLessonActive(false);
       setCameraError('');
-      setIsShootSuccessButtonVisible(false);
+      resetShootRecordStarState();
       if (keepCameraPreview) {
         setIsCameraActive(true);
         setIsCameraReady(true);
@@ -6264,7 +6310,7 @@ export function useBasketballCoachApp() {
 
   function changeLessonMode(mode: LessonMode) {
     setLessonMode(mode);
-    setIsShootSuccessButtonVisible(false);
+    resetShootRecordStarState();
     dribbleLessonPhaseRef.current = 'stance_setup';
     shootLessonStartedRef.current = false;
     resetShootAnalysisTracking();
@@ -6360,7 +6406,7 @@ export function useBasketballCoachApp() {
     setCameraStopMode(null);
     setIsCameraPreviewHidden(false);
     setLessonReview(null);
-    setIsShootSuccessButtonVisible(false);
+    resetShootRecordStarState();
     if (mode === 'dribble') {
       setImmediateLessonFeedback(buildDribbleStanceFeedbackForView({
         dribbleStarted: false,
@@ -6465,7 +6511,7 @@ export function useBasketballCoachApp() {
     setCameraStopMode(null);
     setLessonReview(null);
     setIsCameraPreviewHidden(false);
-    setIsShootSuccessButtonVisible(false);
+    resetShootRecordStarState();
     setIsLessonActive(false);
     setIsCameraActive(true);
     setIsCameraReady(false);
@@ -6530,7 +6576,7 @@ export function useBasketballCoachApp() {
     setCameraStopMode(null);
     setLessonReview(null);
     setIsCameraPreviewHidden(false);
-    setIsShootSuccessButtonVisible(false);
+    resetShootRecordStarState();
     setIsLessonActive(true);
     setIsCameraActive(true);
     setIsCameraReady(false);
@@ -6599,7 +6645,7 @@ export function useBasketballCoachApp() {
       setRecordingStopToken(0);
       setCameraStopMode(null);
       setIsCameraPreviewHidden(false);
-      setIsShootSuccessButtonVisible(false);
+      resetShootRecordStarState();
       setIsCameraActive(false);
       setIsCameraReady(false);
       setCameraError('');
@@ -6787,7 +6833,7 @@ export function useBasketballCoachApp() {
       setIsCameraActive(true);
       setIsCameraReady(true);
       setCameraError('');
-      setIsShootSuccessButtonVisible(!shootSuccessRecordedForCurrentAttemptRef.current);
+      setIsShootRecordStarButtonVisible(true);
       const completionText = completedShootHomework ? `\n\n${getHomeworkCompletionMessage('shoot')}` : '';
       shootFeedbackLockedRef.current = true;
       setImmediateLessonFeedback(`${finalFeedback}${completionText}`);
@@ -6842,7 +6888,7 @@ export function useBasketballCoachApp() {
     shootAnalysisHistoryRef.current = [];
     shootAnalysisFramesRef.current = [];
     shootSuccessRecordedForCurrentAttemptRef.current = false;
-    setIsShootSuccessButtonVisible(false);
+    resetShootRecordStarState();
     setShootResetToken(Date.now());
     playStartCue();
     if (!shootRecordingStartedRef.current) {
@@ -7030,7 +7076,7 @@ export function useBasketballCoachApp() {
           shootLessonStartedRef.current = false;
           dribbleLessonPhaseRef.current = 'cooldown';
           shootCooldownUntilRef.current = Date.now() + SHOOT_SUCCESS_CIRCLE_WINDOW_MS;
-          setIsShootSuccessButtonVisible(!shootSuccessRecordedForCurrentAttemptRef.current);
+          setIsShootRecordStarButtonVisible(true);
           setImmediateLessonFeedback(
             `${nextFeedback}\n\n슛 발사를 확인했습니다. ${SHOOT_SUCCESS_CIRCLE_WINDOW_SECONDS}초 동안 성공 동작을 확인한 뒤 기록과 분석을 이어갑니다.`
           );
@@ -7233,7 +7279,7 @@ export function useBasketballCoachApp() {
             setIsLessonActive(true);
             setIsCameraActive(true);
             setIsCameraReady(true);
-            setIsShootSuccessButtonVisible(false);
+            resetShootRecordStarState();
             setImmediateLessonFeedback(`${latestFeedbackRef.current}\n\n다시 슛 준비 자세를 맞춰 주세요.`);
             return;
           }
@@ -7288,18 +7334,33 @@ export function useBasketballCoachApp() {
     setCurrentDate((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
   }
 
-  function registerSuccessfulShot() {
-    if (lessonMode !== 'shoot') {
-      Alert.alert('??遺꾩꽍 紐⑤뱶 ?꾩슜', '???깃났 湲곕줉? ??遺꾩꽍 紐⑤뱶?먯꽌留??ъ슜?????덉뒿?덈떎.');
+  function toggleCurrentShootRecordStar() {
+    if (lessonMode !== 'shoot' || !isShootRecordStarButtonVisible) {
       return;
     }
 
-    if (!isShootSuccessButtonVisible) {
-      Alert.alert('??諛쒖궗 ?뺤씤 ?꾩슂', '??諛쒖궗瑜?癒쇱? ?몄떇???ㅼ뿉 ???깃났??湲곕줉?????덉뒿?덈떎.');
+    const nextIsStarred = !isCurrentShootRecordStarred;
+    pendingShootRecordStarredRef.current = nextIsStarred;
+    setIsCurrentShootRecordStarred(nextIsStarred);
+
+    const currentRecordId = currentShootRecordIdRef.current;
+
+    if (!currentRecordId) {
       return;
     }
 
-    recordSuccessfulShot();
+    const nextLessonRecords = lessonRecordsRef.current.map((item) =>
+      item.id === currentRecordId
+        ? normalizeLessonRecord({
+            ...item,
+            isStarred: nextIsStarred,
+          })
+        : item
+    );
+
+    lessonRecordsRef.current = nextLessonRecords;
+    setLessonRecords(nextLessonRecords);
+    persistLessonRecords(nextLessonRecords);
   }
 
   function toggleLessonRecordShotOutcome(recordId: string) {
@@ -7325,6 +7386,33 @@ export function useBasketballCoachApp() {
     setLessonRecords(nextLessonRecords);
     persistLessonRecords(nextLessonRecords);
     updateShotSuccessCount(record.dateKey, delta);
+  }
+
+  function toggleLessonRecordStarred(recordId: string) {
+    const record = lessonRecordsRef.current.find((item) => item.id === recordId);
+
+    if (!record || record.mode !== 'shoot') {
+      return;
+    }
+
+    const nextIsStarred = !record.isStarred;
+    const nextLessonRecords = lessonRecordsRef.current.map((item) =>
+      item.id === recordId
+        ? normalizeLessonRecord({
+            ...item,
+            isStarred: nextIsStarred,
+          })
+        : item
+    );
+
+    lessonRecordsRef.current = nextLessonRecords;
+    setLessonRecords(nextLessonRecords);
+    persistLessonRecords(nextLessonRecords);
+
+    if (currentShootRecordIdRef.current === recordId) {
+      pendingShootRecordStarredRef.current = nextIsStarred;
+      setIsCurrentShootRecordStarred(nextIsStarred);
+    }
   }
 
   async function openSkillVideo() {
@@ -7375,6 +7463,10 @@ export function useBasketballCoachApp() {
     lessonRecordsRef.current = nextLessonRecords;
     setLessonRecords(nextLessonRecords);
     persistLessonRecords(nextLessonRecords);
+
+    if (currentShootRecordIdRef.current === recordId) {
+      resetShootRecordStarState();
+    }
   }
 
   return {
@@ -7414,7 +7506,8 @@ export function useBasketballCoachApp() {
     cameraSessionKey,
     countdownValue,
     startupStatusText,
-    isShootSuccessButtonVisible,
+    isShootRecordStarButtonVisible,
+    isCurrentShootRecordStarred,
     recoverStartupToLogin,
     dribbleResetToken,
     shootResetToken,
@@ -7439,8 +7532,9 @@ export function useBasketballCoachApp() {
     beginLesson,
     endLesson,
     handlePoseMessage,
-    registerSuccessfulShot,
+    toggleCurrentShootRecordStar,
     toggleLessonRecordShotOutcome,
+    toggleLessonRecordStarred,
     selectSkill,
     selectBallBrand,
     toggleBallColor,

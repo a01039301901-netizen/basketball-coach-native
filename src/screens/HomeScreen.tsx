@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
+import { ResizeMode, Video } from 'expo-av';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { colors } from '../theme/colors';
-import type { HomeworkDiaryLinkContext, HomeworkProgressItem, LessonMode, LessonRecord } from '../types/app';
+import type { HomeworkProgressItem, LessonMode, LessonRecord } from '../types/app';
+import { generateLessonRecordThumbnail } from '../utils/lessonRecordThumbnail';
 import { getDesktopMobileFrameWidth, shouldUseDesktopMobileLayout } from '../utils/layout';
 
 type HomeMenuArtworkType = 'lesson' | 'diary';
@@ -16,7 +18,6 @@ interface HomeScreenProps {
   lessonRecords: LessonRecord[];
   onOpenLesson: () => void;
   onOpenDiary: () => void;
-  onOpenHomeworkLinkedDiary: (context: HomeworkDiaryLinkContext) => void;
   onOpenRules: () => void;
 }
 
@@ -67,6 +68,10 @@ function getHomeworkEvaluationLevelLabel(level: NonNullable<LessonRecord['evalua
   }
 
   return '나쁨';
+}
+
+function getHomeworkEvaluationRecordTitle(record: LessonRecord) {
+  return record.mode === 'shoot' ? '슛 분석' : '드리블 분석';
 }
 
 function HomeMenuButton({
@@ -174,7 +179,6 @@ export function HomeScreen({
   lessonRecords,
   onOpenLesson,
   onOpenDiary,
-  onOpenHomeworkLinkedDiary,
   onOpenRules,
 }: HomeScreenProps) {
   const { width } = useWindowDimensions();
@@ -182,6 +186,8 @@ export function HomeScreen({
   const isWide = layoutWidth >= 860;
   const [selectedHomeworkReasonItem, setSelectedHomeworkReasonItem] = useState<HomeworkProgressItem | null>(null);
   const [selectedHomeworkEvaluationRecord, setSelectedHomeworkEvaluationRecord] = useState<LessonRecord | null>(null);
+  const [generatedHomeworkPreviewThumbnails, setGeneratedHomeworkPreviewThumbnails] = useState<Record<string, string>>({});
+  const attemptedHomeworkPreviewThumbnailsRef = useRef<Record<string, boolean>>({});
   const selectedHomeworkReasonSummary = selectedHomeworkReasonItem?.reasonText?.trim() || '';
   const hasSelectedHomeworkDetailText = Boolean(selectedHomeworkReasonItem?.detailText?.trim());
   const selectedHomeworkReasonText =
@@ -198,9 +204,78 @@ export function HomeScreen({
     return previewRecords.map((preview) => ({
       preview,
       record: lessonRecordMap.get(preview.recordId) ?? null,
+      thumbnailUri:
+        lessonRecordMap.get(preview.recordId)?.thumbnailUri.trim()
+        || generatedHomeworkPreviewThumbnails[preview.recordId]?.trim()
+        || preview.thumbnailUri.trim(),
     }));
-  }, [lessonRecordMap, selectedHomeworkReasonItem]);
+  }, [generatedHomeworkPreviewThumbnails, lessonRecordMap, selectedHomeworkReasonItem]);
   const selectedHomeworkEvaluation = selectedHomeworkEvaluationRecord?.evaluation ?? null;
+
+  useEffect(() => {
+    const thumbnailTargets = selectedHomeworkLinkedRecordCards.filter(
+      ({ preview, record, thumbnailUri }) =>
+        Boolean(record?.videoUri.trim())
+        && !thumbnailUri
+        && !attemptedHomeworkPreviewThumbnailsRef.current[preview.recordId]
+    );
+
+    if (thumbnailTargets.length === 0) {
+      return;
+    }
+
+    thumbnailTargets.forEach(({ preview }) => {
+      attemptedHomeworkPreviewThumbnailsRef.current[preview.recordId] = true;
+    });
+
+    let isCancelled = false;
+
+    void Promise.all(
+      thumbnailTargets.map(async ({ preview, record }) => {
+        if (!record?.videoUri.trim()) {
+          return null;
+        }
+
+        const thumbnailUri = await generateLessonRecordThumbnail(record.videoUri);
+
+        if (!thumbnailUri?.trim()) {
+          return null;
+        }
+
+        return [preview.recordId, thumbnailUri.trim()] as const;
+      })
+    ).then((results) => {
+      if (isCancelled) {
+        return;
+      }
+
+      setGeneratedHomeworkPreviewThumbnails((current) => {
+        let hasChanged = false;
+        const next = { ...current };
+
+        results.forEach((result) => {
+          if (!result) {
+            return;
+          }
+
+          const [recordId, thumbnailUri] = result;
+
+          if (next[recordId] === thumbnailUri) {
+            return;
+          }
+
+          next[recordId] = thumbnailUri;
+          hasChanged = true;
+        });
+
+        return hasChanged ? next : current;
+      });
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedHomeworkLinkedRecordCards]);
 
   function closeHomeworkReasonModal() {
     setSelectedHomeworkEvaluationRecord(null);
@@ -390,7 +465,7 @@ export function HomeScreen({
               ) : null}
               {selectedHomeworkLinkedRecordCards.length > 0 ? (
                 <View style={styles.reasonModalLinkedPreviewRow}>
-                  {selectedHomeworkLinkedRecordCards.map(({ preview, record }) => (
+                  {selectedHomeworkLinkedRecordCards.map(({ preview, record, thumbnailUri }) => (
                     <Pressable
                       key={preview.recordId}
                       disabled={!record}
@@ -401,8 +476,8 @@ export function HomeScreen({
                         record && pressed && styles.pressed,
                       ]}
                     >
-                      {preview.thumbnailUri.trim() ? (
-                        <Image source={{ uri: preview.thumbnailUri }} resizeMode="cover" style={styles.reasonModalLinkedPreviewImage} />
+                      {thumbnailUri ? (
+                        <Image source={{ uri: thumbnailUri }} resizeMode="cover" style={styles.reasonModalLinkedPreviewImage} />
                       ) : (
                         <View style={[styles.reasonModalLinkedPreviewImage, styles.reasonModalLinkedPreviewImageEmpty]}>
                           <Text style={styles.reasonModalLinkedPreviewEmptyText}>기록</Text>
@@ -433,109 +508,117 @@ export function HomeScreen({
       <Modal
         visible={Boolean(selectedHomeworkEvaluationRecord)}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={closeHomeworkEvaluationModal}
       >
         <View style={styles.homeworkEvaluationOverlay}>
           <Pressable style={styles.homeworkEvaluationBackdrop} onPress={closeHomeworkEvaluationModal} />
           <View style={styles.homeworkEvaluationCard}>
             <View style={styles.homeworkEvaluationHeader}>
-              <Text style={styles.homeworkEvaluationTitle}>기록 평가</Text>
               <Pressable
                 onPress={closeHomeworkEvaluationModal}
-                style={({ pressed }) => [styles.homeworkEvaluationCloseButton, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.homeworkEvaluationBackButton, pressed && styles.pressed]}
               >
-                <Text style={styles.homeworkEvaluationCloseText}>닫기</Text>
+                <Text style={styles.homeworkEvaluationBackText}>{'<'}</Text>
               </Pressable>
+              <View style={styles.homeworkEvaluationHeaderTitleWrap}>
+                <Text style={styles.homeworkEvaluationTitle}>기록 평가</Text>
+              </View>
             </View>
+
             <ScrollView
               style={styles.homeworkEvaluationScroll}
               contentContainerStyle={styles.homeworkEvaluationScrollContent}
               showsVerticalScrollIndicator={false}
             >
-              {selectedHomeworkEvaluationRecord?.thumbnailUri.trim() ? (
-                <Image
-                  source={{ uri: selectedHomeworkEvaluationRecord.thumbnailUri }}
-                  resizeMode="cover"
-                  style={styles.homeworkEvaluationThumbnail}
-                />
-              ) : (
-                <View style={[styles.homeworkEvaluationThumbnail, styles.homeworkEvaluationThumbnailEmpty]}>
-                  <Text style={styles.homeworkEvaluationThumbnailEmptyText}>썸네일 없음</Text>
-                </View>
-              )}
-
-              <View style={styles.homeworkEvaluationMetaRow}>
-                <View style={styles.homeworkEvaluationModeBadge}>
-                  <Text style={styles.homeworkEvaluationModeBadgeText}>
-                    {selectedHomeworkEvaluationRecord ? getHomeworkPreviewModeLabel(selectedHomeworkEvaluationRecord.mode) : ''}
-                  </Text>
-                </View>
-                {selectedHomeworkEvaluation ? (
-                  <View
-                    style={[
-                      styles.homeworkEvaluationLevelBadge,
-                      selectedHomeworkEvaluation.level === 'good'
-                        ? styles.homeworkEvaluationLevelBadgeGood
-                        : selectedHomeworkEvaluation.level === 'average'
-                          ? styles.homeworkEvaluationLevelBadgeAverage
-                          : styles.homeworkEvaluationLevelBadgeBad,
-                    ]}
-                  >
-                    <Text style={styles.homeworkEvaluationLevelText}>
-                      {getHomeworkEvaluationLevelLabel(selectedHomeworkEvaluation.level)}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-
-              {selectedHomeworkEvaluationRecord?.createdAt ? (
-                <Text style={styles.homeworkEvaluationCreatedAt}>{selectedHomeworkEvaluationRecord.createdAt}</Text>
-              ) : null}
-
-              {selectedHomeworkEvaluation ? (
+              {selectedHomeworkEvaluationRecord ? (
                 <>
-                  <Text style={styles.homeworkEvaluationSummary}>{selectedHomeworkEvaluation.summary}</Text>
-                  <View style={styles.homeworkEvaluationCriteriaList}>
-                    {selectedHomeworkEvaluation.criteria.map((criterion) => (
-                      <View key={`${criterion.key}-${criterion.label}`} style={styles.homeworkEvaluationCriterionRow}>
-                        <View
-                          style={[
-                            styles.homeworkEvaluationCriterionStatus,
-                            criterion.isStable
-                              ? styles.homeworkEvaluationCriterionStatusStable
-                              : styles.homeworkEvaluationCriterionStatusUnstable,
-                          ]}
-                        >
-                          <Text style={styles.homeworkEvaluationCriterionStatusText}>
-                            {criterion.isStable ? '좋음' : '보완'}
-                          </Text>
-                        </View>
-                        <View style={styles.homeworkEvaluationCriterionTextWrap}>
-                          <Text style={styles.homeworkEvaluationCriterionLabel}>{criterion.label}</Text>
-                          <Text style={styles.homeworkEvaluationCriterionDetail}>{criterion.detail}</Text>
-                        </View>
+                  <View style={styles.homeworkEvaluationMetaRow}>
+                    <View style={styles.homeworkEvaluationModeBadge}>
+                      <Text style={styles.homeworkEvaluationModeBadgeText}>
+                        {getHomeworkEvaluationRecordTitle(selectedHomeworkEvaluationRecord)}
+                      </Text>
+                    </View>
+                    {selectedHomeworkEvaluation ? (
+                      <View
+                        style={[
+                          styles.homeworkEvaluationLevelBadge,
+                          selectedHomeworkEvaluation.level === 'good'
+                            ? styles.homeworkEvaluationLevelBadgeGood
+                            : selectedHomeworkEvaluation.level === 'average'
+                              ? styles.homeworkEvaluationLevelBadgeAverage
+                              : styles.homeworkEvaluationLevelBadgeBad,
+                        ]}
+                      >
+                        <Text style={styles.homeworkEvaluationLevelText}>
+                          {getHomeworkEvaluationLevelLabel(selectedHomeworkEvaluation.level)}
+                        </Text>
                       </View>
-                    ))}
+                    ) : null}
                   </View>
 
-                  {selectedHomeworkEvaluation.improvements.length > 0 ? (
-                    <View style={styles.homeworkEvaluationHighlightList}>
-                      <Text style={styles.homeworkEvaluationSectionTitle}>보완 포인트</Text>
-                      {selectedHomeworkEvaluation.improvements.map((highlight, index) => (
-                        <View key={`${highlight.label}-${index}`} style={styles.homeworkEvaluationHighlightCard}>
-                          <Text style={styles.homeworkEvaluationHighlightLabel}>{highlight.label}</Text>
-                          <Text style={styles.homeworkEvaluationHighlightDetail}>{highlight.detail}</Text>
-                        </View>
-                      ))}
-                    </View>
+                  {selectedHomeworkEvaluationRecord.createdAt ? (
+                    <Text style={styles.homeworkEvaluationCreatedAt}>{selectedHomeworkEvaluationRecord.createdAt}</Text>
                   ) : null}
+
+                  {selectedHomeworkEvaluationRecord.videoUri.trim() ? (
+                    <Video
+                      source={{ uri: selectedHomeworkEvaluationRecord.videoUri }}
+                      useNativeControls
+                      shouldPlay={false}
+                      isLooping={false}
+                      resizeMode={ResizeMode.CONTAIN}
+                      style={styles.homeworkEvaluationThumbnail}
+                    />
+                  ) : selectedHomeworkEvaluationRecord.thumbnailUri.trim() ? (
+                    <Image
+                      source={{ uri: selectedHomeworkEvaluationRecord.thumbnailUri }}
+                      resizeMode="cover"
+                      style={styles.homeworkEvaluationThumbnail}
+                    />
+                  ) : (
+                    <View style={[styles.homeworkEvaluationThumbnail, styles.homeworkEvaluationThumbnailEmpty]}>
+                      <Text style={styles.homeworkEvaluationThumbnailEmptyText}>저장된 영상이 없습니다.</Text>
+                    </View>
+                  )}
+
+                  {selectedHomeworkEvaluation ? (
+                    <>
+                      <Text style={styles.homeworkEvaluationSummary}>{selectedHomeworkEvaluation.summary}</Text>
+                      <View style={styles.homeworkEvaluationCriteriaList}>
+                        {selectedHomeworkEvaluation.criteria
+                          .filter((criterion) => criterion.key !== 'shoot-result')
+                          .map((criterion) => (
+                            <View key={`${criterion.key}-${criterion.label}`} style={styles.homeworkEvaluationCriterionRow}>
+                              <View
+                                style={[
+                                  styles.homeworkEvaluationCriterionStatus,
+                                  criterion.isStable
+                                    ? styles.homeworkEvaluationCriterionStatusStable
+                                    : styles.homeworkEvaluationCriterionStatusUnstable,
+                                ]}
+                              >
+                                <Text style={styles.homeworkEvaluationCriterionStatusText}>
+                                  {criterion.isStable ? '잘한 점' : '보완'}
+                                </Text>
+                              </View>
+                              <View style={styles.homeworkEvaluationCriterionTextWrap}>
+                                <Text style={styles.homeworkEvaluationCriterionLabel}>{criterion.label}</Text>
+                                {criterion.detail.trim() ? (
+                                  <Text style={styles.homeworkEvaluationCriterionDetail}>{criterion.detail}</Text>
+                                ) : null}
+                              </View>
+                            </View>
+                          ))}
+                      </View>
+                    </>
+                  ) : (
+                    <Text style={styles.homeworkEvaluationEmptyText}>
+                      자세한 기록 평가는 AI로 분석한 기록부터 확인할 수 있습니다.
+                    </Text>
+                  )}
                 </>
-              ) : (
-                <Text style={styles.homeworkEvaluationEmptyText}>
-                  자세한 기록 평가는 AI로 분석한 기록부터 확인할 수 있습니다.
-                </Text>
-              )}
+              ) : null}
             </ScrollView>
           </View>
         </View>
@@ -1133,8 +1216,13 @@ const styles = StyleSheet.create({
   homeworkEvaluationHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     gap: 12,
+  },
+  homeworkEvaluationHeaderTitleWrap: {
+    flex: 1,
+    alignItems: 'center',
+    marginRight: 40,
   },
   homeworkEvaluationTitle: {
     color: colors.text,
@@ -1142,14 +1230,19 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontWeight: '900',
   },
-  homeworkEvaluationCloseButton: {
-    alignSelf: 'flex-start',
+  homeworkEvaluationBackButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 999,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  homeworkEvaluationCloseText: {
-    color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '700',
+  homeworkEvaluationBackText: {
+    color: colors.surface,
+    fontSize: 20,
+    lineHeight: 20,
+    fontWeight: '900',
   },
   homeworkEvaluationScroll: {
     flexGrow: 0,
