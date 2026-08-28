@@ -917,7 +917,10 @@ function sanitizeLessonRecords(value: unknown): LessonRecord[] {
       const representativeFeedbackCategory = isHomeworkFeedbackCategory(entry.representativeFeedbackCategory)
         ? entry.representativeFeedbackCategory
         : undefined;
-      const evaluation = normalizeLessonRecordEvaluation(entry.evaluation);
+      const evaluation = normalizeLessonRecordEvaluation(entry.evaluation, {
+        mode,
+        dribbleView,
+      });
 
       const nextRecord: LessonRecord = normalizeLessonRecord({
         id,
@@ -1125,16 +1128,189 @@ function normalizeLessonRecordHighlights(value: unknown): LessonRecordHighlight[
     .filter((entry): entry is LessonRecordHighlight => Boolean(entry));
 }
 
-function normalizeLessonRecordEvaluation(value: unknown): LessonRecordEvaluation | undefined {
+interface LessonRecordEvaluationNormalizationContext {
+  mode: LessonMode;
+  dribbleView?: DribbleLessonView;
+}
+
+interface LegacyDribbleCriterionDefinition {
+  key: string;
+  label: string;
+  legacyKeys: string[];
+  matchKeywords: string[];
+  stableDetail: string;
+  unstableDetail: string;
+}
+
+function getLegacySideDribbleCriterionDefinitions(): LegacyDribbleCriterionDefinition[] {
+  return [
+    {
+      key: 'dribble-torso-posture',
+      label: '상체 기울기',
+      legacyKeys: ['dribble-torso-posture', 'dribble-position-stability'],
+      matchKeywords: ['상체', '공 위치'],
+      stableDetail: '상체 기울기가 안정적으로 유지되었습니다.',
+      unstableDetail: '상체 기울기를 조금 더 일정하게 유지해 주세요.',
+    },
+    {
+      key: 'dribble-height-appropriate',
+      label: '드리블 높이',
+      legacyKeys: ['dribble-height-appropriate', 'dribble-height', 'dribble-height-stability'],
+      matchKeywords: ['드리블 높이', '높이 안정'],
+      stableDetail: '드리블 높이가 적절하게 유지되었습니다.',
+      unstableDetail: '드리블 높이를 조금 더 일정하게 맞춰 주세요.',
+    },
+    {
+      key: 'dribble-eye-focus',
+      label: '시선 처리',
+      legacyKeys: ['dribble-eye-focus'],
+      matchKeywords: ['시선'],
+      stableDetail: '시선이 앞을 향한 구간이 충분했습니다.',
+      unstableDetail: '시선을 공보다 앞쪽으로 더 오래 유지해 주세요.',
+    },
+    {
+      key: 'dribble-rhythm',
+      label: '드리블 리듬',
+      legacyKeys: ['dribble-rhythm', 'dribble-tempo-stability'],
+      matchKeywords: ['리듬'],
+      stableDetail: '드리블 리듬이 일정하게 유지되었습니다.',
+      unstableDetail: '같은 리듬으로 드리블을 이어가 보세요.',
+    },
+  ];
+}
+
+function findLegacyDribbleCriterionByDefinition(
+  criteria: LessonRecordCriterion[],
+  definition: LegacyDribbleCriterionDefinition
+) {
+  return criteria.find((criterion) => definition.legacyKeys.includes(criterion.key)) ?? null;
+}
+
+function findLegacyDribbleHighlightByDefinition(
+  highlights: LessonRecordHighlight[],
+  definition: LegacyDribbleCriterionDefinition
+) {
+  return (
+    highlights.find((highlight) =>
+      definition.matchKeywords.some((keyword) => highlight.label.includes(keyword))
+    ) ?? null
+  );
+}
+
+function getLegacySideDribbleTargetStableCount(level: LessonRecordLevel) {
+  if (level === 'good') {
+    return 3;
+  }
+
+  if (level === 'average') {
+    return 2;
+  }
+
+  return 0;
+}
+
+function normalizeLegacySideDribbleCriteria(
+  criteria: LessonRecordCriterion[],
+  strengths: LessonRecordHighlight[],
+  improvements: LessonRecordHighlight[],
+  level: LessonRecordLevel
+) {
+  const definitions = getLegacySideDribbleCriterionDefinitions();
+  const seededCriteria = definitions.map((definition) => {
+    const existingCriterion = findLegacyDribbleCriterionByDefinition(criteria, definition);
+
+    if (existingCriterion) {
+      return {
+        definition,
+        criterion: {
+          ...existingCriterion,
+          key: definition.key,
+          label: definition.label,
+        } satisfies LessonRecordCriterion,
+      };
+    }
+
+    const matchingStrength = findLegacyDribbleHighlightByDefinition(strengths, definition);
+
+    if (matchingStrength) {
+      return {
+        definition,
+        criterion: {
+          key: definition.key,
+          label: definition.label,
+          isStable: true,
+          stableRatio: 1,
+          detail: matchingStrength.detail || definition.stableDetail,
+        } satisfies LessonRecordCriterion,
+      };
+    }
+
+    const matchingImprovement = findLegacyDribbleHighlightByDefinition(improvements, definition);
+
+    if (matchingImprovement) {
+      return {
+        definition,
+        criterion: {
+          key: definition.key,
+          label: definition.label,
+          isStable: false,
+          stableRatio: 0,
+          detail: matchingImprovement.detail || definition.unstableDetail,
+        } satisfies LessonRecordCriterion,
+      };
+    }
+
+    return {
+      definition,
+      criterion: null,
+    };
+  });
+
+  const seededStableCount = seededCriteria.reduce(
+    (count, entry) => count + (entry.criterion?.isStable ? 1 : 0),
+    0
+  );
+  const targetStableCount = Math.max(seededStableCount, getLegacySideDribbleTargetStableCount(level));
+  let remainingStableSlots = Math.max(0, targetStableCount - seededStableCount);
+
+  return seededCriteria.map((entry) => {
+    if (entry.criterion) {
+      return entry.criterion;
+    }
+
+    const shouldMarkStable = remainingStableSlots > 0;
+
+    if (shouldMarkStable) {
+      remainingStableSlots -= 1;
+    }
+
+    return {
+      key: entry.definition.key,
+      label: entry.definition.label,
+      isStable: shouldMarkStable,
+      stableRatio: shouldMarkStable ? 1 : 0,
+      detail: shouldMarkStable ? entry.definition.stableDetail : entry.definition.unstableDetail,
+    } satisfies LessonRecordCriterion;
+  });
+}
+
+function normalizeLessonRecordEvaluation(
+  value: unknown,
+  context?: LessonRecordEvaluationNormalizationContext
+): LessonRecordEvaluation | undefined {
   if (!isRecordObject(value) || typeof value.summary !== 'string') {
     return undefined;
   }
 
   const level: LessonRecordLevel =
     value.level === 'good' || value.level === 'average' || value.level === 'bad' ? value.level : 'bad';
-  const criteria = normalizeLessonRecordCriteria(value.criteria);
+  const normalizedCriteria = normalizeLessonRecordCriteria(value.criteria);
   const strengths = normalizeLessonRecordHighlights(value.strengths);
   const improvements = normalizeLessonRecordHighlights(value.improvements);
+  const criteria =
+    context?.mode === 'dribble' && context.dribbleView === 'side'
+      ? normalizeLegacySideDribbleCriteria(normalizedCriteria, strengths, improvements, level)
+      : normalizedCriteria;
   const shootCriteriaTotal = getShootEvaluationCriteriaTotal(criteria);
   const isShootEvaluation = shootCriteriaTotal > 0 && shootCriteriaTotal !== criteria.length;
   const stableCount = isShootEvaluation
@@ -1181,7 +1357,10 @@ function normalizeLessonRecord(
     isStarred: record.isStarred === true,
     thumbnailUri: typeof record.thumbnailUri === 'string' ? record.thumbnailUri : '',
     feedbackTimeline: normalizedFeedbackTimeline,
-    evaluation: normalizeLessonRecordEvaluation(record.evaluation),
+    evaluation: normalizeLessonRecordEvaluation(record.evaluation, {
+      mode: record.mode,
+      dribbleView: record.dribbleView,
+    }),
   } as LessonRecord;
   const representativeFeedbackCategory =
     nextRecord.representativeFeedbackCategory ?? getRepresentativeHomeworkFeedbackCategory(nextRecord) ?? undefined;
@@ -5277,7 +5456,6 @@ export function useBasketballCoachApp() {
       currentShootRecordIdRef.current = recordId;
       pendingShootRecordStarredRef.current = nextRecord.isStarred === true;
       setIsCurrentShootRecordStarred(nextRecord.isStarred === true);
-      setIsShootRecordStarButtonVisible(true);
     }
 
     setSelectedDateKey(dateKey);
@@ -5304,6 +5482,10 @@ export function useBasketballCoachApp() {
         shouldSaveRecord && shouldPersistShootRecord
           ? await saveLessonRecord(videoUri)
           : false;
+
+      if (didSaveLessonRecord) {
+        setIsShootRecordStarButtonVisible(true);
+      }
 
       if (didSaveLessonRecord && lessonModeRef.current === 'shoot') {
           const completedShootHomework = recordDailyShootAttempt();
@@ -6763,7 +6945,11 @@ export function useBasketballCoachApp() {
 
       recordFrontDribbleHomeworkData(selectedDribbleViewRef.current === 'front' ? latestDribbleAnalysisRef.current : null);
       const completedDribbleHomework = recordDailyDribbleProgress(dribbleTargetCountRef.current ?? 0);
-      await saveLessonRecord(videoUri, finalReviewClip);
+      const didSaveLessonRecord = await saveLessonRecord(videoUri, finalReviewClip);
+
+      if (didSaveLessonRecord) {
+        setIsShootRecordStarButtonVisible(true);
+      }
 
       resumeDribbleLessonCycle(
         '紐⑺몴 ?쒕━釉??잛닔瑜?紐⑤몢 梨꾩썙 ?덉뒯???앹꽦?섏뒿?덈떎. ?ㅼ떆 以鍮??먯꽭瑜?留욎떠 媛숈? ?잛닔濡??쒕━釉??덉뒯???붾컮濡??쒖옉???덉뒿?덈떎.',
@@ -6802,7 +6988,7 @@ export function useBasketballCoachApp() {
       setLessonReview(null);
 
       const completedShootHomework = recordDailyShootAttempt();
-      await saveLessonRecord(videoUri);
+      const didSaveLessonRecord = await saveLessonRecord(videoUri);
 
       lessonStartedAtRef.current = null;
       dribbleLessonPhaseRef.current = 'stance_setup';
@@ -6827,7 +7013,9 @@ export function useBasketballCoachApp() {
       setIsCameraActive(true);
       setIsCameraReady(true);
       setCameraError('');
-      setIsShootRecordStarButtonVisible(true);
+      if (didSaveLessonRecord) {
+        setIsShootRecordStarButtonVisible(true);
+      }
       const completionText = completedShootHomework ? `\n\n${getHomeworkCompletionMessage('shoot')}` : '';
       shootFeedbackLockedRef.current = true;
       setImmediateLessonFeedback(`${finalFeedback}${completionText}`);
@@ -7071,7 +7259,6 @@ export function useBasketballCoachApp() {
           shootLessonStartedRef.current = false;
           dribbleLessonPhaseRef.current = 'cooldown';
           shootCooldownUntilRef.current = Date.now() + SHOOT_SUCCESS_CIRCLE_WINDOW_MS;
-          setIsShootRecordStarButtonVisible(true);
           setImmediateLessonFeedback(
             `${nextFeedback}\n\n슛 발사를 확인했습니다. ${SHOOT_SUCCESS_CIRCLE_WINDOW_SECONDS}초 동안 성공 동작을 확인한 뒤 기록과 분석을 이어갑니다.`
           );
