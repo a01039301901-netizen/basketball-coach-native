@@ -74,6 +74,37 @@ function getHomeworkEvaluationRecordTitle(record: LessonRecord) {
   return record.mode === 'shoot' ? '슛 분석' : '드리블 분석';
 }
 
+function getHomeworkBalanceGraphHeadline(balanceGraph: NonNullable<HomeworkProgressItem['balanceGraph']>) {
+  if (balanceGraph.totalCount === 0) {
+    return '드리블 균형 기록 없음';
+  }
+
+  if (balanceGraph.leftCount === balanceGraph.rightCount) {
+    return `균형 · 왼손 ${balanceGraph.leftCount} / 오른손 ${balanceGraph.rightCount}`;
+  }
+
+  return balanceGraph.leftCount > balanceGraph.rightCount
+    ? `왼손 우세 · 왼손 ${balanceGraph.leftCount} / 오른손 ${balanceGraph.rightCount}`
+    : `오른손 우세 · 왼손 ${balanceGraph.leftCount} / 오른손 ${balanceGraph.rightCount}`;
+}
+
+function getHomeworkBalanceGraphHelperText(balanceGraph: NonNullable<HomeworkProgressItem['balanceGraph']>) {
+  if (balanceGraph.totalCount === 0) {
+    return '아직 추가 드리블 기록이 없어요. 드리블 레슨에서 왼손과 오른손을 번갈아 사용해보세요.';
+  }
+
+  if (balanceGraph.totalCount < balanceGraph.minTotalTarget) {
+    return `현재 왼손 ${balanceGraph.leftCount}회, 오른손 ${balanceGraph.rightCount}회가 기록돼 있어요. 먼저 ${balanceGraph.minTotalTarget}회 정도까지 채우면 좌우 균형을 더 정확하게 볼 수 있어요.`;
+  }
+
+  if (balanceGraph.gap <= balanceGraph.targetGap) {
+    return `현재 좌우 차이는 ${balanceGraph.gap}회로 목표 범위 안에 들어왔어요. 이 리듬을 유지하면서 양손 전환을 계속 이어가면 좋아요.`;
+  }
+
+  const weakerHand = balanceGraph.leftCount < balanceGraph.rightCount ? '왼손' : '오른손';
+  return `현재 좌우 차이는 ${balanceGraph.gap}회예요. 다음 드리블 레슨에서는 ${weakerHand} 사용을 조금 더 늘려 차이를 ${balanceGraph.targetGap}회 이하로 맞춰보세요.`;
+}
+
 function HomeMenuButton({
   accentColor,
   accentSoft,
@@ -194,6 +225,31 @@ export function HomeScreen({
     selectedHomeworkReasonItem?.detailText?.trim() ||
     selectedHomeworkReasonSummary ||
     '이 숙제가 생성된 이유를 준비하고 있어요.';
+  const selectedHomeworkBalanceGraph = selectedHomeworkReasonItem?.balanceGraph ?? null;
+  const selectedHomeworkBalanceGraphHeadline = selectedHomeworkBalanceGraph
+    ? getHomeworkBalanceGraphHeadline(selectedHomeworkBalanceGraph)
+    : '';
+  const selectedHomeworkBalanceGraphHelperText = selectedHomeworkBalanceGraph
+    ? getHomeworkBalanceGraphHelperText(selectedHomeworkBalanceGraph)
+    : '';
+  const selectedHomeworkBalanceGraphTotal = selectedHomeworkBalanceGraph
+    ? Math.max(
+        selectedHomeworkBalanceGraph.totalCount,
+        selectedHomeworkBalanceGraph.leftCount + selectedHomeworkBalanceGraph.rightCount
+      )
+    : 0;
+  const isSelectedHomeworkLeftDominant = Boolean(
+    selectedHomeworkBalanceGraph && selectedHomeworkBalanceGraph.leftCount > selectedHomeworkBalanceGraph.rightCount
+  );
+  const isSelectedHomeworkRightDominant = Boolean(
+    selectedHomeworkBalanceGraph && selectedHomeworkBalanceGraph.rightCount > selectedHomeworkBalanceGraph.leftCount
+  );
+  const selectedHomeworkLeftGraphWidth: `${number}%` = selectedHomeworkBalanceGraphTotal > 0 && selectedHomeworkBalanceGraph
+    ? `${(selectedHomeworkBalanceGraph.leftCount / selectedHomeworkBalanceGraphTotal) * 100}%`
+    : '0%';
+  const selectedHomeworkRightGraphWidth: `${number}%` = selectedHomeworkBalanceGraphTotal > 0 && selectedHomeworkBalanceGraph
+    ? `${(selectedHomeworkBalanceGraph.rightCount / selectedHomeworkBalanceGraphTotal) * 100}%`
+    : '0%';
   const lessonRecordMap = useMemo(
     () => new Map(lessonRecords.map((record) => [record.id, record] as const)),
     [lessonRecords]
@@ -462,6 +518,69 @@ export function HomeScreen({
             >
               {selectedHomeworkReasonSummary && hasSelectedHomeworkDetailText ? (
                 <Text style={styles.reasonModalSummary}>{selectedHomeworkReasonSummary}</Text>
+              ) : null}
+              {selectedHomeworkBalanceGraph ? (
+                <View style={styles.reasonModalBalanceCard}>
+                  <Text style={styles.reasonModalBalanceCardLabel}>기록일지 드리블 균형 그래프</Text>
+                  <Text style={styles.reasonModalBalanceHeadline}>{selectedHomeworkBalanceGraphHeadline}</Text>
+                  <View style={styles.reasonModalBalanceLegendRow}>
+                    <View style={styles.reasonModalBalanceLegendItem}>
+                      <View
+                        style={[
+                          styles.reasonModalBalanceLegendDot,
+                          isSelectedHomeworkLeftDominant
+                            ? styles.reasonModalBalanceLegendDotDominant
+                            : styles.reasonModalBalanceLegendDotSubtle,
+                        ]}
+                      />
+                      <Text style={styles.reasonModalBalanceLegendText}>
+                        {`왼손 ${selectedHomeworkBalanceGraph.leftCount}회`}
+                      </Text>
+                    </View>
+                    <View style={styles.reasonModalBalanceLegendItem}>
+                      <View
+                        style={[
+                          styles.reasonModalBalanceLegendDot,
+                          isSelectedHomeworkRightDominant
+                            ? styles.reasonModalBalanceLegendDotDominant
+                            : styles.reasonModalBalanceLegendDotSubtle,
+                        ]}
+                      />
+                      <Text style={styles.reasonModalBalanceLegendText}>
+                        {`오른손 ${selectedHomeworkBalanceGraph.rightCount}회`}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.reasonModalBalanceTrack}>
+                    {selectedHomeworkBalanceGraph.leftCount > 0 ? (
+                      <View
+                        style={[
+                          styles.reasonModalBalanceFill,
+                          isSelectedHomeworkLeftDominant
+                            ? styles.reasonModalBalanceFillDominant
+                            : styles.reasonModalBalanceFillSubtle,
+                          styles.reasonModalBalanceFillLeftEdge,
+                          { width: selectedHomeworkLeftGraphWidth },
+                          selectedHomeworkBalanceGraph.rightCount === 0 && styles.reasonModalBalanceFillSolo,
+                        ]}
+                      />
+                    ) : null}
+                    {selectedHomeworkBalanceGraph.rightCount > 0 ? (
+                      <View
+                        style={[
+                          styles.reasonModalBalanceFill,
+                          isSelectedHomeworkRightDominant
+                            ? styles.reasonModalBalanceFillDominant
+                            : styles.reasonModalBalanceFillSubtle,
+                          styles.reasonModalBalanceFillRightEdge,
+                          { width: selectedHomeworkRightGraphWidth },
+                          selectedHomeworkBalanceGraph.leftCount === 0 && styles.reasonModalBalanceFillSolo,
+                        ]}
+                      />
+                    ) : null}
+                  </View>
+                  <Text style={styles.reasonModalBalanceHelper}>{selectedHomeworkBalanceGraphHelperText}</Text>
+                </View>
               ) : null}
               {selectedHomeworkLinkedRecordCards.length > 0 ? (
                 <View style={styles.reasonModalLinkedPreviewRow}>
@@ -1126,6 +1245,88 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     fontWeight: '700',
+  },
+  reasonModalBalanceCard: {
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    backgroundColor: colors.surfaceStrong,
+    gap: 10,
+  },
+  reasonModalBalanceCardLabel: {
+    color: colors.textMuted,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '800',
+  },
+  reasonModalBalanceHeadline: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: '800',
+  },
+  reasonModalBalanceLegendRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  reasonModalBalanceLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  reasonModalBalanceLegendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+  },
+  reasonModalBalanceLegendDotDominant: {
+    backgroundColor: colors.secondary,
+  },
+  reasonModalBalanceLegendDotSubtle: {
+    backgroundColor: 'rgba(127,156,191,0.72)',
+  },
+  reasonModalBalanceLegendText: {
+    color: colors.textSoft,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '800',
+  },
+  reasonModalBalanceTrack: {
+    width: '100%',
+    height: 22,
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    flexDirection: 'row',
+  },
+  reasonModalBalanceFill: {
+    height: '100%',
+  },
+  reasonModalBalanceFillDominant: {
+    backgroundColor: colors.secondary,
+  },
+  reasonModalBalanceFillSubtle: {
+    backgroundColor: 'rgba(127,156,191,0.72)',
+  },
+  reasonModalBalanceFillLeftEdge: {
+    borderTopLeftRadius: 999,
+    borderBottomLeftRadius: 999,
+  },
+  reasonModalBalanceFillRightEdge: {
+    borderTopRightRadius: 999,
+    borderBottomRightRadius: 999,
+  },
+  reasonModalBalanceFillSolo: {
+    borderRadius: 999,
+  },
+  reasonModalBalanceHelper: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '600',
   },
   reasonModalLinkedPreviewRow: {
     flexDirection: 'row',

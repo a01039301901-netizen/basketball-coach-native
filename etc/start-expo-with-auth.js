@@ -14,6 +14,10 @@ function hasArg(flag) {
   return process.argv.includes(flag);
 }
 
+function hasAnyArg(flags) {
+  return flags.some((flag) => hasArg(flag));
+}
+
 function isPrivateIpv4Address(address) {
   if (address.startsWith('10.')) {
     return true;
@@ -99,6 +103,20 @@ function resolveAuthServerUrl() {
   }
 
   return `http://${lanAddress}:${AUTH_SERVER_PORT}`;
+}
+
+function resolveExpoPackagerHostname() {
+  const explicitHostname = process.env.REACT_NATIVE_PACKAGER_HOSTNAME?.trim();
+
+  if (explicitHostname) {
+    return explicitHostname;
+  }
+
+  if (hasArg('--localhost') || hasArg('--web') || hasArg('--tunnel')) {
+    return null;
+  }
+
+  return getPreferredLanAddress();
 }
 
 function writeGeneratedConfigFile(url) {
@@ -202,6 +220,14 @@ async function ensureExpoPortArg() {
   console.warn(`[expo] Could not find a free port near ${preferredPort}. Expo may prompt for a port.`);
 }
 
+function ensureExpoLaunchTargetArg() {
+  if (hasAnyArg(['--web', '-w', '--go', '-g', '--dev-client', '-d'])) {
+    return;
+  }
+
+  expoCliArgs.push('--go');
+}
+
 async function probeAuthServer(url) {
   if (!url) {
     return false;
@@ -231,9 +257,11 @@ async function probeAuthServer(url) {
 
 async function main() {
   const authServerUrl = resolveAuthServerUrl();
+  const expoPackagerHostname = resolveExpoPackagerHostname();
   const childEnv = {
     ...process.env,
     ...(authServerUrl ? { EXPO_PUBLIC_AUTH_SERVER_URL: authServerUrl } : {}),
+    ...(expoPackagerHostname ? { REACT_NATIVE_PACKAGER_HOSTNAME: expoPackagerHostname } : {}),
   };
 
   let authServerProcess = null;
@@ -248,10 +276,19 @@ async function main() {
     console.warn('[auth] Could not determine the auth server URL automatically. Set EXPO_PUBLIC_AUTH_SERVER_URL manually if login does not work.');
   }
 
+  if (expoPackagerHostname) {
+    console.log(`[expo] REACT_NATIVE_PACKAGER_HOSTNAME=${expoPackagerHostname}`);
+    console.log(`[expo] Open this project in Expo Go with: exp://${expoPackagerHostname}:${getExplicitPortArg() ?? 8081}`);
+    console.log(`[expo] Do not use a localhost QR code on your phone. localhost on mobile points to the phone itself.`);
+  } else if (!hasArg('--localhost') && !hasArg('--web') && !hasArg('--tunnel')) {
+    console.warn('[expo] Could not determine a LAN packager hostname automatically. Expo Go may fail to connect on other devices.');
+  }
+
   if (hasArg('--tunnel') && !process.env.EXPO_PUBLIC_AUTH_SERVER_URL) {
     console.warn('[auth] Tunnel mode only works for shared login when the device can still reach this computer over the network.');
   }
 
+  ensureExpoLaunchTargetArg();
   await ensureExpoPortArg();
 
   if (authServerUrl && (await probeAuthServer(authServerUrl))) {

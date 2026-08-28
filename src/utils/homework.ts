@@ -21,6 +21,10 @@ export const POSITION_DRIBBLE_TARGET = 50;
 export const POSITION_SHOOT_SUCCESS_TARGET = 10;
 export const POSITION_SKILL_VIDEO_TARGET = 1;
 export const POSITION_FEEDBACK_RETRY_TARGET = 1;
+export const BALANCE_HOMEWORK_TITLE = '왼손과 오른손 드리블 차이 5회 이하로 맞추기';
+export const BALANCE_HOMEWORK_MIN_TOTAL = 20;
+export const BALANCE_HOMEWORK_MAX_GAP = 5;
+export const BALANCE_HOMEWORK_PROGRESS_TARGET = 100;
 export const CORRECTION_DRIBBLE_TARGET = 10;
 export const FRONT_DRIBBLE_CORRECTION_MIN_TOTAL = 20;
 export const FRONT_DRIBBLE_CORRECTION_MIN_GAP = 6;
@@ -48,6 +52,7 @@ interface HomeworkProgressItemOptions {
   detailToggleText?: HomeworkProgressItem['detailToggleText'];
   detailText?: HomeworkProgressItem['detailText'];
   linkedDiaryContext?: HomeworkProgressItem['linkedDiaryContext'];
+  balanceGraph?: HomeworkProgressItem['balanceGraph'];
 }
 
 function clampProgress(current: number, target: number) {
@@ -95,6 +100,7 @@ function buildProgressItem(
     detailToggleText: options.detailText ? options.detailToggleText ?? DEFAULT_HOMEWORK_DETAIL_TOGGLE_TEXT : undefined,
     detailText: options.detailText,
     linkedDiaryContext: options.linkedDiaryContext ?? null,
+    balanceGraph: options.balanceGraph ?? null,
   };
 }
 
@@ -403,6 +409,111 @@ function isStage2FeedbackHomeworkResolved(
   );
 }
 
+function getPostStage2DribbleHandTotals(
+  lessonRecords: LessonRecord[],
+  stage2Unlock: HomeworkUnlockSnapshot
+) {
+  const followupRecords = lessonRecords.slice(Math.max(0, Math.trunc(stage2Unlock.lessonCount)));
+
+  return followupRecords.reduce(
+    (accumulator, record) => {
+      if (record.mode !== 'dribble') {
+        return accumulator;
+      }
+
+      accumulator.left += Math.max(0, record.leftHandDribbleCount ?? 0);
+      accumulator.right += Math.max(0, record.rightHandDribbleCount ?? 0);
+      return accumulator;
+    },
+    { left: 0, right: 0 }
+  );
+}
+
+function buildBalanceHomeworkProgressValue(leftCount: number, rightCount: number) {
+  const safeLeftCount = Math.max(0, Math.trunc(leftCount));
+  const safeRightCount = Math.max(0, Math.trunc(rightCount));
+  const totalCount = safeLeftCount + safeRightCount;
+  const gap = Math.abs(safeLeftCount - safeRightCount);
+  const volumeScore = Math.round((Math.min(totalCount, BALANCE_HOMEWORK_MIN_TOTAL) / BALANCE_HOMEWORK_MIN_TOTAL) * 50);
+  let balanceScore = 0;
+
+  if (totalCount >= BALANCE_HOMEWORK_MIN_TOTAL) {
+    if (gap <= BALANCE_HOMEWORK_MAX_GAP) {
+      balanceScore = 50;
+    } else {
+      const cappedGap = Math.min(gap, BALANCE_HOMEWORK_MIN_TOTAL);
+      const balanceWindow = Math.max(0, BALANCE_HOMEWORK_MIN_TOTAL - cappedGap);
+      balanceScore = Math.round((balanceWindow / (BALANCE_HOMEWORK_MIN_TOTAL - BALANCE_HOMEWORK_MAX_GAP)) * 50);
+    }
+  }
+
+  const isCompleted = totalCount >= BALANCE_HOMEWORK_MIN_TOTAL && gap <= BALANCE_HOMEWORK_MAX_GAP;
+  const progressValue = isCompleted
+    ? BALANCE_HOMEWORK_PROGRESS_TARGET
+    : Math.min(BALANCE_HOMEWORK_PROGRESS_TARGET - 1, volumeScore + balanceScore);
+
+  return {
+    leftCount: safeLeftCount,
+    rightCount: safeRightCount,
+    totalCount,
+    gap,
+    progressValue,
+    isCompleted,
+  };
+}
+
+function buildBalanceHomeworkReasonText(leftCount: number, rightCount: number) {
+  return `추가 드리블에서 왼손 ${leftCount}회, 오른손 ${rightCount}회가 기록돼 있어요.`;
+}
+
+function buildBalanceHomeworkDetailText(leftCount: number, rightCount: number) {
+  const totalCount = leftCount + rightCount;
+  const gap = Math.abs(leftCount - rightCount);
+
+  if (totalCount < BALANCE_HOMEWORK_MIN_TOTAL) {
+    return `양손 드리블 균형을 보려면 추가 드리블 ${BALANCE_HOMEWORK_MIN_TOTAL}회 정도가 먼저 필요해요. 드리블 레슨에서 왼손과 오른손을 비슷한 횟수로 사용하면서 차이를 ${BALANCE_HOMEWORK_MAX_GAP}회 이하로 맞춰보세요.`;
+  }
+
+  if (gap <= BALANCE_HOMEWORK_MAX_GAP) {
+    return `양손 드리블 균형이 잘 맞고 있어요. 추가 드리블에서 왼손 ${leftCount}회, 오른손 ${rightCount}회로 차이가 ${gap}회라서 목표 범위 안에 들어왔습니다.`;
+  }
+
+  return `양손 드리블 균형은 어느 손으로도 안정적으로 공을 다루기 위해 중요해요. 지금 추가 드리블에서는 좌우 차이가 ${gap}회이니 드리블 레슨에서 덜 사용한 손을 더 신경 써서 차이를 ${BALANCE_HOMEWORK_MAX_GAP}회 이하로 맞춰보세요.`;
+}
+
+function buildBalanceHomeworkItem(
+  lessonRecords: LessonRecord[],
+  stage2Unlock: HomeworkUnlockSnapshot
+) {
+  const { leftCount, rightCount, totalCount, gap, progressValue } = buildBalanceHomeworkProgressValue(
+    ...(() => {
+      const totals = getPostStage2DribbleHandTotals(lessonRecords, stage2Unlock);
+      return [totals.left, totals.right] as const;
+    })()
+  );
+
+  return buildProgressItem(
+    'stage3-balance',
+    BALANCE_HOMEWORK_TITLE,
+    'balance_followup',
+    'dribble_balance',
+    progressValue,
+    BALANCE_HOMEWORK_PROGRESS_TARGET,
+    {
+      reasonText: buildBalanceHomeworkReasonText(leftCount, rightCount),
+      detailText: buildBalanceHomeworkDetailText(leftCount, rightCount),
+      balanceGraph: {
+        leftCount,
+        rightCount,
+        totalCount,
+        gap,
+        minTotalTarget: BALANCE_HOMEWORK_MIN_TOTAL,
+        targetGap: BALANCE_HOMEWORK_MAX_GAP,
+      },
+    }
+  );
+}
+
 function buildBaseHomeworkItems(dribbleCount: number, shootAttemptCount: number) {
   return [
     buildProgressItem('base-dribble', DAILY_DRIBBLE_HOMEWORK_TITLE, 'base', 'daily', dribbleCount, DAILY_DRIBBLE_TARGET, {
@@ -502,6 +613,11 @@ export function buildDailyHomeworkProgress(input: BuildHomeworkProgressInput): H
 
   if (!stage2Unlock) {
     return correctionItem ? [...baseItems, correctionItem] : baseItems;
+  }
+
+  if (isStage2FeedbackHomeworkResolved(input.lessonRecords, stage2Unlock)) {
+    const balanceItem = buildBalanceHomeworkItem(input.lessonRecords, stage2Unlock);
+    return correctionItem ? [balanceItem, correctionItem] : [balanceItem];
   }
 
   const followupItems = buildStage2FollowupHomeworkItems(input, stage2Unlock);

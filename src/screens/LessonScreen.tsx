@@ -153,8 +153,9 @@ function OverlayStarButton({
 }) {
   return (
     <Pressable
-      accessibilityLabel={active ? '체크한 슛 기록 해제' : '방금 한 슛 기록 체크'}
+      accessibilityLabel={active ? '체크한 레슨 기록 해제' : '방금 한 레슨 기록 체크'}
       accessibilityRole="button"
+      hitSlop={12}
       onPress={onPress}
       style={({ pressed }) => [
         styles.overlayStarButton,
@@ -1022,7 +1023,7 @@ export function LessonScreen({
               <CameraShutterButton active={isRoundLessonControlActive} onPress={isRoundLessonControlActive ? onEndLesson : openLessonStart} />
             </View>
 
-            {lessonMode === 'shoot' && isShootRecordStarButtonVisible ? (
+            {isShootRecordStarButtonVisible ? (
               <View pointerEvents="box-none" style={styles.landscapeUtilityDock}>
                 <OverlayStarButton active={isCurrentShootRecordStarred} onPress={onToggleCurrentShootRecordStar} />
               </View>
@@ -1040,7 +1041,7 @@ export function LessonScreen({
               </View>
 
               <View style={styles.captureSideSlot}>
-                {lessonMode === 'shoot' && isShootRecordStarButtonVisible ? (
+                {isShootRecordStarButtonVisible ? (
                   <OverlayStarButton active={isCurrentShootRecordStarred} onPress={onToggleCurrentShootRecordStar} />
                 ) : (
                   <View style={styles.captureSidePlaceholder} />
@@ -1879,29 +1880,22 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   overlayStarButton: {
-    width: 58,
-    height: 58,
-    borderRadius: 999,
-    backgroundColor: 'rgba(10,10,10,0.58)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,214,81,0.64)',
+    paddingHorizontal: 4,
+    paddingVertical: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.22,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 10,
   },
   overlayStarButtonActive: {
-    backgroundColor: 'rgba(69,52,0,0.82)',
-    borderColor: '#ffd451',
+    transform: [{ scale: 1.04 }],
   },
   overlayStarButtonIcon: {
     color: '#ffd451',
-    fontSize: 30,
-    lineHeight: 32,
+    fontSize: 52,
+    lineHeight: 56,
     fontWeight: '900',
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 10,
   },
   overlayStarButtonIconActive: {
     color: '#ffe27a',

@@ -2842,151 +2842,6 @@ export function DiaryScreen({
     setPendingDeleteRecordId(null);
   }, [closeRecordEvaluation, onDeleteRecord, openedEvaluationRecordId, pendingDeleteRecordId]);
 
-  /* function renderRecordCard(record: LessonRecord) {
-    const syncedFeedback = playbackFeedback[record.id] || record.feedback;
-    const evaluation = record.evaluation;
-    const isEvaluationVisible = Boolean(visibleRecordEvaluations[record.id]);
-
-    return (
-      <View
-        key={record.id}
-        style={[
-          styles.recordCard,
-          record.mode === 'shoot' ? styles.recordCardShoot : styles.recordCardDribble,
-        ]}
-      >
-        <View style={styles.recordHeader}>
-          <View style={styles.recordHeaderBadges}>
-            <View
-              style={[
-                styles.recordBadge,
-                record.mode === 'shoot' ? styles.recordBadgeShoot : styles.recordBadgeDribble,
-              ]}
-            >
-              <Text style={styles.recordBadgeText}>{getRecordModeLabel(record.mode)}</Text>
-            </View>
-
-            {evaluation ? (
-              <View
-                style={[
-                  styles.recordLevelBadge,
-                  evaluation.level === 'good'
-                    ? styles.recordLevelBadgeGood
-                    : evaluation.level === 'average'
-                      ? styles.recordLevelBadgeAverage
-                      : styles.recordLevelBadgeBad,
-                ]}
-              >
-                <Text style={styles.recordLevelBadgeText}>{getRecordLevelLabel(evaluation.level)}</Text>
-              </View>
-          )}
-          </CollapsibleRecordSection>
-        </View>
-          </CollapsibleRecordSection>
-        </View>
-
-          {renderRecordLevelBadge(evaluation?.level)}
-        </View>
-        <Text style={styles.recordTitle}>{getRecordTitle(record.mode)}</Text>
-        <Text style={styles.recordMeta}>{record.createdAt}</Text>
-
-        {record.videoUri ? (
-          <Video
-            ref={(instance) => {
-              videoRefs.current[record.id] = instance;
-            }}
-            source={{ uri: record.videoUri }}
-            useNativeControls
-            shouldPlay={false}
-            isLooping={false}
-            progressUpdateIntervalMillis={200}
-            resizeMode={ResizeMode.COVER}
-            style={styles.recordVideo}
-            onPlaybackStatusUpdate={(status) => handlePlaybackStatus(record, status)}
-          />
-        ) : null}
-
-        <View style={styles.evaluationToggleRow}>
-          <CollapsibleRecordSection
-            expanded={isEvaluationVisible}
-            onToggle={() => toggleRecordEvaluation(record.id)}
-            title={isEvaluationVisible ? '湲곕줉 ?됯? ?④린湲? : '湲곕줉 ?됯? 蹂닿린'}
-          >
-
-            {evaluation ? (
-            <View style={styles.evaluationBox}>
-              <Text style={styles.evaluationTitle}>湲곕줉 ?됯?</Text>
-              <Text style={styles.evaluationSummary}>{evaluation.summary}</Text>
-
-              <View style={styles.criteriaRow}>
-                {evaluation.criteria.map((criterion) => (
-                  <View
-                    key={`${record.id}-${criterion.key}`}
-                    style={[
-                      styles.criterionChip,
-                      criterion.isStable ? styles.criterionChipStable : styles.criterionChipUnstable,
-                    ]}
-                  >
-                    <Text style={styles.criterionChipLabel}>{criterion.label}</Text>
-                    <Text style={styles.criterionChipValue}>{criterion.isStable ? '?덉젙' : '蹂댁셿'}</Text>
-                  </View>
-                ))}
-              </View>
-
-              <View style={styles.highlightGroup}>
-                <Text style={styles.highlightGroupTitle}>?섑븳 ???ㅼ떆蹂닿린</Text>
-                {evaluation.strengths.length > 0 ? (
-                  evaluation.strengths.map((highlight, index) => (
-                    <Pressable
-                      key={`${record.id}-strength-${index}`}
-                      onPress={() => void jumpToHighlight(record, highlight.startAtMs)}
-                      style={({ pressed }) => [styles.highlightButton, styles.highlightButtonGood, pressed && styles.pressed]}
-                    >
-                      <Text style={styles.highlightButtonLabel}>{highlight.label}</Text>
-                      <Text style={styles.highlightButtonDetail}>{highlight.detail}</Text>
-                    </Pressable>
-                  ))
-                ) : (
-                  <Text style={styles.highlightEmptyText}>?꾩쭅 ?쒖떆???덉젙 ?λ㈃???놁뒿?덈떎.</Text>
-                )}
-              </View>
-
-              <View style={styles.highlightGroup}>
-                <Text style={styles.highlightGroupTitle}>蹂댁셿?????ㅼ떆蹂닿린</Text>
-                {evaluation.improvements.length > 0 ? (
-                  evaluation.improvements.map((highlight, index) => (
-                    <Pressable
-                      key={`${record.id}-improvement-${index}`}
-                      onPress={() => void jumpToHighlight(record, highlight.startAtMs)}
-                      style={({ pressed }) => [styles.highlightButton, styles.highlightButtonBad, pressed && styles.pressed]}
-                    >
-                      <Text style={styles.highlightButtonLabel}>{highlight.label}</Text>
-                      <Text style={styles.highlightButtonDetail}>{highlight.detail}</Text>
-                    </Pressable>
-                  ))
-                ) : (
-                  <Text style={styles.highlightEmptyText}>吏湲덉? 異붽? 蹂댁셿 ?λ㈃???놁뒿?덈떎.</Text>
-                )}
-              </View>
-            </View>
-          ) : (
-            <View style={styles.evaluationEmptyBox}>
-              <Text style={styles.evaluationEmptyText}>?먯꽭 ?됯? ?뺣낫???덈줈 ??ν븳 湲곕줉遺???④퍡 ?쒖떆?⑸땲??</Text>
-            </View>
-            )}
-          </CollapsibleRecordSection>
-        </View>
-
-        <View style={styles.liveFeedbackBox}>
-          <Text style={styles.liveFeedbackLabel}>{'\uC2E4\uC2DC\uAC04 \uD53C\uB4DC\uBC31'}</Text>
-          <Text style={styles.liveFeedbackText}>{syncedFeedback}</Text>
-        </View>
-
-        <SmallButton title="湲곕줉 ??젣" onPress={() => onDeleteRecord(record.id)} variant="red" />
-      </View>
-    );
-  } */
-
   function renderRecordEvaluationContent(record: LessonRecord) {
     const evaluation = record.evaluation;
 
@@ -3061,7 +2916,7 @@ export function DiaryScreen({
               if (record.mode === 'dribble') {
                 const stableRatio = getDiaryCriterionStableRatio(criterion);
                 const content = (
-                  <>
+                  <View style={styles.dribbleCriterionMeterSurface}>
                     <View
                       style={[
                         styles.dribbleCriterionMeterFill,
@@ -3076,7 +2931,7 @@ export function DiaryScreen({
                         <Text style={styles.dribbleCriterionMeterDescription}>{criterionDetail}</Text>
                       ) : null}
                     </View>
-                  </>
+                  </View>
                 );
 
                 return (
@@ -3161,7 +3016,7 @@ export function DiaryScreen({
           { width: recordCardWidth },
         ]}
       >
-        {record.mode === 'shoot' && record.isStarred ? (
+        {record.isStarred ? (
           <Pressable
             accessibilityRole="button"
             onPress={() => onToggleStarredRecord(record.id)}
@@ -3968,7 +3823,7 @@ export function DiaryScreen({
 
                     <Text style={styles.selectedCriterionComparisonSummary}>
                       {selectedCriterionComparison.previousRatio !== null && selectedCriterionComparison.previousDateKey
-                        ? `현재 ${selectedCriterionComparison.currentRatio}% · 직전 기록(${formatDiarySummaryDateLabel(selectedCriterionComparison.previousDateKey)}) ${selectedCriterionComparison.previousRatio}%`
+                        ? `현재 ${selectedCriterionComparison.currentRatio}% · 이전 ${selectedCriterionComparison.previousRatio}%`
                         : `현재 ${selectedCriterionComparison.currentRatio}%`}
                     </Text>
 
@@ -3990,11 +3845,7 @@ export function DiaryScreen({
                       </View>
 
                       <View style={styles.selectedCriterionComparisonBarRow}>
-                        <Text style={styles.selectedCriterionComparisonBarLabel}>
-                          {selectedCriterionComparison.previousDateKey
-                            ? formatDiarySummaryDateLabel(selectedCriterionComparison.previousDateKey)
-                            : '직전'}
-                        </Text>
+                        <Text style={styles.selectedCriterionComparisonBarLabel}>{'이전'}</Text>
                         <View style={styles.selectedCriterionComparisonBarTrack}>
                           <View
                             style={[
@@ -4027,10 +3878,10 @@ export function DiaryScreen({
                       {selectedCriterionComparison.fallbackText
                         ? selectedCriterionComparison.fallbackText
                         : selectedCriterionComparison.delta === 0
-                          ? '직전 기록과 같아요'
+                          ? '이전 기록과 같아요'
                           : selectedCriterionComparison.delta && selectedCriterionComparison.delta > 0
-                            ? `직전 기록보다 ${Math.abs(selectedCriterionComparison.delta)}% 높아졌어요`
-                            : `직전 기록보다 ${Math.abs(selectedCriterionComparison.delta ?? 0)}% 낮아졌어요`}
+                            ? `이전 기록보다 ${Math.abs(selectedCriterionComparison.delta)}% 높아졌어요`
+                            : `이전 기록보다 ${Math.abs(selectedCriterionComparison.delta ?? 0)}% 낮아졌어요`}
                     </Text>
                   </View>
                 ) : null}
@@ -5998,6 +5849,10 @@ const styles = StyleSheet.create({
   },
   dribbleCriterionMeter: {
     width: '100%',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  dribbleCriterionMeterSurface: {
     position: 'relative',
     overflow: 'hidden',
     minHeight: 0,
@@ -6005,7 +5860,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(191,80,88,0.28)',
   },
   dribbleCriterionMeterSelected: {
-    borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.24)',
   },
   dribbleCriterionMeterFill: {

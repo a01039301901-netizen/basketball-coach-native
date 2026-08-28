@@ -42,7 +42,7 @@ export type BallBrandOption = 'wilson' | 'spalding' | 'molten';
 export type BallRecognitionPatternOrientation = 'vertical' | 'horizontal' | 'mixed';
 export type PositionOption = 'none' | 'defense' | 'offense';
 export type BallTrainingImageSource = 'camera' | 'library' | 'url';
-export type HomeworkStage = 'base' | 'position_followup' | 'correction';
+export type HomeworkStage = 'base' | 'position_followup' | 'balance_followup' | 'correction';
 export type HomeworkSource = 'daily' | 'position' | 'feedback' | 'dribble_balance';
 export type HomeworkFeedbackCategory =
   | 'dribble_balance'
@@ -206,6 +206,15 @@ export interface HomeworkDiaryLinkContext {
   openedRecordId?: string;
 }
 
+export interface HomeworkBalanceGraphData {
+  leftCount: number;
+  rightCount: number;
+  totalCount: number;
+  gap: number;
+  minTotalTarget: number;
+  targetGap: number;
+}
+
 export interface HomeworkProgressItem {
   id: string;
   title: string;
@@ -222,6 +231,7 @@ export interface HomeworkProgressItem {
   detailToggleText?: string;
   detailText?: string;
   linkedDiaryContext?: HomeworkDiaryLinkContext | null;
+  balanceGraph?: HomeworkBalanceGraphData | null;
 }
 
 export interface SkillVideoOpenEvent {

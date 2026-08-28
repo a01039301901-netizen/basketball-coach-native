@@ -1,1 +1,1 @@
-export const GENERATED_AUTH_SERVER_URL = "http://192.168.219.103:4317" as const;
+export const GENERATED_AUTH_SERVER_URL = "http://192.168.219.104:4317" as const;

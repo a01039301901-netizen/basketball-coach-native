@@ -10887,6 +10887,28 @@
           }
         }
       }
+    },
+    {
+      "id": "3c717468-56bd-4ffe-8aa4-27fbb90a1899",
+      "nickname": "codex-e2e-709655",
+      "nicknameKey": "codex-e2e-709655",
+      "passwordHash": "a41aefa6cc728b061315aade423e07e2:3509593d4c1db0df472671e9564eb472b9c587b257e9627f1598d1b776d170df49e17ecefbce41a8a44d92b3c19a9d38c6ccf0eb597eeef34e7801a67ef936ce",
+      "createdAt": "2026-08-27T14:25:09.785Z",
+      "updatedAt": "2026-08-27T14:25:10.131Z",
+      "snapshot": {
+        "attendance": {},
+        "lessonRecords": [],
+        "dribbleCounts": {},
+        "shotAttempts": {},
+        "shotSuccess": {},
+        "ballColors": [
+          "orange"
+        ],
+        "ballBrand": "wilson",
+        "ballRecognitionProfile": null,
+        "position": "none",
+        "homework": {}
+      }
     }
   ],
   "sessions": {
@@ -10924,6 +10946,11 @@
       "userId": "8c7ec6fc-a199-4351-b765-f52d8928eb1b",
       "createdAt": "2026-07-26T05:58:42.242Z",
       "lastUsedAt": "2026-08-20T14:06:13.523Z"
+    },
+    "bac95ec33c37b41237ab34787ccf8968054d1ff8b8262e9fd17c8f9aae7f640d": {
+      "userId": "3c717468-56bd-4ffe-8aa4-27fbb90a1899",
+      "createdAt": "2026-08-27T14:25:10.131Z",
+      "lastUsedAt": "2026-08-27T14:25:10.131Z"
     }
   }
 }

@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node ./etc/start-expo-with-auth.js --tunnel --clear",
-    "start:phone": "node ./etc/start-expo-with-auth.js --tunnel --clear",
+    "start": "node ./etc/start-expo-with-auth.js --lan --clear",
+    "start:phone": "node ./etc/start-expo-with-auth.js --lan --clear",
     "start:lan": "node ./etc/start-expo-with-auth.js --lan --clear",
     "start:tunnel": "node ./etc/start-expo-with-auth.js --tunnel --clear",
     "start:local": "node ./etc/start-expo-with-auth.js --localhost --clear",
@@ -17,10 +17,10 @@
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
     "@types/react": "~19.1.10",
-    "expo": "~54.0.36",
+    "expo": "~54.0.37",
     "expo-av": "~16.0.8",
     "expo-camera": "~17.0.10",
-    "expo-file-system": "~19.0.23",
+    "expo-file-system": "~19.0.24",
     "expo-image-picker": "~17.0.11",
     "expo-linking": "~8.0.12",
     "expo-navigation-bar": "~5.0.10",
@@ -36,6 +36,9 @@
     "react-native-web": "^0.21.0",
     "react-native-webview": "13.15.0",
     "typescript": "~5.9.2"
+  },
+  "overrides": {
+    "expo-constants": "~18.0.14"
   },
   "private": true
 }

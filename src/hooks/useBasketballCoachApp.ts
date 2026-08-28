@@ -5246,7 +5246,7 @@ export function useBasketballCoachApp() {
       dateKey,
       mode,
       shotOutcome,
-      isStarred: mode === 'shoot' ? pendingShootRecordStarredRef.current : false,
+      isStarred: pendingShootRecordStarredRef.current,
       feedback: representativeFeedback,
       feedbackTimeline: [...feedbackTimelineRef.current],
       videoUri: persistedVideoUri,
@@ -5273,7 +5273,7 @@ export function useBasketballCoachApp() {
     setLessonRecords(nextLessonRecords);
     persistLessonRecords(nextLessonRecords);
 
-    if (mode === 'shoot') {
+    if (mode === 'shoot' || mode === 'dribble') {
       currentShootRecordIdRef.current = recordId;
       pendingShootRecordStarredRef.current = nextRecord.isStarred === true;
       setIsCurrentShootRecordStarred(nextRecord.isStarred === true);
@@ -5334,7 +5334,6 @@ export function useBasketballCoachApp() {
       setIsCameraPreviewHidden(false);
       setIsLessonActive(false);
       setCameraError('');
-      resetShootRecordStarState();
       if (keepCameraPreview) {
         setIsCameraActive(true);
         setIsCameraReady(true);
@@ -6310,7 +6309,6 @@ export function useBasketballCoachApp() {
 
   function changeLessonMode(mode: LessonMode) {
     setLessonMode(mode);
-    resetShootRecordStarState();
     dribbleLessonPhaseRef.current = 'stance_setup';
     shootLessonStartedRef.current = false;
     resetShootAnalysisTracking();
@@ -6406,7 +6404,6 @@ export function useBasketballCoachApp() {
     setCameraStopMode(null);
     setIsCameraPreviewHidden(false);
     setLessonReview(null);
-    resetShootRecordStarState();
     if (mode === 'dribble') {
       setImmediateLessonFeedback(buildDribbleStanceFeedbackForView({
         dribbleStarted: false,
@@ -6511,7 +6508,6 @@ export function useBasketballCoachApp() {
     setCameraStopMode(null);
     setLessonReview(null);
     setIsCameraPreviewHidden(false);
-    resetShootRecordStarState();
     setIsLessonActive(false);
     setIsCameraActive(true);
     setIsCameraReady(false);
@@ -6576,7 +6572,6 @@ export function useBasketballCoachApp() {
     setCameraStopMode(null);
     setLessonReview(null);
     setIsCameraPreviewHidden(false);
-    resetShootRecordStarState();
     setIsLessonActive(true);
     setIsCameraActive(true);
     setIsCameraReady(false);
@@ -6645,7 +6640,6 @@ export function useBasketballCoachApp() {
       setRecordingStopToken(0);
       setCameraStopMode(null);
       setIsCameraPreviewHidden(false);
-      resetShootRecordStarState();
       setIsCameraActive(false);
       setIsCameraReady(false);
       setCameraError('');
@@ -6859,6 +6853,7 @@ export function useBasketballCoachApp() {
 
     dribbleLessonPhaseRef.current = 'active';
     stanceCountdownStartedAtRef.current = null;
+    resetShootRecordStarState();
     setCountdownValue(null);
     setCurrentDribbleCount(completedDribbleCountRef.current);
     dribbleAnalysisFramesRef.current = [];
@@ -7335,7 +7330,7 @@ export function useBasketballCoachApp() {
   }
 
   function toggleCurrentShootRecordStar() {
-    if (lessonMode !== 'shoot' || !isShootRecordStarButtonVisible) {
+    if (!isShootRecordStarButtonVisible) {
       return;
     }
 
@@ -7391,7 +7386,7 @@ export function useBasketballCoachApp() {
   function toggleLessonRecordStarred(recordId: string) {
     const record = lessonRecordsRef.current.find((item) => item.id === recordId);
 
-    if (!record || record.mode !== 'shoot') {
+    if (!record) {
       return;
     }
 
