@@ -88,23 +88,6 @@ function getHomeworkBalanceGraphHeadline(balanceGraph: NonNullable<HomeworkProgr
     : `오른손 우세 · 왼손 ${balanceGraph.leftCount} / 오른손 ${balanceGraph.rightCount}`;
 }
 
-function getHomeworkBalanceGraphHelperText(balanceGraph: NonNullable<HomeworkProgressItem['balanceGraph']>) {
-  if (balanceGraph.totalCount === 0) {
-    return '아직 추가 드리블 기록이 없어요. 드리블 레슨에서 왼손과 오른손을 번갈아 사용해보세요.';
-  }
-
-  if (balanceGraph.totalCount < balanceGraph.minTotalTarget) {
-    return `현재 왼손 ${balanceGraph.leftCount}회, 오른손 ${balanceGraph.rightCount}회가 기록돼 있어요. 먼저 ${balanceGraph.minTotalTarget}회 정도까지 채우면 좌우 균형을 더 정확하게 볼 수 있어요.`;
-  }
-
-  if (balanceGraph.gap <= balanceGraph.targetGap) {
-    return `현재 좌우 차이는 ${balanceGraph.gap}회로 목표 범위 안에 들어왔어요. 이 리듬을 유지하면서 양손 전환을 계속 이어가면 좋아요.`;
-  }
-
-  const weakerHand = balanceGraph.leftCount < balanceGraph.rightCount ? '왼손' : '오른손';
-  return `현재 좌우 차이는 ${balanceGraph.gap}회예요. 다음 드리블 레슨에서는 ${weakerHand} 사용을 조금 더 늘려 차이를 ${balanceGraph.targetGap}회 이하로 맞춰보세요.`;
-}
-
 function HomeMenuButton({
   accentColor,
   accentSoft,
@@ -225,12 +208,11 @@ export function HomeScreen({
     selectedHomeworkReasonItem?.detailText?.trim() ||
     selectedHomeworkReasonSummary ||
     '이 숙제가 생성된 이유를 준비하고 있어요.';
+  const shouldShowSelectedHomeworkSummaryProgress =
+    selectedHomeworkReasonItem?.stage === 'base' && selectedHomeworkReasonItem?.source === 'daily';
   const selectedHomeworkBalanceGraph = selectedHomeworkReasonItem?.balanceGraph ?? null;
   const selectedHomeworkBalanceGraphHeadline = selectedHomeworkBalanceGraph
     ? getHomeworkBalanceGraphHeadline(selectedHomeworkBalanceGraph)
-    : '';
-  const selectedHomeworkBalanceGraphHelperText = selectedHomeworkBalanceGraph
-    ? getHomeworkBalanceGraphHelperText(selectedHomeworkBalanceGraph)
     : '';
   const selectedHomeworkBalanceGraphTotal = selectedHomeworkBalanceGraph
     ? Math.max(
@@ -517,7 +499,25 @@ export function HomeScreen({
               showsVerticalScrollIndicator={false}
             >
               {selectedHomeworkReasonSummary && hasSelectedHomeworkDetailText ? (
-                <Text style={styles.reasonModalSummary}>{selectedHomeworkReasonSummary}</Text>
+                <>
+                  <Text style={styles.reasonModalSummary}>{selectedHomeworkReasonSummary}</Text>
+                  {shouldShowSelectedHomeworkSummaryProgress && selectedHomeworkReasonItem ? (
+                    <View style={styles.reasonModalProgressSection}>
+                      <View style={styles.reasonModalProgressRow}>
+                        <Text style={styles.reasonModalProgressLabel}>숙제 진행도</Text>
+                        <Text style={styles.reasonModalProgressValue}>{selectedHomeworkReasonItem.progressText}</Text>
+                      </View>
+                      <View style={styles.progressTrack}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            { width: `${selectedHomeworkReasonItem.progressPercent}%` },
+                          ]}
+                        />
+                      </View>
+                    </View>
+                  ) : null}
+                </>
               ) : null}
               {selectedHomeworkBalanceGraph ? (
                 <View style={styles.reasonModalBalanceCard}>
@@ -579,7 +579,6 @@ export function HomeScreen({
                       />
                     ) : null}
                   </View>
-                  <Text style={styles.reasonModalBalanceHelper}>{selectedHomeworkBalanceGraphHelperText}</Text>
                 </View>
               ) : null}
               {selectedHomeworkLinkedRecordCards.length > 0 ? (
@@ -1246,6 +1245,28 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: '700',
   },
+  reasonModalProgressSection: {
+    gap: 8,
+    marginTop: -4,
+  },
+  reasonModalProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  reasonModalProgressLabel: {
+    color: colors.textSoft,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
+  reasonModalProgressValue: {
+    color: colors.textAccent,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '800',
+  },
   reasonModalBalanceCard: {
     borderRadius: 18,
     paddingHorizontal: 14,
@@ -1321,12 +1342,6 @@ const styles = StyleSheet.create({
   },
   reasonModalBalanceFillSolo: {
     borderRadius: 999,
-  },
-  reasonModalBalanceHelper: {
-    color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: '600',
   },
   reasonModalLinkedPreviewRow: {
     flexDirection: 'row',

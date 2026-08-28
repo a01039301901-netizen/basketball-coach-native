@@ -73,6 +73,7 @@ interface DailySummaryCorrectionAggregate {
   averageStableRatio: number;
   firstSeenIndex: number;
   coachText: string;
+  recordIds: string[];
 }
 
 interface DailySummaryAutoFeedback {
@@ -80,6 +81,7 @@ interface DailySummaryAutoFeedback {
   topFeedbackText: string;
   nextPracticeText: string;
   toggleSubtext: string;
+  topFeedbackRecordIds: string[];
 }
 
 interface RecordEvaluationVideoPlayerProps {
@@ -1747,6 +1749,9 @@ function buildDailySummaryAutoFeedback(
         current.count += 1;
         current.ratioTotal += ratio;
         current.averageStableRatio = current.ratioTotal / current.count;
+        if (!current.recordIds.includes(record.id)) {
+          current.recordIds.push(record.id);
+        }
         return;
       }
 
@@ -1758,6 +1763,7 @@ function buildDailySummaryAutoFeedback(
         firstSeenIndex: recordIndex,
         coachText: getDailySummaryCoachingText(criterion.key),
         ratioTotal: ratio,
+        recordIds: [record.id],
       });
     });
   });
@@ -1782,6 +1788,7 @@ function buildDailySummaryAutoFeedback(
       topFeedbackText: `${topCorrection.label} \uD53C\uB4DC\uBC31\uC774 \uAC00\uC7A5 \uB9CE\uC544\uC694 \u00B7 ${topCorrection.count}\uAC1C \uAE30\uB85D`,
       nextPracticeText: topCorrection.coachText,
       toggleSubtext: `${topCorrection.label} \uD53C\uB4DC\uBC31\uC774 \uAC00\uC7A5 \uB9CE\uC544\uC694.`,
+      topFeedbackRecordIds: topCorrection.recordIds,
     };
   }
 
@@ -1791,6 +1798,7 @@ function buildDailySummaryAutoFeedback(
       topFeedbackText: '\uC624\uB298\uC740 \uD06C\uAC8C \uACE0\uCCD0\uC57C \uD560 \uD53C\uB4DC\uBC31\uC774 \uB9CE\uC9C0 \uC54A\uC544\uC694.',
       nextPracticeText: '\uC624\uB298 \uC548\uC815\uC801\uC774\uC5C8\uB358 \uC790\uC138 \uAC10\uAC01\uC744 \uAC19\uAC8C \uD55C \uBC88 \uB354 \uBC18\uBCF5\uD574 \uBCF4\uC138\uC694.',
       toggleSubtext: '\uC624\uB298\uC740 \uD06C\uAC8C \uACE0\uCCD0\uC57C \uD560 \uD53C\uB4DC\uBC31\uC774 \uB9CE\uC9C0 \uC54A\uC544\uC694.',
+      topFeedbackRecordIds: [],
     };
   }
 
@@ -1799,6 +1807,7 @@ function buildDailySummaryAutoFeedback(
     topFeedbackText: '\uC544\uC9C1 \uD53C\uB4DC\uBC31 \uAE30\uB85D\uC774 \uB354 \uD544\uC694\uD574\uC694.',
     nextPracticeText: '\uAE30\uB85D\uC774 \uB354 \uC313\uC774\uBA74 \uB2E4\uC74C \uC5F0\uC2B5 \uD3EC\uC778\uD2B8\uB97C \uC790\uC138\uD788 \uBCFC \uC218 \uC788\uC5B4\uC694.',
     toggleSubtext: '\uC544\uC9C1 \uD53C\uB4DC\uBC31 \uAE30\uB85D\uC774 \uB354 \uD544\uC694\uD574\uC694.',
+    topFeedbackRecordIds: [],
   };
 }
 
@@ -1932,6 +1941,24 @@ function buildSelectedCriterionComparisonSummary(
     delta: currentRatio - previousRatio,
     fallbackText: null,
   };
+}
+
+function getSelectedCriterionComparisonDeltaText(summary: SelectedCriterionComparisonSummary) {
+  if (summary.fallbackText) {
+    return summary.fallbackText;
+  }
+
+  if (summary.delta === 0) {
+    return summary.currentRatio === 100
+      ? '이전 기록과 같아요. 지금을 계속 유지해 주세요.'
+      : '이전 기록과 같아요. 지금보다 더 나아지게 집중해보세요.';
+  }
+
+  if ((summary.delta ?? 0) > 0) {
+    return `이전 기록보다 ${Math.abs(summary.delta ?? 0)}% 높아졌어요. 지금처럼 유지하세요.`;
+  }
+
+  return `이전 기록보다 ${Math.abs(summary.delta ?? 0)}% 낮아졌어요. 이전처럼 좀 더 집중해보세요.`;
 }
 
 function getCriterionJumpStartAtMs(record: LessonRecord, criterion: LessonRecordCriterion) {
@@ -2465,6 +2492,16 @@ export function DiaryScreen({
     () => buildDailySummaryAutoFeedback(selectedDateRecords, diarySkillInsight),
     [diarySkillInsight, selectedDateRecords]
   );
+  const dailySummaryTopFeedbackRecords = useMemo(() => {
+    if (dailySummaryAutoFeedback.topFeedbackRecordIds.length === 0) {
+      return [] as LessonRecord[];
+    }
+
+    const selectedDateRecordMap = new Map(selectedDateRecords.map((record) => [record.id, record] as const));
+    return dailySummaryAutoFeedback.topFeedbackRecordIds
+      .map((recordId) => selectedDateRecordMap.get(recordId) ?? null)
+      .filter((record): record is LessonRecord => record !== null);
+  }, [dailySummaryAutoFeedback.topFeedbackRecordIds, selectedDateRecords]);
   const dailyRecordRankingByMode = useMemo(
     () => ({
       shoot: buildDailyRecordRankingGroup(baseDateRecords.filter((record) => record.mode === 'shoot')),
@@ -2912,28 +2949,27 @@ export function DiaryScreen({
               const isSelected = criterion.key === selectedCriterionKey;
               const criterionDetail = getDiaryCriterionInsightText(criterion);
               const criterionLabel = getDiaryCriterionDisplayLabel(criterion);
+              const stableRatio = getDiaryCriterionStableRatio(criterion);
+              const content = (
+                <View style={styles.dribbleCriterionMeterSurface}>
+                  <View
+                    style={[
+                      styles.dribbleCriterionMeterFill,
+                      {
+                        width: `${stableRatio * 100}%`,
+                      },
+                    ]}
+                  />
+                  <View style={styles.dribbleCriterionMeterContent}>
+                    <Text style={styles.dribbleCriterionMeterTitle}>{criterionLabel}</Text>
+                    {criterionDetail ? (
+                      <Text style={styles.dribbleCriterionMeterDescription}>{criterionDetail}</Text>
+                    ) : null}
+                  </View>
+                </View>
+              );
 
               if (record.mode === 'dribble') {
-                const stableRatio = getDiaryCriterionStableRatio(criterion);
-                const content = (
-                  <View style={styles.dribbleCriterionMeterSurface}>
-                    <View
-                      style={[
-                        styles.dribbleCriterionMeterFill,
-                        {
-                          width: `${stableRatio * 100}%`,
-                        },
-                      ]}
-                    />
-                    <View style={styles.dribbleCriterionMeterContent}>
-                      <Text style={styles.dribbleCriterionMeterTitle}>{criterionLabel}</Text>
-                      {criterionDetail ? (
-                        <Text style={styles.dribbleCriterionMeterDescription}>{criterionDetail}</Text>
-                      ) : null}
-                    </View>
-                  </View>
-                );
-
                 return (
                   <Pressable
                     key={`${record.id}-${criterion.key}`}
@@ -2949,41 +2985,13 @@ export function DiaryScreen({
                 );
               }
 
-              const content = (
-                <>
-                  <View
-                    style={[
-                      styles.criteriaListBadge,
-                      criterion.isStable ? styles.criteriaListBadgeStable : styles.criteriaListBadgeUnstable,
-                      isSelected && styles.criteriaListBadgeSelected,
-                    ]}
-                  >
-                    <Text style={styles.criteriaListBadgeText}>{criterionLabel}</Text>
-                  </View>
-
-                  <View style={styles.criteriaListTextWrap}>
-                    <Text
-                      style={[
-                        styles.criteriaListStatus,
-                        criterion.isStable ? styles.criteriaListStatusStable : styles.criteriaListStatusUnstable,
-                      ]}
-                    >
-                      {criterion.isStable ? '\uC798\uD55C \uC810' : '\uBCF4\uC644'}
-                    </Text>
-                    {criterionDetail ? (
-                      <Text style={styles.criteriaListDescription}>{criterionDetail}</Text>
-                    ) : null}
-                  </View>
-                </>
-              );
-
               return (
                 <Pressable
                   key={`${record.id}-${criterion.key}`}
                   onPress={() => handleCriterionPress(record, criterion)}
                   style={({ pressed }) => [
-                    styles.criteriaListItem,
-                    isSelected && styles.criteriaListItemSelected,
+                    styles.dribbleCriterionMeter,
+                    isSelected && styles.dribbleCriterionMeterSelected,
                     pressed && styles.pressed,
                   ]}
                 >
@@ -3334,6 +3342,57 @@ export function DiaryScreen({
 
                         {showDailySummary ? (
                           <>
+                            {dailySummaryTopFeedbackRecords.length > 0 ? (
+                              <View style={styles.dailySummaryFeedbackRecordsSection}>
+                                <Text style={styles.dailySummaryFeedbackRecordsTitle}>
+                                  {'그 피드백이 나온 기록 카드'}
+                                </Text>
+                                <ScrollView
+                                  horizontal
+                                  showsHorizontalScrollIndicator={false}
+                                  contentContainerStyle={styles.dailySummaryFeedbackRecordsContent}
+                                >
+                                  {dailySummaryTopFeedbackRecords.map((record) => {
+                                    const recordCardLevelStyle = getRecordCardLevelStyle(record.evaluation?.level);
+                                    const recordTypeLabel =
+                                      record.mode === 'shoot'
+                                        ? '슛 분석'
+                                        : `${getComparableRecordTypeLabel(record)} 분석`;
+
+                                    return (
+                                      <Pressable
+                                        key={`daily-summary-feedback-${record.id}`}
+                                        onPress={() => openRecordEvaluation(record.id)}
+                                        style={({ pressed }) => [
+                                          styles.dailySummaryFeedbackRecordCard,
+                                          recordCardLevelStyle,
+                                          pressed && styles.pressed,
+                                        ]}
+                                      >
+                                        <View style={styles.dailySummaryFeedbackRecordPreview}>
+                                          {record.videoUri ? (
+                                            <RecordVideoThumbnail thumbnailUri={record.thumbnailUri} />
+                                          ) : (
+                                            <View
+                                              style={[
+                                                styles.recordVideoPreview,
+                                                styles.recordVideoPreviewEmpty,
+                                                styles.dailySummaryFeedbackRecordPreviewEmpty,
+                                              ]}
+                                            >
+                                              <Text style={styles.recordVideoPreviewCaption}>{'저장된 영상이 없습니다.'}</Text>
+                                            </View>
+                                          )}
+                                        </View>
+                                        <Text style={styles.dailySummaryFeedbackRecordType}>{recordTypeLabel}</Text>
+                                        <Text style={styles.dailySummaryFeedbackRecordMeta}>{record.createdAt}</Text>
+                                      </Pressable>
+                                    );
+                                  })}
+                                </ScrollView>
+                              </View>
+                            ) : null}
+
                             <View style={[styles.skillInsightStatCard, styles.dailySummaryCard]}>
                             <View style={styles.summaryBoardRow}>
                               <Text style={styles.summaryBoardLabel}>{'\uC5F0\uC2B5\uB7C9'}</Text>
@@ -3875,13 +3934,7 @@ export function DiaryScreen({
                               : styles.selectedCriterionComparisonDeltaNeutral,
                       ]}
                     >
-                      {selectedCriterionComparison.fallbackText
-                        ? selectedCriterionComparison.fallbackText
-                        : selectedCriterionComparison.delta === 0
-                          ? '이전 기록과 같아요'
-                          : selectedCriterionComparison.delta && selectedCriterionComparison.delta > 0
-                            ? `이전 기록보다 ${Math.abs(selectedCriterionComparison.delta)}% 높아졌어요`
-                            : `이전 기록보다 ${Math.abs(selectedCriterionComparison.delta ?? 0)}% 낮아졌어요`}
+                      {getSelectedCriterionComparisonDeltaText(selectedCriterionComparison)}
                     </Text>
                   </View>
                 ) : null}
@@ -4388,6 +4441,52 @@ const styles = StyleSheet.create({
     padding: 0,
     backgroundColor: 'transparent',
     gap: 10,
+  },
+  dailySummaryFeedbackRecordsSection: {
+    gap: 10,
+  },
+  dailySummaryFeedbackRecordsTitle: {
+    color: colors.textSoft,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '800',
+  },
+  dailySummaryFeedbackRecordsContent: {
+    gap: 12,
+    paddingRight: 4,
+  },
+  dailySummaryFeedbackRecordCard: {
+    width: 156,
+    flexShrink: 0,
+    padding: 10,
+    borderRadius: 0,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: DIARY_NEUTRAL_SURFACE_ALT,
+    gap: 8,
+  },
+  dailySummaryFeedbackRecordPreview: {
+    width: '100%',
+    height: 90,
+    overflow: 'hidden',
+    backgroundColor: '#111111',
+  },
+  dailySummaryFeedbackRecordPreviewEmpty: {
+    height: 90,
+    marginBottom: 0,
+    paddingHorizontal: 12,
+  },
+  dailySummaryFeedbackRecordType: {
+    color: colors.text,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '900',
+  },
+  dailySummaryFeedbackRecordMeta: {
+    color: colors.textMuted,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '700',
   },
   summaryBoardRow: {
     flexDirection: 'row',

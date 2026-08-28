@@ -4823,6 +4823,16 @@ export function useBasketballCoachApp() {
     []
   );
 
+  const canRecordShootSuccessForCurrentAttempt = useCallback(
+    () =>
+      hasCompletedShootAttempt()
+      || dribbleLessonPhaseRef.current === 'cooldown'
+      || pendingShootReviewRef.current
+      || pendingShootRecordingStopRef.current
+      || shootCooldownUntilRef.current !== null,
+    [hasCompletedShootAttempt]
+  );
+
   const resetFrontDribbleTrackingSummary = useCallback(() => {
     latestDribbleAnalysisRef.current = null;
     dribbleAnalysisFramesRef.current = [];
@@ -5368,8 +5378,8 @@ export function useBasketballCoachApp() {
   const recordSuccessfulShot = useCallback(
     (options?: { preserveFeedback?: boolean; debugMessage?: string; celebrate?: boolean }) => {
       const todayKey = formatDateKey(new Date());
-      const nextCount = updateShotSuccessCount(todayKey, 1);
       shootSuccessRecordedForCurrentAttemptRef.current = true;
+      const nextCount = updateShotSuccessCount(todayKey, 1);
 
       if (!options?.preserveFeedback) {
         const nextText = `?ㅻ뒛 ???깃났 ${nextCount}媛쒕? 湲곕줉?덉뒿?덈떎.`;
@@ -7399,11 +7409,20 @@ export function useBasketballCoachApp() {
         }
 
         if (payload.type === 'shoot_success_circle_detected') {
-          if (!isLessonActive || lessonModeRef.current !== 'shoot') {
+          const canHandleShootSuccessGesture =
+            isLessonActive
+            || dribbleLessonPhaseRef.current === 'cooldown'
+            || pendingShootReviewRef.current
+            || pendingShootRecordingStopRef.current;
+
+          if (!canHandleShootSuccessGesture || lessonModeRef.current !== 'shoot') {
             return;
           }
 
-          if (shootSuccessRecordedForCurrentAttemptRef.current || !hasCompletedShootAttempt()) {
+          if (
+            shootSuccessRecordedForCurrentAttemptRef.current
+            || !canRecordShootSuccessForCurrentAttempt()
+          ) {
             return;
           }
 
@@ -7491,8 +7510,8 @@ export function useBasketballCoachApp() {
       completeDribbleReview,
       completeShootReview,
       cameraStopMode,
+      canRecordShootSuccessForCurrentAttempt,
       finalizeLessonSession,
-      hasCompletedShootAttempt,
       isCameraActive,
       isLessonActive,
       playStartCue,
