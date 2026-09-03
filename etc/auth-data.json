@@ -10894,12 +10894,98 @@
       "nicknameKey": "codex-e2e-709655",
       "passwordHash": "a41aefa6cc728b061315aade423e07e2:3509593d4c1db0df472671e9564eb472b9c587b257e9627f1598d1b776d170df49e17ecefbce41a8a44d92b3c19a9d38c6ccf0eb597eeef34e7801a67ef936ce",
       "createdAt": "2026-08-27T14:25:09.785Z",
-      "updatedAt": "2026-08-27T14:25:10.131Z",
+      "updatedAt": "2026-09-03T12:54:53.971Z",
       "snapshot": {
-        "attendance": {},
-        "lessonRecords": [],
+        "attendance": {
+          "2026-9-3": "attended"
+        },
+        "lessonRecords": [
+          {
+            "id": "__dev-test-shoot-bad-no-video-v1",
+            "dateKey": "2026-9-3",
+            "mode": "shoot",
+            "shotOutcome": "failure",
+            "isStarred": false,
+            "feedback": "테스트용 슛 피드백입니다. 무릎 각도와 릴리스 타이밍이 불안정했습니다.",
+            "feedbackTimeline": [
+              {
+                "atMs": 0,
+                "text": "테스트용 슛 피드백입니다. 무릎 각도와 릴리스 타이밍이 불안정했습니다."
+              }
+            ],
+            "videoUri": "",
+            "thumbnailUri": "",
+            "createdAt": "2026. 9. 3. 오후 9:54:08",
+            "representativeFeedbackCategory": "leg_angle",
+            "evaluation": {
+              "level": "bad",
+              "summary": "4가지 기준 중 0가지가 안정적이라 나쁨 기록입니다.",
+              "criteria": [
+                {
+                  "key": "shoot-leg-angle",
+                  "label": "무릎 각도",
+                  "isStable": false,
+                  "detail": "무릎 각도가 흔들려 하체 힘 전달이 일정하지 않았습니다."
+                },
+                {
+                  "key": "shoot-release-timing",
+                  "label": "슛 타이밍",
+                  "isStable": false,
+                  "detail": "릴리스 타이밍이 일정하지 않아 슛 흐름이 끊겼습니다."
+                },
+                {
+                  "key": "shoot-release-point",
+                  "label": "슛 타점",
+                  "isStable": false,
+                  "detail": "릴리스 타점이 낮아져 공이 짧게 나갈 수 있습니다."
+                },
+                {
+                  "key": "shoot-release-duration",
+                  "label": "릴리스 시간",
+                  "isStable": false,
+                  "detail": "릴리스 시간이 일정하지 않아 슛 리듬이 흔들렸습니다."
+                },
+                {
+                  "key": "shoot-result",
+                  "label": "슛 성공",
+                  "isStable": false,
+                  "detail": "이번 테스트 시도는 슛이 성공하지 않았습니다."
+                }
+              ],
+              "strengths": [],
+              "improvements": [
+                {
+                  "label": "무릎 각도 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프를 해 힘을 실어 쏴야 하기 때문에 무릎 각도가 중요합니다. 지금 무릎 각도는 152.0도 정도로 120~140도로 굽혀야 합니다. 더 굽혀서 쏴주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 2000
+                },
+                {
+                  "label": "슛 타이밍 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 점프와 동시에 슛을 쏘아 힘을 실어야 하기 때문에 슛 타이밍이 중요합니다. 지금 슛 타이밍은 느립니다. 점프와 동시에 슛을 쏘아야 합니다. 더 빨리 쏴주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 2000
+                },
+                {
+                  "label": "슛 타점(위치) 보완이 필요합니다.",
+                  "detail": "슛을 쏠 때 수비에게 막히지 않기 위해서 슛을 머리 위에 쏘는 것이 중요합니다. 지금 슛 타점(위치)가 낮습니다. 머리 위로 좀 더 높여 쏴주세요.",
+                  "startAtMs": 0,
+                  "durationMs": 2000
+                },
+                {
+                  "label": "릴리즈 속도 보완이 필요합니다.",
+                  "detail": "수비수에게 막히지 않고 빠르게 슛을 쏴야 하기 때문에 릴리즈 시간이 짧아야 합니다. 지금 릴리즈 시간은 0.82초로 릴리즈 시간은 0.6초로 해야 합니다. 더 빨리 슛을 쏴보세요.",
+                  "startAtMs": 0,
+                  "durationMs": 2000
+                }
+              ]
+            }
+          }
+        ],
         "dribbleCounts": {},
-        "shotAttempts": {},
+        "shotAttempts": {
+          "2026-9-3": 1
+        },
         "shotSuccess": {},
         "ballColors": [
           "orange"
@@ -10951,6 +11037,11 @@
       "userId": "3c717468-56bd-4ffe-8aa4-27fbb90a1899",
       "createdAt": "2026-08-27T14:25:10.131Z",
       "lastUsedAt": "2026-08-27T14:25:10.131Z"
+    },
+    "d34f65ab9019f77af08906a50e82df939cbb80ac03c04afe203de07d58a0e86c": {
+      "userId": "3c717468-56bd-4ffe-8aa4-27fbb90a1899",
+      "createdAt": "2026-09-03T12:54:07.983Z",
+      "lastUsedAt": "2026-09-03T13:15:43.006Z"
     }
   }
 }

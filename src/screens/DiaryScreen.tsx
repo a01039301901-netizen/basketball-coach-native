@@ -2357,7 +2357,6 @@ export function DiaryScreen({
   const evaluationScrollRef = useRef<ScrollView | null>(null);
   const recordListRefs = useRef<Record<string, FlatList<LessonRecord> | null>>({});
   const playbackPollersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
-  const selectedCriterionComparisonYRef = useRef(0);
   const pendingCriterionComparisonScrollRef = useRef(false);
   const menuOpenSpacerHeight = showSuccessRateRangeMenu ? 220 : 0;
   const dribbleGraphTotal = Math.max(
@@ -2576,12 +2575,12 @@ export function DiaryScreen({
   );
 
   const scrollToSelectedCriterionComparison = useCallback((animated = true) => {
-    if (!evaluationScrollRef.current || selectedCriterionComparisonYRef.current <= 0) {
+    if (!evaluationScrollRef.current) {
       return;
     }
 
     evaluationScrollRef.current.scrollTo({
-      y: Math.max(0, selectedCriterionComparisonYRef.current - 12),
+      y: 0,
       animated,
     });
     pendingCriterionComparisonScrollRef.current = false;
@@ -2623,7 +2622,6 @@ export function DiaryScreen({
 
   useEffect(() => {
     setSelectedCriterionKey(null);
-    selectedCriterionComparisonYRef.current = 0;
     pendingCriterionComparisonScrollRef.current = false;
   }, [openedEvaluationRecordId]);
 
@@ -3024,17 +3022,6 @@ export function DiaryScreen({
           { width: recordCardWidth },
         ]}
       >
-        {record.isStarred ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => onToggleStarredRecord(record.id)}
-            style={({ pressed }) => [styles.recordStarBadge, pressed && styles.pressed]}
-          >
-            <Text style={styles.recordStarBadgeIcon}>★</Text>
-            <Text style={styles.recordStarBadgeText}>체크된 기록</Text>
-          </Pressable>
-        ) : null}
-
         <View style={styles.recordHeader}>
           <Pressable
             onPress={() => openRecordEvaluation(record.id)}
@@ -3051,7 +3038,24 @@ export function DiaryScreen({
             </View>
           </Pressable>
 
-          {renderRecordLevelBadge(evaluation?.level)}
+          <View style={styles.recordHeaderActions}>
+            {renderRecordLevelBadge(evaluation?.level)}
+            <Pressable
+              accessibilityLabel={record.isStarred ? '체크한 기록 고정 해제' : '기록을 맨 앞에 고정'}
+              accessibilityRole="button"
+              hitSlop={10}
+              onPress={() => onToggleStarredRecord(record.id)}
+              style={({ pressed }) => [
+                styles.recordStarToggle,
+                record.isStarred && styles.recordStarToggleActive,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={[styles.recordStarToggleIcon, record.isStarred && styles.recordStarToggleIconActive]}>
+                {record.isStarred ? '★' : '☆'}
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
         <Pressable
@@ -3851,18 +3855,7 @@ export function DiaryScreen({
                 </View>
 
                 {selectedCriterionComparison ? (
-                  <View
-                    onLayout={(event) => {
-                      selectedCriterionComparisonYRef.current = event.nativeEvent.layout.y;
-
-                      if (pendingCriterionComparisonScrollRef.current) {
-                        requestAnimationFrame(() => {
-                          scrollToSelectedCriterionComparison();
-                        });
-                      }
-                    }}
-                    style={styles.selectedCriterionComparisonSection}
-                  >
+                  <View style={styles.selectedCriterionComparisonSection}>
                     <Text
                       style={[
                         styles.selectedCriterionComparisonTitle,
@@ -5600,29 +5593,33 @@ const styles = StyleSheet.create({
     borderColor: DIARY_NEUTRAL_BORDER,
     backgroundColor: DIARY_NEUTRAL_SURFACE,
   },
-  recordStarBadge: {
-    alignSelf: 'flex-start',
+  recordHeaderActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,212,81,0.14)',
+    gap: 8,
+  },
+  recordStarToggle: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255,212,81,0.38)',
+    borderColor: 'rgba(255,255,255,0.18)',
   },
-  recordStarBadgeIcon: {
-    color: '#ffd451',
-    fontSize: 13,
-    fontWeight: '900',
+  recordStarToggleActive: {
+    backgroundColor: 'rgba(255,212,81,0.16)',
+    borderColor: 'rgba(255,212,81,0.58)',
   },
-  recordStarBadgeText: {
-    color: '#ffe89a',
-    fontSize: 12,
+  recordStarToggleIcon: {
+    color: 'rgba(255,255,255,0.56)',
+    fontSize: 18,
     fontWeight: '800',
-    letterSpacing: 0.2,
+    lineHeight: 20,
+  },
+  recordStarToggleIconActive: {
+    color: '#ffd451',
   },
   recordHeader: {
     flexDirection: 'row',

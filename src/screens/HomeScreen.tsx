@@ -155,7 +155,14 @@ function HomeMenuButton({
                 <Image source={diaryPencilIcon} resizeMode="contain" style={[styles.diaryPencilIcon, isCompact && styles.diaryPencilIconCompact]} />
               )}
             </View>
-            <Text style={[styles.mainButtonLabel, isCompact && styles.mainButtonLabelCompact]}>{label}</Text>
+            <Text
+              style={[
+                styles.mainButtonLabel,
+                isCompact && styles.mainButtonLabelCompact,
+              ]}
+            >
+              {label}
+            </Text>
           </View>
 
           <Text
@@ -173,7 +180,7 @@ function HomeMenuButton({
           {hasSubtitle ? (
             <Text
               style={[
-                styles.mainButtonSubtitle,
+              styles.mainButtonSubtitle,
                 hasArtwork && styles.mainButtonSubtitleWithArtwork,
                 isDiaryArtwork && styles.mainButtonSubtitleDiary,
                 isCompact && styles.mainButtonSubtitleCompact,
@@ -360,97 +367,106 @@ export function HomeScreen({
       onPress: onOpenDiary,
     },
   ];
+  const dailyHomeworkItems = homeworkToShow.filter((item) => item.stage === 'base' && item.source === 'daily');
+  const additionalHomeworkItems = homeworkToShow.filter((item) => !(item.stage === 'base' && item.source === 'daily'));
+
+  function renderHomeworkItem(item: HomeworkProgressItem) {
+    const hasReasonDetail = Boolean(item.detailText || item.reasonText);
+    const homeworkDetailLabel = '자세히 보기';
+
+    return (
+      <Pressable
+        key={item.id}
+        disabled={!hasReasonDetail}
+        onPress={hasReasonDetail ? () => setSelectedHomeworkReasonItem(item) : undefined}
+        style={({ pressed }) => [
+          styles.homeworkItem,
+          item.isCompleted && styles.homeworkItemCompleted,
+          hasReasonDetail && pressed && !item.isCompleted && styles.pressed,
+        ]}
+      >
+        <View style={styles.homeworkHeader}>
+          {item.isCompleted ? (
+            <Text style={styles.homeworkCompletedCheck}>{'✓'}</Text>
+          ) : (
+            <View style={styles.homeworkBullet} />
+          )}
+          <Text style={styles.homeworkText}>{item.title}</Text>
+          {hasReasonDetail ? <Text style={styles.homeworkDetailToggleText}>{homeworkDetailLabel}</Text> : null}
+        </View>
+
+        <View style={styles.homeworkMetaRow}>
+          <Text style={styles.homeworkStatus}>{item.completionText}</Text>
+          <Text style={styles.homeworkProgress}>{item.progressText}</Text>
+        </View>
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${item.progressPercent}%` }]} />
+        </View>
+      </Pressable>
+    );
+  }
 
   return (
     <View style={styles.layout}>
-      <View style={styles.heroCard}>
-        <View style={styles.heroTextWrap}>
-          <Text style={styles.heroTitle}>오늘 어떤 연습부터 시작할까요?</Text>
-        </View>
-      </View>
-
-      {isWide ? (
-        <View style={styles.menuButtonsRow}>
-          {menuButtons.map((button) => (
-            <HomeMenuButton
-              key={button.key}
-              accentColor={button.accentColor}
-              accentSoft={button.accentSoft}
-              artworkType={button.artworkType}
-              label={button.label}
-              title={button.title}
-              subtitle={button.subtitle}
-              onPress={button.onPress}
-              isWide={isWide}
-              isCompact={false}
-              isBorderless={button.isBorderless}
-            />
-          ))}
-        </View>
-      ) : (
-        <View style={styles.menuButtonsStack}>
-          {menuButtons.map((button) => (
-            <HomeMenuButton
-              key={button.key}
-              accentColor={button.accentColor}
-              accentSoft={button.accentSoft}
-              artworkType={button.artworkType}
-              label={button.label}
-              title={button.title}
-              subtitle={button.subtitle}
-              onPress={button.onPress}
-              isWide={isWide}
-              isCompact={false}
-              isFullWidth
-              isBorderless={button.isBorderless}
-            />
-          ))}
-        </View>
-      )}
-
-      <View style={styles.homeworkCard}>
-        <View style={styles.homeworkTopRow}>
-          <View>
-            <Text style={styles.homeworkTitle}>오늘의 연습 숙제</Text>
+      <View style={styles.topSection}>
+        <View style={styles.heroCard}>
+          <View style={styles.heroTextWrap}>
+            <Text style={styles.heroTitle}>오늘 어떤 연습부터 시작할까요?</Text>
           </View>
         </View>
+
+        {isWide ? (
+          <View style={styles.menuButtonsRow}>
+            {menuButtons.map((button) => (
+              <HomeMenuButton
+                key={button.key}
+                accentColor={button.accentColor}
+                accentSoft={button.accentSoft}
+                artworkType={button.artworkType}
+                label={button.label}
+                title={button.title}
+                subtitle={button.subtitle}
+                onPress={button.onPress}
+                isWide={isWide}
+                isCompact={false}
+                isBorderless={button.isBorderless}
+              />
+            ))}
+          </View>
+        ) : (
+          <View style={styles.menuButtonsStack}>
+            {menuButtons.map((button) => (
+              <HomeMenuButton
+                key={button.key}
+                accentColor={button.accentColor}
+                accentSoft={button.accentSoft}
+                artworkType={button.artworkType}
+                label={button.label}
+                title={button.title}
+                subtitle={button.subtitle}
+                onPress={button.onPress}
+                isWide={isWide}
+                isCompact={false}
+                isFullWidth
+                isBorderless={button.isBorderless}
+              />
+            ))}
+          </View>
+        )}
+      </View>
+
+      <View style={styles.homeworkCard}>
         <View style={styles.homeworkList}>
-          {homeworkToShow.map((item) => {
-            const hasReasonDetail = Boolean(item.detailText || item.reasonText);
-            const isDailyPracticeHomework = item.stage === 'base' && item.source === 'daily';
-            const homeworkDetailLabel = `${item.detailToggleText || '자세히 보기'} >`;
-
-            return (
-              <Pressable
-                key={item.id}
-                disabled={!hasReasonDetail}
-                onPress={hasReasonDetail ? () => setSelectedHomeworkReasonItem(item) : undefined}
-                style={({ pressed }) => [styles.homeworkItem, hasReasonDetail && pressed && styles.pressed]}
-              >
-                {isDailyPracticeHomework || hasReasonDetail ? (
-                  <View style={styles.homeworkItemTopRow}>
-                    {isDailyPracticeHomework ? (
-                      <Text style={styles.homeworkCategoryText}>{'하루 연습량'}</Text>
-                    ) : null}
-                    {hasReasonDetail ? <Text style={styles.homeworkDetailToggleText}>{homeworkDetailLabel}</Text> : null}
-                  </View>
-                ) : null}
-
-                <View style={styles.homeworkHeader}>
-                  <View style={[styles.homeworkBullet, item.isCompleted && styles.homeworkBulletCompleted]} />
-                  <Text style={styles.homeworkText}>{item.title}</Text>
-                </View>
-
-                <View style={styles.homeworkMetaRow}>
-                  <Text style={styles.homeworkStatus}>{item.completionText}</Text>
-                  <Text style={styles.homeworkProgress}>{item.progressText}</Text>
-                </View>
-                <View style={styles.progressTrack}>
-                  <View style={[styles.progressFill, { width: `${item.progressPercent}%` }]} />
-                </View>
-              </Pressable>
-            );
-          })}
+          {dailyHomeworkItems.length > 0 ? (
+            <Text style={[styles.homeworkSectionTitle, styles.homeworkDailySectionTitle]}>{'하루 연습량'}</Text>
+          ) : null}
+          {dailyHomeworkItems.map(renderHomeworkItem)}
+          {additionalHomeworkItems.length > 0 ? (
+            <Text style={[styles.homeworkSectionTitle, dailyHomeworkItems.length > 0 && styles.homeworkSectionTitleAdditional]}>
+              {'추가 연습 숙제'}
+            </Text>
+          ) : null}
+          {additionalHomeworkItems.map(renderHomeworkItem)}
         </View>
       </View>
 
@@ -747,15 +763,19 @@ export function HomeScreen({
 
 const styles = StyleSheet.create({
   layout: {
-    gap: 16,
+    gap: 8,
+  },
+  topSection: {
+    gap: 4,
   },
   heroCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    borderWidth: 0,
+    borderColor: 'transparent',
     paddingHorizontal: 20,
-    paddingVertical: 18,
+    paddingTop: 12,
+    paddingBottom: 0,
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
@@ -768,7 +788,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 24,
     fontWeight: '800',
-    marginBottom: 8,
+    marginBottom: 0,
   },
   menuButtonsRow: {
     flexDirection: 'row',
@@ -799,7 +819,7 @@ const styles = StyleSheet.create({
     minHeight: 178,
     borderRadius: 24,
     padding: 18,
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: '#3a3027',
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
@@ -830,7 +850,7 @@ const styles = StyleSheet.create({
     paddingRight: 22,
   },
   mainButtonDiary: {
-    backgroundColor: '#27211d',
+    backgroundColor: '#343946',
   },
   mainButtonContent: {
     position: 'relative',
@@ -995,52 +1015,42 @@ const styles = StyleSheet.create({
     opacity: 0.42,
   },
   homeworkCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 24,
+    backgroundColor: 'transparent',
+    borderRadius: 0,
     borderWidth: 0,
     borderColor: 'transparent',
-    padding: 20,
-  },
-  homeworkTopRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  homeworkTitle: {
-    color: colors.text,
-    fontSize: 22,
-    fontWeight: '800',
-    marginBottom: 6,
-  },
-  homeworkDescription: {
-    color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 20,
+    paddingHorizontal: 0,
+    paddingVertical: 12,
   },
   homeworkList: {
     gap: 12,
-    marginTop: 18,
+  },
+  homeworkSectionTitle: {
+    color: colors.textAccent,
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  homeworkDailySectionTitle: {
+    color: '#6eb37c',
+    fontSize: 20,
+    lineHeight: 28,
+  },
+  homeworkSectionTitleAdditional: {
+    marginTop: 6,
   },
   homeworkItem: {
     gap: 10,
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: 'rgba(122, 55, 55, 0.72)',
     borderRadius: 18,
     borderWidth: 0,
     borderColor: 'transparent',
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
-  homeworkCategoryText: {
-    color: colors.textAccent,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: '800',
-  },
-  homeworkItemTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  homeworkItemCompleted: {
+    opacity: 0.56,
   },
   homeworkHeader: {
     flexDirection: 'row',
@@ -1053,22 +1063,26 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: '#f09c46',
   },
-  homeworkBulletCompleted: {
-    backgroundColor: '#6eb37c',
+  homeworkCompletedCheck: {
+    width: 12,
+    color: '#6eb37c',
+    fontSize: 18,
+    lineHeight: 21,
+    fontWeight: '900',
   },
   homeworkText: {
     flex: 1,
-    color: colors.text,
+    color: '#f8f3db',
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '700',
   },
   homeworkDetailToggleText: {
-    marginLeft: 'auto',
-    color: colors.textMuted,
+    color: '#e1d9a8',
     fontSize: 12,
     lineHeight: 18,
     fontWeight: '700',
+    flexShrink: 0,
   },
   homeworkMetaRow: {
     flexDirection: 'row',
@@ -1076,12 +1090,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   homeworkStatus: {
-    color: colors.textAccent,
+    color: '#ffd3a4',
     fontSize: 13,
     fontWeight: '700',
   },
   homeworkProgress: {
-    color: colors.textMuted,
+    color: '#e1d9a8',
     fontSize: 13,
     fontWeight: '600',
   },
@@ -1089,7 +1103,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 6,
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(62, 27, 27, 0.72)',
     overflow: 'hidden',
   },
   progressFill: {

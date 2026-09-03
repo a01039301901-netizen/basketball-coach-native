@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import { setStatusBarBackgroundColor, setStatusBarHidden, StatusBar as ExpoStatusBar, setStatusBarStyle, setStatusBarTranslucent } from 'expo-status-bar';
-import { Animated, AppState, Platform, Pressable, SafeAreaView, ScrollView, StatusBar as NativeStatusBar, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { setStatusBarHidden, StatusBar as ExpoStatusBar, setStatusBarStyle } from 'expo-status-bar';
+import { Animated, AppState, PanResponder, Platform, Pressable, SafeAreaView, ScrollView, StatusBar as NativeStatusBar, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { BallRecognitionCalibrator } from './src/components/ballRecognition/BallRecognitionCalibrator';
 import { SmallButton } from './src/components/common/Buttons';
 import { FireworkBurst } from './src/components/common/FireworkBurst';
@@ -22,8 +22,13 @@ type NavigationBarModule = typeof import('expo-navigation-bar');
 type LessonScreenComponent = typeof import('./src/screens/LessonScreen').LessonScreen;
 const APP_TOP_OFFSET = 12;
 const APP_SHELL_HORIZONTAL_PADDING = 16;
-const HOME_UTILITY_BAR_HEIGHT = 84;
+const HOME_UTILITY_BAR_HEIGHT = 80;
 const HOME_UTILITY_ICON_HIT_SLOP = { top: 14, right: 14, bottom: 14, left: 14 } as const;
+const HOME_DRAWER_SWIPE_ACTIVATION_DISTANCE = 6;
+const HOME_DRAWER_SWIPE_OPEN_DISTANCE = 20;
+const HOME_DRAWER_SWIPE_FLICK_DISTANCE = 12;
+const HOME_DRAWER_SWIPE_MIN_VELOCITY = 0.25;
+const HOME_DRAWER_SWIPE_HORIZONTAL_PRIORITY = 0.6;
 
 function ProfileSilhouetteIcon({ active = false }: { active?: boolean }) {
   return (
@@ -56,6 +61,7 @@ export default function App() {
   const navigationBarModuleRef = useRef<NavigationBarModule | null>(null);
   const navigationBarHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const statusBarHideTimeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const statusBarStackEntryRef = useRef<ReturnType<typeof NativeStatusBar.pushStackEntry> | null>(null);
   const [headerMeasuredHeight, setHeaderMeasuredHeight] = useState(0);
   const [activeDrawer, setActiveDrawer] = useState<SideDrawerType | null>(null);
   const [renderedDrawer, setRenderedDrawer] = useState<SideDrawerType>('settings');
@@ -103,9 +109,138 @@ export default function App() {
     setActiveDrawer((currentDrawer) => (currentDrawer === drawer ? null : drawer));
   }, []);
 
+  const returnHomeFromDrawer = useCallback(() => {
+    setActiveDrawer(null);
+
+    if (app.screen !== 'home') {
+      void app.navigateTo('home');
+    }
+  }, [app]);
+
+  const homeDrawerPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          if (!isHomeScreen || isDrawerVisible) {
+            return false;
+          }
+
+          const horizontalDistance = Math.abs(gestureState.dx);
+          const verticalDistance = Math.abs(gestureState.dy);
+
+          return (
+            horizontalDistance >= HOME_DRAWER_SWIPE_ACTIVATION_DISTANCE &&
+            horizontalDistance > verticalDistance * HOME_DRAWER_SWIPE_HORIZONTAL_PRIORITY
+          );
+        },
+        onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+          if (!isHomeScreen || isDrawerVisible) {
+            return false;
+          }
+
+          const horizontalDistance = Math.abs(gestureState.dx);
+          const verticalDistance = Math.abs(gestureState.dy);
+
+          return (
+            horizontalDistance >= HOME_DRAWER_SWIPE_ACTIVATION_DISTANCE &&
+            horizontalDistance > verticalDistance * HOME_DRAWER_SWIPE_HORIZONTAL_PRIORITY
+          );
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          const horizontalDistance = Math.abs(gestureState.dx);
+          const verticalDistance = Math.abs(gestureState.dy);
+
+          const isLongSwipe = horizontalDistance >= HOME_DRAWER_SWIPE_OPEN_DISTANCE;
+          const isQuickFlick =
+            horizontalDistance >= HOME_DRAWER_SWIPE_FLICK_DISTANCE &&
+            Math.abs(gestureState.vx) >= HOME_DRAWER_SWIPE_MIN_VELOCITY;
+
+          if (
+            (!isLongSwipe && !isQuickFlick) ||
+            horizontalDistance <= verticalDistance * HOME_DRAWER_SWIPE_HORIZONTAL_PRIORITY
+          ) {
+            return;
+          }
+
+          // A right swipe reveals the left-side settings drawer; a left swipe reveals the profile drawer.
+          setActiveDrawer(gestureState.dx > 0 ? 'settings' : 'profile');
+        },
+      }),
+    [isDrawerVisible, isHomeScreen]
+  );
+
+  const drawerDismissPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          if (!isDrawerVisible) {
+            return false;
+          }
+
+          const horizontalDistance = Math.abs(gestureState.dx);
+          const verticalDistance = Math.abs(gestureState.dy);
+
+          return (
+            horizontalDistance >= HOME_DRAWER_SWIPE_ACTIVATION_DISTANCE &&
+            horizontalDistance > verticalDistance * HOME_DRAWER_SWIPE_HORIZONTAL_PRIORITY
+          );
+        },
+        onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+          if (!isDrawerVisible) {
+            return false;
+          }
+
+          const horizontalDistance = Math.abs(gestureState.dx);
+          const verticalDistance = Math.abs(gestureState.dy);
+
+          return (
+            horizontalDistance >= HOME_DRAWER_SWIPE_ACTIVATION_DISTANCE &&
+            horizontalDistance > verticalDistance * HOME_DRAWER_SWIPE_HORIZONTAL_PRIORITY
+          );
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          const horizontalDistance = Math.abs(gestureState.dx);
+          const verticalDistance = Math.abs(gestureState.dy);
+          const isLongSwipe = horizontalDistance >= HOME_DRAWER_SWIPE_OPEN_DISTANCE;
+          const isQuickFlick =
+            horizontalDistance >= HOME_DRAWER_SWIPE_FLICK_DISTANCE &&
+            Math.abs(gestureState.vx) >= HOME_DRAWER_SWIPE_MIN_VELOCITY;
+
+          if (
+            (!isLongSwipe && !isQuickFlick) ||
+            horizontalDistance <= verticalDistance * HOME_DRAWER_SWIPE_HORIZONTAL_PRIORITY
+          ) {
+            return;
+          }
+
+          returnHomeFromDrawer();
+        },
+      }),
+    [isDrawerVisible, returnHomeFromDrawer]
+  );
+
   const clearStatusBarHideTimeouts = useCallback(() => {
     statusBarHideTimeoutRefs.current.forEach((timeoutId) => clearTimeout(timeoutId));
     statusBarHideTimeoutRefs.current = [];
+  }, []);
+
+  const syncStatusBarStackEntry = useCallback(() => {
+    if (Platform.OS === 'web') {
+      return;
+    }
+
+    const stackProps = {
+      animated: false,
+      hidden: true,
+      barStyle: 'light-content' as const,
+    };
+
+    if (statusBarStackEntryRef.current) {
+      statusBarStackEntryRef.current = NativeStatusBar.replaceStackEntry(statusBarStackEntryRef.current, stackProps);
+      return;
+    }
+
+    statusBarStackEntryRef.current = NativeStatusBar.pushStackEntry(stackProps);
   }, []);
 
   const scheduleStatusBarHide = useCallback(() => {
@@ -114,23 +249,17 @@ export default function App() {
     }
 
     const applyStatusBarHidden = () => {
+      syncStatusBarStackEntry();
       setStatusBarStyle('light');
       setStatusBarHidden(true, 'fade');
       NativeStatusBar.setBarStyle('light-content', true);
       NativeStatusBar.setHidden(true, 'fade');
-
-      if (Platform.OS === 'android') {
-        setStatusBarBackgroundColor('transparent', true);
-        setStatusBarTranslucent(true);
-        NativeStatusBar.setBackgroundColor('transparent', true);
-        NativeStatusBar.setTranslucent(true);
-      }
     };
 
     clearStatusBarHideTimeouts();
     applyStatusBarHidden();
-    statusBarHideTimeoutRefs.current = [160, 420, 900].map((delay) => setTimeout(applyStatusBarHidden, delay));
-  }, [clearStatusBarHideTimeouts]);
+    statusBarHideTimeoutRefs.current = [100, 260, 520, 980, 1680].map((delay) => setTimeout(applyStatusBarHidden, delay));
+  }, [clearStatusBarHideTimeouts, syncStatusBarStackEntry]);
 
   const ensureAndroidNavigationBarHidden = useCallback(async () => {
     if (Platform.OS !== 'android') {
@@ -175,6 +304,10 @@ export default function App() {
 
     return () => {
       clearStatusBarHideTimeouts();
+      if (statusBarStackEntryRef.current) {
+        NativeStatusBar.popStackEntry(statusBarStackEntryRef.current);
+        statusBarStackEntryRef.current = null;
+      }
 
       if (navigationBarHideTimeoutRef.current) {
         clearTimeout(navigationBarHideTimeoutRef.current);
@@ -220,6 +353,13 @@ export default function App() {
         }
       }
     });
+    const appFocusSubscription =
+      Platform.OS === 'android'
+        ? AppState.addEventListener('focus', () => {
+            scheduleStatusBarHide();
+            scheduleAndroidNavigationBarHide();
+          })
+        : null;
 
     if (Platform.OS === 'android') {
       void setupNavigationBarPersistence();
@@ -229,6 +369,7 @@ export default function App() {
       isMounted = false;
       visibilitySubscription?.remove();
       appStateSubscription.remove();
+      appFocusSubscription?.remove();
     };
   }, [scheduleAndroidNavigationBarHide, scheduleStatusBarHide]);
 
@@ -298,9 +439,10 @@ export default function App() {
 
   return (
     <RootContainer style={styles.safeArea}>
-      <ExpoStatusBar hidden translucent backgroundColor="transparent" style="light" hideTransitionAnimation="fade" />
+      <ExpoStatusBar hidden translucent style="light" hideTransitionAnimation="fade" />
       <View style={[styles.appViewport, isDesktopMobileMode && styles.appViewportDesktop]}>
       <View
+        {...(isHomeScreen ? homeDrawerPanResponder.panHandlers : {})}
         style={[
           styles.appShell,
           isDesktopMobileMode && styles.appShellDesktop,
@@ -405,6 +547,9 @@ export default function App() {
                 paddingBottom: shouldShowHomeUtilityBar ? HOME_UTILITY_BAR_HEIGHT + 24 : 32,
               },
             ]}
+            scrollEnabled={!isHomeScreen}
+            bounces={!isHomeScreen}
+            overScrollMode={isHomeScreen ? 'never' : 'auto'}
             showsVerticalScrollIndicator={false}
             onScroll={isDiaryScreen ? undefined : handleHeaderScroll}
             scrollEventThrottle={16}
@@ -567,6 +712,7 @@ export default function App() {
               <Animated.View style={[styles.settingsBackdrop, { opacity: sideDrawerBackdropOpacity }]} />
             </Pressable>
             <Animated.View
+              {...drawerDismissPanResponder.panHandlers}
               style={[
                 styles.settingsDrawer,
                 styles.settingsDrawerFullScreen,
@@ -677,8 +823,8 @@ const styles = StyleSheet.create({
   homeUtilityBar: {
     minHeight: HOME_UTILITY_BAR_HEIGHT,
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 16,
+    paddingTop: 4,
+    paddingBottom: 4,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
@@ -687,8 +833,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   homeUtilityAction: {
-    minHeight: 68,
-    minWidth: 68,
+    minHeight: 72,
+    minWidth: 76,
     borderRadius: 0,
     backgroundColor: 'transparent',
     borderWidth: 0,
@@ -703,13 +849,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   homeUtilityHomeButton: {
-    width: 72,
+    width: 82,
   },
   homeUtilityProfileButton: {
-    width: 72,
+    width: 82,
   },
   homeUtilitySettingsButton: {
-    width: 72,
+    width: 82,
   },
   homeUtilityActionText: {
     color: colors.text,
@@ -718,9 +864,9 @@ const styles = StyleSheet.create({
   },
   homeUtilityIconText: {
     color: '#ffffff',
-    fontSize: 28,
+    fontSize: 37,
     fontWeight: '900',
-    lineHeight: 28,
+    lineHeight: 37,
   },
   homeUtilityIconTextActive: {
     color: colors.secondary,
@@ -729,7 +875,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 3,
     borderRadius: 999,
-    marginTop: 10,
+    marginTop: 5,
   },
   homeUtilityIndicatorActive: {
     backgroundColor: colors.secondary,
@@ -738,25 +884,25 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   profileIcon: {
-    width: 28,
-    height: 28,
+    width: 37,
+    height: 37,
     alignItems: 'center',
     justifyContent: 'center',
   },
   profileIconHead: {
-    width: 10,
-    height: 10,
+    width: 13,
+    height: 13,
     borderRadius: 999,
     backgroundColor: '#ffffff',
     marginBottom: 3,
   },
   profileIconBody: {
-    width: 18,
-    height: 12,
-    borderTopLeftRadius: 9,
-    borderTopRightRadius: 9,
-    borderBottomLeftRadius: 5,
-    borderBottomRightRadius: 5,
+    width: 24,
+    height: 16,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 7,
+    borderBottomRightRadius: 7,
     backgroundColor: '#ffffff',
   },
   profileIconPartActive: {
