@@ -6,12 +6,6 @@
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": false,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#120d09"
-    },
     "plugins": [
       [
         "expo-navigation-bar",
@@ -28,7 +22,19 @@
           "microphonePermission": "Allow Basketball Coach AI to use the microphone while recording lesson videos."
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#120d09"
+        }
+      ],
+      "expo-video",
+      "expo-audio",
+      "expo-asset"
     ],
     "ios": {
       "supportsTablet": true,
@@ -49,7 +55,6 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#120d09"
       },
-      "edgeToEdgeEnabled": true,
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO"

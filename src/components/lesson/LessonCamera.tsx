@@ -19,6 +19,7 @@ interface LessonCameraProps {
   shootResetToken: number;
   recordingStartToken: number;
   recordingStopToken: number;
+  cameraSwitchToken: number;
   cameraStopMode: 'review' | 'disconnect' | null;
   containerStyle?: StyleProp<ViewStyle>;
   onPoseMessage: (event: WebViewMessageEvent) => void;

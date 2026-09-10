@@ -48,6 +48,7 @@ interface BuildHomeworkProgressInput {
 }
 
 interface HomeworkProgressItemOptions {
+  recommendedLessonMode?: HomeworkProgressItem['recommendedLessonMode'];
   reasonText?: HomeworkProgressItem['reasonText'];
   detailToggleText?: HomeworkProgressItem['detailToggleText'];
   detailText?: HomeworkProgressItem['detailText'];
@@ -87,6 +88,7 @@ function buildProgressItem(
   return {
     id,
     title,
+    recommendedLessonMode: options.recommendedLessonMode,
     stage,
     source,
     current: progress,
@@ -119,7 +121,7 @@ function buildBaseDribbleDetailText(current: number, target: number) {
     return `기록일지에서 전체적인 평가를 하기 위해서는 드리블 ${target}회면 충분해요. 오늘 기준 연습량을 이미 채워서 손 교대와 리듬을 더 안정적으로 비교할 수 있어요.`;
   }
 
-  return `기록일지에서 전체적인 평가를 하기 위해서는 드리블 ${target}회면 충분해요. 드리블 레슨으로 들어가서 드리블 ${target}회를 도전해봐요.`;
+  return `기록일지에서 전체적인 평가를 하기 위해서는 드리블 ${target}회면 충분해요.`;
 }
 
 function buildBaseShootReasonText(current: number, target: number) {
@@ -133,7 +135,7 @@ function buildBaseShootDetailText(current: number, target: number) {
     return `기록일지에서 전체적인 평가를 하기 위해서는 슛 발사 ${target}번이면 충분해요. 오늘 기준 연습량을 이미 채워서 발사 타이밍과 슛 자세를 더 안정적으로 비교할 수 있어요.`;
   }
 
-  return `기록일지에서 전체적인 평가를 하기 위해서는 슛 발사 ${target}번이면 충분해요. 슛 레슨으로 들어가서 슛 발사 ${target}번을 도전해봐요.`;
+  return `기록일지에서 전체적인 평가를 하기 위해서는 슛 발사 ${target}번이면 충분해요.`;
 }
 
 function getTodayLessonCount(dateKey: string, lessonRecords: LessonRecord[]) {
@@ -446,9 +448,8 @@ function buildBalanceHomeworkReasonText(leftCount: number, rightCount: number) {
   return `오늘 드리블에서 왼손 ${leftCount}회, 오른손 ${rightCount}회가 기록돼 있어요.`;
 }
 
-function buildBalanceHomeworkDetailText(leftCount: number, rightCount: number) {
-  const gap = Math.abs(leftCount - rightCount);
-  return `왼손은 ${leftCount}회, 오른손은 ${rightCount}회로 서로 ${gap}개 차이가 있습니다. 드리블을 연습할 때에는 양손을 균형있게 연습하는 것이 중요하기 때문에 양손 균형을 맞춰보세요.`;
+function buildBalanceHomeworkDetailText() {
+  return '드리블을 연습할 때에는 양손을 균형있게 연습하는 것이 중요하기 때문에 양손 균형을 맞춰보세요.';
 }
 
 function buildBalanceHomeworkItem(dailyState: DailyHomeworkState) {
@@ -465,8 +466,9 @@ function buildBalanceHomeworkItem(dailyState: DailyHomeworkState) {
     progressValue,
     BALANCE_HOMEWORK_PROGRESS_TARGET,
     {
+      recommendedLessonMode: 'dribble',
       reasonText: buildBalanceHomeworkReasonText(leftCount, rightCount),
-      detailText: buildBalanceHomeworkDetailText(leftCount, rightCount),
+      detailText: buildBalanceHomeworkDetailText(),
       balanceGraph: {
         leftCount,
         rightCount,
@@ -482,10 +484,12 @@ function buildBalanceHomeworkItem(dailyState: DailyHomeworkState) {
 function buildBaseHomeworkItems(dribbleCount: number, shootAttemptCount: number) {
   return [
     buildProgressItem('base-dribble', DAILY_DRIBBLE_HOMEWORK_TITLE, 'base', 'daily', dribbleCount, DAILY_DRIBBLE_TARGET, {
+      recommendedLessonMode: 'dribble',
       reasonText: buildBaseDribbleReasonText(dribbleCount, DAILY_DRIBBLE_TARGET),
       detailText: buildBaseDribbleDetailText(dribbleCount, DAILY_DRIBBLE_TARGET),
     }),
     buildProgressItem('base-shoot', DAILY_SHOOT_HOMEWORK_TITLE, 'base', 'daily', shootAttemptCount, DAILY_SHOOT_TARGET, {
+      recommendedLessonMode: 'shoot',
       reasonText: buildBaseShootReasonText(shootAttemptCount, DAILY_SHOOT_TARGET),
       detailText: buildBaseShootDetailText(shootAttemptCount, DAILY_SHOOT_TARGET),
     }),
@@ -519,6 +523,7 @@ function buildStage2FollowupHomeworkItems(
       isResolved ? POSITION_FEEDBACK_RETRY_TARGET : 0,
       POSITION_FEEDBACK_RETRY_TARGET,
       {
+        recommendedLessonMode: getHomeworkFeedbackTargetLessonMode(feedbackCategory) ?? undefined,
         reasonText,
         detailText,
         linkedDiaryContext,
@@ -565,6 +570,7 @@ function buildCorrectionHomeworkItem(correctionTask: CorrectionHomeworkState | n
     progress,
     CORRECTION_DRIBBLE_TARGET,
     {
+      recommendedLessonMode: 'dribble',
       reasonText,
       detailText,
     }

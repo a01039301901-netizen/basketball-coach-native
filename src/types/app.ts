@@ -218,6 +218,7 @@ export interface HomeworkBalanceGraphData {
 export interface HomeworkProgressItem {
   id: string;
   title: string;
+  recommendedLessonMode?: LessonMode;
   stage: HomeworkStage;
   source: HomeworkSource;
   current: number;

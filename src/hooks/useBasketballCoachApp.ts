@@ -1,7 +1,7 @@
 ﻿import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import * as Linking from 'expo-linking';
-import { Audio } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { useCameraPermissions } from 'expo-camera';
 import AppStorage from '../utils/appStorage';
 import {
@@ -273,6 +273,7 @@ function getAccountStorageKeys(userId: string) {
     lessonRecords: buildAccountStorageKey(STORAGE_KEYS.lessonRecords, userId),
     lessonRecordVideos: buildAccountStorageKey(STORAGE_KEYS.lessonRecordVideos, userId),
     lessonRecordThumbnails: buildAccountStorageKey(STORAGE_KEYS.lessonRecordThumbnails, userId),
+    lessonRecordRevision: buildAccountStorageKey(STORAGE_KEYS.lessonRecordRevision, userId),
     dribbleCounts: buildAccountStorageKey(STORAGE_KEYS.dribbleCounts, userId),
     shotAttempts: buildAccountStorageKey(STORAGE_KEYS.shotAttempts, userId),
     shotSuccess: buildAccountStorageKey(STORAGE_KEYS.shotSuccess, userId),
@@ -1513,6 +1514,17 @@ function buildLessonRecordThumbnailMap(records: LessonRecord[]) {
   }, {});
 }
 
+let lessonRecordRevisionSequence = 0;
+
+function buildLessonRecordRevision() {
+  lessonRecordRevisionSequence += 1;
+
+  return JSON.stringify({
+    updatedAt: Date.now(),
+    sequence: lessonRecordRevisionSequence,
+  });
+}
+
 function buildStoredLessonRecordEntries(
   scopedKeys: ReturnType<typeof getAccountStorageKeys>,
   records: LessonRecord[]
@@ -1521,6 +1533,7 @@ function buildStoredLessonRecordEntries(
     [scopedKeys.lessonRecords, JSON.stringify(stripLessonRecordMedia(records))],
     [scopedKeys.lessonRecordVideos, JSON.stringify(buildLessonRecordVideoMap(records))],
     [scopedKeys.lessonRecordThumbnails, JSON.stringify(buildLessonRecordThumbnailMap(records))],
+    [scopedKeys.lessonRecordRevision, buildLessonRecordRevision()],
   ];
 }
 
@@ -1596,7 +1609,8 @@ async function persistLessonRecordThumbnailToFile(
   userId: string,
   recordId: string,
   videoUri: string,
-  thumbnailUri = ''
+  thumbnailUri = '',
+  options: { forceRegenerate?: boolean } = {}
 ) {
   const normalizedVideoUri = videoUri.trim();
   const normalizedThumbnailUri = thumbnailUri.trim();
@@ -1606,7 +1620,7 @@ async function persistLessonRecordThumbnailToFile(
   }
 
   if (Platform.OS === 'web') {
-    if (normalizedThumbnailUri) {
+    if (normalizedThumbnailUri && !options.forceRegenerate) {
       return normalizedThumbnailUri;
     }
 
@@ -1626,8 +1640,12 @@ async function persistLessonRecordThumbnailToFile(
 
     const targetInfo = await FileSystem.getInfoAsync(targetUri);
 
-    if (targetInfo.exists) {
+    if (targetInfo.exists && !options.forceRegenerate) {
       return targetUri;
+    }
+
+    if (targetInfo.exists && options.forceRegenerate) {
+      await FileSystem.deleteAsync(targetUri, { idempotent: true });
     }
 
     if (normalizedThumbnailUri.startsWith('file://')) {
@@ -1656,7 +1674,7 @@ async function persistLessonRecordThumbnailToFile(
     const generatedThumbnailUri = await generateLessonRecordThumbnail(normalizedVideoUri);
 
     if (!generatedThumbnailUri) {
-      return normalizedThumbnailUri;
+      return options.forceRegenerate ? '' : normalizedThumbnailUri;
     }
 
     if (!generatedThumbnailUri.startsWith('file://')) {
@@ -1666,7 +1684,7 @@ async function persistLessonRecordThumbnailToFile(
     const generatedInfo = await FileSystem.getInfoAsync(generatedThumbnailUri);
 
     if (!generatedInfo.exists) {
-      return normalizedThumbnailUri;
+      return options.forceRegenerate ? '' : normalizedThumbnailUri;
     }
 
     await FileSystem.copyAsync({
@@ -1682,49 +1700,51 @@ async function persistLessonRecordThumbnailToFile(
 
     return targetUri;
   } catch {
-    return normalizedThumbnailUri;
+    return options.forceRegenerate ? '' : normalizedThumbnailUri;
   }
 }
 
 async function localizeLessonRecordMedia(userId: string, records: LessonRecord[]) {
-  const localizedResults = await Promise.all(
-    records.map(async (record) => {
-      let nextRecord = record;
-      let changed = false;
+  const localizedResults: Array<{ record: LessonRecord; changed: boolean }> = [];
 
-      if (nextRecord.videoUri) {
-        const nextVideoUri = await persistLessonRecordVideoToFile(userId, nextRecord.id, nextRecord.videoUri);
+  // Native thumbnail generation is file and decoder intensive. Process one record at a
+  // time so a long day of recordings cannot leave later thumbnails half-generated.
+  for (const record of records) {
+    let nextRecord = record;
+    let changed = false;
 
-        if (nextVideoUri !== nextRecord.videoUri) {
-          nextRecord = normalizeLessonRecord({
-            ...nextRecord,
-            videoUri: nextVideoUri,
-          });
-          changed = true;
-        }
-      }
+    if (nextRecord.videoUri) {
+      const nextVideoUri = await persistLessonRecordVideoToFile(userId, nextRecord.id, nextRecord.videoUri);
 
-      const nextThumbnailUri = await persistLessonRecordThumbnailToFile(
-        userId,
-        nextRecord.id,
-        nextRecord.videoUri,
-        nextRecord.thumbnailUri
-      );
-
-      if (nextThumbnailUri !== nextRecord.thumbnailUri) {
+      if (nextVideoUri !== nextRecord.videoUri) {
         nextRecord = normalizeLessonRecord({
           ...nextRecord,
-          thumbnailUri: nextThumbnailUri,
+          videoUri: nextVideoUri,
         });
         changed = true;
       }
+    }
 
-      return {
-        record: nextRecord,
-        changed,
-      };
-    })
-  );
+    const nextThumbnailUri = await persistLessonRecordThumbnailToFile(
+      userId,
+      nextRecord.id,
+      nextRecord.videoUri,
+      nextRecord.thumbnailUri
+    );
+
+    if (nextThumbnailUri !== nextRecord.thumbnailUri) {
+      nextRecord = normalizeLessonRecord({
+        ...nextRecord,
+        thumbnailUri: nextThumbnailUri,
+      });
+      changed = true;
+    }
+
+    localizedResults.push({
+      record: nextRecord,
+      changed,
+    });
+  }
 
   return {
     records: localizedResults.map((result) => result.record),
@@ -1985,6 +2005,7 @@ async function readStoredAccountSnapshot(userId: string): Promise<RemoteAccountS
       scopedKeys.lessonRecords,
       scopedKeys.lessonRecordVideos,
       scopedKeys.lessonRecordThumbnails,
+      scopedKeys.lessonRecordRevision,
     ]),
   ]);
   const stored = Object.fromEntries([...entries, ...lessonRecordEntries]);
@@ -2018,6 +2039,7 @@ async function writeStoredAccountSnapshot(
     scopedKeys.lessonRecords,
     scopedKeys.lessonRecordVideos,
     scopedKeys.lessonRecordThumbnails,
+    scopedKeys.lessonRecordRevision,
   ]);
   const existingStoredLessonRecords = buildLessonRecordSnapshotFromStoredEntries(
     scopedKeys,
@@ -3601,7 +3623,7 @@ export function useBasketballCoachApp() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isAccountDataReady, setIsAccountDataReady] = useState(false);
-  const [lessonMode, setLessonMode] = useState<LessonMode>('dribble');
+  const [lessonMode, setLessonMode] = useState<LessonMode>('shoot');
   const [attendance, setAttendance] = useState<Record<string, string>>({});
   const [dailyDribbleRecords, setDailyDribbleRecords] = useState<Record<string, number>>({});
   const [homeworkState, setHomeworkState] = useState<HomeworkStateRecord>({});
@@ -3663,8 +3685,8 @@ export function useBasketballCoachApp() {
   const pendingReviewStopRef = useRef(false);
   const pendingShootReviewRef = useRef(false);
   const pendingShootRecordingStopRef = useRef(false);
-  const startCueSoundRef = useRef<Audio.Sound | null>(null);
-  const countdownCueSoundRef = useRef<Audio.Sound | null>(null);
+  const startCueSoundRef = useRef<AudioPlayer | null>(null);
+  const countdownCueSoundRef = useRef<AudioPlayer | null>(null);
   const countdownCueUriRef = useRef<string | null>(null);
   const lastCountdownCueValueRef = useRef<number | null>(null);
   const webStartCueContextRef = useRef<any>(null);
@@ -3675,6 +3697,7 @@ export function useBasketballCoachApp() {
   const dailyDribbleRecordsRef = useRef<Record<string, number>>({});
   const homeworkStateRef = useRef<HomeworkStateRecord>({});
   const lessonRecordsRef = useRef<LessonRecord[]>([]);
+  const thumbnailRepairInFlightRef = useRef<Set<string>>(new Set());
   const shotAttemptRecordsRef = useRef<Record<string, number>>({});
   const shootAnalysisHistoryRef = useRef<ShootAnalysis[]>([]);
   const shootAnalysisFramesRef = useRef<TimedShootAnalysis[]>([]);
@@ -3892,7 +3915,7 @@ export function useBasketballCoachApp() {
     const resetDateKey = formatDateKey(resetDate);
 
     setScreen('home');
-    setLessonMode('dribble');
+    setLessonMode('shoot');
     setAttendance({});
     setDailyDribbleRecords({});
     setHomeworkState({});
@@ -3934,7 +3957,7 @@ export function useBasketballCoachApp() {
 
     latestFeedbackRef.current = DEFAULT_DRIBBLE_FEEDBACK;
     pendingFeedbackRef.current = null;
-    lessonModeRef.current = 'dribble';
+    lessonModeRef.current = 'shoot';
     selectedDribbleViewRef.current = 'front';
     lessonStartedAtRef.current = null;
     dribbleLessonPhaseRef.current = 'stance_setup';
@@ -4952,9 +4975,9 @@ export function useBasketballCoachApp() {
   }, []);
 
   const ensureAudioPlaybackMode = useCallback(async () => {
-    await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      shouldDuckAndroid: true,
+    await setAudioModeAsync({
+      playsInSilentMode: true,
+      interruptionMode: 'duckOthers',
     });
   }, []);
 
@@ -4969,7 +4992,7 @@ export function useBasketballCoachApp() {
 
     await ensureAudioPlaybackMode();
 
-    const { sound } = await Audio.Sound.createAsync(require('../../assets/sounds/whistle-start.wav'));
+    const sound = createAudioPlayer(require('../../assets/sounds/whistle-start.wav'));
     startCueSoundRef.current = sound;
     return sound;
   }, [ensureAudioPlaybackMode]);
@@ -5003,7 +5026,7 @@ export function useBasketballCoachApp() {
       }
     }
 
-    const { sound } = await Audio.Sound.createAsync({ uri: countdownCueUri });
+    const sound = createAudioPlayer({ uri: countdownCueUri });
     countdownCueSoundRef.current = sound;
     return sound;
   }, [ensureAudioPlaybackMode]);
@@ -5015,8 +5038,8 @@ export function useBasketballCoachApp() {
     }
 
     try {
-      await sound.stopAsync();
-      await sound.setPositionAsync(0);
+      sound.pause();
+      await sound.seekTo(0);
     } catch {
       // Ignore transient sound stop failures.
     }
@@ -5031,7 +5054,7 @@ export function useBasketballCoachApp() {
     }
 
     try {
-      await sound.unloadAsync();
+      sound.remove();
     } catch {
       // Ignore unload failures during cleanup.
     }
@@ -5046,7 +5069,7 @@ export function useBasketballCoachApp() {
     }
 
     try {
-      await sound.unloadAsync();
+      sound.remove();
     } catch {
       // Ignore unload failures during cleanup.
     }
@@ -5083,7 +5106,8 @@ export function useBasketballCoachApp() {
 
         const sound = await ensureCountdownCueSound();
         if (sound) {
-          await sound.replayAsync();
+          await sound.seekTo(0);
+          sound.play();
         }
       } catch {
         // Keep the lesson flow running even if the cue sound fails.
@@ -5133,7 +5157,8 @@ export function useBasketballCoachApp() {
 
         const sound = await ensureStartCueSound();
         if (sound) {
-          await sound.replayAsync();
+          await sound.seekTo(0);
+          sound.play();
         }
       } catch {
         // Keep the lesson flow running even if the cue sound fails.
@@ -6232,10 +6257,12 @@ export function useBasketballCoachApp() {
     if (nextScreen === 'lesson') {
       void startLessonCameraPreview();
     }
-    if (nextScreen === 'diary' && !selectedDateKey) {
+    if (nextScreen === 'diary') {
       const today = new Date();
-      setSelectedDateKey(formatDateKey(today));
       setCurrentDate(today);
+      if (!selectedDateKey) {
+        setSelectedDateKey(formatDateKey(today));
+      }
     }
   }
 
@@ -7616,6 +7643,46 @@ export function useBasketballCoachApp() {
     }
   }
 
+  const repairLessonRecordThumbnail = useCallback(async (recordId: string) => {
+    const record = lessonRecordsRef.current.find((item) => item.id === recordId);
+
+    if (!record?.videoUri || thumbnailRepairInFlightRef.current.has(recordId)) {
+      return false;
+    }
+
+    thumbnailRepairInFlightRef.current.add(recordId);
+
+    try {
+      const nextThumbnailUri = await persistLessonRecordThumbnailToFile(
+        currentUserId || 'local',
+        record.id,
+        record.videoUri,
+        record.thumbnailUri,
+        { forceRegenerate: true }
+      );
+
+      if (!nextThumbnailUri.trim()) {
+        return false;
+      }
+
+      const nextLessonRecords = lessonRecordsRef.current.map((item) =>
+        item.id === recordId
+          ? normalizeLessonRecord({
+              ...item,
+              thumbnailUri: nextThumbnailUri,
+            })
+          : item
+      );
+
+      lessonRecordsRef.current = nextLessonRecords;
+      setLessonRecords(nextLessonRecords);
+      persistLessonRecords(nextLessonRecords);
+      return true;
+    } finally {
+      thumbnailRepairInFlightRef.current.delete(recordId);
+    }
+  }, [currentUserId, persistLessonRecords]);
+
   async function openSkillVideo() {
     if (!selectedSkill || !selectedSkillKey) {
       return;
@@ -7736,6 +7803,7 @@ export function useBasketballCoachApp() {
     toggleCurrentShootRecordStar,
     toggleLessonRecordShotOutcome,
     toggleLessonRecordStarred,
+    repairLessonRecordThumbnail,
     selectSkill,
     selectBallBrand,
     toggleBallColor,

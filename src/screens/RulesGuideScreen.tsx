@@ -30,10 +30,7 @@ function CollapsibleRuleCard({ title, isOpen, onToggle, style, children }: Colla
 }
 
 export function RulesGuideScreen() {
-  const [openedSections, setOpenedSections] = useState<Record<string, boolean>>(() => ({
-    ...Object.fromEntries(RULE_GUIDE_SECTIONS.map((section) => [section.title, true])),
-    memory: true,
-  }));
+  const [openedSections, setOpenedSections] = useState<Record<string, boolean>>({});
   const sectionEntries = useMemo(() => RULE_GUIDE_SECTIONS, []);
 
   function toggleSection(sectionKey: string) {
@@ -45,7 +42,7 @@ export function RulesGuideScreen() {
 
   return (
     <View style={styles.layout}>
-      <Card title="농구 규칙 가이드" style={styles.heroCard}>
+      <Card title="농구 가이드" style={styles.heroCard}>
         <Text style={styles.heroText}>
           초보자가 먼저 알아두면 좋은 기본 규칙만 모았습니다. 경기 목표, 득점 방식, 드리블 반칙, 시간 규칙까지 한 번에 빠르게 볼 수 있습니다.
         </Text>

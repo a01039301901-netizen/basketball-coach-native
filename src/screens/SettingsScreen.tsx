@@ -28,6 +28,7 @@ const CORRECTION_OPTIONS: Array<{
 ];
 
 interface SettingsScreenProps {
+  isDrawer?: boolean;
   selectedBallBrand: BallBrandOption;
   selectedBallColors: BallColorOption[];
   ballRecognitionProfile: BallRecognitionProfile | null;
@@ -81,6 +82,7 @@ function getPreviewSourceLabel(source: BallTrainingImageSource) {
 }
 
 export function SettingsScreen({
+  isDrawer = false,
   selectedBallBrand,
   selectedBallColors,
   ballRecognitionProfile,
@@ -163,74 +165,85 @@ export function SettingsScreen({
     <View style={styles.contentGap}>
       <View style={styles.sectionBlock}>
         <Text style={styles.sectionHeader}>인식 설정</Text>
-        <Card style={[styles.compactCard, styles.borderlessCard]}>
-          <Text style={styles.sectionTitle}>농구공 브랜드</Text>
-          <View style={styles.optionList}>
-            {BALL_BRAND_OPTIONS.map((option) => {
-              const active = selectedBallBrand === option.key;
+        <Card style={[styles.compactCard, styles.borderlessCard, styles.recognitionCard, isDrawer && styles.recognitionCardDrawer]}>
+          <View style={styles.brandPanel}>
+            <Text style={[styles.sectionTitle, styles.recognitionSectionTitle]}>농구공 브랜드</Text>
+            <View style={styles.optionList}>
+              {BALL_BRAND_OPTIONS.map((option) => {
+                const active = selectedBallBrand === option.key;
 
-              return (
-                <Pressable
+                return (
+                  <Pressable
                   key={option.key}
                   onPress={() => onSelectBallBrand(option.key)}
-                  style={({ pressed }) => [styles.optionButton, active && styles.optionButtonActive, pressed && styles.pressed]}
-                >
-                  <View style={styles.optionTextWrap}>
-                    <Text style={styles.optionTitle}>{option.label}</Text>
-                    <Text style={styles.optionSubtitle}>{option.description}</Text>
-                  </View>
-                  <View style={[styles.checkBadge, active && styles.checkBadgeActive]}>
-                    <Text style={styles.checkBadgeText}>{active ? '선택됨' : '선택'}</Text>
-                  </View>
-                </Pressable>
-              );
-            })}
+                  style={({ pressed }) => [
+                    styles.optionButton,
+                    option.key === 'wilson' && styles.wilsonOptionButton,
+                    option.key === 'spalding' && styles.spaldingOptionButton,
+                    option.key === 'molten' && styles.moltenOptionButton,
+                    active && styles.optionButtonActive,
+                    pressed && styles.pressed,
+                  ]}
+                  >
+                    <View style={styles.optionTextWrap}>
+                      <Text style={styles.optionTitle}>{option.label}</Text>
+                      <Text style={styles.optionSubtitle}>{option.description}</Text>
+                    </View>
+                    <View style={[styles.checkBadge, active && styles.checkBadgeActive]}>
+                      <Text style={styles.checkBadgeText}>{active ? '✓' : ''}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
 
-          <Text style={[styles.sectionTitle, styles.sectionSpacing]}>공 색상 조정</Text>
-          <View style={styles.colorSection}>
-            {BALL_COLOR_ROWS.map((row, rowIndex) => (
-              <View key={`row-${rowIndex}`} style={styles.colorRow}>
-                {row.map((colorKey) => {
-                  const option = ballColorOptionsByKey.get(colorKey);
+          <View style={styles.colorPanel}>
+            <Text style={[styles.sectionTitle, styles.recognitionSectionTitle, styles.colorPanelTitle]}>공 색상 조정</Text>
+            <View style={styles.colorSection}>
+              {BALL_COLOR_ROWS.map((row, rowIndex) => (
+                <View key={`row-${rowIndex}`} style={styles.colorRow}>
+                  {row.map((colorKey) => {
+                    const option = ballColorOptionsByKey.get(colorKey);
 
-                  if (!option) {
-                    return null;
-                  }
+                    if (!option) {
+                      return null;
+                    }
 
-                  const active = selectedBallColors.includes(option.key);
+                    const active = selectedBallColors.includes(option.key);
 
-                  return (
-                    <Pressable
-                      key={option.key}
-                      onPress={() => onToggleBallColor(option.key)}
-                      style={({ pressed }) => [
-                        styles.colorOptionButton,
-                        active && styles.colorOptionButtonActive,
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.swatch,
-                          styles.colorOptionSwatch,
-                          {
-                            backgroundColor: option.accent,
-                            borderColor: option.key === 'white' ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.12)',
-                          },
+                    return (
+                      <Pressable
+                        key={option.key}
+                        onPress={() => onToggleBallColor(option.key)}
+                        style={({ pressed }) => [
+                          styles.colorOptionButton,
+                          active && styles.colorOptionButtonActive,
+                          pressed && styles.pressed,
                         ]}
-                      />
-                      <Text style={[styles.colorOptionLabel, active && styles.colorOptionLabelActive]}>{option.label}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ))}
+                      >
+                        <View
+                          style={[
+                            styles.swatch,
+                            styles.colorOptionSwatch,
+                            {
+                              backgroundColor: option.accent,
+                              borderColor: option.key === 'white' ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.12)',
+                            },
+                          ]}
+                        />
+                        <Text style={[styles.colorOptionLabel, active && styles.colorOptionLabelActive]}>{option.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
           </View>
 
           <View style={styles.trainingSection}>
-            <Text style={styles.sectionTitle}>공 이미지 학습</Text>
-            <Text style={styles.trainingLead}>
+            <Text style={[styles.sectionTitle, styles.recognitionSectionTitle]}>공 이미지 학습</Text>
+            <Text style={[styles.trainingLead, styles.recognitionTrainingLead]}>
               공 사진을 1~3장 등록하면 현재 공 색상에 맞춘 보정 밴드와 줄무늬 패턴 변형을 만들어 레슨 공 인식에 먼저 반영합니다. 세로 줄무늬가 보이는 사진, 가로 줄무늬가 보이는 사진, 비스듬한 사진을 함께 넣으면 여러 방향에서 더 안정적으로 인식할 수 있습니다.
             </Text>
 
@@ -438,6 +451,14 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     borderColor: 'transparent',
   },
+  recognitionCard: {
+    padding: 0,
+    borderRadius: 0,
+    overflow: 'visible',
+  },
+  recognitionCardDrawer: {
+    marginHorizontal: -18,
+  },
   lead: {
     color: colors.textMuted,
     fontSize: 15,
@@ -450,26 +471,50 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 12,
   },
+  recognitionSectionTitle: {
+    paddingHorizontal: 16,
+  },
+  brandPanel: {
+    paddingTop: 16,
+    backgroundColor: 'rgba(74,74,74,0.84)',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+    overflow: 'hidden',
+  },
   sectionSpacing: {
     marginTop: 20,
   },
   optionList: {
-    gap: 10,
+    gap: 0,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    overflow: 'hidden',
   },
   optionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    borderRadius: 0,
+    borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: colors.border,
   },
+  wilsonOptionButton: {
+    backgroundColor: '#78512f',
+  },
+  spaldingOptionButton: {
+    backgroundColor: '#bd6d2a',
+  },
+  moltenOptionButton: {
+    backgroundColor: '#9f3f42',
+  },
   optionButtonActive: {
-    backgroundColor: 'rgba(208,145,85,0.18)',
-    borderColor: 'rgba(208,145,85,0.32)',
+    borderColor: 'rgba(255,255,255,0.7)',
+    borderWidth: 2,
   },
   optionTextWrap: {
     flex: 1,
@@ -485,18 +530,24 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   checkBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: colors.surface,
+    width: 24,
+    height: 24,
+    borderRadius: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.45)',
   },
   checkBadgeActive: {
     backgroundColor: colors.secondary,
+    borderColor: colors.secondary,
   },
   checkBadgeText: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '700',
+    color: colors.background,
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 18,
   },
   swatch: {
     width: 28,
@@ -505,11 +556,22 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   colorSection: {
-    gap: 10,
+    gap: 0,
+  },
+  colorPanel: {
+    marginTop: 20,
+    paddingTop: 16,
+    backgroundColor: 'rgba(74,74,74,0.84)',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    overflow: 'hidden',
+  },
+  colorPanelTitle: {
+    color: colors.textSoft,
   },
   colorRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 0,
   },
   colorOptionButton: {
     flex: 1,
@@ -522,11 +584,11 @@ const styles = StyleSheet.create({
     gap: 10,
     backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#8a8a8a',
   },
   colorOptionButtonActive: {
     backgroundColor: 'rgba(208,145,85,0.18)',
-    borderColor: 'rgba(208,145,85,0.32)',
+    borderColor: '#8a8a8a',
   },
   colorOptionSwatch: {
     width: 34,
@@ -542,12 +604,20 @@ const styles = StyleSheet.create({
   },
   trainingSection: {
     marginTop: 22,
+    paddingTop: 16,
+    backgroundColor: 'rgba(74,74,74,0.84)',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    overflow: 'hidden',
   },
   trainingLead: {
     color: colors.textMuted,
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 14,
+  },
+  recognitionTrainingLead: {
+    paddingHorizontal: 16,
   },
   trainingActionStack: {
     gap: 10,

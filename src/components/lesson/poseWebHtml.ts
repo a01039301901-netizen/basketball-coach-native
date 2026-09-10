@@ -83,7 +83,7 @@ export function buildPoseWebHtml(
     </div>
 
     <script type="module">
-      const lessonMode = ${JSON.stringify(lessonMode)};
+      let lessonMode = ${JSON.stringify(lessonMode)};
       const selectedDribbleView = ${JSON.stringify(selectedDribbleView)};
       const selectedBallBrand = ${JSON.stringify(selectedBallBrand)};
       const selectedBallColors = ${JSON.stringify(selectedBallColors)};
@@ -562,6 +562,21 @@ export function buildPoseWebHtml(
       window.__codexResetDribbleTracking = resetDribbleTracking;
       window.__codexResetShootTracking = resetShootTracking;
       window.__codexResetBallTracking = resetBallTracking;
+      window.__codexSwitchCameraFacing = () => {
+        void switchCameraFacing();
+      };
+      window.__codexSetLessonMode = (nextLessonMode) => {
+        if (nextLessonMode !== "shoot" && nextLessonMode !== "dribble") {
+          return;
+        }
+
+        lessonMode = nextLessonMode;
+        resetAnalysisSummaries();
+        resetBallTracking();
+        resetDribbleTracking();
+        resetShootTracking();
+        setHud(getCameraConnectedMessage());
+      };
 
       function setHud(text) {
         hud.textContent = text;

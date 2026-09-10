@@ -22,6 +22,7 @@ interface LessonCameraProps {
   shootResetToken: number;
   recordingStartToken: number;
   recordingStopToken: number;
+  cameraSwitchToken: number;
   cameraStopMode: 'review' | 'disconnect' | null;
   containerStyle?: StyleProp<ViewStyle>;
   onPoseMessage: (event: WebViewMessageEvent) => void;
@@ -37,11 +38,13 @@ export function LessonCamera({
   isCameraActive,
   isCameraPreviewHidden,
   isLessonActive,
+  isCameraReady,
   countdownValue,
   dribbleResetToken,
   shootResetToken,
   recordingStartToken,
   recordingStopToken,
+  cameraSwitchToken,
   cameraStopMode,
   containerStyle,
   onPoseMessage,
@@ -109,6 +112,30 @@ export function LessonCamera({
   }, [isCameraActive, shootResetToken]);
 
   useEffect(() => {
+    if (!isCameraActive || !isCameraReady || cameraStopMode !== null) {
+      return;
+    }
+
+    const iframeWindow = iframeRef.current?.contentWindow as
+      | (Window & { __codexSetLessonMode?: (mode: LessonMode) => void })
+      | undefined;
+
+    iframeWindow?.__codexSetLessonMode?.(lessonMode);
+  }, [cameraStopMode, isCameraActive, isCameraReady, lessonMode]);
+
+  useEffect(() => {
+    if (!isCameraActive || cameraSwitchToken <= 0 || cameraStopMode !== null) {
+      return;
+    }
+
+    const iframeWindow = iframeRef.current?.contentWindow as
+      | (Window & { __codexSwitchCameraFacing?: () => void })
+      | undefined;
+
+    iframeWindow?.__codexSwitchCameraFacing?.();
+  }, [cameraStopMode, cameraSwitchToken, isCameraActive]);
+
+  useEffect(() => {
     if (!isCameraActive || recordingStopToken <= 0) {
       return;
     }
@@ -130,11 +157,11 @@ export function LessonCamera({
     }
 
     iframeWindow?.__codexStopRecordingForReview?.();
-  }, [cameraStopMode, isCameraActive, lessonMode, recordingStopToken]);
+  }, [cameraStopMode, isCameraActive, recordingStopToken]);
 
   const srcDoc = useMemo(
     () => buildPoseWebHtml(lessonMode, selectedDribbleView, selectedBallBrand, selectedBallColors, ballRecognitionProfile),
-    [ballRecognitionProfile, lessonMode, selectedDribbleView, selectedBallBrand, selectedBallColors]
+    [ballRecognitionProfile, cameraSessionKey, selectedDribbleView, selectedBallBrand, selectedBallColors]
   );
 
   return (
@@ -142,7 +169,7 @@ export function LessonCamera({
       {isCameraActive ? (
         <>
           {createElement('iframe', {
-            key: `${lessonMode}-${cameraSessionKey}`,
+            key: cameraSessionKey,
             ref: iframeRef,
             srcDoc,
             allow: 'camera; microphone; autoplay',
@@ -207,7 +234,7 @@ const styles = StyleSheet.create({
     pointerEvents: 'none',
   },
   placeholderOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,

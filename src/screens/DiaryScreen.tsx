@@ -1,7 +1,9 @@
-import { type AVPlaybackStatus, ResizeMode, Video } from 'expo-av';
-import { memo, type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEventListener } from 'expo';
+import { type VideoPlayer, VideoView, useVideoPlayer } from 'expo-video';
+import { Fragment, memo, type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  ActivityIndicator,
   Easing,
   FlatList,
   Image,
@@ -49,10 +51,12 @@ interface DiaryScreenProps {
   onGoBack: () => void;
   onToggleShotOutcome: (recordId: string) => void;
   onToggleStarredRecord: (recordId: string) => void;
+  onRepairRecordThumbnail: (recordId: string) => Promise<boolean>;
   onDeleteRecord: (recordId: string) => void;
 }
 
 type RecordSort = 'latest' | 'best' | 'worst';
+type DiaryRecordMode = 'shoot' | 'dribble';
 type SuccessRateRange = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 interface RankedDiaryRecordInsight {
@@ -88,8 +92,15 @@ interface RecordEvaluationVideoPlayerProps {
   recordId: string;
   source: { uri: string };
   height: number;
-  videoRef: MutableRefObject<Video | null>;
-  onPlaybackStatusUpdate: (status: AVPlaybackStatus) => void;
+  videoRef: MutableRefObject<VideoPlayer | null>;
+  onPlaybackStatusUpdate: (status: VideoPlaybackStatus) => void;
+}
+
+interface VideoPlaybackStatus {
+  isLoaded: boolean;
+  isPlaying: boolean;
+  positionMillis: number;
+  didJustFinish?: boolean;
 }
 
 interface RecordListSection {
@@ -132,11 +143,11 @@ const DIARY_NEUTRAL_SURFACE_ALT = '#23262a';
 const DIARY_NEUTRAL_SURFACE_SOFT = '#1d2024';
 const DIARY_NEUTRAL_ACTIVE = 'rgba(255,255,255,0.08)';
 const DIARY_NEUTRAL_BORDER = 'rgba(255,255,255,0.1)';
-const DIARY_RECORD_GOOD_SURFACE = 'rgba(76,175,80,0.18)';
+const DIARY_RECORD_GOOD_SURFACE = '#294432';
 const DIARY_RECORD_GOOD_BORDER = 'rgba(76,175,80,0.46)';
-const DIARY_RECORD_AVERAGE_SURFACE = 'rgba(217,161,110,0.18)';
+const DIARY_RECORD_AVERAGE_SURFACE = '#4a3b2a';
 const DIARY_RECORD_AVERAGE_BORDER = 'rgba(217,161,110,0.46)';
-const DIARY_RECORD_BAD_SURFACE = 'rgba(191,80,88,0.18)';
+const DIARY_RECORD_BAD_SURFACE = '#492f35';
 const DIARY_RECORD_BAD_BORDER = 'rgba(191,80,88,0.46)';
 const EMPTY_LESSON_RECORDS: LessonRecord[] = [];
 
@@ -343,19 +354,57 @@ const RecordEvaluationVideoPlayer = memo(function RecordEvaluationVideoPlayer({
   videoRef,
   onPlaybackStatusUpdate,
 }: RecordEvaluationVideoPlayerProps) {
+  const player = useVideoPlayer(source, (instance) => {
+    instance.loop = false;
+    instance.timeUpdateEventInterval = 0.2;
+  });
+  const onPlaybackStatusUpdateRef = useRef(onPlaybackStatusUpdate);
+
+  useEffect(() => {
+    onPlaybackStatusUpdateRef.current = onPlaybackStatusUpdate;
+  }, [onPlaybackStatusUpdate]);
+
+  useEffect(() => {
+    videoRef.current = player;
+
+    return () => {
+      if (videoRef.current === player) {
+        videoRef.current = null;
+      }
+    };
+  }, [player, videoRef]);
+
+  useEventListener(player, 'timeUpdate', ({ currentTime }) => {
+    onPlaybackStatusUpdateRef.current({
+      isLoaded: true,
+      isPlaying: player.playing,
+      positionMillis: Math.round(currentTime * 1000),
+    });
+  });
+
+  useEventListener(player, 'playingChange', ({ isPlaying }) => {
+    onPlaybackStatusUpdateRef.current({
+      isLoaded: player.status === 'readyToPlay',
+      isPlaying,
+      positionMillis: Math.round(player.currentTime * 1000),
+    });
+  });
+
+  useEventListener(player, 'playToEnd', () => {
+    onPlaybackStatusUpdateRef.current({
+      isLoaded: true,
+      isPlaying: false,
+      positionMillis: Math.round(player.currentTime * 1000),
+      didJustFinish: true,
+    });
+  });
+
   return (
-    <Video
-      ref={(instance) => {
-        videoRef.current = instance;
-      }}
-      source={source}
-      useNativeControls
-      shouldPlay={false}
-      isLooping={false}
-      progressUpdateIntervalMillis={200}
-      resizeMode={ResizeMode.CONTAIN}
+    <VideoView
+      player={player}
+      nativeControls
+      contentFit="contain"
       style={[styles.recordEvaluationVideo, { height }]}
-      onPlaybackStatusUpdate={onPlaybackStatusUpdate}
     />
   );
 }, (prevProps, nextProps) => (
@@ -364,14 +413,81 @@ const RecordEvaluationVideoPlayer = memo(function RecordEvaluationVideoPlayer({
   prevProps.height === nextProps.height
 ));
 
-const RecordVideoThumbnail = memo(function RecordVideoThumbnail({ thumbnailUri }: { thumbnailUri: string }) {
-  if (thumbnailUri.trim()) {
-    return <Image source={{ uri: thumbnailUri }} resizeMode="cover" style={styles.recordVideoPreviewImage} />;
+const RecordVideoThumbnail = memo(function RecordVideoThumbnail({
+  recordId,
+  thumbnailUri,
+  onRepair,
+}: {
+  recordId: string;
+  thumbnailUri: string;
+  onRepair: (recordId: string) => Promise<boolean>;
+}) {
+  const normalizedThumbnailUri = thumbnailUri.trim();
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [isRepairing, setIsRepairing] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const repairAttemptKeyRef = useRef<string | null>(null);
+
+  const repairThumbnail = useCallback(async () => {
+    const attemptKey = `${recordId}:${normalizedThumbnailUri || 'missing'}`;
+
+    if (repairAttemptKeyRef.current === attemptKey || isRepairing) {
+      return;
+    }
+
+    repairAttemptKeyRef.current = attemptKey;
+    setIsRepairing(true);
+    setIsLoaded(false);
+
+    try {
+      const didRepair = await onRepair(recordId);
+
+      if (didRepair) {
+        setReloadKey((current) => current + 1);
+      }
+    } finally {
+      setIsRepairing(false);
+    }
+  }, [isRepairing, normalizedThumbnailUri, onRepair, recordId]);
+
+  useEffect(() => {
+    repairAttemptKeyRef.current = null;
+    setIsLoaded(false);
+    setIsRepairing(false);
+  }, [normalizedThumbnailUri, recordId]);
+
+  useEffect(() => {
+    if (!normalizedThumbnailUri) {
+      void repairThumbnail();
+    }
+  }, [normalizedThumbnailUri, repairThumbnail]);
+
+  if (!normalizedThumbnailUri) {
+    return (
+      <View style={[styles.recordVideoPreview, styles.recordVideoPreviewEmpty]}>
+        {isRepairing ? <ActivityIndicator color={colors.textSoft} size="small" /> : null}
+        <Text style={styles.recordVideoPreviewCaption}>
+          {isRepairing ? '썸네일을 불러오는 중입니다.' : '썸네일을 준비하고 있습니다.'}
+        </Text>
+      </View>
+    );
   }
 
   return (
-    <View style={[styles.recordVideoPreview, styles.recordVideoPreviewEmpty]}>
-      <Text style={styles.recordVideoPreviewCaption}>{'썸네일을 준비하고 있습니다.'}</Text>
+    <View style={styles.recordVideoPreview}>
+      <Image
+        key={`${normalizedThumbnailUri}-${reloadKey}`}
+        source={{ uri: normalizedThumbnailUri }}
+        resizeMode="cover"
+        onLoad={() => setIsLoaded(true)}
+        onError={() => void repairThumbnail()}
+        style={styles.recordVideoPreviewImage}
+      />
+      {!isLoaded || isRepairing ? (
+        <View style={styles.recordVideoPreviewLoadingOverlay} pointerEvents="none">
+          <ActivityIndicator color={colors.textSoft} size="small" />
+        </View>
+      ) : null}
     </View>
   );
 });
@@ -2330,6 +2446,7 @@ export function DiaryScreen({
   onGoBack,
   onToggleShotOutcome,
   onToggleStarredRecord,
+  onRepairRecordThumbnail,
   onDeleteRecord,
 }: DiaryScreenProps) {
   const { width } = useWindowDimensions();
@@ -2342,8 +2459,9 @@ export function DiaryScreen({
   const recordListItemWidth = recordCardWidth + RECORD_LIST_GAP;
   const recordEvaluationVideoHeight = isCompactMobile ? 320 : isWide ? 420 : 360;
   const [playbackFeedback, setPlaybackFeedback] = useState<Record<string, string>>({});
-  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(true);
   const [recordSort, setRecordSort] = useState<RecordSort>('latest');
+  const [selectedRecordMode, setSelectedRecordMode] = useState<DiaryRecordMode>('shoot');
   const [showRecordFilterMenu, setShowRecordFilterMenu] = useState(false);
   const [showDailySummary, setShowDailySummary] = useState(false);
   const [successRateRange, setSuccessRateRange] = useState<SuccessRateRange>('daily');
@@ -2353,7 +2471,7 @@ export function DiaryScreen({
   const [selectedCriterionKey, setSelectedCriterionKey] = useState<string | null>(null);
   const [pendingDeleteRecordId, setPendingDeleteRecordId] = useState<string | null>(null);
   const [recordCarouselIndices, setRecordCarouselIndices] = useState<Record<string, number>>({});
-  const evaluationVideoRef = useRef<Video | null>(null);
+  const evaluationVideoRef = useRef<VideoPlayer | null>(null);
   const evaluationScrollRef = useRef<ScrollView | null>(null);
   const recordListRefs = useRef<Record<string, FlatList<LessonRecord> | null>>({});
   const playbackPollersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
@@ -2376,6 +2494,7 @@ export function DiaryScreen({
     [homeworkLinkedDiaryContext]
   );
   const selectedDate = useMemo(() => (selectedDateKey ? parseDateKeyToDate(selectedDateKey) : new Date()), [selectedDateKey]);
+  const todayDateKey = formatDateKey(new Date());
   const successRateComparisonFrames = useMemo(
     () => buildSuccessRateComparisonFrames(selectedDate, successRateRange),
     [selectedDate, successRateRange]
@@ -2396,7 +2515,7 @@ export function DiaryScreen({
         recordListRef?.scrollToOffset({ offset: 0, animated: false });
       });
     });
-  }, [homeworkLinkedRecordIdsKey, recordSort, selectedDateKey]);
+  }, [homeworkLinkedRecordIdsKey, recordSort, selectedDateKey, selectedRecordMode]);
 
   const successRateComparisonData = useMemo(
     () =>
@@ -2462,31 +2581,24 @@ export function DiaryScreen({
       return [];
     }
 
+    const modeLabel = selectedRecordMode === 'shoot' ? '슛 레슨 기록' : '드리블 레슨 기록';
     const getSectionEmptyText = (label: string) =>
       homeworkLinkedDiaryContext
         ? `${homeworkLinkedDiaryContext.feedbackLabel} 피드백과 연결된 ${label}이 없습니다.`
         : `이 날짜에 저장된 ${label}이 없습니다.`;
+
     return [
       {
-        key: 'shoot',
-        title: '슛 레슨 기록',
+        key: selectedRecordMode,
+        title: modeLabel,
         records: sortDiaryRecords(
-          baseDateRecords.filter((record) => record.mode === 'shoot'),
+          baseDateRecords.filter((record) => record.mode === selectedRecordMode),
           recordSort
         ),
-        emptyText: getSectionEmptyText('슛 레슨 기록'),
-      },
-      {
-        key: 'dribble',
-        title: '드리블 레슨 기록',
-        records: sortDiaryRecords(
-          baseDateRecords.filter((record) => record.mode === 'dribble'),
-          recordSort
-        ),
-        emptyText: getSectionEmptyText('드리블 레슨 기록'),
+        emptyText: getSectionEmptyText(modeLabel),
       },
     ];
-  }, [baseDateRecords, homeworkLinkedDiaryContext, recordSort, selectedDateKey]);
+  }, [baseDateRecords, homeworkLinkedDiaryContext, recordSort, selectedDateKey, selectedRecordMode]);
   const dailySummaryAutoFeedback = useMemo(
     () => buildDailySummaryAutoFeedback(selectedDateRecords, diarySkillInsight),
     [diarySkillInsight, selectedDateRecords]
@@ -2730,24 +2842,18 @@ export function DiaryScreen({
           return;
         }
 
-        void video.getStatusAsync().then((status) => {
-          if (!status.isLoaded) {
-            return;
-          }
+        const positionMillis = Math.round(video.currentTime * 1000);
+        syncFeedbackFromPosition(record, positionMillis);
 
-          const positionMillis = typeof status.positionMillis === 'number' ? status.positionMillis : 0;
-          syncFeedbackFromPosition(record, positionMillis);
-
-          if (!status.isPlaying) {
-            stopPlaybackPolling(record.id);
-          }
-        });
+        if (!video.playing) {
+          stopPlaybackPolling(record.id);
+        }
       }, 200);
     },
     [getPlaybackVideoRef, stopPlaybackPolling, syncFeedbackFromPosition]
   );
 
-  const handlePlaybackStatus = useCallback((record: LessonRecord, status: AVPlaybackStatus) => {
+  const handlePlaybackStatus = useCallback((record: LessonRecord, status: VideoPlaybackStatus) => {
     if (!status.isLoaded) {
       return;
     }
@@ -2785,7 +2891,8 @@ export function DiaryScreen({
 
       syncFeedbackFromPosition(record, startAtMs);
       try {
-        await video.playFromPositionAsync(Math.max(0, startAtMs));
+        video.currentTime = Math.max(0, startAtMs) / 1000;
+        video.play();
         startPlaybackPolling(record);
       } catch {
         // Keep the selected criterion visible even when the player cannot seek immediately.
@@ -2830,7 +2937,7 @@ export function DiaryScreen({
   }, []);
 
   const handleOpenedEvaluationPlaybackStatus = useCallback(
-    (status: AVPlaybackStatus) => {
+    (status: VideoPlaybackStatus) => {
       if (!openedEvaluationRecord) {
         return;
       }
@@ -3047,7 +3154,6 @@ export function DiaryScreen({
               onPress={() => onToggleStarredRecord(record.id)}
               style={({ pressed }) => [
                 styles.recordStarToggle,
-                record.isStarred && styles.recordStarToggleActive,
                 pressed && styles.pressed,
               ]}
             >
@@ -3065,7 +3171,11 @@ export function DiaryScreen({
           <Text style={styles.recordMeta}>{record.createdAt}</Text>
 
           {record.videoUri ? (
-            <RecordVideoThumbnail thumbnailUri={record.thumbnailUri} />
+            <RecordVideoThumbnail
+              recordId={record.id}
+              thumbnailUri={record.thumbnailUri}
+              onRepair={onRepairRecordThumbnail}
+            />
           ) : (
             <View style={[styles.recordVideoPreview, styles.recordVideoPreviewEmpty]}>
               <Text style={styles.recordVideoPreviewCaption}>{'저장된 영상이 없습니다.'}</Text>
@@ -3085,6 +3195,7 @@ export function DiaryScreen({
     dailyRecordRankingByMode.shoot.worst?.record.id,
     openDeleteConfirm,
     openRecordEvaluation,
+    onRepairRecordThumbnail,
     onToggleStarredRecord,
     recordCardWidth,
   ]);
@@ -3309,6 +3420,31 @@ export function DiaryScreen({
           </View>
         </Pressable>
       </View>
+      <View style={styles.recordModeTabBar}>
+        {(['dribble', 'shoot'] as DiaryRecordMode[]).map((mode, index) => {
+          const isActive = selectedRecordMode === mode;
+
+          return (
+            <Fragment key={mode}>
+              {index > 0 ? <View style={styles.recordModeTabDivider} /> : null}
+              <Pressable
+                accessibilityRole="tab"
+                accessibilityState={{ selected: isActive }}
+                onPress={() => setSelectedRecordMode(mode)}
+                style={({ pressed }) => [
+                  styles.recordModeTab,
+                  isActive && styles.recordModeTabActive,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.recordModeTabText, isActive && styles.recordModeTabTextActive]}>
+                  {mode === 'shoot' ? '슛' : '드리블'}
+                </Text>
+              </Pressable>
+            </Fragment>
+          );
+        })}
+      </View>
 
       <View style={styles.recordsSection}>
         <View style={[styles.contentRow, isWide && styles.contentRowWide]}>
@@ -3322,7 +3458,7 @@ export function DiaryScreen({
                 <>
                   <View style={styles.skillInsightStats}>
                     {diarySkillInsight.canShowDailySummary ? (
-                      <View style={styles.dailySummarySection}>
+                      <View style={[styles.dailySummarySection, styles.skillInsightDividedPanel]}>
                         <Pressable
                           onPress={() => setShowDailySummary((current) => !current)}
                           style={({ pressed }) => [styles.dailySummaryToggle, pressed && styles.pressed]}
@@ -3375,7 +3511,11 @@ export function DiaryScreen({
                                       >
                                         <View style={styles.dailySummaryFeedbackRecordPreview}>
                                           {record.videoUri ? (
-                                            <RecordVideoThumbnail thumbnailUri={record.thumbnailUri} />
+                                            <RecordVideoThumbnail
+                                              recordId={record.id}
+                                              thumbnailUri={record.thumbnailUri}
+                                              onRepair={onRepairRecordThumbnail}
+                                            />
                                           ) : (
                                             <View
                                               style={[
@@ -3445,7 +3585,7 @@ export function DiaryScreen({
                       </View>
                     ) : null}
 
-                    <View style={[styles.skillInsightStatCard, styles.skillInsightShotCard]}>
+                    <View style={[styles.skillInsightStatCard, styles.skillInsightShotCard, styles.skillInsightDividedPanel]}>
                       <View style={styles.skillInsightShotHeader}>
                         <View style={styles.skillInsightShotTitleWrap}>
                           <Text style={styles.skillInsightStatLabel}>{'\uC131\uACF5\uB960 \uBE44\uAD50'}</Text>
@@ -3655,7 +3795,7 @@ export function DiaryScreen({
                       )}
                     </View>
 
-                    <View style={styles.skillInsightStatCard}>
+                    <View style={[styles.skillInsightStatCard, styles.skillInsightDividedPanel]}>
                       <Text style={styles.skillInsightStatLabel}>{'\uB4DC\uB9AC\uBE14 \uADE0\uD615'}</Text>
                       <Text style={styles.skillInsightNarration}>
                         {getDribbleBalanceHeadline(diarySkillInsight, dribbleGraphTotal)}
@@ -3981,8 +4121,14 @@ export function DiaryScreen({
         </View>
       </Modal>
 
-      <Modal visible={showCalendarModal} transparent animationType="fade" onRequestClose={() => setShowCalendarModal(false)}>
-        <View style={styles.modalOverlay}>
+      <Modal
+        visible={showCalendarModal}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setShowCalendarModal(false)}
+      >
+        <View style={[styles.modalOverlay, styles.calendarModalOverlay]}>
           <Pressable
             style={styles.modalBackdropPressable}
             onPress={() => setShowCalendarModal(false)}
@@ -3995,9 +4141,17 @@ export function DiaryScreen({
             </View>
 
             <View style={styles.calendarGrid}>
-              {DAY_NAMES.map((name) => (
+              {DAY_NAMES.map((name, index) => (
                 <View key={name} style={styles.dayName}>
-                  <Text style={styles.dayNameText}>{name}</Text>
+                  <Text
+                    style={[
+                      styles.dayNameText,
+                      index === 0 && styles.dayNameSunday,
+                      index === DAY_NAMES.length - 1 && styles.dayNameSaturday,
+                    ]}
+                  >
+                    {name}
+                  </Text>
                 </View>
               ))}
 
@@ -4015,14 +4169,28 @@ export function DiaryScreen({
                     }}
                     style={({ pressed }) => [
                       styles.dayCell,
-                      cell.variant === 'good' && styles.dayCellGood,
-                      cell.variant === 'average' && styles.dayCellAverage,
-                      cell.variant === 'bad' && styles.dayCellBad,
-                      selectedDateKey === cell.dateKey && styles.dayCellSelected,
                       pressed && styles.pressed,
                     ]}
                   >
-                    <Text style={styles.dayNumber}>{cell.date}</Text>
+                    <View
+                      style={[
+                        styles.dayCellInner,
+                        selectedDateKey === cell.dateKey && styles.dayCellInnerSelected,
+                        todayDateKey === cell.dateKey && styles.dayCellInnerToday,
+                      ]}
+                    >
+                      <Text style={styles.dayNumber}>{cell.date}</Text>
+                      {cell.variant !== 'default' ? (
+                        <View
+                          style={[
+                            styles.dayStatusDot,
+                            cell.variant === 'good' && styles.dayStatusDotGood,
+                            cell.variant === 'average' && styles.dayStatusDotAverage,
+                            cell.variant === 'bad' && styles.dayStatusDotBad,
+                          ]}
+                        />
+                      ) : null}
+                    </View>
                   </Pressable>
                 );
               })}
@@ -4110,6 +4278,40 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'stretch',
   },
+  recordModeTabBar: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 560,
+    marginTop: -6,
+    marginBottom: 12,
+  },
+  recordModeTab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    backgroundColor: 'transparent',
+  },
+  recordModeTabActive: {
+    backgroundColor: 'transparent',
+  },
+  recordModeTabDivider: {
+    width: 1,
+    height: 22,
+    backgroundColor: 'rgba(255,255,255,0.28)',
+  },
+  recordModeTabText: {
+    color: colors.textMuted,
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  recordModeTabTextActive: {
+    color: colors.textSoft,
+    fontWeight: '700',
+  },
   dateSelectorMain: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -4183,72 +4385,89 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
-    marginBottom: 12,
+    marginBottom: 28,
   },
   monthTitle: {
     color: colors.text,
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '900',
     flex: 1,
     textAlign: 'center',
   },
   calendarGrid: {
+    flex: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'flex-start',
-    overflow: 'hidden',
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderColor: DIARY_NEUTRAL_BORDER,
+    alignContent: 'stretch',
+    overflow: 'visible',
+    marginBottom: 18,
   },
   dayName: {
     width: '14.2857%',
-    minHeight: 36,
-    borderRadius: 0,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    minHeight: 40,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: DIARY_NEUTRAL_BORDER,
   },
   dayNameText: {
     color: colors.text,
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  dayNameSunday: {
+    color: '#f07b84',
+  },
+  dayNameSaturday: {
+    color: '#75bdf0',
   },
   dayCell: {
     width: '14.2857%',
-    minHeight: 66,
+    minHeight: 82,
     borderRadius: 0,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    borderRightWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: DIARY_NEUTRAL_BORDER,
+    paddingVertical: 0,
   },
   dayCellEmpty: {
     opacity: 1,
     backgroundColor: 'transparent',
   },
-  dayCellGood: {
-    backgroundColor: colors.green,
+  dayCellInner: {
+    width: 48,
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: '#111111',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 10,
+    gap: 3,
   },
-  dayCellAverage: {
-    backgroundColor: 'rgba(214,186,92,0.32)',
+  dayCellInnerSelected: {
+    backgroundColor: '#000000',
   },
-  dayCellBad: {
-    backgroundColor: colors.red,
+  dayCellInnerToday: {
+    backgroundColor: '#2f84c6',
   },
-  dayCellSelected: {
-    borderColor: '#fff6ed',
+  dayStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  dayStatusDotGood: {
+    backgroundColor: '#6fcb7d',
+  },
+  dayStatusDotAverage: {
+    backgroundColor: '#e6c45f',
+  },
+  dayStatusDotBad: {
+    backgroundColor: '#d46d75',
   },
   dayNumber: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '900',
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
   },
   dayStatus: {
     color: colors.text,
@@ -4356,7 +4575,12 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   skillInsightStats: {
-    gap: 14,
+    gap: 0,
+  },
+  skillInsightDividedPanel: {
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#77c8f2',
   },
   skillInsightStatCard: {
     borderRadius: 0,
@@ -5175,8 +5399,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 28,
   },
+  calendarModalOverlay: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    backgroundColor: DIARY_NEUTRAL_SURFACE_SOFT,
+  },
   modalBackdropPressable: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   recordEvaluationModalOverlay: {
     paddingHorizontal: 0,
@@ -5191,11 +5420,17 @@ const styles = StyleSheet.create({
     borderColor: DIARY_NEUTRAL_BORDER,
   },
   calendarModalCard: {
-    maxWidth: 960,
+    flex: 1,
+    maxWidth: '100%',
+    maxHeight: '100%',
     width: '100%',
+    height: '100%',
     alignSelf: 'center',
-    paddingTop: 16,
-    paddingBottom: 12,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    paddingTop: 48,
+    paddingBottom: 24,
+    paddingHorizontal: 18,
   },
   recordEvaluationModalCard: {
     maxWidth: '100%',
@@ -5603,14 +5838,6 @@ const styles = StyleSheet.create({
     height: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-  },
-  recordStarToggleActive: {
-    backgroundColor: 'rgba(255,212,81,0.16)',
-    borderColor: 'rgba(255,212,81,0.58)',
   },
   recordStarToggleIcon: {
     color: 'rgba(255,255,255,0.56)',
@@ -5917,7 +6144,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   evaluationRingCenterOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -6142,9 +6369,14 @@ const styles = StyleSheet.create({
   },
   recordVideoPreviewImage: {
     width: '100%',
-    height: 260,
-    marginBottom: 12,
+    height: '100%',
     backgroundColor: '#111111',
+  },
+  recordVideoPreviewLoadingOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(17,17,17,0.42)',
   },
   recordVideoPreviewCaption: {
     color: colors.textMuted,

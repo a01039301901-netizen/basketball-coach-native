@@ -1,4 +1,4 @@
-import { ResizeMode, Video } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { colors } from '../theme/colors';
@@ -16,9 +16,22 @@ const rulesGuideIcon = require('../../assets/rules-guide-icon.png');
 interface HomeScreenProps {
   homeworkToShow: HomeworkProgressItem[];
   lessonRecords: LessonRecord[];
-  onOpenLesson: () => void;
+  onOpenLesson: (mode?: LessonMode) => void;
   onOpenDiary: () => void;
   onOpenRules: () => void;
+}
+
+function HomeworkEvaluationVideo({ uri }: { uri: string }) {
+  const player = useVideoPlayer({ uri });
+
+  return (
+    <VideoView
+      player={player}
+      nativeControls
+      contentFit="contain"
+      style={styles.homeworkEvaluationThumbnail}
+    />
+  );
 }
 
 interface HomeMenuButtonProps {
@@ -32,7 +45,6 @@ interface HomeMenuButtonProps {
   isWide: boolean;
   isCompact: boolean;
   isFullWidth?: boolean;
-  isBorderless?: boolean;
 }
 
 function HomeMenuArtwork({ type }: { type: HomeMenuArtworkType }) {
@@ -99,7 +111,6 @@ function HomeMenuButton({
   isWide,
   isCompact,
   isFullWidth = false,
-  isBorderless = false,
 }: HomeMenuButtonProps) {
   const hasArtwork = !isCompact;
   const isDiaryArtwork = !isCompact && artworkType === 'diary';
@@ -127,7 +138,6 @@ function HomeMenuButton({
           isCompact && !hasSubtitle && styles.mainButtonCompactNoSubtitle,
           hasArtwork && styles.mainButtonWithArtwork,
           isDiaryArtwork && styles.mainButtonDiary,
-          isBorderless && styles.mainButtonBorderless,
         ]}
       >
         <HomeMenuArtwork type={artworkType} />
@@ -205,6 +215,7 @@ export function HomeScreen({
   const { width } = useWindowDimensions();
   const layoutWidth = shouldUseDesktopMobileLayout(width) ? getDesktopMobileFrameWidth(width) : width;
   const isWide = layoutWidth >= 860;
+  const [isHomeworkInfoModalOpen, setIsHomeworkInfoModalOpen] = useState(false);
   const [selectedHomeworkReasonItem, setSelectedHomeworkReasonItem] = useState<HomeworkProgressItem | null>(null);
   const [selectedHomeworkEvaluationRecord, setSelectedHomeworkEvaluationRecord] = useState<LessonRecord | null>(null);
   const [generatedHomeworkPreviewThumbnails, setGeneratedHomeworkPreviewThumbnails] = useState<Record<string, string>>({});
@@ -354,7 +365,6 @@ export function HomeScreen({
       title: 'AI에게 레슨 받기',
       subtitle: undefined,
       onPress: onOpenLesson,
-      isBorderless: true,
     },
     {
       key: 'diary',
@@ -369,20 +379,23 @@ export function HomeScreen({
   ];
   const dailyHomeworkItems = homeworkToShow.filter((item) => item.stage === 'base' && item.source === 'daily');
   const additionalHomeworkItems = homeworkToShow.filter((item) => !(item.stage === 'base' && item.source === 'daily'));
+  const firstDailyHomeworkItem = dailyHomeworkItems[0] ?? null;
+  const remainingDailyHomeworkItems = firstDailyHomeworkItem ? dailyHomeworkItems.slice(1) : dailyHomeworkItems;
+  const dailyDribbleHomework = dailyHomeworkItems.find((item) => item.recommendedLessonMode === 'dribble');
+  const dailyShootHomework = dailyHomeworkItems.find((item) => item.recommendedLessonMode === 'shoot');
+  const combinedDailyHomeworkDescription = dailyDribbleHomework && dailyShootHomework
+    ? `오늘은 드리블과 슛을 함께 연습해 균형 잡힌 기록을 만들어요. ${dailyDribbleHomework.detailText?.trim() || dailyDribbleHomework.reasonText?.trim() || ''} ${dailyShootHomework.detailText?.trim() || dailyShootHomework.reasonText?.trim() || ''}`.trim()
+    : '';
 
   function renderHomeworkItem(item: HomeworkProgressItem) {
-    const hasReasonDetail = Boolean(item.detailText || item.reasonText);
-    const homeworkDetailLabel = '자세히 보기';
-
     return (
       <Pressable
         key={item.id}
-        disabled={!hasReasonDetail}
-        onPress={hasReasonDetail ? () => setSelectedHomeworkReasonItem(item) : undefined}
+        onPress={() => onOpenLesson(item.recommendedLessonMode)}
         style={({ pressed }) => [
           styles.homeworkItem,
           item.isCompleted && styles.homeworkItemCompleted,
-          hasReasonDetail && pressed && !item.isCompleted && styles.pressed,
+          pressed && !item.isCompleted && styles.pressed,
         ]}
       >
         <View style={styles.homeworkHeader}>
@@ -392,7 +405,7 @@ export function HomeScreen({
             <View style={styles.homeworkBullet} />
           )}
           <Text style={styles.homeworkText}>{item.title}</Text>
-          {hasReasonDetail ? <Text style={styles.homeworkDetailToggleText}>{homeworkDetailLabel}</Text> : null}
+          <Text style={styles.homeworkDetailToggleText}>도전하기</Text>
         </View>
 
         <View style={styles.homeworkMetaRow}>
@@ -429,7 +442,6 @@ export function HomeScreen({
                 onPress={button.onPress}
                 isWide={isWide}
                 isCompact={false}
-                isBorderless={button.isBorderless}
               />
             ))}
           </View>
@@ -448,48 +460,114 @@ export function HomeScreen({
                 isWide={isWide}
                 isCompact={false}
                 isFullWidth
-                isBorderless={button.isBorderless}
               />
             ))}
           </View>
         )}
       </View>
 
-      <View style={styles.homeworkCard}>
-        <View style={styles.homeworkList}>
-          {dailyHomeworkItems.length > 0 ? (
-            <Text style={[styles.homeworkSectionTitle, styles.homeworkDailySectionTitle]}>{'하루 연습량'}</Text>
-          ) : null}
-          {dailyHomeworkItems.map(renderHomeworkItem)}
-          {additionalHomeworkItems.length > 0 ? (
-            <Text style={[styles.homeworkSectionTitle, dailyHomeworkItems.length > 0 && styles.homeworkSectionTitleAdditional]}>
-              {'추가 연습 숙제'}
-            </Text>
-          ) : null}
-          {additionalHomeworkItems.map(renderHomeworkItem)}
+      {firstDailyHomeworkItem ? (
+        <View style={[styles.homeworkCard, styles.homeworkInitialCard]}>
+          <View style={styles.homeworkList}>
+            <View style={styles.homeworkSectionHeaderRow}>
+              <Text style={[styles.homeworkSectionTitle, styles.homeworkDailySectionTitle]}>{'하루 연습량'}</Text>
+              <Pressable
+                accessibilityLabel="숙제 설명 열기"
+                onPress={() => setIsHomeworkInfoModalOpen(true)}
+                style={({ pressed }) => [styles.homeworkInfoTrigger, pressed && styles.pressed]}
+              >
+                <Text style={styles.homeworkInfoTriggerText}>i</Text>
+              </Pressable>
+            </View>
+            {renderHomeworkItem(firstDailyHomeworkItem)}
+          </View>
+        </View>
+      ) : null}
+
+      <View style={styles.homeworkBackgroundSection}>
+        <View pointerEvents="none" style={styles.homeworkBall}>
+          <View style={styles.homeworkBallSurface} />
+          <View style={styles.homeworkBallCenterSeam} />
+          <View style={[styles.homeworkBallCurve, styles.homeworkBallLeftCurve]} />
+          <View style={[styles.homeworkBallCurve, styles.homeworkBallRightCurve]} />
+        </View>
+        <View style={styles.homeworkBackgroundContent}>
+          <View style={styles.homeworkArcCard}>
+            <View style={styles.homeworkList}>
+              {remainingDailyHomeworkItems.map(renderHomeworkItem)}
+              {additionalHomeworkItems.length > 0 ? (
+                <Text style={[styles.homeworkSectionTitle, remainingDailyHomeworkItems.length > 0 && styles.homeworkSectionTitleAdditional]}>
+                  {'추가 연습 숙제'}
+                </Text>
+              ) : null}
+              {additionalHomeworkItems.map(renderHomeworkItem)}
+            </View>
+          </View>
+
+          <View style={[styles.secondaryCards, isWide && styles.secondaryCardsWide]}>
+            <Pressable
+              onPress={onOpenRules}
+              style={({ pressed }) => [
+                styles.rulesCardButton,
+                isWide && styles.secondaryCardCompactWide,
+                pressed && styles.pressed,
+              ]}
+            >
+              <View style={styles.rulesCard}>
+                <View style={styles.rulesCardContent}>
+                  <View style={styles.rulesTextWrap}>
+                    <Text style={styles.rulesTitle}>농구 가이드</Text>
+                    <Text style={styles.rulesText}>기본 규칙을 빠르게 확인할 수 있어요.</Text>
+                  </View>
+                  <Image source={rulesGuideIcon} resizeMode="contain" style={styles.rulesGuideIcon} />
+                </View>
+              </View>
+            </Pressable>
+          </View>
         </View>
       </View>
 
-      <View style={[styles.secondaryCards, isWide && styles.secondaryCardsWide]}>
-        <Pressable
-          onPress={onOpenRules}
-          style={({ pressed }) => [
-            styles.rulesCardButton,
-            isWide && styles.secondaryCardCompactWide,
-            pressed && styles.pressed,
-          ]}
-        >
-          <View style={styles.rulesCard}>
-            <View style={styles.rulesCardContent}>
-              <View style={styles.rulesTextWrap}>
-                <Text style={styles.rulesTitle}>농구 규칙 가이드</Text>
-                <Text style={styles.rulesText}>기본 규칙을 빠르게 확인할 수 있어요.</Text>
-              </View>
-              <Image source={rulesGuideIcon} resizeMode="contain" style={styles.rulesGuideIcon} />
+      <Modal
+        visible={isHomeworkInfoModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsHomeworkInfoModalOpen(false)}
+      >
+        <View style={styles.reasonModalOverlay}>
+          <Pressable style={styles.reasonModalBackdrop} onPress={() => setIsHomeworkInfoModalOpen(false)} />
+          <View style={styles.reasonModalCard}>
+            <View style={styles.reasonModalHeader}>
+              <Text style={styles.reasonModalTitle}>숙제 설명</Text>
+              <Pressable
+                onPress={() => setIsHomeworkInfoModalOpen(false)}
+                style={({ pressed }) => [styles.reasonModalCloseButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.reasonModalCloseButtonText}>닫기</Text>
+              </Pressable>
             </View>
+            <ScrollView
+              style={styles.reasonModalScroll}
+              contentContainerStyle={styles.reasonModalScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {combinedDailyHomeworkDescription ? (
+                <View style={styles.homeworkInfoModalItem}>
+                  <Text style={styles.homeworkInfoModalItemTitle}>오늘의 기본 연습</Text>
+                  <Text style={styles.homeworkInfoModalItemText}>{combinedDailyHomeworkDescription}</Text>
+                </View>
+              ) : null}
+              {additionalHomeworkItems.map((item) => (
+                <View key={item.id} style={styles.homeworkInfoModalItem}>
+                  <Text style={styles.homeworkInfoModalItemTitle}>{item.title}</Text>
+                  <Text style={styles.homeworkInfoModalItemText}>
+                    {item.detailText?.trim() || item.reasonText?.trim() || '이 숙제를 위한 설명을 준비하고 있어요.'}
+                  </Text>
+                </View>
+              ))}
+            </ScrollView>
           </View>
-        </Pressable>
-      </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={Boolean(selectedHomeworkReasonItem)}
@@ -537,7 +615,6 @@ export function HomeScreen({
               ) : null}
               {selectedHomeworkBalanceGraph ? (
                 <View style={styles.reasonModalBalanceCard}>
-                  <Text style={styles.reasonModalBalanceCardLabel}>기록일지 드리블 균형 그래프</Text>
                   <Text style={styles.reasonModalBalanceHeadline}>{selectedHomeworkBalanceGraphHeadline}</Text>
                   <View style={styles.reasonModalBalanceLegendRow}>
                     <View style={styles.reasonModalBalanceLegendItem}>
@@ -696,14 +773,7 @@ export function HomeScreen({
                   ) : null}
 
                   {selectedHomeworkEvaluationRecord.videoUri.trim() ? (
-                    <Video
-                      source={{ uri: selectedHomeworkEvaluationRecord.videoUri }}
-                      useNativeControls
-                      shouldPlay={false}
-                      isLooping={false}
-                      resizeMode={ResizeMode.CONTAIN}
-                      style={styles.homeworkEvaluationThumbnail}
-                    />
+                    <HomeworkEvaluationVideo uri={selectedHomeworkEvaluationRecord.videoUri} />
                   ) : selectedHomeworkEvaluationRecord.thumbnailUri.trim() ? (
                     <Image
                       source={{ uri: selectedHomeworkEvaluationRecord.thumbnailUri }}
@@ -763,10 +833,88 @@ export function HomeScreen({
 
 const styles = StyleSheet.create({
   layout: {
+    flex: 1,
     gap: 8,
   },
   topSection: {
     gap: 4,
+  },
+  homeworkSectionHeaderRow: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeworkInfoTrigger: {
+    position: 'absolute',
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.48)',
+  },
+  homeworkInfoTriggerText: {
+    color: colors.text,
+    fontSize: 16,
+    lineHeight: 18,
+    fontWeight: '900',
+  },
+  homeworkBackgroundSection: {
+    flex: 1,
+    position: 'relative',
+  },
+  homeworkBall: {
+    position: 'absolute',
+    bottom: -24,
+    left: 0,
+    width: '100%',
+    aspectRatio: 2,
+    opacity: 0.52,
+    overflow: 'hidden',
+  },
+  homeworkBallSurface: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 999,
+    backgroundColor: '#c86628',
+  },
+  homeworkBallCenterSeam: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: '50%',
+    width: 8,
+    marginLeft: -4,
+    backgroundColor: colors.background,
+  },
+  homeworkBallCurve: {
+    position: 'absolute',
+    top: '-18%',
+    width: '82%',
+    height: '160%',
+    borderRadius: 999,
+  },
+  homeworkBallLeftCurve: {
+    left: '-50%',
+    borderRightWidth: 8,
+    borderRightColor: colors.background,
+  },
+  homeworkBallRightCurve: {
+    right: '-50%',
+    borderLeftWidth: 8,
+    borderLeftColor: colors.background,
+  },
+  homeworkBackgroundContent: {
+    flex: 1,
+    position: 'relative',
+    zIndex: 1,
   },
   heroCard: {
     backgroundColor: 'transparent',
@@ -774,7 +922,7 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     borderColor: 'transparent',
     paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingTop: 24,
     paddingBottom: 0,
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -788,6 +936,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 24,
     fontWeight: '800',
+    textAlign: 'center',
     marginBottom: 0,
   },
   menuButtonsRow: {
@@ -796,11 +945,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   menuButtonsStack: {
-    gap: 12,
+    gap: 0,
   },
   mainButtonWrap: {
     width: 232,
-    borderRadius: 24,
+    borderRadius: 0,
   },
   mainButtonWrapWide: {
     flex: 1,
@@ -817,20 +966,18 @@ const styles = StyleSheet.create({
   },
   mainButton: {
     minHeight: 178,
-    borderRadius: 24,
+    borderRadius: 0,
     padding: 18,
     backgroundColor: '#3a3027',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#ffffff',
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
     overflow: 'hidden',
     position: 'relative',
   },
   mainButtonNoSubtitle: {
     minHeight: 148,
-  },
-  mainButtonBorderless: {
-    borderWidth: 0,
-    borderColor: 'transparent',
   },
   mainButtonWide: {
     minHeight: 194,
@@ -1019,8 +1166,18 @@ const styles = StyleSheet.create({
     borderRadius: 0,
     borderWidth: 0,
     borderColor: 'transparent',
-    paddingHorizontal: 0,
+    paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  homeworkInitialCard: {
+    paddingBottom: 0,
+    position: 'relative',
+    zIndex: 1,
+  },
+  homeworkArcCard: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
   },
   homeworkList: {
     gap: 12,
@@ -1042,7 +1199,7 @@ const styles = StyleSheet.create({
   },
   homeworkItem: {
     gap: 10,
-    backgroundColor: 'rgba(122, 55, 55, 0.72)',
+    backgroundColor: '#7a3737',
     borderRadius: 18,
     borderWidth: 0,
     borderColor: 'transparent',
@@ -1050,7 +1207,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   homeworkItemCompleted: {
-    opacity: 0.56,
+    opacity: 1,
+    backgroundColor: '#534a40',
   },
   homeworkHeader: {
     flexDirection: 'row',
@@ -1209,7 +1367,7 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
   },
   reasonModalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(8, 10, 16, 0.56)',
   },
   reasonModalCard: {
@@ -1421,6 +1579,25 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: '900',
   },
+  homeworkInfoModalItem: {
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: colors.surfaceStrong,
+    borderRadius: 14,
+  },
+  homeworkInfoModalItemTitle: {
+    color: colors.text,
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '800',
+  },
+  homeworkInfoModalItemText: {
+    color: colors.textSoft,
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: '600',
+  },
   homeworkEvaluationOverlay: {
     flex: 1,
     alignItems: 'center',
@@ -1429,7 +1606,7 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
   },
   homeworkEvaluationBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(8, 10, 16, 0.68)',
   },
   homeworkEvaluationCard: {

@@ -1,4 +1,5 @@
-import { type AVPlaybackStatus, ResizeMode, Video } from 'expo-av';
+import { useEventListener } from 'expo';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -14,7 +15,6 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import type { ImageSourcePropType } from 'react-native';
 import type { WebViewMessageEvent } from 'react-native-webview';
 import { InfoBox } from '../components/common/InfoBox';
 import { LessonCamera } from '../components/lesson/LessonCamera';
@@ -29,8 +29,7 @@ import type {
 } from '../types/app';
 import { getDesktopMobileFrameWidth, shouldUseDesktopMobileLayout } from '../utils/layout';
 
-const DRIBBLE_MODE_IMAGE = require('../../assets/lesson-player-silhouette.png');
-const SHOOT_MODE_IMAGE = require('../../assets/lesson-mode/shoot.png');
+const CAMERA_SWITCH_ICON = require('../../assets/camera-switch-icon.png');
 
 interface LessonScreenProps {
   lessonMode: LessonMode;
@@ -54,48 +53,12 @@ interface LessonScreenProps {
   lessonReview: LessonReviewClip | null;
   currentDribbleCount: number;
   cameraError: string;
-  isShootRecordStarButtonVisible: boolean;
-  isCurrentShootRecordStarred: boolean;
   onSelectMode: (mode: LessonMode) => void;
   onSelectDribbleView: (view: DribbleLessonView) => void;
   onBeginLesson: (dribbleTargetCount?: number, dribbleView?: DribbleLessonView) => void;
   onEndLesson: () => void;
-  onToggleCurrentShootRecordStar: () => void;
   onGoHome: () => void;
   onPoseMessage: (event: WebViewMessageEvent) => void;
-}
-
-interface ModeButtonProps {
-  title: string;
-  imageSource: ImageSourcePropType;
-  imageTintColor?: string;
-  active: boolean;
-  disabled: boolean;
-  onPress: () => void;
-}
-
-function ModeButton({ title, imageSource, imageTintColor, active, disabled, onPress }: ModeButtonProps) {
-  return (
-    <Pressable
-      accessibilityState={{ disabled, selected: active }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.modeButton,
-        disabled && styles.modeButtonDisabled,
-        pressed && styles.pressed,
-      ]}
-    >
-      <View style={styles.modeButtonArtworkFrame}>
-        <Image
-          source={imageSource}
-          style={[styles.modeButtonArtwork, imageTintColor ? { tintColor: imageTintColor } : null]}
-          resizeMode="contain"
-        />
-      </View>
-      <Text style={styles.modeButtonText}>{title}</Text>
-    </Pressable>
-  );
 }
 
 interface OverlayUtilityButtonProps {
@@ -144,28 +107,36 @@ function CameraShutterButton({ active, disabled = false, onPress }: CameraShutte
   );
 }
 
-function OverlayStarButton({
-  active,
+function CameraUtilityRoundButton({
+  label,
+  icon,
+  accessibilityLabel,
+  disabled = false,
   onPress,
 }: {
-  active: boolean;
+  label: string;
+  icon?: 'camera-switch';
+  accessibilityLabel: string;
+  disabled?: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
-      accessibilityLabel={active ? '체크한 레슨 기록 해제' : '방금 한 레슨 기록 체크'}
-      accessibilityRole="button"
-      hitSlop={12}
+      accessibilityLabel={accessibilityLabel}
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
-        styles.overlayStarButton,
-        active && styles.overlayStarButtonActive,
-        pressed && styles.pressed,
+        styles.shutterButton,
+        styles.utilityRoundButton,
+        disabled && styles.shutterButtonDisabled,
+        pressed && !disabled && styles.pressed,
       ]}
     >
-      <Text style={[styles.overlayStarButtonIcon, active && styles.overlayStarButtonIconActive]}>
-        {active ? '★' : '☆'}
-      </Text>
+      {icon === 'camera-switch' ? (
+        <Image source={CAMERA_SWITCH_ICON} resizeMode="contain" style={styles.cameraSwitchIcon} />
+      ) : (
+        <Text style={[styles.utilityRoundButtonText, label === '<' && styles.utilityRoundButtonBackText]}>{label}</Text>
+      )}
     </Pressable>
   );
 }
@@ -176,48 +147,41 @@ interface ReviewClipPlayerProps {
 }
 
 function ReviewClipPlayer({ clip, reserveToggleSpace = false }: ReviewClipPlayerProps) {
-  const videoRef = useRef<Video | null>(null);
   const [durationMillis, setDurationMillis] = useState(clip.durationMs);
   const loopEndMs = Math.max(clip.startAtMs + 250, Math.min(clip.startAtMs + clip.durationMs, durationMillis));
+  const player = useVideoPlayer({ uri: clip.videoUri }, (instance) => {
+    instance.loop = false;
+    instance.timeUpdateEventInterval = 0.1;
+  });
 
   useEffect(() => {
-    const player = videoRef.current;
+    player.currentTime = clip.startAtMs / 1000;
+    player.play();
+  }, [clip.startAtMs, clip.videoUri, player]);
 
-    if (!player) {
-      return;
+  useEventListener(player, 'sourceLoad', ({ duration }) => {
+    const nextDurationMillis = Math.round(duration * 1000);
+
+    if (nextDurationMillis > 0) {
+      setDurationMillis(nextDurationMillis);
     }
+  });
 
-    void player.setPositionAsync(clip.startAtMs);
-    void player.playAsync();
-  }, [clip.startAtMs, clip.videoUri]);
-
-  function handlePlaybackStatusUpdate(status: AVPlaybackStatus) {
-    if (!status.isLoaded) {
-      return;
+  useEventListener(player, 'timeUpdate', ({ currentTime }) => {
+    if (currentTime * 1000 >= loopEndMs && loopEndMs > clip.startAtMs) {
+      player.currentTime = clip.startAtMs / 1000;
+      player.play();
     }
-
-    if (typeof status.durationMillis === 'number' && status.durationMillis > 0 && status.durationMillis !== durationMillis) {
-      setDurationMillis(status.durationMillis);
-    }
-
-    if (status.positionMillis >= loopEndMs && loopEndMs > clip.startAtMs) {
-      void videoRef.current?.setPositionAsync(clip.startAtMs);
-      void videoRef.current?.playAsync();
-    }
-  }
+  });
 
   return (
     <View style={[styles.reviewWrap, reserveToggleSpace && styles.sectionCardWithToggleSpace]}>
       <Text style={styles.reviewTitle}>{clip.title}</Text>
-      <Video
-        ref={videoRef}
-        source={{ uri: clip.videoUri }}
+      <VideoView
+        player={player}
         style={styles.reviewVideo}
-        resizeMode={ResizeMode.COVER}
-        shouldPlay
-        useNativeControls
-        progressUpdateIntervalMillis={100}
-        onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
+        contentFit="cover"
+        nativeControls
       />
       <Text style={styles.reviewHint}>문제가 가장 많이 나타난 약 3초 구간을 반복해서 보여주고 있습니다.</Text>
     </View>
@@ -446,13 +410,10 @@ export function LessonScreen({
   lessonReview,
   currentDribbleCount,
   cameraError,
-  isShootRecordStarButtonVisible,
-  isCurrentShootRecordStarred,
   onSelectMode,
   onSelectDribbleView,
   onBeginLesson,
   onEndLesson,
-  onToggleCurrentShootRecordStar,
   onGoHome,
   onPoseMessage,
 }: LessonScreenProps) {
@@ -467,7 +428,6 @@ export function LessonScreen({
   const allowPanelDragHide = !isSideDockedCoaching;
   const coachingPanelTopInset = 88;
   const coachingPanelBottomInset = 12;
-  const bottomControlsInset = 170;
   const floatingCoachingHeight = isSideDockedCoaching
     ? Math.max(320, height - coachingPanelTopInset - coachingPanelBottomInset)
     : Math.max(240, height - coachingPanelTopInset - coachingPanelBottomInset);
@@ -485,10 +445,8 @@ export function LessonScreen({
 
   const [showDribbleGuide, setShowDribbleGuide] = useState(false);
   const [dribbleGuideStep, setDribbleGuideStep] = useState(0);
-  const [showLessonModePicker, setShowLessonModePicker] = useState(false);
-  const [showShootGuide, setShowShootGuide] = useState(false);
-  const [shootGuideStep, setShootGuideStep] = useState(0);
   const [dribbleCountInput, setDribbleCountInput] = useState('10');
+  const [cameraSwitchToken, setCameraSwitchToken] = useState(0);
   const [coachingPanelState, setCoachingPanelState] = useState<CoachingPanelState>(allowPanelDragHide ? 'hidden' : 'expanded');
   const isCoachingPanelHidden = coachingPanelState === 'hidden';
   const isCoachingPanelHalfOpen = coachingPanelState === 'half';
@@ -515,6 +473,7 @@ export function LessonScreen({
       shootResetToken={shootResetToken}
       recordingStartToken={recordingStartToken}
       recordingStopToken={recordingStopToken}
+      cameraSwitchToken={cameraSwitchToken}
       cameraStopMode={cameraStopMode}
       containerStyle={styles.fullscreenCamera}
       onPoseMessage={onPoseMessage}
@@ -522,19 +481,11 @@ export function LessonScreen({
   );
 
   useEffect(() => {
-    if (isLessonActive || cameraStopMode !== null) {
-      setShowLessonModePicker(false);
-    }
-
     if (lessonMode !== 'dribble' || isLessonActive) {
       setShowDribbleGuide(false);
       setDribbleGuideStep(0);
     }
 
-    if (lessonMode !== 'shoot' || isLessonActive) {
-      setShowShootGuide(false);
-      setShootGuideStep(0);
-    }
   }, [cameraStopMode, isLessonActive, lessonMode]);
 
   useEffect(() => {
@@ -682,16 +633,7 @@ export function LessonScreen({
     hideCoachingPanel();
   }
 
-  function restoreCoachingPanel() {
-    halfOpenCoachingPanel();
-  }
-
   function finishCoachingPanelDrag(dy: number, vy: number) {
-    const nextOffset = Math.max(0, Math.min(coachingHiddenOffset, coachingPanelDragStartRef.current + dy));
-    snapCoachingPanel(nextOffset, vy);
-  }
-
-  function finishCoachingPanelRestoreDrag(dy: number, vy: number) {
     const nextOffset = Math.max(0, Math.min(coachingHiddenOffset, coachingPanelDragStartRef.current + dy));
     snapCoachingPanel(nextOffset, vy);
   }
@@ -717,38 +659,6 @@ export function LessonScreen({
         },
       })
     : null;
-  const coachingRestorePanResponder = allowPanelDragHide
-    ? PanResponder.create({
-        onStartShouldSetPanResponder: () => false,
-        onMoveShouldSetPanResponder: (_, gestureState) =>
-          Math.abs(gestureState.dy) > Math.abs(gestureState.dx) && Math.abs(gestureState.dy) > 4,
-        onPanResponderGrant: () => {
-          coachingPanelTranslateY.stopAnimation();
-          coachingPanelDragStartRef.current = coachingPanelTranslateYRef.current;
-        },
-        onPanResponderMove: (_, gestureState) => {
-          const nextValue = Math.max(0, Math.min(coachingHiddenOffset, coachingPanelDragStartRef.current + gestureState.dy));
-          coachingPanelTranslateY.setValue(nextValue);
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          finishCoachingPanelRestoreDrag(gestureState.dy, gestureState.vy);
-        },
-        onPanResponderTerminate: (_, gestureState) => {
-          finishCoachingPanelRestoreDrag(gestureState.dy, gestureState.vy);
-        },
-      })
-    : null;
-
-  const coachingRestoreOpacity = coachingPanelTranslateY.interpolate({
-    inputRange: [0, coachingHiddenOffset * 0.65, coachingHiddenOffset],
-    outputRange: [0, 0.12, 1],
-    extrapolate: 'clamp',
-  });
-  const coachingRestoreTranslateY = coachingPanelTranslateY.interpolate({
-    inputRange: [0, coachingHiddenOffset],
-    outputRange: [16, 0],
-    extrapolate: 'clamp',
-  });
   const coachingPanelFadeStartOffset = Math.min(
     coachingHiddenOffset - 24,
     Math.max(coachingHalfOffset + 1, coachingHiddenOffset * 0.84)
@@ -759,6 +669,8 @@ export function LessonScreen({
     extrapolate: 'clamp',
   });
   const isRoundLessonControlActive = isLessonActive || cameraStopMode !== null;
+  const canChangeLessonMode = !isLessonSessionBusy;
+  const canSwitchCamera = isCameraActive && isCameraReady && !isCameraPreviewHidden && cameraStopMode === null;
   const shouldShowRealtimeCoaching = isLessonActive;
   const floatingCoachingFrame = isLandscapeMobileLayout
     ? {
@@ -779,29 +691,40 @@ export function LessonScreen({
       return;
     }
 
-    setShowLessonModePicker(true);
+    if (lessonMode === 'shoot') {
+      onBeginLesson();
+      return;
+    }
+
+    openLessonGuide(lessonMode);
   }
 
-  function closeLessonModePicker() {
-    setShowLessonModePicker(false);
+  function selectLessonMode(mode: LessonMode) {
+    if (!canChangeLessonMode || lessonMode === mode) {
+      return;
+    }
+
+    onSelectMode(mode);
+  }
+
+  function switchCamera() {
+    if (!canSwitchCamera) {
+      return;
+    }
+
+    setCameraSwitchToken((current) => current + 1);
   }
 
   function openLessonGuide(mode: LessonMode) {
-    setShowLessonModePicker(false);
     onSelectMode(mode);
 
     if (mode === 'dribble') {
-      setShowShootGuide(false);
-      setShootGuideStep(0);
       setDribbleGuideStep(0);
       setShowDribbleGuide(true);
       return;
     }
 
-    setShowDribbleGuide(false);
-    setDribbleGuideStep(0);
-    setShootGuideStep(0);
-    setShowShootGuide(true);
+    onBeginLesson();
   }
 
   function closeDribbleGuide() {
@@ -857,43 +780,6 @@ export function LessonScreen({
   const dribbleInstructionSecondaryLabel = '이전';
   const dribbleInstructionPrimaryLabel = dribbleGuideStep === 3 ? '시작' : '다음';
 
-  function closeShootGuide() {
-    setShowShootGuide(false);
-    setShootGuideStep(0);
-  }
-
-  function beginShootLessonFromGuide() {
-    if (isLessonSessionBusy) {
-      setShowShootGuide(false);
-      setShootGuideStep(0);
-      return;
-    }
-
-    setShowShootGuide(false);
-    setShootGuideStep(0);
-    onBeginLesson();
-  }
-
-  function confirmShootGuideStep() {
-    if (shootGuideStep < 2) {
-      setShootGuideStep((current) => current + 1);
-      return;
-    }
-
-    beginShootLessonFromGuide();
-  }
-
-  function goToPreviousShootGuideStep() {
-    if (shootGuideStep <= 0) {
-      return;
-    }
-
-    setShootGuideStep((current) => current - 1);
-  }
-
-  const isShootGuideFirstStep = shootGuideStep === 0;
-  const shootConfirmLabel = shootGuideStep === 2 ? '시작' : '다음';
-
   return (
     <View style={styles.screenRoot}>
       <View style={styles.cameraViewport}>
@@ -902,9 +788,39 @@ export function LessonScreen({
       <View pointerEvents="none" style={styles.cameraChromeTop} />
       <View pointerEvents="none" style={styles.cameraChromeBottom} />
       <View pointerEvents="box-none" style={styles.topActionOverlay}>
-        <Pressable onPress={onGoHome} style={({ pressed }) => [styles.homeChip, pressed && styles.pressed]}>
-          <Text style={styles.homeChipText}>{'<'}</Text>
-        </Pressable>
+        <View style={styles.lessonModeTabs}>
+          <Pressable
+            accessibilityLabel="슛 레슨 선택"
+            accessibilityRole="button"
+            accessibilityState={{ selected: lessonMode === 'shoot', disabled: !canChangeLessonMode }}
+            disabled={!canChangeLessonMode}
+            hitSlop={8}
+            onPress={() => selectLessonMode('shoot')}
+            style={({ pressed }) => [
+              styles.lessonModeTab,
+              lessonMode === 'shoot' && styles.lessonModeTabActive,
+              pressed && canChangeLessonMode && styles.pressed,
+            ]}
+          >
+            <Text style={[styles.lessonModeTabText, lessonMode === 'shoot' && styles.lessonModeTabTextActive]}>슛</Text>
+          </Pressable>
+          <View style={styles.lessonModeTabDivider} />
+          <Pressable
+            accessibilityLabel="드리블 레슨 선택"
+            accessibilityRole="button"
+            accessibilityState={{ selected: lessonMode === 'dribble', disabled: !canChangeLessonMode }}
+            disabled={!canChangeLessonMode}
+            hitSlop={8}
+            onPress={() => selectLessonMode('dribble')}
+            style={({ pressed }) => [
+              styles.lessonModeTab,
+              lessonMode === 'dribble' && styles.lessonModeTabActive,
+              pressed && canChangeLessonMode && styles.pressed,
+            ]}
+          >
+            <Text style={[styles.lessonModeTabText, lessonMode === 'dribble' && styles.lessonModeTabTextActive]}>드리블</Text>
+          </Pressable>
+        </View>
       </View>
 
       {shouldShowRealtimeCoaching && isSideDockedCoaching ? (
@@ -988,28 +904,6 @@ export function LessonScreen({
             </ScrollView>
           </Animated.View>
 
-          {allowPanelDragHide ? (
-            <View
-              pointerEvents="box-none"
-              style={[
-                styles.coachingRestoreWrap,
-                isLandscapeMobileLayout ? styles.coachingRestoreWrapLandscape : { bottom: bottomControlsInset },
-              ]}
-            >
-              <Animated.View
-                pointerEvents={isCoachingPanelHidden ? 'auto' : 'none'}
-                {...coachingRestorePanResponder?.panHandlers}
-                style={{
-                  opacity: coachingRestoreOpacity,
-                  transform: [{ translateY: coachingRestoreTranslateY }],
-                }}
-              >
-                <Pressable onPress={restoreCoachingPanel} style={({ pressed }) => [styles.coachingRestoreChip, pressed && styles.pressed]}>
-                  <Text style={styles.coachingRestoreChipText}>^ 실시간 코칭</Text>
-                </Pressable>
-              </Animated.View>
-            </View>
-          ) : null}
         </View>
       ) : null}
 
@@ -1018,22 +912,22 @@ export function LessonScreen({
         style={[styles.bottomControlsOverlay, isLandscapeMobileLayout ? styles.bottomControlsOverlayLandscape : null]}
       >
         {isLandscapeMobileLayout ? (
-          <>
-            <View pointerEvents="box-none" style={styles.landscapeShutterDock}>
-              <CameraShutterButton active={isRoundLessonControlActive} onPress={isRoundLessonControlActive ? onEndLesson : openLessonStart} />
-            </View>
-
-            {isShootRecordStarButtonVisible ? (
-              <View pointerEvents="box-none" style={styles.landscapeUtilityDock}>
-                <OverlayStarButton active={isCurrentShootRecordStarred} onPress={onToggleCurrentShootRecordStar} />
-              </View>
-            ) : null}
-          </>
+          <View pointerEvents="box-none" style={styles.landscapeShutterDock}>
+            <CameraUtilityRoundButton label="<" accessibilityLabel="뒤로 가기" onPress={onGoHome} />
+            <CameraShutterButton active={isRoundLessonControlActive} onPress={isRoundLessonControlActive ? onEndLesson : openLessonStart} />
+            <CameraUtilityRoundButton
+              label=""
+              icon="camera-switch"
+              accessibilityLabel="앞뒤 카메라 전환"
+              disabled={!canSwitchCamera}
+              onPress={switchCamera}
+            />
+          </View>
         ) : (
           <View style={[styles.bottomControlsStack, isWideLayout ? styles.bottomControlsStackWide : null]}>
             <View style={styles.captureControlsRow}>
               <View style={styles.captureSideSlot}>
-                <View style={styles.captureSidePlaceholder} />
+                <CameraUtilityRoundButton label="<" accessibilityLabel="뒤로 가기" onPress={onGoHome} />
               </View>
 
               <View style={styles.captureButtonStack}>
@@ -1041,49 +935,18 @@ export function LessonScreen({
               </View>
 
               <View style={styles.captureSideSlot}>
-                {isShootRecordStarButtonVisible ? (
-                  <OverlayStarButton active={isCurrentShootRecordStarred} onPress={onToggleCurrentShootRecordStar} />
-                ) : (
-                  <View style={styles.captureSidePlaceholder} />
-                )}
+                <CameraUtilityRoundButton
+                  label=""
+                  icon="camera-switch"
+                  accessibilityLabel="앞뒤 카메라 전환"
+                  disabled={!canSwitchCamera}
+                  onPress={switchCamera}
+                />
               </View>
             </View>
           </View>
         )}
       </View>
-
-      <Modal visible={showLessonModePicker} transparent animationType="fade" onRequestClose={closeLessonModePicker}>
-        <View style={styles.modalBackdrop}>
-          <Pressable onPress={closeLessonModePicker} style={styles.modalBackdropDismissArea} />
-          <View style={styles.modalCard}>
-            <Pressable
-              onPress={closeLessonModePicker}
-              style={({ pressed }) => [styles.modalCloseButton, pressed && styles.pressed]}
-            >
-              <Text style={styles.modalCloseButtonText}>X</Text>
-            </Pressable>
-            <Text style={styles.modalTitle}>레슨 모드 선택</Text>
-            <Text style={styles.modalBody}>이번 레슨에서 어떤 동작을 분석할지 선택해 주세요.</Text>
-            <View style={styles.modePickerOptions}>
-              <ModeButton
-                title="드리블"
-                imageSource={DRIBBLE_MODE_IMAGE}
-                imageTintColor="#050505"
-                active={lessonMode === 'dribble'}
-                disabled={false}
-                onPress={() => openLessonGuide('dribble')}
-              />
-              <ModeButton
-                title="슛"
-                imageSource={SHOOT_MODE_IMAGE}
-                active={lessonMode === 'shoot'}
-                disabled={false}
-                onPress={() => openLessonGuide('shoot')}
-              />
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       <Modal visible={showDribbleGuide} transparent animationType="fade" onRequestClose={closeDribbleGuide}>
         <View style={styles.modalBackdrop}>
@@ -1186,53 +1049,6 @@ export function LessonScreen({
         </View>
       </Modal>
 
-      <Modal visible={showShootGuide} transparent animationType="fade" onRequestClose={closeShootGuide}>
-        <View style={styles.modalBackdrop}>
-          <Pressable onPress={closeShootGuide} style={styles.modalBackdropDismissArea} />
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>슛 레슨 안내</Text>
-            <Text style={styles.modalStep}>STEP {shootGuideStep + 1} / 3</Text>
-
-            {shootGuideStep === 0 ? (
-              <>
-                <Text style={styles.modalBody}>
-                  슛을 하기 위한 준비 자세로 팔 각도를 80~120도 범위에 맞춰 공을 들어 주세요. 그러면 카운트가 시작됩니다.
-                </Text>
-                <Text style={styles.modalHint}>어깨, 팔꿈치, 손목 각도가 잘 보이도록 화면 안으로 들어와 주세요.</Text>
-              </>
-            ) : null}
-
-            {shootGuideStep === 1 ? (
-              <>
-                <Text style={styles.modalBody}>카운트가 끝나면 슛을 발사해 주세요.</Text>
-                <Text style={styles.modalHint}>카운트가 끝난 뒤에는 준비 자세 안내로 돌아가지 않고 바로 슛 분석을 진행합니다.</Text>
-              </>
-            ) : null}
-
-            {shootGuideStep === 2 ? (
-              <>
-                <Text style={styles.modalBody}>또한 카운트가 끝나면 녹화를 시작해 레슨하겠습니다.</Text>
-                <Text style={styles.modalHint}>촬영된 영상과 피드백은 기록일지에서도 다시 확인할 수 있습니다.</Text>
-              </>
-            ) : null}
-
-            <View style={styles.modalActions}>
-              {isShootGuideFirstStep ? (
-                <Pressable onPress={beginShootLessonFromGuide} style={({ pressed }) => [styles.modalGhostButton, pressed && styles.pressed]}>
-                  <Text style={styles.modalGhostButtonText}>바로 시작</Text>
-                </Pressable>
-              ) : (
-                <Pressable onPress={goToPreviousShootGuideStep} style={({ pressed }) => [styles.modalGhostButton, pressed && styles.pressed]}>
-                  <Text style={styles.modalGhostButtonText}>이전</Text>
-                </Pressable>
-              )}
-              <Pressable onPress={confirmShootGuideStep} style={({ pressed }) => [styles.modalPrimaryButton, pressed && styles.pressed]}>
-                <Text style={styles.modalPrimaryButtonText}>{shootConfirmLabel}</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -1253,11 +1069,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#020202',
   },
   screenBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     overflow: 'hidden',
   },
   screenBackdropBase: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.background,
   },
   screenBackdropGlowPrimary: {
@@ -1284,28 +1100,46 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 30,
-    paddingTop: 18,
-    paddingHorizontal: 16,
     pointerEvents: 'box-none',
   },
-  homeChip: {
-    alignSelf: 'flex-start',
-    minWidth: 48,
-    minHeight: 44,
+  lessonModeTabs: {
+    position: 'absolute',
+    top: 18,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 4,
+    borderRadius: 16,
+    backgroundColor: 'rgba(8,8,8,0.2)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  lessonModeTab: {
+    flex: 1,
+    minHeight: 42,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 999,
-    backgroundColor: 'rgba(10,10,10,0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  homeChipText: {
+  lessonModeTabActive: {
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,250,244,0.13)',
+  },
+  lessonModeTabText: {
+    color: 'rgba(255,250,244,0.5)',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  lessonModeTabTextActive: {
     color: '#fffaf4',
-    fontSize: 22,
     fontWeight: '900',
-    lineHeight: 24,
+  },
+  lessonModeTabDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 22,
+    backgroundColor: 'rgba(255,255,255,0.25)',
   },
   cameraViewport: {
     flex: 1,
@@ -1373,7 +1207,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   heroBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 28,
     backgroundColor: 'rgba(33,26,21,0.58)',
   },
@@ -1483,41 +1317,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   coachingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  coachingRestoreWrap: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    bottom: 12,
-    alignItems: 'center',
-  },
-  coachingRestoreWrapWide: {
-    left: undefined,
-    right: 0,
-    top: 0,
-    bottom: undefined,
-    alignItems: 'flex-end',
-  },
-  coachingRestoreWrapLandscape: {
-    left: 12,
-    right: undefined,
-    top: 88,
-    bottom: undefined,
-    alignItems: 'flex-start',
-  },
-  coachingRestoreChip: {
-    borderRadius: 0,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(8,8,8,0.28)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-  },
-  coachingRestoreChipText: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '900',
+    ...StyleSheet.absoluteFill,
   },
   panelDragHandle: {
     alignItems: 'center',
@@ -1680,78 +1480,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
   },
-  modeButtons: {
-    flexDirection: 'row',
-    gap: 10,
-    alignSelf: 'center',
-    padding: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(8,8,8,0.42)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-  modeStatus: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 0,
-    borderColor: 'transparent',
-    marginTop: 12,
-    marginBottom: 12,
-  },
-  modeButton: {
-    flex: 1,
-    minWidth: 0,
-    borderRadius: 24,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    backgroundColor: 'rgba(247, 238, 226, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    alignItems: 'center',
-    gap: 14,
-    overflow: 'hidden',
-  },
-  modeButtonActive: {
-    backgroundColor: 'rgba(247, 238, 226, 0.12)',
-    borderColor: 'rgba(255,214,160,0.82)',
-    shadowColor: '#f4b36b',
-    shadowOpacity: 0.24,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 6,
-  },
-  modeButtonDisabled: {
-    opacity: 0.48,
-  },
-  modeButtonArtworkFrame: {
-    width: '100%',
-    aspectRatio: 1,
-    borderRadius: 18,
-    backgroundColor: '#f7f3eb',
-    padding: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  modeButtonArtwork: {
-    width: '100%',
-    height: '100%',
-  },
-  modeButtonText: {
-    color: '#fff8f0',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  modeButtonTextActive: {
-    color: '#fff8f0',
-  },
-  modeStatusText: {
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: '800',
-  },
   cameraControls: {
     flexDirection: 'row',
     gap: 10,
@@ -1779,16 +1507,10 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     right: 18,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    pointerEvents: 'box-none',
-  },
-  landscapeUtilityDock: {
-    position: 'absolute',
-    right: 20,
-    bottom: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: 14,
     pointerEvents: 'box-none',
   },
   bottomControlsStack: {
@@ -1812,10 +1534,6 @@ const styles = StyleSheet.create({
     minWidth: 72,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  captureSidePlaceholder: {
-    width: 88,
-    height: 40,
   },
   captureButtonStack: {
     alignItems: 'center',
@@ -1854,6 +1572,27 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: '#ef4444',
   },
+  utilityRoundButton: {
+    width: 78,
+    height: 78,
+    padding: 0,
+    borderColor: '#ffffff',
+    backgroundColor: '#ffffff',
+  },
+  utilityRoundButtonText: {
+    color: '#111111',
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  cameraSwitchIcon: {
+    width: 38,
+    height: 38,
+  },
+  utilityRoundButtonBackText: {
+    fontSize: 30,
+    lineHeight: 34,
+    marginTop: -4,
+  },
   overlayUtilityButton: {
     minWidth: 88,
     minHeight: 40,
@@ -1878,27 +1617,6 @@ const styles = StyleSheet.create({
     color: '#fff9f2',
     fontSize: 13,
     fontWeight: '800',
-  },
-  overlayStarButton: {
-    paddingHorizontal: 4,
-    paddingVertical: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  overlayStarButtonActive: {
-    transform: [{ scale: 1.04 }],
-  },
-  overlayStarButtonIcon: {
-    color: '#ffd451',
-    fontSize: 52,
-    lineHeight: 56,
-    fontWeight: '900',
-    textShadowColor: 'rgba(0,0,0,0.4)',
-    textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 10,
-  },
-  overlayStarButtonIconActive: {
-    color: '#ffe27a',
   },
   errorBox: {
     marginBottom: 14,
@@ -1940,7 +1658,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   modalBackdropDismissArea: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   modalCard: {
     position: 'relative',
@@ -1949,26 +1667,6 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     borderColor: 'transparent',
     padding: 20,
-  },
-  modalCloseButton: {
-    position: 'absolute',
-    top: 14,
-    right: 14,
-    width: 34,
-    height: 34,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    zIndex: 2,
-  },
-  modalCloseButtonText: {
-    color: colors.textSoft,
-    fontSize: 16,
-    fontWeight: '900',
-    lineHeight: 18,
   },
   modalTitle: {
     color: colors.text,
@@ -1994,17 +1692,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 14,
     lineHeight: 22,
-  },
-  modePickerOptions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 4,
-    marginBottom: 14,
-  },
-  modePickerHint: {
-    color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 20,
   },
   countInput: {
     marginTop: 2,

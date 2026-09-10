@@ -21,7 +21,7 @@ type SideDrawerType = 'settings' | 'profile';
 type NavigationBarModule = typeof import('expo-navigation-bar');
 type LessonScreenComponent = typeof import('./src/screens/LessonScreen').LessonScreen;
 const APP_TOP_OFFSET = 12;
-const APP_SHELL_HORIZONTAL_PADDING = 16;
+const APP_SHELL_HORIZONTAL_PADDING = 0;
 const HOME_UTILITY_BAR_HEIGHT = 80;
 const HOME_UTILITY_ICON_HIT_SLOP = { top: 14, right: 14, bottom: 14, left: 14 } as const;
 const HOME_DRAWER_SWIPE_ACTIVATION_DISTANCE = 6;
@@ -439,7 +439,7 @@ export default function App() {
 
   return (
     <RootContainer style={styles.safeArea}>
-      <ExpoStatusBar hidden translucent style="light" hideTransitionAnimation="fade" />
+      <ExpoStatusBar hidden style="light" hideTransitionAnimation="fade" />
       <View style={[styles.appViewport, isDesktopMobileMode && styles.appViewportDesktop]}>
       <View
         {...(isHomeScreen ? homeDrawerPanResponder.panHandlers : {})}
@@ -526,13 +526,10 @@ export default function App() {
                 lessonReview={app.lessonReview}
                 currentDribbleCount={app.currentDribbleCount}
                 cameraError={app.cameraError}
-                isShootRecordStarButtonVisible={app.isShootRecordStarButtonVisible}
-                isCurrentShootRecordStarred={app.isCurrentShootRecordStarred}
                 onSelectMode={app.changeLessonMode}
                 onSelectDribbleView={app.setSelectedDribbleView}
                 onBeginLesson={(dribbleTargetCount, dribbleView) => void app.beginLesson(dribbleTargetCount, dribbleView)}
                 onEndLesson={() => void app.endLesson()}
-                onToggleCurrentShootRecordStar={app.toggleCurrentShootRecordStar}
                 onGoHome={() => void app.navigateTo('home')}
                 onPoseMessage={app.handlePoseMessage}
               />
@@ -585,7 +582,12 @@ export default function App() {
             <HomeScreen
               homeworkToShow={app.homeworkToShow}
               lessonRecords={app.lessonRecords}
-              onOpenLesson={() => void app.navigateTo('lesson')}
+              onOpenLesson={(mode) => {
+                if (mode) {
+                  app.changeLessonMode(mode);
+                }
+                void app.navigateTo('lesson');
+              }}
               onOpenDiary={() => void app.navigateTo('diary')}
               onOpenRules={() => void app.navigateTo('rules')}
             />
@@ -616,6 +618,7 @@ export default function App() {
               onGoBack={() => void app.navigateTo('home')}
               onToggleShotOutcome={app.toggleLessonRecordShotOutcome}
               onToggleStarredRecord={app.toggleLessonRecordStarred}
+              onRepairRecordThumbnail={app.repairLessonRecordThumbnail}
               onDeleteRecord={(recordId) => void app.deleteLessonRecord(recordId)}
             />
           )}
@@ -744,6 +747,7 @@ export default function App() {
                     />
                   ) : (
                     <SettingsScreen
+                      isDrawer
                       selectedBallBrand={app.selectedBallBrand}
                       selectedBallColors={app.selectedBallColors}
                       ballRecognitionProfile={app.ballRecognitionProfile}
@@ -810,6 +814,7 @@ const styles = StyleSheet.create({
     elevation: 20,
   },
   scrollContent: {
+    flexGrow: 1,
     paddingBottom: 32,
     gap: 16,
   },
@@ -923,7 +928,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   settingsOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     bottom: HOME_UTILITY_BAR_HEIGHT,
     zIndex: 30,
     justifyContent: 'flex-end',
@@ -936,7 +941,7 @@ const styles = StyleSheet.create({
     bottom: HOME_UTILITY_BAR_HEIGHT,
   },
   settingsBackdropPressable: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   settingsBackdrop: {
     flex: 1,

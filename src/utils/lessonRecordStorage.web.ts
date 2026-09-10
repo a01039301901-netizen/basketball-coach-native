@@ -2,32 +2,50 @@ import AppStorage from './appStorage';
 
 type StorageEntry = [string, string | null];
 
+let lessonRecordOperationQueue: Promise<void> = Promise.resolve();
+
+function enqueueLessonRecordOperation<T>(operation: () => Promise<T>) {
+  const nextOperation = lessonRecordOperationQueue.then(operation, operation);
+
+  // Keep web writes in the same order even when a previous write failed.
+  lessonRecordOperationQueue = nextOperation.then(
+    () => undefined,
+    () => undefined
+  );
+
+  return nextOperation;
+}
+
 function buildEmptyEntries(keys: string[]): StorageEntry[] {
   return keys.map((key) => [key, null]);
 }
 
-export async function getLessonRecordEntries(keys: string[]): Promise<StorageEntry[]> {
-  try {
-    return await AppStorage.multiGet(keys);
-  } catch {
-    return buildEmptyEntries(keys);
-  }
+export function getLessonRecordEntries(keys: string[]): Promise<StorageEntry[]> {
+  return enqueueLessonRecordOperation(async () => {
+    try {
+      return await AppStorage.multiGet(keys);
+    } catch {
+      return buildEmptyEntries(keys);
+    }
+  });
 }
 
-export async function setLessonRecordEntries(entries: Array<[string, string]>): Promise<void> {
+export function setLessonRecordEntries(entries: Array<[string, string]>): Promise<void> {
   if (entries.length === 0) {
-    return;
+    return Promise.resolve();
   }
 
-  await AppStorage.multiSet(entries);
+  return enqueueLessonRecordOperation(() => AppStorage.multiSet(entries));
 }
 
-export async function removeLessonRecordEntries(keys: string[]): Promise<void> {
+export function removeLessonRecordEntries(keys: string[]): Promise<void> {
   if (keys.length === 0) {
-    return;
+    return Promise.resolve();
   }
 
-  await Promise.all(keys.map((key) => AppStorage.removeItem(key)));
+  return enqueueLessonRecordOperation(async () => {
+    await Promise.all(keys.map((key) => AppStorage.removeItem(key)));
+  });
 }
 
 export async function getLessonRecordEntriesWithMigration(keys: string[]): Promise<StorageEntry[]> {

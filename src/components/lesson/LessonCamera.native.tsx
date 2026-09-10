@@ -22,6 +22,7 @@ interface LessonCameraProps {
   shootResetToken: number;
   recordingStartToken: number;
   recordingStopToken: number;
+  cameraSwitchToken: number;
   cameraStopMode: 'review' | 'disconnect' | null;
   containerStyle?: StyleProp<ViewStyle>;
   onPoseMessage: (event: WebViewMessageEvent) => void;
@@ -37,11 +38,13 @@ export function LessonCamera({
   isCameraActive,
   isCameraPreviewHidden,
   isLessonActive,
+  isCameraReady,
   countdownValue,
   dribbleResetToken,
   shootResetToken,
   recordingStartToken,
   recordingStopToken,
+  cameraSwitchToken,
   cameraStopMode,
   containerStyle,
   onPoseMessage,
@@ -79,6 +82,26 @@ export function LessonCamera({
   }, [isCameraActive, shootResetToken]);
 
   useEffect(() => {
+    if (!isCameraActive || !isCameraReady || cameraStopMode !== null) {
+      return;
+    }
+
+    webViewRef.current?.injectJavaScript(
+      `window.__codexSetLessonMode && window.__codexSetLessonMode(${JSON.stringify(lessonMode)}); true;`
+    );
+  }, [cameraStopMode, isCameraActive, isCameraReady, lessonMode]);
+
+  useEffect(() => {
+    if (!isCameraActive || cameraSwitchToken <= 0 || cameraStopMode !== null) {
+      return;
+    }
+
+    webViewRef.current?.injectJavaScript(
+      "window.__codexSwitchCameraFacing && window.__codexSwitchCameraFacing(); true;"
+    );
+  }, [cameraStopMode, cameraSwitchToken, isCameraActive]);
+
+  useEffect(() => {
     if (!isCameraActive || recordingStopToken <= 0) {
       return;
     }
@@ -93,17 +116,17 @@ export function LessonCamera({
         : "window.__codexStopRecordingForReview && window.__codexStopRecordingForReview(); true;";
 
     webViewRef.current?.injectJavaScript(stopScript);
-  }, [cameraStopMode, isCameraActive, lessonMode, recordingStopToken]);
+  }, [cameraStopMode, isCameraActive, recordingStopToken]);
 
   return (
     <View style={[styles.videoWrap, containerStyle]}>
       {isCameraActive ? (
         <>
           <WebView
-            key={`${lessonMode}-${cameraSessionKey}`}
+            key={cameraSessionKey}
             ref={webViewRef}
             originWhitelist={['https://*']}
-            source={{ uri: `${POSE_WEB_BOOTSTRAP_URL}?session=${cameraSessionKey}&mode=${lessonMode}` }}
+            source={{ uri: `${POSE_WEB_BOOTSTRAP_URL}?session=${cameraSessionKey}` }}
             style={[styles.webview, isCameraPreviewHidden && styles.hiddenCapture]}
             onMessage={onPoseMessage}
             injectedJavaScriptBeforeContentLoaded={buildPoseBootstrapScript(
@@ -200,7 +223,7 @@ const styles = StyleSheet.create({
     pointerEvents: 'none',
   },
   placeholderOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
