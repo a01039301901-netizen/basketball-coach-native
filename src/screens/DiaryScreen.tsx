@@ -17,7 +17,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import Svg, { Path, Text as SvgText } from 'react-native-svg';
+import Svg, { G, Path, Text as SvgText } from 'react-native-svg';
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
 import { DAY_NAMES } from '../constants/content';
@@ -36,6 +36,7 @@ import { formatDateKey, formatMonthTitle } from '../utils/date';
 import { getDesktopMobileFrameWidth, shouldUseDesktopMobileLayout } from '../utils/layout';
 
 interface DiaryScreenProps {
+  diaryEntryToken: number;
   currentDate: Date;
   calendarCells: CalendarCell[];
   selectedDateKey: string;
@@ -50,7 +51,6 @@ interface DiaryScreenProps {
   onClearHomeworkLinkedDiaryContext: () => void;
   onGoBack: () => void;
   onToggleShotOutcome: (recordId: string) => void;
-  onToggleStarredRecord: (recordId: string) => void;
   onRepairRecordThumbnail: (recordId: string) => Promise<boolean>;
   onDeleteRecord: (recordId: string) => void;
 }
@@ -72,6 +72,8 @@ interface RankedDiaryRecordInsight {
 
 interface DailySummaryCorrectionAggregate {
   key: string;
+  categoryLabel: string;
+  criterionLabel: string;
   label: string;
   count: number;
   averageStableRatio: number;
@@ -86,6 +88,8 @@ interface DailySummaryAutoFeedback {
   nextPracticeText: string;
   toggleSubtext: string;
   topFeedbackRecordIds: string[];
+  topFeedbackCategoryLabel: string | null;
+  topFeedbackCriterionLabel: string | null;
 }
 
 interface RecordEvaluationVideoPlayerProps {
@@ -164,12 +168,14 @@ interface EvaluationProgressRingProps {
   size?: number;
   strokeWidth?: number;
   segmentGapDegrees?: number;
+  onCriterionPress?: (criterion: LessonRecordCriterion) => void;
 }
 
 interface EvaluationProgressRingSegment {
   key: string;
   label: string;
   ratio: number;
+  criterion: LessonRecordCriterion;
 }
 
 interface DiaryEvaluationCriterionMeta {
@@ -822,6 +828,32 @@ function getRecordLevelTone(level?: NonNullable<LessonRecord['evaluation']>['lev
   return '#d46d75';
 }
 
+function formatVideoDuration(seconds: number | null) {
+  if (seconds === null || !Number.isFinite(seconds) || seconds <= 0) {
+    return '\uC601\uC0C1 \uAE38\uC774 \uD655\uC778 \uC911';
+  }
+
+  const totalSeconds = Math.max(1, Math.round(seconds));
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+  return minutes > 0
+    ? `${minutes}:${String(remainingSeconds).padStart(2, '0')}`
+    : `${remainingSeconds}\uCD08`;
+}
+
+const RecordVideoDuration = memo(function RecordVideoDuration({ videoUri }: { videoUri: string }) {
+  const player = useVideoPlayer({ uri: videoUri });
+  const [durationSeconds, setDurationSeconds] = useState<number | null>(null);
+
+  useEventListener(player, 'sourceLoad', ({ duration }) => {
+    if (Number.isFinite(duration) && duration > 0) {
+      setDurationSeconds(duration);
+    }
+  });
+
+  return <Text style={styles.allRecordsRowDuration}>{formatVideoDuration(durationSeconds)}</Text>;
+});
+
 function polarToCartesian(
   centerX: number,
   centerY: number,
@@ -860,6 +892,7 @@ const EvaluationProgressRing = memo(function EvaluationProgressRing({
   size = 148,
   strokeWidth = 14,
   segmentGapDegrees = 8,
+  onCriterionPress,
 }: EvaluationProgressRingProps) {
   const segments = useMemo<EvaluationProgressRingSegment[]>(
     () =>
@@ -867,6 +900,7 @@ const EvaluationProgressRing = memo(function EvaluationProgressRing({
         key: criterion.key,
         label: getDiaryCriterionDisplayLabel(criterion),
         ratio: getDiaryCriterionStableRatio(criterion),
+        criterion,
       })),
     [criteria]
   );
@@ -892,6 +926,13 @@ const EvaluationProgressRing = memo(function EvaluationProgressRing({
           const segmentStart = index * segmentSpan + segmentGapDegrees / 2;
           const segmentEnd = segmentStart + availableSweep;
           const segmentMidAngle = segmentStart + availableSweep / 2;
+          const touchPath = buildRingArcPath(
+            center,
+            center,
+            radius,
+            segmentStart - 6,
+            segmentEnd + 6,
+          );
           const basePath = buildRingArcPath(center, center, radius, segmentStart, segmentEnd);
           const fillEnd = segmentStart + availableSweep * segment.ratio;
           const fillPath = buildRingArcPath(center, center, radius, segmentStart, fillEnd);
@@ -900,48 +941,35 @@ const EvaluationProgressRing = memo(function EvaluationProgressRing({
             Math.abs(labelPosition.x - center) < 10 ? 'middle' : labelPosition.x < center ? 'end' : 'start';
           const labelOffset = labelAnchor === 'start' ? 4 : labelAnchor === 'end' ? -4 : 0;
 
-          return fillPath
-            ? [
-                <Path
-                  key={`${segment.key}-base`}
-                  d={basePath}
-                  stroke="rgba(191,80,88,0.26)"
-                  strokeWidth={strokeWidth}
-                  strokeLinecap="butt"
-                  fill="none"
-                />,
-                <Path
-                  key={`${segment.key}-fill`}
-                  d={fillPath}
-                  stroke="rgba(87,194,106,0.96)"
-                  strokeWidth={strokeWidth}
-                  strokeLinecap="butt"
-                  fill="none"
-                />,
-                <SvgText
-                  key={`${segment.key}-label`}
-                  x={labelPosition.x + labelOffset}
-                  y={labelPosition.y}
-                  textAnchor={labelAnchor}
-                  alignmentBaseline="middle"
-                  fontSize={12}
-                  fontWeight="800"
-                  fill="rgba(255,255,255,0.78)"
-                >
-                  {segment.label}
-                </SvgText>,
-              ]
-            : [
+          return (
+            <G
+              key={segment.key}
+              onPress={() => onCriterionPress?.(segment.criterion)}
+            >
               <Path
-                key={`${segment.key}-base`}
+                d={touchPath}
+                stroke="rgba(0,0,0,0.01)"
+                strokeWidth={strokeWidth + 36}
+                strokeLinecap="round"
+                fill="none"
+              />
+              <Path
                 d={basePath}
                 stroke="rgba(191,80,88,0.26)"
                 strokeWidth={strokeWidth}
                 strokeLinecap="butt"
                 fill="none"
-              />,
+              />
+              {fillPath ? (
+                <Path
+                  d={fillPath}
+                  stroke="rgba(87,194,106,0.96)"
+                  strokeWidth={strokeWidth}
+                  strokeLinecap="butt"
+                  fill="none"
+                />
+              ) : null}
               <SvgText
-                key={`${segment.key}-label`}
                 x={labelPosition.x + labelOffset}
                 y={labelPosition.y}
                 textAnchor={labelAnchor}
@@ -951,8 +979,9 @@ const EvaluationProgressRing = memo(function EvaluationProgressRing({
                 fill="rgba(255,255,255,0.78)"
               >
                 {segment.label}
-              </SvgText>,
-            ];
+              </SvgText>
+            </G>
+          );
         })}
       </Svg>
 
@@ -1074,6 +1103,51 @@ function getDailySummaryEvaluationText(insight: DiarySkillInsight) {
 function getDailySummaryEvaluationCountText(insight: DiarySkillInsight) {
   const { good, average, bad } = insight.evaluationCounts;
   return `\uC88B\uC74C ${good}\uAC1C, \uBCF4\uD1B5 ${average}\uAC1C, \uB098\uC068 ${bad}\uAC1C`;
+}
+
+function getModeEvaluationCounts(records: LessonRecord[]): DiarySkillInsight['evaluationCounts'] {
+  return records.reduce(
+    (counts, record) => {
+      const level = record.evaluation?.level;
+      if (level) {
+        counts[level] += 1;
+      }
+      return counts;
+    },
+    { good: 0, average: 0, bad: 0 } as DiarySkillInsight['evaluationCounts']
+  );
+}
+
+function getModeEvaluationDominantLevel(
+  counts: DiarySkillInsight['evaluationCounts']
+): DiarySkillInsight['evaluationDominantLevel'] {
+  const total = counts.good + counts.average + counts.bad;
+  if (total === 0) {
+    return 'none';
+  }
+
+  const highestCount = Math.max(counts.good, counts.average, counts.bad);
+  const leaders = (['good', 'average', 'bad'] as const).filter((level) => counts[level] === highestCount);
+  return leaders.length === 1 ? leaders[0] : 'mixed';
+}
+
+function getModeSummaryStatusText(
+  dominantLevel: DiarySkillInsight['evaluationDominantLevel'],
+  totalCount: number
+) {
+  if (totalCount === 0 || dominantLevel === 'none') {
+    return '\uC774\uB0A0\uC758 \uC0C1\uD0DC\uB294 \uD3C9\uAC00 \uAE30\uB85D\uC774 \uC5C6\uC5B4\uC694';
+  }
+
+  if (dominantLevel === 'good') {
+    return '\uC774\uB0A0\uC758 \uC0C1\uD0DC\uB294 \uB300\uCCB4\uB85C \uC88B\uC74C\uC774\uC5D0\uC694';
+  }
+
+  if (dominantLevel === 'bad') {
+    return '\uC774\uB0A0\uC758 \uC0C1\uD0DC\uB294 \uB300\uCCB4\uB85C \uB098\uC068\uC774\uC5D0\uC694';
+  }
+
+  return '\uC774\uB0A0\uC758 \uC0C1\uD0DC\uB294 \uB300\uCCB4\uB85C \uBCF4\uD1B5\uC774\uC5D0\uC694';
 }
 
 function getRecordCardLevelStyle(level?: NonNullable<LessonRecord['evaluation']>['level']) {
@@ -1227,6 +1301,66 @@ function getDiaryCriterionDisplayLabel(criterion: LessonRecordCriterion) {
 
 function getDiaryCriterionInsightText(criterion: LessonRecordCriterion) {
   return getDiaryVisibleDetailText(criterion.detail);
+}
+
+function getDiaryCriterionReasonText(criterion: LessonRecordCriterion | null) {
+  if (!criterion) {
+    return '';
+  }
+
+  if (criterion.key === 'shoot-leg-angle') {
+    return '\uC810\uD504\uD558\uBA70 \uC2B4\uC5D0 \uD798\uC744 \uC2E4\uC5B4 \uC548\uC815\uC801\uC73C\uB85C \uC3D8\uC544\uC57C \uD558\uBBC0\uB85C \uBB34\uB98E \uAC01\uB3C4\uAC00 \uC911\uC694\uD569\uB2C8\uB2E4.';
+  }
+
+  if (criterion.key === 'shoot-release-timing') {
+    return '\uC810\uD504\uC640 \uB3D9\uC2DC\uC5D0 \uC29B\uC744 \uC3D8\uC544 \uD798\uC744 \uC804\uB2EC\uD574\uC57C \uD558\uBBC0\uB85C \uC29B \uD0C0\uC774\uBC0D\uC774 \uC911\uC694\uD569\uB2C8\uB2E4.';
+  }
+
+  if (criterion.key === 'shoot-release-point') {
+    return '\uC218\uBE44\uC5D0\uAC8C \uB9C9\uD788\uC9C0 \uC54A\uACE0 \uC29B\uC744 \uC3D8\uAE30 \uC704\uD574 \uBA38\uB9AC \uC704\uB85C \uD0C0\uC810\uC744 \uB192\uC5EC\uC57C \uD569\uB2C8\uB2E4.';
+  }
+
+  if (criterion.key === 'shoot-release-duration') {
+    return '\uC218\uBE44\uC218\uAC00 \uB9C9\uAE30 \uC804\uC5D0 \uBE60\uB974\uAC8C \uC29B\uC744 \uC3D8\uC544\uC57C \uD558\uBBC0\uB85C \uB9B4\uB9AC\uC988 \uC2DC\uAC04\uC774 \uC9E7\uC544\uC57C \uD569\uB2C8\uB2E4.';
+  }
+
+  if (criterion.key === 'dribble-front-stance-angle') {
+    return '\uB0AE\uC740 \uC790\uC138\uB85C \uC911\uC2EC\uC744 \uC7A1\uACE0 \uBC29\uD5A5\uC744 \uBE60\uB974\uAC8C \uBC14\uAFB8\uAE30 \uC704\uD574 \uBB34\uB98E \uAC01\uB3C4\uAC00 \uC911\uC694\uD569\uB2C8\uB2E4.';
+  }
+
+  if (criterion.key === 'dribble-front-ball-lane') {
+    return '\uACF5\uC744 \uBA38\uB9AC\uC640 \uBAB8\uC73C\uB85C \uBCF4\uD638\uD558\uACE0 \uB2E4\uC74C \uB3D9\uC791\uC73C\uB85C \uC5F0\uACB0\uD558\uAE30 \uC704\uD574 \uACF5 \uB77C\uC778\uC774 \uC911\uC694\uD569\uB2C8\uB2E4.';
+  }
+
+  if (criterion.key === 'dribble-front-foot-spacing') {
+    return '\uD751\uD2B8\uB7EC\uC9C0\uC9C0 \uC54A\uACE0 \uBE60\uB974\uAC8C \uBC29\uD5A5\uC744 \uBC14\uAFB8\uAE30 \uC704\uD574 \uBC1C \uAC04\uACA9\uC774 \uC911\uC694\uD569\uB2C8\uB2E4.';
+  }
+
+  if (criterion.key === 'dribble-torso-posture') {
+    return '\uC911\uC2EC\uC744 \uC7A1\uACE0 \uBCFC\uC744 \uBCF4\uD638\uD558\uBA70 \uC548\uC815\uC801\uC73C\uB85C \uB4DC\uB9AC\uBE14\uD558\uAE30 \uC704\uD574 \uC0C1\uCCB4 \uAE30\uC6B8\uAE30\uAC00 \uC911\uC694\uD569\uB2C8\uB2E4.';
+  }
+
+  if (criterion.key === 'dribble-height' || criterion.key === 'dribble-height-appropriate') {
+    return '\uB4DC\uB9AC\uBE14\uC744 \uC81C\uC5B4\uD558\uACE0 \uC218\uBE44\uC5D0\uAC8C \uACF5\uC744 \uBE7C\uC557\uAE30\uC9C0 \uC54A\uAE30 \uC704\uD574 \uB4DC\uB9AC\uBE14 \uB192\uC774\uB97C \uC720\uC9C0\uD574\uC57C \uD569\uB2C8\uB2E4.';
+  }
+
+  if (criterion.key === 'dribble-eye-focus') {
+    return '\uC8FC\uBCC0 \uC0C1\uD669\uACFC \uC218\uBE44\uC218\uB97C \uD655\uC778\uD558\uBA70 \uD310\uB2E8\uD558\uAE30 \uC704\uD574 \uC2DC\uC120\uC744 \uC55E\uC73C\uB85C \uB450\uB294 \uAC83\uC774 \uC911\uC694\uD569\uB2C8\uB2E4.';
+  }
+
+  if (criterion.key === 'dribble-rhythm' || criterion.key === 'dribble-tempo-stability') {
+    return '\uAC19\uC740 \uBC15\uC790\uB85C \uB4DC\uB9AC\uBE14\uD574\uC57C \uD0C0\uC774\uBC0D\uC774 \uD750\uD2B8\uB7EC\uC9C0\uC9C0 \uC54A\uACE0 \uB2E4\uC74C \uB3D9\uC791\uC73C\uB85C \uC5F0\uACB0\uB429\uB2C8\uB2E4.';
+  }
+
+  if (criterion.key === 'dribble-position-stability') {
+    return '\uACF5\uC744 \uBAB8 \uC606\uC5D0\uC11C \uC77C\uC815\uD558\uAC8C \uB4DC\uB9AC\uBE14\uD574\uC57C \uBCF4\uD638\uC640 \uBC29\uD5A5 \uC804\uD658\uC774 \uC26C\uC6CC\uC9D1\uB2C8\uB2E4.';
+  }
+
+  if (criterion.key === 'dribble-height-stability') {
+    return '\uC77C\uC815\uD55C \uB4DC\uB9AC\uBE14 \uB192\uC774\uB97C \uC720\uC9C0\uD574\uC57C \uACF5 \uC81C\uC5B4\uC640 \uBC29\uD5A5 \uC804\uD658\uC774 \uC548\uC815\uC801\uC785\uB2C8\uB2E4.';
+  }
+
+  return '\uC548\uC815\uC801\uC778 \uB3D9\uC791\uC744 \uC720\uC9C0\uD574\uC57C \uB2E4\uC74C \uB3D9\uC791\uC73C\uB85C \uC790\uC5F0\uC2A4\uB7FD\uAC8C \uC774\uC5B4\uC9D1\uB2C8\uB2E4.';
 }
 
 function getDiaryCriterionStableRatio(criterion: LessonRecordCriterion) {
@@ -1837,10 +1971,7 @@ function getDailySummaryCoachingText(criterionKey: string) {
   return '\uC624\uB298 \uB098\uC628 \uD53C\uB4DC\uBC31\uC744 \uC911\uC2EC\uC73C\uB85C \uAC19\uC740 \uB3D9\uC791\uC744 \uD55C \uBC88 \uB354 \uBC18\uBCF5\uD574 \uBCF4\uC138\uC694.';
 }
 
-function buildDailySummaryAutoFeedback(
-  records: LessonRecord[],
-  insight: DiarySkillInsight
-): DailySummaryAutoFeedback {
+function buildDailySummaryAutoFeedback(records: LessonRecord[], statusText: string): DailySummaryAutoFeedback {
   const correctionCounts = new Map<string, DailySummaryCorrectionAggregate & { ratioTotal: number }>();
   let hasEvaluation = false;
 
@@ -1873,6 +2004,8 @@ function buildDailySummaryAutoFeedback(
 
       correctionCounts.set(correctionKey, {
         key: correctionKey,
+        categoryLabel,
+        criterionLabel: getDiaryCriterionDisplayLabel(criterion),
         label: `${categoryLabel} ${getDiaryCriterionDisplayLabel(criterion)}`,
         count: 1,
         averageStableRatio: ratio,
@@ -1896,8 +2029,6 @@ function buildDailySummaryAutoFeedback(
 
       return left.firstSeenIndex - right.firstSeenIndex;
     })[0] ?? null;
-  const statusText = getDailySummaryEvaluationText(insight);
-
   if (topCorrection) {
     return {
       statusText,
@@ -1905,6 +2036,8 @@ function buildDailySummaryAutoFeedback(
       nextPracticeText: topCorrection.coachText,
       toggleSubtext: `${topCorrection.label} \uD53C\uB4DC\uBC31\uC774 \uAC00\uC7A5 \uB9CE\uC544\uC694.`,
       topFeedbackRecordIds: topCorrection.recordIds,
+      topFeedbackCategoryLabel: topCorrection.categoryLabel,
+      topFeedbackCriterionLabel: topCorrection.criterionLabel,
     };
   }
 
@@ -1915,6 +2048,8 @@ function buildDailySummaryAutoFeedback(
       nextPracticeText: '\uC624\uB298 \uC548\uC815\uC801\uC774\uC5C8\uB358 \uC790\uC138 \uAC10\uAC01\uC744 \uAC19\uAC8C \uD55C \uBC88 \uB354 \uBC18\uBCF5\uD574 \uBCF4\uC138\uC694.',
       toggleSubtext: '\uC624\uB298\uC740 \uD06C\uAC8C \uACE0\uCCD0\uC57C \uD560 \uD53C\uB4DC\uBC31\uC774 \uB9CE\uC9C0 \uC54A\uC544\uC694.',
       topFeedbackRecordIds: [],
+      topFeedbackCategoryLabel: null,
+      topFeedbackCriterionLabel: null,
     };
   }
 
@@ -1924,6 +2059,8 @@ function buildDailySummaryAutoFeedback(
     nextPracticeText: '\uAE30\uB85D\uC774 \uB354 \uC313\uC774\uBA74 \uB2E4\uC74C \uC5F0\uC2B5 \uD3EC\uC778\uD2B8\uB97C \uC790\uC138\uD788 \uBCFC \uC218 \uC788\uC5B4\uC694.',
     toggleSubtext: '\uC544\uC9C1 \uD53C\uB4DC\uBC31 \uAE30\uB85D\uC774 \uB354 \uD544\uC694\uD574\uC694.',
     topFeedbackRecordIds: [],
+    topFeedbackCategoryLabel: null,
+    topFeedbackCriterionLabel: null,
   };
 }
 
@@ -2431,6 +2568,7 @@ function getSuccessRateHeadline(
 }
 
 export function DiaryScreen({
+  diaryEntryToken,
   currentDate,
   calendarCells,
   selectedDateKey,
@@ -2445,7 +2583,6 @@ export function DiaryScreen({
   onClearHomeworkLinkedDiaryContext,
   onGoBack,
   onToggleShotOutcome,
-  onToggleStarredRecord,
   onRepairRecordThumbnail,
   onDeleteRecord,
 }: DiaryScreenProps) {
@@ -2463,6 +2600,7 @@ export function DiaryScreen({
   const [recordSort, setRecordSort] = useState<RecordSort>('latest');
   const [selectedRecordMode, setSelectedRecordMode] = useState<DiaryRecordMode>('shoot');
   const [showRecordFilterMenu, setShowRecordFilterMenu] = useState(false);
+  const [showAllRecordsModal, setShowAllRecordsModal] = useState(false);
   const [showDailySummary, setShowDailySummary] = useState(false);
   const [successRateRange, setSuccessRateRange] = useState<SuccessRateRange>('daily');
   const [showSuccessRateRangeMenu, setShowSuccessRateRangeMenu] = useState(false);
@@ -2471,9 +2609,11 @@ export function DiaryScreen({
   const [selectedCriterionKey, setSelectedCriterionKey] = useState<string | null>(null);
   const [pendingDeleteRecordId, setPendingDeleteRecordId] = useState<string | null>(null);
   const [recordCarouselIndices, setRecordCarouselIndices] = useState<Record<string, number>>({});
+  const [overviewCarouselIndex, setOverviewCarouselIndex] = useState(0);
   const evaluationVideoRef = useRef<VideoPlayer | null>(null);
   const evaluationScrollRef = useRef<ScrollView | null>(null);
   const recordListRefs = useRef<Record<string, FlatList<LessonRecord> | null>>({});
+  const overviewCarouselRef = useRef<ScrollView | null>(null);
   const playbackPollersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
   const pendingCriterionComparisonScrollRef = useRef(false);
   const menuOpenSpacerHeight = showSuccessRateRangeMenu ? 220 : 0;
@@ -2501,21 +2641,27 @@ export function DiaryScreen({
   );
 
   useEffect(() => {
-    setShowDailySummary(false);
-  }, [selectedDateKey]);
-
-  useEffect(() => {
     setPendingHomeworkOpenedRecordId(homeworkLinkedDiaryContext?.openedRecordId?.trim() || null);
   }, [homeworkLinkedDiaryContext?.dateKey, homeworkLinkedDiaryContext?.openedRecordId]);
 
   useEffect(() => {
+    setShowCalendarModal(true);
+  }, [diaryEntryToken]);
+
+  useEffect(() => {
     setRecordCarouselIndices({});
+    setOverviewCarouselIndex(0);
     requestAnimationFrame(() => {
       Object.values(recordListRefs.current).forEach((recordListRef) => {
         recordListRef?.scrollToOffset({ offset: 0, animated: false });
       });
+      overviewCarouselRef.current?.scrollTo({ x: 0, animated: false });
     });
   }, [homeworkLinkedRecordIdsKey, recordSort, selectedDateKey, selectedRecordMode]);
+
+  useEffect(() => {
+    setShowAllRecordsModal(false);
+  }, [selectedDateKey, selectedRecordMode]);
 
   const successRateComparisonData = useMemo(
     () =>
@@ -2599,20 +2745,51 @@ export function DiaryScreen({
       },
     ];
   }, [baseDateRecords, homeworkLinkedDiaryContext, recordSort, selectedDateKey, selectedRecordMode]);
-  const dailySummaryAutoFeedback = useMemo(
-    () => buildDailySummaryAutoFeedback(selectedDateRecords, diarySkillInsight),
-    [diarySkillInsight, selectedDateRecords]
+  const selectedModeRecords = useMemo(
+    () => selectedDateRecords.filter((record) => record.mode === selectedRecordMode),
+    [selectedDateRecords, selectedRecordMode]
   );
+  const selectedModeEvaluationCounts = useMemo(
+    () => getModeEvaluationCounts(selectedModeRecords),
+    [selectedModeRecords]
+  );
+  const selectedModeEvaluationTotal =
+    selectedModeEvaluationCounts.good + selectedModeEvaluationCounts.average + selectedModeEvaluationCounts.bad;
+  const selectedModeEvaluationDominantLevel = useMemo(
+    () => getModeEvaluationDominantLevel(selectedModeEvaluationCounts),
+    [selectedModeEvaluationCounts]
+  );
+  const selectedModeStatusText = getModeSummaryStatusText(
+    selectedModeEvaluationDominantLevel,
+    selectedModeEvaluationTotal
+  );
+  const dailySummaryAutoFeedback = useMemo(
+    () => buildDailySummaryAutoFeedback(selectedModeRecords, selectedModeStatusText),
+    [selectedModeRecords, selectedModeStatusText]
+  );
+  const selectedModePracticeCount = selectedRecordMode === 'shoot'
+    ? diarySkillInsight.selectedShotAttempts
+    : dribbleGraphTotal;
+  const selectedModePracticeLabel = selectedRecordMode === 'shoot' ? '\uC29B \uC2DC\uB3C4' : '\uB4DC\uB9AC\uBE14';
+  const selectedModeLabel = selectedRecordMode === 'shoot' ? '\uC29B' : '\uB4DC\uB9AC\uBE14';
+  const selectedModeFeedbackText = dailySummaryAutoFeedback.topFeedbackRecordIds.length > 0
+    ? `${dailySummaryAutoFeedback.topFeedbackCategoryLabel ?? selectedModeLabel} \uB808\uC2A8\uC5D0\uC11C\uB294 ${dailySummaryAutoFeedback.topFeedbackCriterionLabel ?? '\uBCF4\uC644'} \uD53C\uB4DC\uBC31\uC774 \uAC00\uC7A5 \uB9CE\uC544\uC694.`
+    : `${selectedModeLabel} \uB808\uC2A8\uC5D0\uC11C\uB294 \uB6F0\uB837\uD55C \uBCF4\uC644 \uD53C\uB4DC\uBC31\uC774 \uC5C6\uC5B4\uC694.`;
   const dailySummaryTopFeedbackRecords = useMemo(() => {
-    if (dailySummaryAutoFeedback.topFeedbackRecordIds.length === 0) {
-      return [] as LessonRecord[];
-    }
-
     const selectedDateRecordMap = new Map(selectedDateRecords.map((record) => [record.id, record] as const));
     return dailySummaryAutoFeedback.topFeedbackRecordIds
       .map((recordId) => selectedDateRecordMap.get(recordId) ?? null)
       .filter((record): record is LessonRecord => record !== null);
   }, [dailySummaryAutoFeedback.topFeedbackRecordIds, selectedDateRecords]);
+  const shootSuccessGraphData = useMemo(() => {
+    const eligibleData = shotGraphData
+      .filter((item) => item.attempts > 0)
+      .slice()
+      .sort((left, right) => left.dateKey.localeCompare(right.dateKey));
+    const selectedIndex = eligibleData.findIndex((item) => item.dateKey === selectedDateKey);
+    const endIndex = selectedIndex >= 0 ? selectedIndex + 1 : eligibleData.length;
+    return eligibleData.slice(Math.max(0, endIndex - 3), endIndex);
+  }, [selectedDateKey, shotGraphData]);
   const dailyRecordRankingByMode = useMemo(
     () => ({
       shoot: buildDailyRecordRankingGroup(baseDateRecords.filter((record) => record.mode === 'shoot')),
@@ -2620,6 +2797,48 @@ export function DiaryScreen({
     }),
     [baseDateRecords]
   );
+  const allModeRecords = useMemo(
+    () => sortDiaryRecords(
+      baseDateRecords.filter((record) => record.mode === selectedRecordMode),
+      recordSort
+    ),
+    [baseDateRecords, recordSort, selectedRecordMode]
+  );
+  const selectedModeRanking = selectedRecordMode === 'shoot'
+    ? dailyRecordRankingByMode.shoot
+    : dailyRecordRankingByMode.dribble;
+  const featuredRecords = useMemo(() => {
+    const records: LessonRecord[] = [];
+    const bestRecord = selectedModeRanking.best?.record;
+    const worstRecord = selectedModeRanking.worst?.record;
+
+    if (bestRecord) {
+      records.push(bestRecord);
+    }
+
+    if (worstRecord && worstRecord.id !== bestRecord?.id) {
+      records.push(worstRecord);
+    }
+
+    return records;
+  }, [selectedModeRanking.best?.record, selectedModeRanking.worst?.record]);
+  const overviewCarouselCardCount = featuredRecords.length + 2;
+  const moveOverviewCarousel = (delta: number) => {
+    const nextIndex = Math.max(
+      0,
+      Math.min(overviewCarouselCardCount - 1, overviewCarouselIndex + delta),
+    );
+
+    if (nextIndex === overviewCarouselIndex) {
+      return;
+    }
+
+    setOverviewCarouselIndex(nextIndex);
+    overviewCarouselRef.current?.scrollTo({
+      x: nextIndex * recordListItemWidth,
+      animated: true,
+    });
+  };
   const openedEvaluationRecord = useMemo(
     () => (openedEvaluationRecordId ? selectedDateRecords.find((record) => record.id === openedEvaluationRecordId) ?? null : null),
     [openedEvaluationRecordId, selectedDateRecords]
@@ -3022,6 +3241,7 @@ export function DiaryScreen({
               level={evaluation.level}
               size={isCompactMobile ? 160 : 172}
               strokeWidth={15}
+              onCriterionPress={(criterion) => handleCriterionPress(record, criterion)}
             />
           </View>
 
@@ -3048,64 +3268,6 @@ export function DiaryScreen({
           </View>
         </View>
 
-        {orderedDisplayedCriteria.length > 0 ? (
-          <View style={styles.criteriaList}>
-            {orderedDisplayedCriteria.map((criterion) => {
-              const isSelected = criterion.key === selectedCriterionKey;
-              const criterionDetail = getDiaryCriterionInsightText(criterion);
-              const criterionLabel = getDiaryCriterionDisplayLabel(criterion);
-              const stableRatio = getDiaryCriterionStableRatio(criterion);
-              const content = (
-                <View style={styles.dribbleCriterionMeterSurface}>
-                  <View
-                    style={[
-                      styles.dribbleCriterionMeterFill,
-                      {
-                        width: `${stableRatio * 100}%`,
-                      },
-                    ]}
-                  />
-                  <View style={styles.dribbleCriterionMeterContent}>
-                    <Text style={styles.dribbleCriterionMeterTitle}>{criterionLabel}</Text>
-                    {criterionDetail ? (
-                      <Text style={styles.dribbleCriterionMeterDescription}>{criterionDetail}</Text>
-                    ) : null}
-                  </View>
-                </View>
-              );
-
-              if (record.mode === 'dribble') {
-                return (
-                  <Pressable
-                    key={`${record.id}-${criterion.key}`}
-                    onPress={() => handleCriterionPress(record, criterion)}
-                    style={({ pressed }) => [
-                      styles.dribbleCriterionMeter,
-                      isSelected && styles.dribbleCriterionMeterSelected,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    {content}
-                  </Pressable>
-                );
-              }
-
-              return (
-                <Pressable
-                  key={`${record.id}-${criterion.key}`}
-                  onPress={() => handleCriterionPress(record, criterion)}
-                  style={({ pressed }) => [
-                    styles.dribbleCriterionMeter,
-                    isSelected && styles.dribbleCriterionMeterSelected,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  {content}
-                </Pressable>
-              );
-            })}
-          </View>
-        ) : null}
       </View>
     );
   }
@@ -3147,20 +3309,6 @@ export function DiaryScreen({
 
           <View style={styles.recordHeaderActions}>
             {renderRecordLevelBadge(evaluation?.level)}
-            <Pressable
-              accessibilityLabel={record.isStarred ? '체크한 기록 고정 해제' : '기록을 맨 앞에 고정'}
-              accessibilityRole="button"
-              hitSlop={10}
-              onPress={() => onToggleStarredRecord(record.id)}
-              style={({ pressed }) => [
-                styles.recordStarToggle,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text style={[styles.recordStarToggleIcon, record.isStarred && styles.recordStarToggleIconActive]}>
-                {record.isStarred ? '★' : '☆'}
-              </Text>
-            </Pressable>
           </View>
         </View>
 
@@ -3196,7 +3344,6 @@ export function DiaryScreen({
     openDeleteConfirm,
     openRecordEvaluation,
     onRepairRecordThumbnail,
-    onToggleStarredRecord,
     recordCardWidth,
   ]);
 
@@ -3421,7 +3568,7 @@ export function DiaryScreen({
         </Pressable>
       </View>
       <View style={styles.recordModeTabBar}>
-        {(['dribble', 'shoot'] as DiaryRecordMode[]).map((mode, index) => {
+        {(['shoot', 'dribble'] as DiaryRecordMode[]).map((mode, index) => {
           const isActive = selectedRecordMode === mode;
 
           return (
@@ -3447,8 +3594,7 @@ export function DiaryScreen({
       </View>
 
       <View style={styles.recordsSection}>
-        <View style={[styles.contentRow, isWide && styles.contentRowWide]}>
-          <View style={[styles.graphColumn, isWide && styles.graphColumnWide]}>
+        <View style={[styles.graphColumn, isWide && styles.graphColumnWide, styles.graphColumnHidden]}>
             <View style={styles.skillInsightCard}>
               {!selectedDateKey ? (
                 <View style={[styles.skillInsightStatCard, styles.skillInsightEmptyCard]}>
@@ -3457,7 +3603,36 @@ export function DiaryScreen({
               ) : (
                 <>
                   <View style={styles.skillInsightStats}>
-                    {diarySkillInsight.canShowDailySummary ? (
+                    <View style={[styles.modeSummarySection, styles.skillInsightDividedPanel]}>
+                      <Text
+                        style={[
+                          styles.modeSummaryHeadline,
+                          getDailySummaryStatusColorStyle(selectedModeEvaluationDominantLevel),
+                        ]}
+                      >
+                        {selectedModeStatusText}
+                      </Text>
+                      <Text style={styles.modeSummaryFeedback}>{selectedModeFeedbackText}</Text>
+                      <View style={styles.modeSummaryStatsRow}>
+                        <View style={styles.modeSummaryStatItem}>
+                          <Text style={styles.modeSummaryStatLabel}>{'연습량'}</Text>
+                          <Text style={styles.modeSummaryStatValue}>{`${selectedModePracticeLabel} ${selectedModePracticeCount}회`}</Text>
+                        </View>
+                        <View style={styles.modeSummaryStatItem}>
+                          <Text style={styles.modeSummaryStatLabel}>{'기록 개수'}</Text>
+                          <Text style={styles.modeSummaryStatValue}>{`${selectedModeRecords.length}개`}</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.modeSummaryCounts}>
+                        <Text style={styles.recordFilterCountBad}>{`나쁨 ${selectedModeEvaluationCounts.bad}`}</Text>
+                        <Text style={styles.recordFilterCountsSpacer}>{'   '}</Text>
+                        <Text style={styles.recordFilterCountAverage}>{`보통 ${selectedModeEvaluationCounts.average}`}</Text>
+                        <Text style={styles.recordFilterCountsSpacer}>{'   '}</Text>
+                        <Text style={styles.recordFilterCountGood}>{`좋음 ${selectedModeEvaluationCounts.good}`}</Text>
+                      </Text>
+                    </View>
+
+                    {false ? (
                       <View style={[styles.dailySummarySection, styles.skillInsightDividedPanel]}>
                         <Pressable
                           onPress={() => setShowDailySummary((current) => !current)}
@@ -3585,6 +3760,7 @@ export function DiaryScreen({
                       </View>
                     ) : null}
 
+                    {false ? (
                     <View style={[styles.skillInsightStatCard, styles.skillInsightShotCard, styles.skillInsightDividedPanel]}>
                       <View style={styles.skillInsightShotHeader}>
                         <View style={styles.skillInsightShotTitleWrap}>
@@ -3794,7 +3970,9 @@ export function DiaryScreen({
                         </Text>
                       )}
                     </View>
+                    ) : null}
 
+                    <>
                     <View style={[styles.skillInsightStatCard, styles.skillInsightDividedPanel]}>
                       <Text style={styles.skillInsightStatLabel}>{'\uB4DC\uB9AC\uBE14 \uADE0\uD615'}</Text>
                       <Text style={styles.skillInsightNarration}>
@@ -3857,13 +4035,40 @@ export function DiaryScreen({
                         ) : null}
                       </View>
                     </View>
+                    
+                      <View style={[styles.skillInsightStatCard, styles.modeShotGraphCard, styles.skillInsightDividedPanel]}>
+                        <Text style={styles.skillInsightStatLabel}>{'슛 성공률'}</Text>
+                        {shootSuccessGraphData.length > 0 ? (
+                          <View style={styles.modeShotGraphRow}>
+                            {shootSuccessGraphData.map((item) => (
+                              <View key={item.dateKey} style={styles.modeShotGraphItem}>
+                                <Text style={styles.modeShotGraphValue}>{`${item.successRate}%`}</Text>
+                                <View style={styles.modeShotGraphTrack}>
+                                  {item.successRate > 0 ? (
+                                    <View
+                                      style={[
+                                        styles.modeShotGraphFill,
+                                        { height: `${item.successRate}%` },
+                                      ]}
+                                    />
+                                  ) : null}
+                                </View>
+                                <Text style={styles.modeShotGraphLabel}>{formatDiarySummaryDateLabel(item.dateKey)}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        ) : (
+                          <Text style={styles.graphEmpty}>{'슛 성공률 기록이 없습니다.'}</Text>
+                        )}
+                      </View>
+                    </>
                   </View>
                 </>
               )}
             </View>
           </View>
 
-          <View style={[styles.recordsColumn, isWide && styles.recordsColumnWide]}>
+        <View style={[styles.recordsColumn, isWide && styles.recordsColumnWide]}>
             {homeworkLinkedDiaryContext ? (
               <View style={styles.homeworkLinkedBanner}>
                 <View style={styles.homeworkLinkedBannerTextWrap}>
@@ -3881,63 +4086,293 @@ export function DiaryScreen({
               </View>
             ) : null}
 
-            <View style={styles.recordFilterHeaderRow}>
-              <View style={styles.recordFilterWrap}>
-                <Pressable
-                  onPress={() => {
-                    setShowRecordFilterMenu((current) => !current);
-                    setShowSuccessRateRangeMenu(false);
-                  }}
-                  style={({ pressed }) => [
-                    styles.recordFilterDropdown,
-                    pressed && styles.pressed,
+            <View style={styles.featuredRecordsCarousel}>
+              <ScrollView
+                ref={overviewCarouselRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                onMomentumScrollEnd={(event) => {
+                  const nextIndex = Math.max(
+                    0,
+                    Math.min(
+                      overviewCarouselCardCount - 1,
+                      Math.round(event.nativeEvent.contentOffset.x / recordListItemWidth),
+                    ),
+                  );
+                  setOverviewCarouselIndex(nextIndex);
+                }}
+                contentContainerStyle={[
+                  styles.featuredRecordsContent,
+                  {
+                    paddingLeft: Math.max(0, (layoutWidth - recordCardWidth) / 2),
+                    paddingRight: Math.max(12, (layoutWidth - recordCardWidth) / 2),
+                  },
+                ]}
+              >
+              <View style={[styles.recordOverviewCard, styles.recordOverviewCombinedCard, { width: recordCardWidth }]}>
+                <Text style={styles.recordOverviewTitle}>{'하루 총평'}</Text>
+                <Text
+                  style={[
+                    styles.modeSummaryHeadline,
+                    getDailySummaryStatusColorStyle(selectedModeEvaluationDominantLevel),
                   ]}
                 >
-                  <Text style={styles.recordFilterDropdownText}>{'\uAE30\uB85D \uBCF4\uAE30: '}{getRecordSortLabel(recordSort)}</Text>
-                  <Text style={styles.recordFilterDropdownIcon}>{showRecordFilterMenu ? '\u25B2' : '\u25BC'}</Text>
-                </Pressable>
-
-                {showRecordFilterMenu ? (
-                  <View style={styles.recordFilterMenu}>
-                    {(['latest', 'best', 'worst'] as RecordSort[]).map((sortOption) => (
-                      <Pressable
-                        key={sortOption}
-                        onPress={() => {
-                          setRecordSort(sortOption);
-                          setShowRecordFilterMenu(false);
-                        }}
-                        style={({ pressed }) => [
-                          styles.recordFilterMenuItem,
-                          recordSort === sortOption && styles.recordFilterMenuItemActive,
-                          pressed && styles.pressed,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.recordFilterMenuText,
-                            recordSort === sortOption && styles.recordFilterMenuTextActive,
-                          ]}
-                        >
-                          {getRecordSortLabel(sortOption)}
-                        </Text>
-                      </Pressable>
-                    ))}
+                  {selectedModeStatusText}
+                </Text>
+                <Text style={styles.modeSummaryFeedback}>{selectedModeFeedbackText}</Text>
+                <View style={styles.modeSummaryStatsRow}>
+                  <View style={styles.modeSummaryStatItem}>
+                    <Text style={styles.modeSummaryStatLabel}>{'연습량'}</Text>
+                    <Text style={styles.modeSummaryStatValue}>{`${selectedModePracticeLabel} ${selectedModePracticeCount}회`}</Text>
                   </View>
-                ) : null}
+                  <View style={styles.modeSummaryStatItem}>
+                    <Text style={styles.modeSummaryStatLabel}>{'기록 개수'}</Text>
+                    <Text style={styles.modeSummaryStatValue}>{`${selectedModeRecords.length}개`}</Text>
+                  </View>
+                </View>
+                <Text style={styles.modeSummaryCounts}>
+                  <Text style={styles.recordFilterCountBad}>{`나쁨 ${selectedModeEvaluationCounts.bad}`}</Text>
+                  <Text style={styles.recordFilterCountsSpacer}>{'   '}</Text>
+                  <Text style={styles.recordFilterCountAverage}>{`보통 ${selectedModeEvaluationCounts.average}`}</Text>
+                  <Text style={styles.recordFilterCountsSpacer}>{'   '}</Text>
+                  <Text style={styles.recordFilterCountGood}>{`좋음 ${selectedModeEvaluationCounts.good}`}</Text>
+                </Text>
+              <View style={styles.recordOverviewDivider} />
+
+              {selectedRecordMode === 'dribble' ? (
+                <View style={styles.recordOverviewSection}>
+                  <Text style={styles.recordOverviewTitle}>{'드리블 균형'}</Text>
+                  <Text style={styles.skillInsightNarration}>
+                    {getDribbleBalanceHeadline(diarySkillInsight, dribbleGraphTotal)}
+                  </Text>
+                  <View style={styles.dribbleBalanceLegendRow}>
+                    <View style={styles.dribbleBalanceLegendItem}>
+                      <View
+                        style={[
+                          styles.dribbleBalanceLegendDot,
+                          isLeftDribbleDominant
+                            ? styles.dribbleBalanceLegendDotDominant
+                            : styles.dribbleBalanceLegendDotSubtle,
+                        ]}
+                      />
+                      <Text style={styles.dribbleBalanceLegendText}>{`왼손 ${diarySkillInsight.leftDribbleCount}회`}</Text>
+                    </View>
+                    <View style={styles.dribbleBalanceLegendItem}>
+                      <View
+                        style={[
+                          styles.dribbleBalanceLegendDot,
+                          isRightDribbleDominant
+                            ? styles.dribbleBalanceLegendDotDominant
+                            : styles.dribbleBalanceLegendDotSubtle,
+                        ]}
+                      />
+                      <Text style={styles.dribbleBalanceLegendText}>{`오른손 ${diarySkillInsight.rightDribbleCount}회`}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.dribbleBalanceTrack}>
+                    {diarySkillInsight.leftDribbleCount > 0 ? (
+                      <View
+                        style={[
+                          styles.dribbleBalanceFill,
+                          isLeftDribbleDominant
+                            ? styles.dribbleBalanceFillDominant
+                            : styles.dribbleBalanceFillSubtle,
+                          styles.dribbleBalanceFillLeftEdge,
+                          { width: leftDribbleGraphWidth },
+                          diarySkillInsight.rightDribbleCount === 0 && styles.dribbleBalanceFillSolo,
+                        ]}
+                      />
+                    ) : null}
+                    {diarySkillInsight.rightDribbleCount > 0 ? (
+                      <View
+                        style={[
+                          styles.dribbleBalanceFill,
+                          isRightDribbleDominant
+                            ? styles.dribbleBalanceFillDominant
+                            : styles.dribbleBalanceFillSubtle,
+                          styles.dribbleBalanceFillRightEdge,
+                          { width: rightDribbleGraphWidth },
+                          diarySkillInsight.leftDribbleCount === 0 && styles.dribbleBalanceFillSolo,
+                        ]}
+                      />
+                    ) : null}
+                  </View>
+                </View>
+              ) : (
+                <View style={[styles.recordOverviewSection, styles.modeShotGraphCard]}>
+                  <Text style={styles.recordOverviewTitle}>{'슛 성공률'}</Text>
+                  {shootSuccessGraphData.length > 0 ? (
+                    <View style={styles.modeShotGraphRow}>
+                      {shootSuccessGraphData.map((item) => (
+                        <View key={item.dateKey} style={styles.modeShotGraphItem}>
+                          <Text style={styles.modeShotGraphValue}>{`${item.successRate}%`}</Text>
+                          <View style={styles.modeShotGraphTrack}>
+                            {item.successRate > 0 ? (
+                              <View style={[styles.modeShotGraphFill, { height: `${item.successRate}%` }]} />
+                            ) : null}
+                          </View>
+                          <Text style={styles.modeShotGraphLabel}>{formatDiarySummaryDateLabel(item.dateKey)}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={styles.graphEmpty}>{'슛 성공률 기록이 없습니다.'}</Text>
+                  )}
+                </View>
+              )}
               </View>
 
-              {selectedDateKey ? renderEvaluationCountSummary(diarySkillInsight) : null}
+              {featuredRecords.map((record) => (
+                <View key={`featured-${record.id}`}>
+                  {renderRecordCard(record)}
+                </View>
+              ))}
+              <Pressable
+                onPress={() => {
+                  setRecordSort('latest');
+                  setShowAllRecordsModal(true);
+                }}
+                style={({ pressed }) => [
+                  styles.allRecordsCard,
+                  { width: recordCardWidth },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.allRecordsCardTitle}>{'전체 기록 보기'}</Text>
+                <Text style={styles.allRecordsCardCount}>{`${allModeRecords.length}개 기록`}</Text>
+                <Text style={styles.allRecordsCardHint}>{'최신 기록부터 보기'}</Text>
+              </Pressable>
+              </ScrollView>
+
+              {overviewCarouselCardCount > 1 ? (
+                <>
+                  <Pressable
+                    onPress={() => moveOverviewCarousel(-1)}
+                    disabled={overviewCarouselIndex === 0}
+                    hitSlop={8}
+                    style={({ pressed }) => [
+                      styles.recordCarouselArrow,
+                      styles.recordCarouselArrowLeft,
+                      overviewCarouselIndex === 0 && styles.recordCarouselArrowDisabled,
+                      pressed && overviewCarouselIndex > 0 && styles.pressed,
+                    ]}
+                  >
+                    <DateArrowIcon direction="left" />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => moveOverviewCarousel(1)}
+                    disabled={overviewCarouselIndex >= overviewCarouselCardCount - 1}
+                    hitSlop={8}
+                    style={({ pressed }) => [
+                      styles.recordCarouselArrow,
+                      styles.recordCarouselArrowRight,
+                      overviewCarouselIndex >= overviewCarouselCardCount - 1 && styles.recordCarouselArrowDisabled,
+                      pressed && overviewCarouselIndex < overviewCarouselCardCount - 1 && styles.pressed,
+                    ]}
+                  >
+                    <DateArrowIcon direction="right" />
+                  </Pressable>
+                </>
+              ) : null}
             </View>
 
-            <View style={styles.recordSectionsStack}>
-              {recordSections.map((section) => renderRecordSection(section))}
-            </View>
-
-          </View>
         </View>
       </View>
 
       {menuOpenSpacerHeight > 0 ? <View style={[styles.menuOpenSpacer, { height: menuOpenSpacerHeight }]} /> : null}
+
+      <Modal
+        visible={showAllRecordsModal}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setShowAllRecordsModal(false)}
+      >
+        <View style={[styles.modalOverlay, styles.allRecordsModalOverlay]}>
+          <Pressable
+            style={styles.modalBackdropPressable}
+            onPress={() => setShowAllRecordsModal(false)}
+          />
+          <View style={[styles.modalCard, styles.allRecordsModalCard]}>
+            <View style={styles.allRecordsModalHeader}>
+              <Pressable
+                onPress={() => setShowAllRecordsModal(false)}
+                style={({ pressed }) => [styles.allRecordsModalBackButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.allRecordsModalBackButtonText}>{'<'}</Text>
+              </Pressable>
+              <Text style={styles.allRecordsModalTitle}>{'전체 기록 보기'}</Text>
+            </View>
+
+            <View style={styles.allRecordsSortRow}>
+              {(['latest', 'best', 'worst'] as RecordSort[]).map((sortOption) => (
+                <Pressable
+                  key={sortOption}
+                  onPress={() => setRecordSort(sortOption)}
+                  style={({ pressed }) => [
+                    styles.allRecordsSortButton,
+                    recordSort === sortOption && styles.allRecordsSortButtonActive,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.allRecordsSortButtonText,
+                      recordSort === sortOption && styles.allRecordsSortButtonTextActive,
+                    ]}
+                  >
+                    {getRecordSortLabel(sortOption)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.allRecordsListContent}
+            >
+              {allModeRecords.length > 0 ? (
+                allModeRecords.map((record) => (
+                  <Pressable
+                    key={`all-record-${record.id}`}
+                    onPress={() => {
+                      setShowAllRecordsModal(false);
+                      openRecordEvaluation(record.id);
+                    }}
+                    style={({ pressed }) => [
+                      styles.allRecordsRow,
+                      getRecordCardLevelStyle(record.evaluation?.level),
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <View style={styles.allRecordsRowMain}>
+                      <Text style={styles.allRecordsRowDate}>{record.createdAt}</Text>
+                      {record.videoUri ? (
+                        <RecordVideoDuration videoUri={record.videoUri} />
+                      ) : (
+                        <Text style={styles.allRecordsRowDuration}>{'영상 없음'}</Text>
+                      )}
+                    </View>
+                    <View style={styles.allRecordsRowStatus}>
+                      <View
+                        style={[
+                          styles.allRecordsRowStatusDot,
+                          { backgroundColor: getRecordLevelTone(record.evaluation?.level) },
+                        ]}
+                      />
+                      {record.evaluation ? renderRecordLevelBadge(record.evaluation.level) : (
+                        <Text style={styles.allRecordsRowStatusText}>{'평가 없음'}</Text>
+                      )}
+                    </View>
+                  </Pressable>
+                ))
+              ) : (
+                <Text style={styles.graphEmpty}>{'이 날짜에 저장된 기록이 없습니다.'}</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={openedEvaluationRecord !== null}
@@ -4012,6 +4447,18 @@ export function DiaryScreen({
                         {selectedCriterionComparison.currentDetail}
                       </Text>
                     ) : null}
+
+                    <View style={styles.selectedCriterionReasonSection}>
+                      <Text style={styles.selectedCriterionReasonTitle}>{'왜 지켜야 할까요?'}</Text>
+                      <Text style={styles.selectedCriterionReasonText}>
+                        {getDiaryCriterionReasonText(selectedEvaluationCriterion)}
+                      </Text>
+                      {selectedEvaluationCriterion && !selectedEvaluationCriterion.isStable ? (
+                        <Text style={styles.selectedCriterionCorrectionText}>
+                          {getDailySummaryCoachingText(selectedEvaluationCriterion.key)}
+                        </Text>
+                      ) : null}
+                    </View>
 
                     <Text style={styles.selectedCriterionComparisonSummary}>
                       {selectedCriterionComparison.previousRatio !== null && selectedCriterionComparison.previousDateKey
@@ -4124,7 +4571,7 @@ export function DiaryScreen({
       <Modal
         visible={showCalendarModal}
         transparent
-        animationType="fade"
+        animationType="none"
         statusBarTranslucent
         onRequestClose={() => setShowCalendarModal(false)}
       >
@@ -4177,19 +4624,12 @@ export function DiaryScreen({
                         styles.dayCellInner,
                         selectedDateKey === cell.dateKey && styles.dayCellInnerSelected,
                         todayDateKey === cell.dateKey && styles.dayCellInnerToday,
+                        cell.variant === 'good' && styles.dayCellInnerGood,
+                        cell.variant === 'average' && styles.dayCellInnerAverage,
+                        cell.variant === 'bad' && styles.dayCellInnerBad,
                       ]}
                     >
                       <Text style={styles.dayNumber}>{cell.date}</Text>
-                      {cell.variant !== 'default' ? (
-                        <View
-                          style={[
-                            styles.dayStatusDot,
-                            cell.variant === 'good' && styles.dayStatusDotGood,
-                            cell.variant === 'average' && styles.dayStatusDotAverage,
-                            cell.variant === 'bad' && styles.dayStatusDotBad,
-                          ]}
-                        />
-                      ) : null}
                     </View>
                   </Pressable>
                 );
@@ -4450,18 +4890,13 @@ const styles = StyleSheet.create({
   dayCellInnerToday: {
     backgroundColor: '#2f84c6',
   },
-  dayStatusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  dayStatusDotGood: {
+  dayCellInnerGood: {
     backgroundColor: '#6fcb7d',
   },
-  dayStatusDotAverage: {
+  dayCellInnerAverage: {
     backgroundColor: '#e6c45f',
   },
-  dayStatusDotBad: {
+  dayCellInnerBad: {
     backgroundColor: '#d46d75',
   },
   dayNumber: {
@@ -4563,6 +4998,9 @@ const styles = StyleSheet.create({
     width: '100%',
     flexShrink: 0,
   },
+  graphColumnHidden: {
+    display: 'none',
+  },
   skillInsightCard: {
     backgroundColor: 'transparent',
     borderRadius: 0,
@@ -4588,6 +5026,87 @@ const styles = StyleSheet.create({
     backgroundColor: DIARY_NEUTRAL_SURFACE,
     borderWidth: 0,
     borderColor: 'transparent',
+  },
+  modeSummarySection: {
+    gap: 10,
+    padding: 16,
+    backgroundColor: DIARY_NEUTRAL_SURFACE,
+  },
+  modeSummaryHeadline: {
+    color: colors.text,
+    fontSize: 18,
+    lineHeight: 26,
+    fontWeight: '900',
+  },
+  modeSummaryFeedback: {
+    color: colors.textSoft,
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: '700',
+  },
+  modeSummaryStatsRow: {
+    flexDirection: 'row',
+    gap: 18,
+    marginTop: 2,
+  },
+  modeSummaryStatItem: {
+    flex: 1,
+    gap: 3,
+  },
+  modeSummaryStatLabel: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  modeSummaryStatValue: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  modeSummaryCounts: {
+    color: colors.textSoft,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  modeShotGraphCard: {
+    paddingVertical: 12,
+  },
+  modeShotGraphRow: {
+    height: 126,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    gap: 14,
+    marginTop: 8,
+  },
+  modeShotGraphItem: {
+    width: 54,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 5,
+  },
+  modeShotGraphValue: {
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  modeShotGraphTrack: {
+    width: 34,
+    height: 84,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+  },
+  modeShotGraphFill: {
+    width: '100%',
+    minHeight: 5,
+    backgroundColor: '#32cd32',
+  },
+  modeShotGraphLabel: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
   },
   skillInsightEmptyCard: {
     minHeight: 88,
@@ -5124,6 +5643,67 @@ const styles = StyleSheet.create({
   recordSectionsStack: {
     gap: 18,
   },
+  featuredRecordsContent: {
+    gap: 14,
+    paddingRight: 12,
+  },
+  featuredRecordsCarousel: {
+    position: 'relative',
+    width: '100%',
+    justifyContent: 'center',
+  },
+  recordOverviewCard: {
+    minHeight: 260,
+    justifyContent: 'center',
+    padding: 16,
+    gap: 12,
+    backgroundColor: DIARY_NEUTRAL_SURFACE,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#77c8f2',
+  },
+  recordOverviewCombinedCard: {
+    justifyContent: 'flex-start',
+  },
+  recordOverviewSection: {
+    gap: 10,
+  },
+  recordOverviewDivider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: '#77c8f2',
+  },
+  recordOverviewTitle: {
+    color: colors.text,
+    fontSize: 19,
+    fontWeight: '900',
+  },
+  allRecordsCard: {
+    minHeight: 260,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor: DIARY_NEUTRAL_SURFACE,
+    borderWidth: 1,
+    borderColor: DIARY_NEUTRAL_BORDER,
+    gap: 10,
+  },
+  allRecordsCardTitle: {
+    color: colors.text,
+    fontSize: 19,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  allRecordsCardCount: {
+    color: colors.textSoft,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  allRecordsCardHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   recordSection: {
     gap: 10,
   },
@@ -5419,6 +5999,116 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: DIARY_NEUTRAL_BORDER,
   },
+  allRecordsModalOverlay: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  allRecordsModalCard: {
+    flex: 1,
+    width: '100%',
+    maxWidth: '100%',
+    maxHeight: '100%',
+    paddingTop: 32,
+    paddingBottom: 20,
+    paddingHorizontal: 16,
+    borderWidth: 0,
+    borderColor: 'transparent',
+  },
+  allRecordsModalHeader: {
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  allRecordsModalBackButton: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    minWidth: 46,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  allRecordsModalBackButtonText: {
+    color: colors.text,
+    fontSize: 28,
+    fontWeight: '500',
+  },
+  allRecordsModalTitle: {
+    color: colors.text,
+    fontSize: 21,
+    fontWeight: '900',
+  },
+  allRecordsSortRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  allRecordsSortButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+    backgroundColor: DIARY_NEUTRAL_SURFACE,
+  },
+  allRecordsSortButtonActive: {
+    backgroundColor: DIARY_NEUTRAL_ACTIVE,
+  },
+  allRecordsSortButtonText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  allRecordsSortButtonTextActive: {
+    color: colors.text,
+  },
+  allRecordsListContent: {
+    gap: 10,
+    paddingBottom: 24,
+  },
+  allRecordsRow: {
+    minHeight: 76,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: DIARY_NEUTRAL_SURFACE,
+    borderWidth: 1,
+    borderColor: DIARY_NEUTRAL_BORDER,
+  },
+  allRecordsRowMain: {
+    flex: 1,
+    minWidth: 0,
+    gap: 5,
+  },
+  allRecordsRowDate: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  allRecordsRowDuration: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  allRecordsRowStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  allRecordsRowStatusDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+  },
+  allRecordsRowStatusText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
   calendarModalCard: {
     flex: 1,
     maxWidth: '100%',
@@ -5570,6 +6260,26 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 13,
     lineHeight: 20,
+  },
+  selectedCriterionReasonSection: {
+    gap: 5,
+    paddingVertical: 4,
+  },
+  selectedCriterionReasonTitle: {
+    color: colors.textSoft,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  selectedCriterionReasonText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  selectedCriterionCorrectionText: {
+    color: '#d46d75',
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: '700',
   },
   selectedCriterionComparisonSummary: {
     color: colors.text,

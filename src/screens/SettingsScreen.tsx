@@ -559,7 +559,6 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   colorPanel: {
-    marginTop: 20,
     paddingTop: 16,
     backgroundColor: 'rgba(74,74,74,0.84)',
     borderTopLeftRadius: 18,
@@ -603,7 +602,6 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   trainingSection: {
-    marginTop: 22,
     paddingTop: 16,
     backgroundColor: 'rgba(74,74,74,0.84)',
     borderTopLeftRadius: 18,

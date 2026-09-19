@@ -3618,6 +3618,7 @@ function buildFrontWeakPointSummary(frontWeakPoint: FrontDribbleWeakPoint) {
 
 export function useBasketballCoachApp() {
   const [screen, setScreen] = useState<AppScreen>('home');
+  const [diaryEntryToken, setDiaryEntryToken] = useState(0);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [accounts, setAccounts] = useState<UserAccount[]>([]);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
@@ -3767,6 +3768,41 @@ export function useBasketballCoachApp() {
     () => lessonRecords.filter((record) => record.dateKey === todayKey).length,
     [lessonRecords, todayKey]
   );
+  const profileTrainingStats = useMemo(() => {
+    const sumRecordedCount = (records: Record<string, number>) =>
+      Object.values(records).reduce((total, value) => total + Math.max(0, Math.trunc(value)), 0);
+    const totalDribbleCount = sumRecordedCount(dailyDribbleRecords);
+    const totalShootAttemptCount = sumRecordedCount(shotAttemptRecords);
+    const totalShotSuccessCount = sumRecordedCount(shotSuccessRecords);
+    const recordedHandTotalsByDate = buildRecordedDribbleHandTotalsByDate(lessonRecords);
+    const dribbleBalanceDateKeys = new Set([...recordedHandTotalsByDate.keys(), ...Object.keys(homeworkState)]);
+    let totalLeftHandDribbleCount = 0;
+    let totalRightHandDribbleCount = 0;
+
+    for (const dateKey of dribbleBalanceDateKeys) {
+      const handTotals = getDiaryDribbleHandTotalsForDate(
+        dateKey,
+        homeworkState,
+        recordedHandTotalsByDate,
+        todayKey
+      );
+      totalLeftHandDribbleCount += handTotals.left;
+      totalRightHandDribbleCount += handTotals.right;
+    }
+
+    return {
+      lessonRecordCount: lessonRecords.length,
+      totalDribbleCount,
+      totalLeftHandDribbleCount,
+      totalRightHandDribbleCount,
+      totalShootAttemptCount,
+      totalShotSuccessCount,
+      overallShotSuccessRate:
+        totalShootAttemptCount > 0
+          ? Math.min(100, Math.round((totalShotSuccessCount / totalShootAttemptCount) * 100))
+          : 0,
+    };
+  }, [dailyDribbleRecords, homeworkState, lessonRecords, shotAttemptRecords, shotSuccessRecords, todayKey]);
   const homeworkTestState = useMemo<HomeworkTestState>(() => {
     const correctionTask = todayHomeworkState.correctionTask;
     const correctionDirection = correctionTask?.direction ?? 'none';
@@ -6258,6 +6294,7 @@ export function useBasketballCoachApp() {
       void startLessonCameraPreview();
     }
     if (nextScreen === 'diary') {
+      setDiaryEntryToken((current) => current + 1);
       const today = new Date();
       setCurrentDate(today);
       if (!selectedDateKey) {
@@ -7742,9 +7779,11 @@ export function useBasketballCoachApp() {
     authMode,
     currentUser,
     screen,
+    diaryEntryToken,
     lessonMode,
     homeworkToShow,
     homeworkTestState,
+    profileTrainingStats,
     currentDate,
     selectedDateKey,
     lessonRecords,

@@ -3,7 +3,7 @@ import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-nativ
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
 import { colors } from '../theme/colors';
-import type { AuthUser } from '../types/app';
+import type { AuthUser, ProfileTrainingStats } from '../types/app';
 
 interface ProfileActionResult {
   success: boolean;
@@ -12,6 +12,7 @@ interface ProfileActionResult {
 
 interface ProfileScreenProps {
   currentUser: AuthUser;
+  trainingStats: ProfileTrainingStats;
   onUpdateProfile: (values: {
     nickname: string;
   }) => Promise<ProfileActionResult>;
@@ -46,6 +47,7 @@ function ResetIcon() {
 
 export function ProfileScreen({
   currentUser,
+  trainingStats,
   onUpdateProfile,
   onChangePassword,
   onDeleteAccount,
@@ -67,6 +69,13 @@ export function ProfileScreen({
   const [profileStatus, setProfileStatus] = useState<StatusMessage | null>(null);
   const [passwordStatus, setPasswordStatus] = useState<StatusMessage | null>(null);
   const [deleteStatus, setDeleteStatus] = useState<StatusMessage | null>(null);
+  const totalTrackedHandDribbleCount = trainingStats.totalLeftHandDribbleCount + trainingStats.totalRightHandDribbleCount;
+  const leftHandDribbleBalanceWidth: `${number}%` = totalTrackedHandDribbleCount > 0
+    ? `${(trainingStats.totalLeftHandDribbleCount / totalTrackedHandDribbleCount) * 100}%`
+    : '0%';
+  const rightHandDribbleBalanceWidth: `${number}%` = totalTrackedHandDribbleCount > 0
+    ? `${(trainingStats.totalRightHandDribbleCount / totalTrackedHandDribbleCount) * 100}%`
+    : '0%';
 
   useEffect(() => {
     setNickname(currentUser.nickname);
@@ -168,6 +177,57 @@ export function ProfileScreen({
 
   return (
     <View style={styles.contentGap}>
+      <View style={styles.sectionBlock}>
+        <Card style={[styles.card, styles.activityCard]}>
+          <Text style={styles.activityGreeting}>{`안녕하세요. ${currentUser.nickname}님.`}</Text>
+          <Text style={styles.activityHello}>{`${currentUser.nickname}님의 활동은`}</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>레슨 기록 횟수</Text>
+              <Text style={styles.statValue}>{`${trainingStats.lessonRecordCount.toLocaleString()}회`}</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>총 드리블 횟수</Text>
+              <Text style={styles.statValue}>{`${trainingStats.totalDribbleCount.toLocaleString()}회`}</Text>
+            </View>
+            <View style={[styles.statItem, styles.statItemWide]}>
+              <Text style={styles.statLabel}>전체 드리블 균형</Text>
+              <View style={styles.dribbleBalanceLegendRow}>
+                <View style={styles.dribbleBalanceLegendItem}>
+                  <View style={[styles.dribbleBalanceLegendDot, styles.dribbleBalanceLegendDotLeft]} />
+                  <Text style={styles.dribbleBalanceLegendText}>{`왼손 ${trainingStats.totalLeftHandDribbleCount.toLocaleString()}회`}</Text>
+                </View>
+                <View style={styles.dribbleBalanceLegendItem}>
+                  <View style={[styles.dribbleBalanceLegendDot, styles.dribbleBalanceLegendDotRight]} />
+                  <Text style={styles.dribbleBalanceLegendText}>{`오른손 ${trainingStats.totalRightHandDribbleCount.toLocaleString()}회`}</Text>
+                </View>
+              </View>
+              <View style={styles.profileDribbleBalanceTrack}>
+                <View style={[styles.profileDribbleBalanceFill, styles.profileDribbleBalanceFillLeft, { width: leftHandDribbleBalanceWidth }]} />
+                <View style={[styles.profileDribbleBalanceFill, styles.profileDribbleBalanceFillRight, { width: rightHandDribbleBalanceWidth }]} />
+              </View>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>슛 시도 횟수</Text>
+              <Text style={styles.statValue}>{`${trainingStats.totalShootAttemptCount.toLocaleString()}회`}</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>슛 성공 횟수</Text>
+              <Text style={styles.statValue}>{`${trainingStats.totalShotSuccessCount.toLocaleString()}회`}</Text>
+            </View>
+            <View style={[styles.statItem, styles.statItemWide]}>
+              <View style={styles.statRateHeader}>
+                <Text style={styles.statLabel}>전체 슛 성공률</Text>
+                <Text style={styles.statValue}>{`${trainingStats.overallShotSuccessRate}%`}</Text>
+              </View>
+              <View style={styles.shotSuccessRateTrack}>
+                <View style={[styles.shotSuccessRateFill, { width: `${trainingStats.overallShotSuccessRate}%` }]} />
+              </View>
+            </View>
+          </View>
+        </Card>
+      </View>
+
       <View style={styles.sectionBlock}>
         <Text style={styles.sectionHeader}>사용자 정보</Text>
         <Card style={styles.card}>
@@ -389,6 +449,118 @@ const styles = StyleSheet.create({
   },
   card: {
     minHeight: 0,
+  },
+  activityCard: {
+    borderWidth: 0,
+  },
+  activityGreeting: {
+    color: colors.text,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '900',
+    marginBottom: 16,
+  },
+  activityHello: {
+    color: colors.textSoft,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  statItem: {
+    width: '48%',
+    minHeight: 84,
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: colors.surfaceStrong,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  statItemWide: {
+    width: '100%',
+    minHeight: 74,
+  },
+  statRateHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  shotSuccessRateTrack: {
+    width: '100%',
+    height: 12,
+    overflow: 'hidden',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  shotSuccessRateFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: '#76c987',
+  },
+  dribbleBalanceLegendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  dribbleBalanceLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dribbleBalanceLegendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+  },
+  dribbleBalanceLegendDotLeft: {
+    backgroundColor: '#76c987',
+  },
+  dribbleBalanceLegendDotRight: {
+    backgroundColor: '#79b7ec',
+  },
+  dribbleBalanceLegendText: {
+    color: colors.textSoft,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '800',
+  },
+  profileDribbleBalanceTrack: {
+    width: '100%',
+    height: 12,
+    overflow: 'hidden',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    flexDirection: 'row',
+  },
+  profileDribbleBalanceFill: {
+    height: '100%',
+  },
+  profileDribbleBalanceFillLeft: {
+    backgroundColor: '#76c987',
+  },
+  profileDribbleBalanceFillRight: {
+    backgroundColor: '#79b7ec',
+  },
+  statLabel: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
+  statValue: {
+    color: colors.text,
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '900',
   },
   lead: {
     color: colors.textMuted,

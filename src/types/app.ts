@@ -17,6 +17,16 @@ export interface AuthUser {
   nickname: string;
 }
 
+export interface ProfileTrainingStats {
+  lessonRecordCount: number;
+  totalDribbleCount: number;
+  totalLeftHandDribbleCount: number;
+  totalRightHandDribbleCount: number;
+  totalShootAttemptCount: number;
+  totalShotSuccessCount: number;
+  overallShotSuccessRate: number;
+}
+
 export interface AuthSession {
   userId: string;
   remoteToken?: string | null;

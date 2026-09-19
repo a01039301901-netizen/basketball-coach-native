@@ -603,6 +603,7 @@ export default function App() {
 
           {app.isReady && app.currentUser && app.screen === 'diary' && (
             <DiaryScreen
+              diaryEntryToken={app.diaryEntryToken}
               currentDate={app.currentDate}
               calendarCells={app.calendarCells}
               selectedDateKey={app.selectedDateKey}
@@ -617,7 +618,6 @@ export default function App() {
               onClearHomeworkLinkedDiaryContext={app.clearHomeworkLinkedDiaryContext}
               onGoBack={() => void app.navigateTo('home')}
               onToggleShotOutcome={app.toggleLessonRecordShotOutcome}
-              onToggleStarredRecord={app.toggleLessonRecordStarred}
               onRepairRecordThumbnail={app.repairLessonRecordThumbnail}
               onDeleteRecord={(recordId) => void app.deleteLessonRecord(recordId)}
             />
@@ -737,6 +737,7 @@ export default function App() {
                   {visibleDrawer === 'profile' ? (
                     <ProfileScreen
                       currentUser={app.currentUser!}
+                      trainingStats={app.profileTrainingStats}
                       onUpdateProfile={app.updateProfile}
                       onChangePassword={app.changePassword}
                       onDeleteAccount={app.deleteAccount}

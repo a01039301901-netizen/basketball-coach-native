@@ -517,7 +517,7 @@ export function HomeScreen({
                 <View style={styles.rulesCardContent}>
                   <View style={styles.rulesTextWrap}>
                     <Text style={styles.rulesTitle}>농구 가이드</Text>
-                    <Text style={styles.rulesText}>기본 규칙을 빠르게 확인할 수 있어요.</Text>
+                    <Text style={styles.rulesText}>이 앱을 어떻게 사용해야 할지 빠르게 확인할 수 있어요.</Text>
                   </View>
                   <Image source={rulesGuideIcon} resizeMode="contain" style={styles.rulesGuideIcon} />
                 </View>
