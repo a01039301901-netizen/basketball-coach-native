@@ -529,6 +529,7 @@ export default function App() {
                 onSelectMode={app.changeLessonMode}
                 onSelectDribbleView={app.setSelectedDribbleView}
                 onBeginLesson={(dribbleTargetCount, dribbleView) => void app.beginLesson(dribbleTargetCount, dribbleView)}
+                onRetryCamera={app.retryLessonCamera}
                 onEndLesson={() => void app.endLesson()}
                 onGoHome={() => void app.navigateTo('home')}
                 onPoseMessage={app.handlePoseMessage}
@@ -554,12 +555,6 @@ export default function App() {
           {!app.isReady && (
             <View style={styles.loadingCard}>
               <Text style={styles.loadingTitle}>앱을 준비하는 중입니다</Text>
-              <Text style={styles.loadingText}>
-                {app.startupStatusText || '초기 데이터를 불러오고 있습니다. 잠시만 기다려 주세요.'}
-              </Text>
-              <Text style={styles.loadingHint}>
-                이 화면이 계속 유지되면 저장된 로그인 상태를 초기화하고 로그인 화면으로 바로 이동할 수 있습니다.
-              </Text>
               <View style={styles.loadingActionRow}>
                 <SmallButton title="로그인 화면 바로 열기" onPress={() => void app.recoverStartupToLogin()} variant="dark" />
               </View>
@@ -583,9 +578,8 @@ export default function App() {
               homeworkToShow={app.homeworkToShow}
               lessonRecords={app.lessonRecords}
               onOpenLesson={(mode) => {
-                if (mode) {
-                  app.changeLessonMode(mode);
-                }
+                const nextMode = mode === 'dribble' || mode === 'shoot' ? mode : 'shoot';
+                app.changeLessonMode(nextMode);
                 void app.navigateTo('lesson');
               }}
               onOpenDiary={() => void app.navigateTo('diary')}
@@ -627,17 +621,8 @@ export default function App() {
             <SettingsScreen
               selectedBallBrand={app.selectedBallBrand}
               selectedBallColors={app.selectedBallColors}
-              ballRecognitionProfile={app.ballRecognitionProfile}
-              ballRecognitionPreviews={app.ballRecognitionPreviews}
-              isBallRecognitionTraining={app.isBallRecognitionTraining}
-              homeworkTestState={app.homeworkTestState}
               onSelectBallBrand={app.selectBallBrand}
               onToggleBallColor={app.toggleBallColor}
-              onTrainBallRecognitionFromCamera={() => void app.startBallRecognitionTrainingFromCamera()}
-              onTrainBallRecognitionFromLibrary={() => void app.startBallRecognitionTrainingFromLibrary()}
-              onTrainBallRecognitionFromUrls={(rawUrls) => void app.startBallRecognitionTrainingFromUrls(rawUrls)}
-              onResetBallRecognition={() => void app.resetBallRecognitionTraining()}
-              onApplyHomeworkTestState={app.applyHomeworkTestState}
             />
           )}
 
@@ -739,7 +724,6 @@ export default function App() {
                       currentUser={app.currentUser!}
                       trainingStats={app.profileTrainingStats}
                       onUpdateProfile={app.updateProfile}
-                      onChangePassword={app.changePassword}
                       onDeleteAccount={app.deleteAccount}
                       onLogout={() => {
                         setActiveDrawer(null);
@@ -751,17 +735,8 @@ export default function App() {
                       isDrawer
                       selectedBallBrand={app.selectedBallBrand}
                       selectedBallColors={app.selectedBallColors}
-                      ballRecognitionProfile={app.ballRecognitionProfile}
-                      ballRecognitionPreviews={app.ballRecognitionPreviews}
-                      isBallRecognitionTraining={app.isBallRecognitionTraining}
-                      homeworkTestState={app.homeworkTestState}
                       onSelectBallBrand={app.selectBallBrand}
                       onToggleBallColor={app.toggleBallColor}
-                      onTrainBallRecognitionFromCamera={() => void app.startBallRecognitionTrainingFromCamera()}
-                      onTrainBallRecognitionFromLibrary={() => void app.startBallRecognitionTrainingFromLibrary()}
-                      onTrainBallRecognitionFromUrls={(rawUrls) => void app.startBallRecognitionTrainingFromUrls(rawUrls)}
-                      onResetBallRecognition={() => void app.resetBallRecognitionTraining()}
-                      onApplyHomeworkTestState={app.applyHomeworkTestState}
                     />
                   )}
                 </View>
@@ -989,11 +964,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingsDrawerContent: {
+    flexGrow: 1,
     padding: 18,
     paddingBottom: 28,
     alignItems: 'center',
   },
   settingsDrawerInner: {
+    flex: 1,
     width: '100%',
     maxWidth: 760,
   },

@@ -12,6 +12,20 @@ const diaryCalendarArt = require('../../assets/diary-calendar-art.png');
 const lessonBallIcon = require('../../assets/lesson-basketball-icon.png');
 const diaryPencilIcon = require('../../assets/diary-pencil-icon.png');
 const rulesGuideIcon = require('../../assets/rules-guide-icon.png');
+const DAILY_HOMEWORK_INFO_TEXT =
+  '슛과 드리블 자세를 충분히 분석하기 위해서는 드리블 50회, 슛 20회가 필요해요. 하루 연습량을 채우고 기록일지에서 자세한 평가를 확인해보세요.';
+
+function getHomeworkExplanationSectionTitle(item: HomeworkProgressItem | null) {
+  if (item?.stage === 'base' && item.source === 'daily') {
+    return '하루 연습량';
+  }
+
+  if (item?.stage === 'balance_followup' || item?.source === 'dribble_balance') {
+    return '드리블 균형';
+  }
+
+  return '보충';
+}
 
 interface HomeScreenProps {
   homeworkToShow: HomeworkProgressItem[];
@@ -118,7 +132,7 @@ function HomeMenuButton({
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => onPress()}
       style={({ pressed }) => [
         styles.mainButtonWrap,
         isWide && styles.mainButtonWrapWide,
@@ -226,6 +240,7 @@ export function HomeScreen({
     selectedHomeworkReasonItem?.detailText?.trim() ||
     selectedHomeworkReasonSummary ||
     '이 숙제가 생성된 이유를 준비하고 있어요.';
+  const selectedHomeworkExplanationSectionTitle = getHomeworkExplanationSectionTitle(selectedHomeworkReasonItem);
   const shouldShowSelectedHomeworkSummaryProgress =
     selectedHomeworkReasonItem?.stage === 'base' && selectedHomeworkReasonItem?.source === 'daily';
   const selectedHomeworkBalanceGraph = selectedHomeworkReasonItem?.balanceGraph ?? null;
@@ -362,7 +377,7 @@ export function HomeScreen({
       accentSoft: '#ffe0bf',
       artworkType: 'lesson' as const,
       label: '실시간 분석',
-      title: 'AI에게 레슨 받기',
+      title: '레슨 받기',
       subtitle: undefined,
       onPress: onOpenLesson,
     },
@@ -381,11 +396,6 @@ export function HomeScreen({
   const additionalHomeworkItems = homeworkToShow.filter((item) => !(item.stage === 'base' && item.source === 'daily'));
   const firstDailyHomeworkItem = dailyHomeworkItems[0] ?? null;
   const remainingDailyHomeworkItems = firstDailyHomeworkItem ? dailyHomeworkItems.slice(1) : dailyHomeworkItems;
-  const dailyDribbleHomework = dailyHomeworkItems.find((item) => item.recommendedLessonMode === 'dribble');
-  const dailyShootHomework = dailyHomeworkItems.find((item) => item.recommendedLessonMode === 'shoot');
-  const combinedDailyHomeworkDescription = dailyDribbleHomework && dailyShootHomework
-    ? `오늘은 드리블과 슛을 함께 연습해 균형 잡힌 기록을 만들어요. ${dailyDribbleHomework.detailText?.trim() || dailyDribbleHomework.reasonText?.trim() || ''} ${dailyShootHomework.detailText?.trim() || dailyShootHomework.reasonText?.trim() || ''}`.trim()
-    : '';
 
   function renderHomeworkItem(item: HomeworkProgressItem) {
     return (
@@ -485,12 +495,6 @@ export function HomeScreen({
       ) : null}
 
       <View style={styles.homeworkBackgroundSection}>
-        <View pointerEvents="none" style={styles.homeworkBall}>
-          <View style={styles.homeworkBallSurface} />
-          <View style={styles.homeworkBallCenterSeam} />
-          <View style={[styles.homeworkBallCurve, styles.homeworkBallLeftCurve]} />
-          <View style={[styles.homeworkBallCurve, styles.homeworkBallRightCurve]} />
-        </View>
         <View style={styles.homeworkBackgroundContent}>
           <View style={styles.homeworkArcCard}>
             <View style={styles.homeworkList}>
@@ -536,13 +540,15 @@ export function HomeScreen({
         <View style={styles.reasonModalOverlay}>
           <Pressable style={styles.reasonModalBackdrop} onPress={() => setIsHomeworkInfoModalOpen(false)} />
           <View style={styles.reasonModalCard}>
-            <View style={styles.reasonModalHeader}>
-              <Text style={styles.reasonModalTitle}>숙제 설명</Text>
+            <View style={[styles.reasonModalHeader, styles.homeworkInfoModalHeader]}>
+              <View style={styles.reasonModalHeaderSideSpacer} />
+              <Text style={[styles.reasonModalTitle, styles.reasonModalHomeworkTitle]}>하루 연습량</Text>
               <Pressable
+                accessibilityLabel="숙제 설명 닫기"
                 onPress={() => setIsHomeworkInfoModalOpen(false)}
                 style={({ pressed }) => [styles.reasonModalCloseButton, pressed && styles.pressed]}
               >
-                <Text style={styles.reasonModalCloseButtonText}>닫기</Text>
+                <Text style={styles.homeworkInfoModalCloseIcon}>×</Text>
               </Pressable>
             </View>
             <ScrollView
@@ -550,15 +556,14 @@ export function HomeScreen({
               contentContainerStyle={styles.reasonModalScrollContent}
               showsVerticalScrollIndicator={false}
             >
-              {combinedDailyHomeworkDescription ? (
-                <View style={styles.homeworkInfoModalItem}>
-                  <Text style={styles.homeworkInfoModalItemTitle}>오늘의 기본 연습</Text>
-                  <Text style={styles.homeworkInfoModalItemText}>{combinedDailyHomeworkDescription}</Text>
-                </View>
-              ) : null}
+              <View style={styles.homeworkInfoModalItem}>
+                <Text style={styles.homeworkInfoModalItemText}>{DAILY_HOMEWORK_INFO_TEXT}</Text>
+              </View>
               {additionalHomeworkItems.map((item) => (
                 <View key={item.id} style={styles.homeworkInfoModalItem}>
-                  <Text style={styles.homeworkInfoModalItemTitle}>{item.title}</Text>
+                  <Text style={[styles.homeworkInfoModalItemTitle, styles.homeworkInfoModalItemSectionTitle]}>
+                    {getHomeworkExplanationSectionTitle(item)}
+                  </Text>
                   <Text style={styles.homeworkInfoModalItemText}>
                     {item.detailText?.trim() || item.reasonText?.trim() || '이 숙제를 위한 설명을 준비하고 있어요.'}
                   </Text>
@@ -578,13 +583,19 @@ export function HomeScreen({
         <View style={styles.reasonModalOverlay}>
           <Pressable style={styles.reasonModalBackdrop} onPress={closeHomeworkReasonModal} />
           <View style={styles.reasonModalCard}>
-            <View style={styles.reasonModalHeader}>
-              <Text style={styles.reasonModalTitle}>{selectedHomeworkReasonItem?.title}</Text>
+            <View style={[styles.reasonModalHeader, styles.reasonModalHomeworkHeader]}>
+              <View style={styles.reasonModalHeaderSideSpacer} />
+              <Text style={[styles.reasonModalTitle, styles.reasonModalHomeworkTitle]}>
+                {selectedHomeworkExplanationSectionTitle}
+              </Text>
               <Pressable
                 onPress={closeHomeworkReasonModal}
-                style={({ pressed }) => [styles.reasonModalCloseButton, pressed && styles.pressed]}
+                style={({ pressed }) => [
+                  styles.reasonModalCloseButton,
+                  pressed && styles.pressed,
+                ]}
               >
-                <Text style={styles.reasonModalCloseButtonText}>닫기</Text>
+                <Text style={styles.homeworkInfoModalCloseIcon}>×</Text>
               </Pressable>
             </View>
             <ScrollView
@@ -866,50 +877,6 @@ const styles = StyleSheet.create({
   homeworkBackgroundSection: {
     flex: 1,
     position: 'relative',
-  },
-  homeworkBall: {
-    position: 'absolute',
-    bottom: -24,
-    left: 0,
-    width: '100%',
-    aspectRatio: 2,
-    opacity: 0.52,
-    overflow: 'hidden',
-  },
-  homeworkBallSurface: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '100%',
-    aspectRatio: 1,
-    borderRadius: 999,
-    backgroundColor: '#c86628',
-  },
-  homeworkBallCenterSeam: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: '50%',
-    width: 8,
-    marginLeft: -4,
-    backgroundColor: colors.background,
-  },
-  homeworkBallCurve: {
-    position: 'absolute',
-    top: '-18%',
-    width: '82%',
-    height: '160%',
-    borderRadius: 999,
-  },
-  homeworkBallLeftCurve: {
-    left: '-50%',
-    borderRightWidth: 8,
-    borderRightColor: colors.background,
-  },
-  homeworkBallRightCurve: {
-    right: '-50%',
-    borderLeftWidth: 8,
-    borderLeftColor: colors.background,
   },
   homeworkBackgroundContent: {
     flex: 1,
@@ -1396,8 +1363,23 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontWeight: '800',
   },
+  reasonModalHomeworkHeader: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 28,
+    gap: 0,
+  },
+  reasonModalHomeworkTitle: {
+    flex: 1,
+    paddingHorizontal: 8,
+    textAlign: 'center',
+  },
   reasonModalCloseButton: {
     alignSelf: 'flex-start',
+  },
+  reasonModalHeaderSideSpacer: {
+    width: 28,
+    height: 28,
   },
   reasonModalCloseButtonText: {
     color: colors.textMuted,
@@ -1586,11 +1568,26 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceStrong,
     borderRadius: 14,
   },
+  homeworkInfoModalHeader: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 28,
+    gap: 0,
+  },
+  homeworkInfoModalCloseIcon: {
+    color: colors.textMuted,
+    fontSize: 28,
+    lineHeight: 28,
+    fontWeight: '500',
+  },
   homeworkInfoModalItemTitle: {
     color: colors.text,
     fontSize: 15,
     lineHeight: 21,
     fontWeight: '800',
+  },
+  homeworkInfoModalItemSectionTitle: {
+    textAlign: 'center',
   },
   homeworkInfoModalItemText: {
     color: colors.textSoft,

@@ -2,6 +2,7 @@
   "expo": {
     "name": "Basketball Coach AI",
     "slug": "basketball-coach-native",
+    "scheme": "basketball-coach-ai",
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/icon.png",

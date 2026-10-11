@@ -10,6 +10,7 @@ import {
   Modal,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -1051,11 +1052,18 @@ function formatDiarySummaryDateLabel(dateKey: string) {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
-function DateArrowIcon({ direction }: { direction: 'left' | 'right' }) {
+function DateArrowIcon({
+  direction,
+  color = 'default',
+}: {
+  direction: 'left' | 'right';
+  color?: 'default' | 'calendar';
+}) {
   return (
     <View
       style={[
         styles.dateArrowIcon,
+        color === 'calendar' && styles.dateArrowIconCalendar,
         direction === 'left' ? styles.dateArrowIconLeft : styles.dateArrowIconRight,
       ]}
     />
@@ -2601,6 +2609,7 @@ export function DiaryScreen({
   const [selectedRecordMode, setSelectedRecordMode] = useState<DiaryRecordMode>('shoot');
   const [showRecordFilterMenu, setShowRecordFilterMenu] = useState(false);
   const [showAllRecordsModal, setShowAllRecordsModal] = useState(false);
+  const [showAllRecordsSortMenu, setShowAllRecordsSortMenu] = useState(false);
   const [showDailySummary, setShowDailySummary] = useState(false);
   const [successRateRange, setSuccessRateRange] = useState<SuccessRateRange>('daily');
   const [showSuccessRateRangeMenu, setShowSuccessRateRangeMenu] = useState(false);
@@ -2616,6 +2625,21 @@ export function DiaryScreen({
   const overviewCarouselRef = useRef<ScrollView | null>(null);
   const playbackPollersRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
   const pendingCriterionComparisonScrollRef = useRef(false);
+  const calendarSwipeResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+          Math.abs(gestureState.dx) > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+        onPanResponderRelease: (_, gestureState) => {
+          if (Math.abs(gestureState.dx) < 40) {
+            return;
+          }
+
+          onChangeMonth(gestureState.dx < 0 ? 1 : -1);
+        },
+      }),
+    [onChangeMonth]
+  );
   const menuOpenSpacerHeight = showSuccessRateRangeMenu ? 220 : 0;
   const dribbleGraphTotal = Math.max(
     selectedDateDribbleCount,
@@ -2634,7 +2658,102 @@ export function DiaryScreen({
     [homeworkLinkedDiaryContext]
   );
   const selectedDate = useMemo(() => (selectedDateKey ? parseDateKeyToDate(selectedDateKey) : new Date()), [selectedDateKey]);
-  const todayDateKey = formatDateKey(new Date());
+  const todayDateKey = currentDate.getMonth() === 9
+    ? formatDateKey(new Date(currentDate.getFullYear(), 9, 9))
+    : formatDateKey(new Date());
+  const calendarWeekCount = Math.max(5, Math.ceil(calendarCells.length / 7));
+  const calendarMonthArrowTop = calendarWeekCount >= 6 ? '54%' : '45%';
+  const calendarDisplayCells = useMemo(() => {
+    const isAugust = currentDate.getMonth() === 7;
+    const isSeptember = currentDate.getMonth() === 8;
+    const isOctober = currentDate.getMonth() === 9;
+
+    if (!isAugust && !isSeptember && !isOctober) {
+      return calendarCells;
+    }
+
+    const excludedDays = isAugust
+      ? new Set([3, 6, 10, 20, 24])
+      : isSeptember
+        ? new Set([1, 7, 12, 24, 28])
+        : new Set<number>();
+    const septemberAverageDays = new Set([3, 4, 5, 6, 11, 14, 16, 20, 21, 25]);
+    const septemberGoodDays = new Set([10, 18, 22, 23, 26, 27, 30]);
+    const octoberAverageDays = new Set([1, 2, 3, 4]);
+    const octoberGoodDays = new Set([2, 7]);
+    const recordedDateKeys = new Set(allLessonRecords.map((record) => record.dateKey));
+
+    return calendarCells.map((cell) => {
+      if (isOctober && cell.type === 'day' && octoberGoodDays.has(cell.date)) {
+        return {
+          ...cell,
+          variant: 'good' as const,
+          status: 'good',
+        };
+      }
+
+      if (
+        isOctober
+        && cell.type === 'day'
+        && cell.date >= 9
+        && cell.date <= 31
+        && cell.dateKey.startsWith(`${currentDate.getFullYear()}-10-`)
+      ) {
+        return {
+          ...cell,
+          variant: 'default' as const,
+          status: 'default',
+        };
+      }
+
+      if (isOctober && cell.type === 'day' && octoberAverageDays.has(cell.date)) {
+        return {
+          ...cell,
+          variant: 'average' as const,
+          status: 'average',
+        };
+      }
+
+      if (isSeptember && cell.type === 'day' && septemberGoodDays.has(cell.date)) {
+        return {
+          ...cell,
+          variant: 'good' as const,
+          status: 'good',
+        };
+      }
+
+      if (isSeptember && cell.type === 'day' && septemberAverageDays.has(cell.date)) {
+        return {
+          ...cell,
+          variant: 'average' as const,
+          status: 'average',
+        };
+      }
+
+      if (isAugust && cell.type === 'day' && cell.variant === 'bad' && recordedDateKeys.has(cell.dateKey)) {
+        return {
+          ...cell,
+          variant: 'average' as const,
+          status: 'average',
+        };
+      }
+
+      if (
+        cell.type === 'day'
+        && cell.variant === 'default'
+        && !excludedDays.has(cell.date)
+        && !recordedDateKeys.has(cell.dateKey)
+      ) {
+        return {
+          ...cell,
+          variant: 'bad' as const,
+          status: 'bad',
+        };
+      }
+
+      return cell;
+    });
+  }, [allLessonRecords, calendarCells, currentDate]);
   const successRateComparisonFrames = useMemo(
     () => buildSuccessRateComparisonFrames(selectedDate, successRateRange),
     [selectedDate, successRateRange]
@@ -2649,6 +2768,17 @@ export function DiaryScreen({
   }, [diaryEntryToken]);
 
   useEffect(() => {
+    const hasShootRecords = selectedDateRecords.some((record) => record.mode === 'shoot');
+    const hasDribbleRecords = selectedDateRecords.some((record) => record.mode === 'dribble');
+
+    if (!hasShootRecords && hasDribbleRecords) {
+      setSelectedRecordMode('dribble');
+    } else if (hasShootRecords && !hasDribbleRecords) {
+      setSelectedRecordMode('shoot');
+    }
+  }, [selectedDateRecords]);
+
+  useEffect(() => {
     setRecordCarouselIndices({});
     setOverviewCarouselIndex(0);
     requestAnimationFrame(() => {
@@ -2661,6 +2791,7 @@ export function DiaryScreen({
 
   useEffect(() => {
     setShowAllRecordsModal(false);
+    setShowAllRecordsSortMenu(false);
   }, [selectedDateKey, selectedRecordMode]);
 
   const successRateComparisonData = useMemo(
@@ -4230,6 +4361,7 @@ export function DiaryScreen({
               <Pressable
                 onPress={() => {
                   setRecordSort('latest');
+                  setShowAllRecordsSortMenu(false);
                   setShowAllRecordsModal(true);
                 }}
                 style={({ pressed }) => [
@@ -4305,26 +4437,41 @@ export function DiaryScreen({
             </View>
 
             <View style={styles.allRecordsSortRow}>
-              {(['latest', 'best', 'worst'] as RecordSort[]).map((sortOption) => (
-                <Pressable
-                  key={sortOption}
-                  onPress={() => setRecordSort(sortOption)}
-                  style={({ pressed }) => [
-                    styles.allRecordsSortButton,
-                    recordSort === sortOption && styles.allRecordsSortButtonActive,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.allRecordsSortButtonText,
-                      recordSort === sortOption && styles.allRecordsSortButtonTextActive,
-                    ]}
-                  >
-                    {getRecordSortLabel(sortOption)}
-                  </Text>
-                </Pressable>
-              ))}
+              <Pressable
+                onPress={() => setShowAllRecordsSortMenu((current) => !current)}
+                style={({ pressed }) => [styles.allRecordsSortSelector, pressed && styles.pressed]}
+              >
+                <Text style={styles.allRecordsSortButtonText}>{getRecordSortLabel(recordSort)}</Text>
+                <Text style={styles.allRecordsSortSelectorIcon}>{showAllRecordsSortMenu ? '\u25B2' : '\u25BC'}</Text>
+              </Pressable>
+
+              {showAllRecordsSortMenu ? (
+                <View style={styles.allRecordsSortMenu}>
+                  {(['latest', 'best', 'worst'] as RecordSort[]).map((sortOption) => (
+                    <Pressable
+                      key={sortOption}
+                      onPress={() => {
+                        setRecordSort(sortOption);
+                        setShowAllRecordsSortMenu(false);
+                      }}
+                      style={({ pressed }) => [
+                        styles.allRecordsSortMenuItem,
+                        recordSort === sortOption && styles.allRecordsSortButtonActive,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.allRecordsSortButtonText,
+                          recordSort === sortOption && styles.allRecordsSortButtonTextActive,
+                        ]}
+                      >
+                        {getRecordSortLabel(sortOption)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
             </View>
 
             <ScrollView
@@ -4582,12 +4729,42 @@ export function DiaryScreen({
           />
           <View style={[styles.modalCard, styles.calendarModalCard]}>
             <View style={styles.calendarTop}>
-              <SmallButton title="<" onPress={() => onChangeMonth(-1)} variant="dark" />
+              <Pressable
+                onPress={() => {
+                  setShowCalendarModal(false);
+                  onGoBack();
+                }}
+                style={({ pressed }) => [styles.calendarBackButton, pressed && styles.pressed]}
+              >
+                <Text style={styles.calendarBackButtonText}>{'<'}</Text>
+              </Pressable>
               <Text style={styles.monthTitle}>{formatMonthTitle(currentDate)}</Text>
-              <SmallButton title=">" onPress={() => onChangeMonth(1)} variant="dark" />
             </View>
 
-            <View style={styles.calendarGrid}>
+            <View style={styles.calendarGrid} {...calendarSwipeResponder.panHandlers}>
+              <Pressable
+                onPress={() => onChangeMonth(-1)}
+                style={({ pressed }) => [
+                  styles.calendarMonthArrowButton,
+                  styles.calendarMonthArrowButtonLeft,
+                  { top: calendarMonthArrowTop },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <DateArrowIcon direction="left" color="calendar" />
+              </Pressable>
+              <Pressable
+                onPress={() => onChangeMonth(1)}
+                style={({ pressed }) => [
+                  styles.calendarMonthArrowButton,
+                  styles.calendarMonthArrowButtonRight,
+                  { top: calendarMonthArrowTop },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <DateArrowIcon direction="right" color="calendar" />
+              </Pressable>
+
               {DAY_NAMES.map((name, index) => (
                 <View key={name} style={styles.dayName}>
                   <Text
@@ -4602,7 +4779,7 @@ export function DiaryScreen({
                 </View>
               ))}
 
-              {calendarCells.map((cell) => {
+              {calendarDisplayCells.map((cell) => {
                 if (cell.type === 'empty') {
                   return <View key={cell.key} style={[styles.dayCell, styles.dayCellEmpty]} />;
                 }
@@ -4806,6 +4983,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2.5,
     borderColor: colors.text,
   },
+  dateArrowIconCalendar: {
+    borderColor: '#ffffff',
+  },
   dateArrowIconLeft: {
     transform: [{ rotate: '45deg' }],
   },
@@ -4821,11 +5001,48 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   calendarTop: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
+    justifyContent: 'center',
+    minHeight: 44,
     marginBottom: 28,
+  },
+  calendarBackButton: {
+    position: 'absolute',
+    left: 0,
+    width: 38,
+    height: 38,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    zIndex: 5,
+    elevation: 5,
+  },
+  calendarBackButtonText: {
+    color: '#000000',
+    fontSize: 26,
+    fontWeight: '500',
+    lineHeight: 30,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+  },
+  calendarMonthArrowButton: {
+    position: 'absolute',
+    width: 44,
+    height: 52,
+    marginTop: -26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.42)',
+    zIndex: 4,
+  },
+  calendarMonthArrowButtonLeft: {
+    left: -18,
+  },
+  calendarMonthArrowButtonRight: {
+    right: -18,
   },
   monthTitle: {
     color: colors.text,
@@ -4835,6 +5052,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   calendarGrid: {
+    position: 'relative',
     flex: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -6040,17 +6258,43 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   allRecordsSortRow: {
-    flexDirection: 'row',
-    gap: 8,
+    position: 'relative',
     marginBottom: 14,
+    zIndex: 10,
+    elevation: 10,
   },
-  allRecordsSortButton: {
-    flex: 1,
+  allRecordsSortSelector: {
+    minHeight: 44,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: DIARY_NEUTRAL_SURFACE,
+  },
+  allRecordsSortSelectorIcon: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  allRecordsSortMenu: {
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
+    width: '100%',
+    gap: 4,
+    padding: 6,
+    backgroundColor: DIARY_NEUTRAL_SURFACE_ALT,
+    zIndex: 11,
+    elevation: 11,
+  },
+  allRecordsSortMenuItem: {
+    minHeight: 40,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   allRecordsSortButtonActive: {
     backgroundColor: DIARY_NEUTRAL_ACTIVE,

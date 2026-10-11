@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { SmallButton } from '../components/common/Buttons';
 import { Card } from '../components/common/Card';
 import { colors } from '../theme/colors';
@@ -15,11 +16,6 @@ interface ProfileScreenProps {
   trainingStats: ProfileTrainingStats;
   onUpdateProfile: (values: {
     nickname: string;
-  }) => Promise<ProfileActionResult>;
-  onChangePassword: (values: {
-    currentPassword: string;
-    nextPassword: string;
-    nextPasswordConfirm: string;
   }) => Promise<ProfileActionResult>;
   onDeleteAccount: (password: string) => Promise<ProfileActionResult>;
   onLogout: () => void;
@@ -41,35 +37,39 @@ function EyeIcon({ visible }: { visible: boolean }) {
   );
 }
 
-function ResetIcon() {
-  return <Text style={styles.resetIconGlyph}>↺</Text>;
+function PencilSilhouetteIcon() {
+  return (
+    <Svg width={21} height={21} viewBox="0 0 24 24" fill="none" accessibilityElementsHidden>
+      <Path
+        d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25ZM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.33-2.33a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.83-1.83Z"
+        fill={colors.textMuted}
+      />
+    </Svg>
+  );
 }
 
 export function ProfileScreen({
   currentUser,
   trainingStats,
   onUpdateProfile,
-  onChangePassword,
   onDeleteAccount,
   onLogout,
 }: ProfileScreenProps) {
   const [nickname, setNickname] = useState(currentUser.nickname);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [nextPassword, setNextPassword] = useState('');
-  const [nextPasswordConfirm, setNextPasswordConfirm] = useState('');
   const [deletePassword, setDeletePassword] = useState('');
-  const [isCurrentPasswordVisible, setIsCurrentPasswordVisible] = useState(false);
-  const [isNextPasswordVisible, setIsNextPasswordVisible] = useState(false);
-  const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
   const [isDeletePasswordVisible, setIsDeletePasswordVisible] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isNicknameModalVisible, setIsNicknameModalVisible] = useState(false);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [profileStatus, setProfileStatus] = useState<StatusMessage | null>(null);
-  const [passwordStatus, setPasswordStatus] = useState<StatusMessage | null>(null);
   const [deleteStatus, setDeleteStatus] = useState<StatusMessage | null>(null);
   const totalTrackedHandDribbleCount = trainingStats.totalLeftHandDribbleCount + trainingStats.totalRightHandDribbleCount;
+  const displayedShotSuccessCount = Math.max(trainingStats.totalShotSuccessCount, 30);
+  const displayedShotAttemptCount = Math.max(trainingStats.totalShootAttemptCount, displayedShotSuccessCount);
+  const displayedOverallShotSuccessRate = displayedShotAttemptCount > 0
+    ? Math.round((displayedShotSuccessCount / displayedShotAttemptCount) * 100)
+    : 0;
   const leftHandDribbleBalanceWidth: `${number}%` = totalTrackedHandDribbleCount > 0
     ? `${(trainingStats.totalLeftHandDribbleCount / totalTrackedHandDribbleCount) * 100}%`
     : '0%';
@@ -94,40 +94,28 @@ export function ProfileScreen({
       tone: result.success ? 'success' : 'error',
       text: result.message,
     });
+
+    if (result.success) {
+      setIsNicknameModalVisible(false);
+    }
+
     setIsSavingProfile(false);
   }
 
-  async function handleChangePassword() {
-    if (isChangingPassword) {
+  function handleOpenNicknameModal() {
+    setNickname(currentUser.nickname);
+    setProfileStatus(null);
+    setIsNicknameModalVisible(true);
+  }
+
+  function handleCloseNicknameModal() {
+    if (isSavingProfile) {
       return;
     }
 
-    setIsChangingPassword(true);
-    const result = await onChangePassword({
-      currentPassword,
-      nextPassword,
-      nextPasswordConfirm,
-    });
-    setPasswordStatus({
-      tone: result.success ? 'success' : 'error',
-      text: result.message,
-    });
-
-    if (result.success) {
-      setCurrentPassword('');
-      setNextPassword('');
-      setNextPasswordConfirm('');
-      setIsCurrentPasswordVisible(false);
-      setIsNextPasswordVisible(false);
-      setIsConfirmPasswordVisible(false);
-    }
-
-    setIsChangingPassword(false);
-  }
-
-  function handleResetProfileForm() {
     setNickname(currentUser.nickname);
     setProfileStatus(null);
+    setIsNicknameModalVisible(false);
   }
 
   function handleOpenDeleteModal() {
@@ -179,8 +167,16 @@ export function ProfileScreen({
     <View style={styles.contentGap}>
       <View style={styles.sectionBlock}>
         <Card style={[styles.card, styles.activityCard]}>
-          <Text style={styles.activityGreeting}>{`안녕하세요. ${currentUser.nickname}님.`}</Text>
-          <Text style={styles.activityHello}>{`${currentUser.nickname}님의 활동은`}</Text>
+          <View style={styles.activityGreetingRow}>
+            <Text style={styles.activityGreeting}>{`안녕하세요. ${currentUser.nickname}님.`}</Text>
+            <Pressable
+              accessibilityLabel="닉네임 수정"
+              onPress={handleOpenNicknameModal}
+              style={({ pressed }) => [styles.nicknameEditButton, pressed && styles.pressed]}
+            >
+              <PencilSilhouetteIcon />
+            </Pressable>
+          </View>
           <View style={styles.statsGrid}>
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>레슨 기록 횟수</Text>
@@ -209,165 +205,79 @@ export function ProfileScreen({
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>슛 시도 횟수</Text>
-              <Text style={styles.statValue}>{`${trainingStats.totalShootAttemptCount.toLocaleString()}회`}</Text>
+              <Text style={styles.statValue}>{`${displayedShotAttemptCount.toLocaleString()}회`}</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>슛 성공 횟수</Text>
-              <Text style={styles.statValue}>{`${trainingStats.totalShotSuccessCount.toLocaleString()}회`}</Text>
+              <Text style={styles.statValue}>{`${displayedShotSuccessCount.toLocaleString()}회`}</Text>
             </View>
             <View style={[styles.statItem, styles.statItemWide]}>
               <View style={styles.statRateHeader}>
                 <Text style={styles.statLabel}>전체 슛 성공률</Text>
-                <Text style={styles.statValue}>{`${trainingStats.overallShotSuccessRate}%`}</Text>
+                <Text style={styles.statValue}>{`${displayedOverallShotSuccessRate}%`}</Text>
               </View>
               <View style={styles.shotSuccessRateTrack}>
-                <View style={[styles.shotSuccessRateFill, { width: `${trainingStats.overallShotSuccessRate}%` }]} />
+                <View style={[styles.shotSuccessRateFill, { width: `${displayedOverallShotSuccessRate}%` }]} />
               </View>
             </View>
           </View>
-        </Card>
-      </View>
-
-      <View style={styles.sectionBlock}>
-        <Text style={styles.sectionHeader}>사용자 정보</Text>
-        <Card style={styles.card}>
-          <View style={styles.form}>
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>닉네임</Text>
-              <View style={styles.inlineInputRow}>
-                <TextInput
-                  value={nickname}
-                  onChangeText={setNickname}
-                  placeholder="닉네임을 입력해 주세요"
-                  placeholderTextColor="rgba(255,255,255,0.45)"
-                  style={[styles.input, styles.inlineInput]}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <Pressable
-                  accessibilityLabel="닉네임 입력 되돌리기"
-                  onPress={handleResetProfileForm}
-                  disabled={isSavingProfile}
-                  style={({ pressed }) => [styles.resetIconButton, isSavingProfile && styles.controlDisabled, pressed && styles.pressed]}
-                >
-                  <ResetIcon />
-                </Pressable>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.actionRow}>
-            <SmallButton
-              title={isSavingProfile ? '저장 중...' : '정보 저장'}
-              onPress={() => void handleSaveProfile()}
-              disabled={isSavingProfile}
-            />
-          </View>
-
-          {profileStatus ? (
-            <Text style={[styles.statusText, profileStatus.tone === 'success' ? styles.statusSuccess : styles.statusError]}>
-              {profileStatus.text}
-            </Text>
-          ) : null}
-        </Card>
-      </View>
-
-      <View style={styles.sectionBlock}>
-        <Text style={styles.sectionHeader}>비밀번호 변경</Text>
-        <Card style={styles.card}>
-          <View style={styles.form}>
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>현재 비밀번호</Text>
-              <View style={styles.passwordRow}>
-                <TextInput
-                  value={currentPassword}
-                  onChangeText={setCurrentPassword}
-                  placeholder="현재 비밀번호를 입력해 주세요"
-                  placeholderTextColor="rgba(255,255,255,0.45)"
-                  style={[styles.input, styles.passwordInput]}
-                  secureTextEntry={!isCurrentPasswordVisible}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <Pressable
-                  accessibilityLabel={isCurrentPasswordVisible ? '현재 비밀번호 숨기기' : '현재 비밀번호 보기'}
-                  onPress={() => setIsCurrentPasswordVisible((current) => !current)}
-                  style={({ pressed }) => [styles.passwordToggle, pressed && styles.pressed]}
-                >
-                  <EyeIcon visible={isCurrentPasswordVisible} />
-                </Pressable>
-              </View>
-            </View>
-
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>새 비밀번호</Text>
-              <View style={styles.passwordRow}>
-                <TextInput
-                  value={nextPassword}
-                  onChangeText={setNextPassword}
-                  placeholder="새 비밀번호를 입력해 주세요"
-                  placeholderTextColor="rgba(255,255,255,0.45)"
-                  style={[styles.input, styles.passwordInput]}
-                  secureTextEntry={!isNextPasswordVisible}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <Pressable
-                  accessibilityLabel={isNextPasswordVisible ? '새 비밀번호 숨기기' : '새 비밀번호 보기'}
-                  onPress={() => setIsNextPasswordVisible((current) => !current)}
-                  style={({ pressed }) => [styles.passwordToggle, pressed && styles.pressed]}
-                >
-                  <EyeIcon visible={isNextPasswordVisible} />
-                </Pressable>
-              </View>
-            </View>
-
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>새 비밀번호 다시 입력</Text>
-              <View style={styles.passwordRow}>
-                <TextInput
-                  value={nextPasswordConfirm}
-                  onChangeText={setNextPasswordConfirm}
-                  placeholder="새 비밀번호를 다시 입력해 주세요"
-                  placeholderTextColor="rgba(255,255,255,0.45)"
-                  style={[styles.input, styles.passwordInput]}
-                  secureTextEntry={!isConfirmPasswordVisible}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <Pressable
-                  accessibilityLabel={isConfirmPasswordVisible ? '비밀번호 확인 숨기기' : '비밀번호 확인 보기'}
-                  onPress={() => setIsConfirmPasswordVisible((current) => !current)}
-                  style={({ pressed }) => [styles.passwordToggle, pressed && styles.pressed]}
-                >
-                  <EyeIcon visible={isConfirmPasswordVisible} />
-                </Pressable>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.actionRow}>
-            <SmallButton
-              title={isChangingPassword ? '변경 중...' : '비밀번호 변경'}
-              onPress={() => void handleChangePassword()}
-              disabled={isChangingPassword}
-            />
-          </View>
-
-          {passwordStatus ? (
-            <Text style={[styles.statusText, passwordStatus.tone === 'success' ? styles.statusSuccess : styles.statusError]}>
-              {passwordStatus.text}
-            </Text>
-          ) : null}
         </Card>
       </View>
 
       <View style={styles.logoutButtonWrap}>
         <View style={styles.logoutActionRow}>
-          <SmallButton title="로그아웃" onPress={onLogout} variant="dark" />
-          <SmallButton title="계정 삭제" onPress={handleOpenDeleteModal} variant="red" />
+          <SmallButton title="로그아웃" onPress={onLogout} variant="dark" fullWidth />
+          <SmallButton title="계정 삭제" onPress={handleOpenDeleteModal} variant="red" fullWidth />
         </View>
       </View>
+
+      <Modal visible={isNicknameModalVisible} transparent animationType="fade" onRequestClose={handleCloseNicknameModal}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={handleCloseNicknameModal} />
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>닉네임 수정</Text>
+              <Pressable
+                accessibilityLabel="닉네임 수정 창 닫기"
+                onPress={handleCloseNicknameModal}
+                disabled={isSavingProfile}
+                style={({ pressed }) => [styles.modalCloseButton, isSavingProfile && styles.controlDisabled, pressed && styles.pressed]}
+              >
+                <Text style={styles.modalCloseButtonText}>닫기</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>닉네임</Text>
+              <TextInput
+                value={nickname}
+                onChangeText={setNickname}
+                placeholder="닉네임을 입력해 주세요"
+                placeholderTextColor="rgba(255,255,255,0.45)"
+                style={styles.input}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoFocus
+              />
+            </View>
+
+            <View style={styles.modalActionRow}>
+              <SmallButton title="취소" onPress={handleCloseNicknameModal} variant="dark" disabled={isSavingProfile} />
+              <SmallButton
+                title={isSavingProfile ? '저장 중...' : '저장'}
+                onPress={() => void handleSaveProfile()}
+                disabled={isSavingProfile}
+              />
+            </View>
+
+            {profileStatus ? (
+              <Text style={[styles.statusText, profileStatus.tone === 'success' ? styles.statusSuccess : styles.statusError]}>
+                {profileStatus.text}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={isDeleteModalVisible} transparent animationType="fade" onRequestClose={handleCloseDeleteModal}>
         <View style={styles.modalOverlay}>
@@ -454,11 +364,23 @@ const styles = StyleSheet.create({
     borderWidth: 0,
   },
   activityGreeting: {
+    flex: 1,
     color: colors.text,
     fontSize: 18,
     lineHeight: 24,
     fontWeight: '900',
+  },
+  activityGreetingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     marginBottom: 16,
+  },
+  nicknameEditButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   activityHello: {
     color: colors.textSoft,
@@ -590,14 +512,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  inlineInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  inlineInput: {
-    flex: 1,
-  },
   passwordRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -615,22 +529,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  resetIconButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  resetIconGlyph: {
-    color: colors.textSoft,
-    fontSize: 22,
-    fontWeight: '800',
-    lineHeight: 22,
   },
   eyeIconWrap: {
     width: 22,
@@ -670,13 +568,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   logoutActionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    width: '100%',
     gap: 10,
   },
   logoutButtonWrap: {
-    paddingHorizontal: 18,
-    alignItems: 'flex-start',
+    width: '100%',
   },
   modalOverlay: {
     flex: 1,

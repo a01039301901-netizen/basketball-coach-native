@@ -3771,7 +3771,6 @@ export function useBasketballCoachApp() {
   const profileTrainingStats = useMemo(() => {
     const sumRecordedCount = (records: Record<string, number>) =>
       Object.values(records).reduce((total, value) => total + Math.max(0, Math.trunc(value)), 0);
-    const totalDribbleCount = sumRecordedCount(dailyDribbleRecords);
     const totalShootAttemptCount = sumRecordedCount(shotAttemptRecords);
     const totalShotSuccessCount = sumRecordedCount(shotSuccessRecords);
     const recordedHandTotalsByDate = buildRecordedDribbleHandTotalsByDate(lessonRecords);
@@ -3789,6 +3788,7 @@ export function useBasketballCoachApp() {
       totalLeftHandDribbleCount += handTotals.left;
       totalRightHandDribbleCount += handTotals.right;
     }
+    const totalDribbleCount = totalLeftHandDribbleCount + totalRightHandDribbleCount;
 
     return {
       lessonRecordCount: lessonRecords.length,
@@ -4502,6 +4502,11 @@ export function useBasketballCoachApp() {
       return;
     }
 
+    // A manual login also loads account data, but it must never be treated as a stalled app startup.
+    if (isAuthReady) {
+      return;
+    }
+
     const timeout = setTimeout(() => {
       if (startupRecoveryTriggeredRef.current) {
         return;
@@ -5018,17 +5023,13 @@ export function useBasketballCoachApp() {
   }, []);
 
   const ensureStartCueSound = useCallback(async () => {
-    if (Platform.OS === 'web') {
-      return null;
-    }
-
     if (startCueSoundRef.current) {
       return startCueSoundRef.current;
     }
 
     await ensureAudioPlaybackMode();
 
-    const sound = createAudioPlayer(require('../../assets/sounds/whistle-start.wav'));
+    const sound = createAudioPlayer(require('../../assets/sounds/sports-referee-whistle.mp3'));
     startCueSoundRef.current = sound;
     return sound;
   }, [ensureAudioPlaybackMode]);
@@ -5154,43 +5155,6 @@ export function useBasketballCoachApp() {
   const playStartCue = useCallback(() => {
     void (async () => {
       try {
-        if (Platform.OS === 'web') {
-          const context = await ensureWebStartCueContext();
-
-          if (context) {
-            const now = context.currentTime;
-            const oscillator = context.createOscillator();
-            const gain = context.createGain();
-            const vibrato = context.createOscillator();
-            const vibratoGain = context.createGain();
-            const whistleDuration = 0.7;
-
-            oscillator.type = 'square';
-            oscillator.frequency.setValueAtTime(2200, now);
-            oscillator.frequency.exponentialRampToValueAtTime(1760, now + whistleDuration);
-
-            vibrato.type = 'sine';
-            vibrato.frequency.setValueAtTime(18, now);
-            vibratoGain.gain.setValueAtTime(80, now);
-
-            gain.gain.setValueAtTime(0.0001, now);
-            gain.gain.exponentialRampToValueAtTime(0.18, now + 0.02);
-            gain.gain.setValueAtTime(0.18, now + whistleDuration - 0.16);
-            gain.gain.exponentialRampToValueAtTime(0.0001, now + whistleDuration);
-
-            vibrato.connect(vibratoGain);
-            vibratoGain.connect(oscillator.frequency);
-            oscillator.connect(gain);
-            gain.connect(context.destination);
-
-            oscillator.start(now);
-            vibrato.start(now);
-            oscillator.stop(now + whistleDuration);
-            vibrato.stop(now + whistleDuration);
-            return;
-          }
-        }
-
         const sound = await ensureStartCueSound();
         if (sound) {
           await sound.seekTo(0);
@@ -5200,7 +5164,7 @@ export function useBasketballCoachApp() {
         // Keep the lesson flow running even if the cue sound fails.
       }
     })();
-  }, [ensureStartCueSound, ensureWebStartCueContext]);
+  }, [ensureStartCueSound]);
 
   const playLessonCompletionCueOnce = useCallback(() => {
     if (lessonCompletionCuePlayedRef.current) {
@@ -6771,6 +6735,17 @@ export function useBasketballCoachApp() {
     return true;
   }
 
+  function retryLessonCamera() {
+    if (!isCameraActive || isCameraPreviewHidden || cameraStopMode !== null) {
+      return;
+    }
+
+    setCameraError('');
+    setIsCameraReady(false);
+    setCameraSessionKey((current) => current + 1);
+    setDebugText('카메라 연결을 다시 시도하고 있습니다.');
+  }
+
   async function beginLesson(dribbleTargetCount?: number, dribbleView?: DribbleLessonView) {
     if (
       isLessonActive
@@ -7049,6 +7024,7 @@ export function useBasketballCoachApp() {
     async (videoUri: string) => {
       clearRecordingWait();
       pendingShootReviewRef.current = false;
+      playLessonCompletionCueOnce();
 
       const finalAnalysis = selectRepresentativeShootAnalysis(
         shootAnalysisHistoryRef.current,
@@ -7102,6 +7078,7 @@ export function useBasketballCoachApp() {
       celebrateHomeworkCompletion,
       clearRecordingWait,
       recordDailyShootAttempt,
+      playLessonCompletionCueOnce,
       resetShootAnalysisTracking,
       saveLessonRecord,
       setImmediateLessonFeedback,
@@ -7837,6 +7814,7 @@ export function useBasketballCoachApp() {
     navigateTo,
     changeLessonMode,
     beginLesson,
+    retryLessonCamera,
     endLesson,
     handlePoseMessage,
     toggleCurrentShootRecordStar,

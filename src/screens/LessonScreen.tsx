@@ -56,6 +56,7 @@ interface LessonScreenProps {
   onSelectMode: (mode: LessonMode) => void;
   onSelectDribbleView: (view: DribbleLessonView) => void;
   onBeginLesson: (dribbleTargetCount?: number, dribbleView?: DribbleLessonView) => void;
+  onRetryCamera: () => void;
   onEndLesson: () => void;
   onGoHome: () => void;
   onPoseMessage: (event: WebViewMessageEvent) => void;
@@ -135,7 +136,15 @@ function CameraUtilityRoundButton({
       {icon === 'camera-switch' ? (
         <Image source={CAMERA_SWITCH_ICON} resizeMode="contain" style={styles.cameraSwitchIcon} />
       ) : (
-        <Text style={[styles.utilityRoundButtonText, label === '<' && styles.utilityRoundButtonBackText]}>{label}</Text>
+        <Text
+          style={[
+            styles.utilityRoundButtonText,
+            label === '<' && styles.utilityRoundButtonBackText,
+            label === '카메라 다시 연결' && styles.utilityRoundButtonRetryText,
+          ]}
+        >
+          {label === '카메라 다시 연결' ? '카메라\n다시 연결' : label}
+        </Text>
       )}
     </Pressable>
   );
@@ -413,6 +422,7 @@ export function LessonScreen({
   onSelectMode,
   onSelectDribbleView,
   onBeginLesson,
+  onRetryCamera,
   onEndLesson,
   onGoHome,
   onPoseMessage,
@@ -671,6 +681,7 @@ export function LessonScreen({
   const isRoundLessonControlActive = isLessonActive || cameraStopMode !== null;
   const canChangeLessonMode = !isLessonSessionBusy;
   const canSwitchCamera = isCameraActive && isCameraReady && !isCameraPreviewHidden && cameraStopMode === null;
+  const shouldShowCameraReconnect = isCameraActive && !isCameraReady && !isCameraPreviewHidden && cameraStopMode === null;
   const shouldShowRealtimeCoaching = isLessonActive;
   const floatingCoachingFrame = isLandscapeMobileLayout
     ? {
@@ -915,13 +926,17 @@ export function LessonScreen({
           <View pointerEvents="box-none" style={styles.landscapeShutterDock}>
             <CameraUtilityRoundButton label="<" accessibilityLabel="뒤로 가기" onPress={onGoHome} />
             <CameraShutterButton active={isRoundLessonControlActive} onPress={isRoundLessonControlActive ? onEndLesson : openLessonStart} />
-            <CameraUtilityRoundButton
-              label=""
-              icon="camera-switch"
-              accessibilityLabel="앞뒤 카메라 전환"
-              disabled={!canSwitchCamera}
-              onPress={switchCamera}
-            />
+            {shouldShowCameraReconnect ? (
+              <CameraUtilityRoundButton label="카메라 다시 연결" accessibilityLabel="카메라 다시 연결" onPress={onRetryCamera} />
+            ) : (
+              <CameraUtilityRoundButton
+                label=""
+                icon="camera-switch"
+                accessibilityLabel="앞뒤 카메라 전환"
+                disabled={!canSwitchCamera}
+                onPress={switchCamera}
+              />
+            )}
           </View>
         ) : (
           <View style={[styles.bottomControlsStack, isWideLayout ? styles.bottomControlsStackWide : null]}>
@@ -935,13 +950,17 @@ export function LessonScreen({
               </View>
 
               <View style={styles.captureSideSlot}>
-                <CameraUtilityRoundButton
-                  label=""
-                  icon="camera-switch"
-                  accessibilityLabel="앞뒤 카메라 전환"
-                  disabled={!canSwitchCamera}
-                  onPress={switchCamera}
-                />
+                {shouldShowCameraReconnect ? (
+                  <CameraUtilityRoundButton label="카메라 다시 연결" accessibilityLabel="카메라 다시 연결" onPress={onRetryCamera} />
+                ) : (
+                  <CameraUtilityRoundButton
+                    label=""
+                    icon="camera-switch"
+                    accessibilityLabel="앞뒤 카메라 전환"
+                    disabled={!canSwitchCamera}
+                    onPress={switchCamera}
+                  />
+                )}
               </View>
             </View>
           </View>
@@ -1592,6 +1611,11 @@ const styles = StyleSheet.create({
     fontSize: 30,
     lineHeight: 34,
     marginTop: -4,
+  },
+  utilityRoundButtonRetryText: {
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
   },
   overlayUtilityButton: {
     minWidth: 88,

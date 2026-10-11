@@ -12,6 +12,7 @@ interface SmallButtonProps {
   onPress: () => void;
   variant?: 'orange' | 'red' | 'dark';
   disabled?: boolean;
+  fullWidth?: boolean;
 }
 
 export function PrimaryButton({ title, subtitle, onPress }: PrimaryButtonProps) {
@@ -23,13 +24,14 @@ export function PrimaryButton({ title, subtitle, onPress }: PrimaryButtonProps) 
   );
 }
 
-export function SmallButton({ title, onPress, variant = 'orange', disabled = false }: SmallButtonProps) {
+export function SmallButton({ title, onPress, variant = 'orange', disabled = false, fullWidth = false }: SmallButtonProps) {
   return (
     <Pressable
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.smallButton,
+        fullWidth && styles.smallButtonFullWidth,
         variant === 'red' && styles.redButton,
         variant === 'dark' && styles.darkButton,
         disabled && styles.disabled,
@@ -69,6 +71,10 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  smallButtonFullWidth: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
   },
   redButton: {
     backgroundColor: colors.danger,
